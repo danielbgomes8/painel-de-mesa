@@ -96,6 +96,17 @@ alter table public.characters   enable row level security;
 alter table public.combat_state enable row level security;
 alter table public.dm_notes     enable row level security;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Grants — RLS sozinho não basta. Com "Automatically expose new tables"
+-- desligado na criação do projeto (recomendação do próprio Supabase), tabela
+-- nova não ganha privilégio nenhum pros papéis do Data API; sem isso o
+-- Postgres barra antes de sequer avaliar a policy de RLS.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.rooms, public.characters,
+  public.combat_state, public.dm_notes to anon, authenticated;
+
 do $$
 declare
   t text;
