@@ -29,6 +29,13 @@ function ler(sala: string): Identidade | null {
 let cacheSala: string | null = null;
 let cacheCru: string | null = null;
 let cacheValor: Identidade | null = null;
+// Flag separada de invalidação: `cacheCru` por si só não dá pra usar como
+// sentinela de "precisa recalcular", porque `null` também é um valor CRU
+// legítimo (é o que `localStorage.getItem` devolve depois de um `trocar` —
+// ou seja, depois de limparIdentidade). Sem essa flag, invalidar setando só
+// `cacheCru = null` batia com esse `null` legítimo e devolvia o valor velho
+// do cache — o botão "trocar" parecia não fazer nada.
+let cacheValido = false;
 
 function snapshot(sala: string): Identidade | null {
   let cru: string | null = null;
@@ -37,17 +44,18 @@ function snapshot(sala: string): Identidade | null {
   } catch {
     cru = null;
   }
-  if (sala === cacheSala && cru === cacheCru) return cacheValor;
+  if (cacheValido && sala === cacheSala && cru === cacheCru) return cacheValor;
   cacheSala = sala;
   cacheCru = cru;
   cacheValor = ler(sala);
+  cacheValido = true;
   return cacheValor;
 }
 
 const ouvintes = new Set<() => void>();
 
 function avisar() {
-  cacheCru = null; // força recomputar no próximo getSnapshot
+  cacheValido = false; // força recomputar no próximo getSnapshot
   for (const fn of ouvintes) fn();
 }
 
