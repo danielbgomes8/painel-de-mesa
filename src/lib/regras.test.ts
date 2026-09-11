@@ -15,6 +15,7 @@ import {
   limitarExaustao,
   limitarPV,
   mensagemAjustePV,
+  mensagemCondicao,
   mensagemDanoAbsorvido,
   nomeExibidoIniciativa,
   numerarNpcsNaOrdem,
@@ -96,6 +97,11 @@ describe("PV temporário", () => {
     expect(mensagemDanoAbsorvido("Tibério", 3)).toBe(
       "Tibério sofreu 3 de dano, todo absorvido pelo PV temporário",
     );
+  });
+
+  it("mensagem de condição ligada/desligada", () => {
+    expect(mensagemCondicao("Tibério", "Amedrontado", true)).toBe("Tibério ficou Amedrontado");
+    expect(mensagemCondicao("Tibério", "Amedrontado", false)).toBe("Tibério não está mais Amedrontado");
   });
 });
 

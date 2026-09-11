@@ -78,6 +78,11 @@ export function mensagemDanoAbsorvido(nome: string, absorvidoPeloTemp: number): 
   return `${nome} sofreu ${absorvidoPeloTemp} de dano, todo absorvido pelo PV temporário`;
 }
 
+/** Frase pro log quando uma condição é ligada/desligada (ações em massa ou card). */
+export function mensagemCondicao(nome: string, condicao: string, ligou: boolean): string {
+  return ligou ? `${nome} ficou ${condicao}` : `${nome} não está mais ${condicao}`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exaustão (D&D 2024: trilha única 0–6)
 // ─────────────────────────────────────────────────────────────────────────────

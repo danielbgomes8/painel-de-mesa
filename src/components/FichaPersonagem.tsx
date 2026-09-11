@@ -21,6 +21,7 @@ import {
   limitarPV,
   limitarTesteMorte,
   mensagemAjustePV,
+  mensagemCondicao,
   mensagemDanoAbsorvido,
   situacaoMorte,
   TESTES_MORTE_MAX,
@@ -381,6 +382,7 @@ export function FichaPersonagem({
                     const cond_prazo = { ...p.cond_prazo };
                     if (!ligar) delete cond_prazo[nome];
                     patch({ cond: { ...p.cond, [nome]: ligar }, cond_prazo });
+                    sala.registrarLog(mensagemCondicao(p.name, nome, ligar));
                   }}
                 >
                   {nome}
