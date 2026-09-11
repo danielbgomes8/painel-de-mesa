@@ -25,3 +25,4 @@
 # cache do typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*
