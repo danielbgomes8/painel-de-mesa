@@ -141,7 +141,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       {abaEfetiva === "diario" && <DiarioCampanha sala={sala} souMestre={souMestre} />}
 
-      {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} souMestre={souMestre} />}
+      {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} />}
 
       {abaEfetiva === "combate" && (
         <>

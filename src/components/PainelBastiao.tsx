@@ -18,8 +18,8 @@ import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 
 /** Painel do Bastião (DMG 2024, cap. 8) — um só, compartilhado pela mesa;
- *  só o Mestre mexe, os jogadores acompanham (mesmo padrão do Diário). */
-export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: boolean }) {
+ *  é recurso do grupo, então Mestre e jogadores mexem igual. */
+export function PainelBastiao({ sala }: { sala: Sala }) {
   const { bastiao, instalacoesBastiao: instalacoes } = sala;
   const especiais = instalacoes.filter((i) => i.categoria === "especial");
   const basicas = instalacoes.filter((i) => i.categoria === "basica");
@@ -41,27 +41,17 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
       </div>
 
       <div className="combatctrls" style={{ marginBottom: 14 }}>
-        {souMestre && (
-          <button type="button" className="btn primary" onClick={avancarTurno}>
-            Próximo turno →
-          </button>
-        )}
+        <button type="button" className="btn primary" onClick={avancarTurno}>
+          Próximo turno →
+        </button>
         <span className="bastiaostat">
           Tesouro{" "}
-          {souMestre ? (
-            <CampoNumero className="campnum" valor={bastiao.tesouro_po} onCommit={(n) => sala.definirBastiao({ tesouro_po: Math.max(0, n) })} />
-          ) : (
-            <b>{bastiao.tesouro_po}</b>
-          )}{" "}
+          <CampoNumero className="campnum" valor={bastiao.tesouro_po} onCommit={(n) => sala.definirBastiao({ tesouro_po: Math.max(0, n) })} />{" "}
           PO
         </span>
         <span className="bastiaostat">
           Defensores{" "}
-          {souMestre ? (
-            <CampoNumero className="campnum" valor={bastiao.defensores} onCommit={(n) => sala.definirBastiao({ defensores: Math.max(0, n) })} />
-          ) : (
-            <b>{bastiao.defensores}</b>
-          )}
+          <CampoNumero className="campnum" valor={bastiao.defensores} onCommit={(n) => sala.definirBastiao({ defensores: Math.max(0, n) })} />
         </span>
         {especiaisAtivas.length > 0 && (
           <span className="bastiaostat">
@@ -76,67 +66,63 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
       </p>
       <div className="reslist" style={{ marginBottom: 12 }}>
         {especiais.map((i) => (
-          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} editavel={souMestre} />
+          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} />
         ))}
       </div>
-      {souMestre && (
-        <div style={{ marginBottom: 16 }}>
-          {PROGRESSAO_INSTALACOES_ESPECIAIS.map(({ nivel }) => (
-            <div key={nivel} style={{ marginBottom: 10 }}>
-              <span className="sectitle">Nível {nivel}</span>
-              <div className="grid">
-                {INSTALACOES_ESPECIAIS_DMG.filter((m) => m.nivel === nivel).map((m) => (
-                  <button
-                    key={m.name}
-                    type="button"
-                    className="instalacaobtn"
-                    onClick={() =>
-                      sala.criarInstalacaoBastiao({
-                        name: m.name,
-                        categoria: "especial",
-                        tamanho: "Apertado",
-                        nivel_min: m.nivel,
-                        ordem: m.ordem,
-                      })
-                    }
-                  >
-                    <div>
-                      <span className="nome">{m.name}</span>
-                      <span className="nivel">{m.ordem}</span>
-                    </div>
-                    <p className="instdesc">
-                      {m.descricao}
-                      {m.prerequisito && ` · pré-requisito: ${m.prerequisito}`}
-                    </p>
-                  </button>
-                ))}
-              </div>
+      <div style={{ marginBottom: 16 }}>
+        {PROGRESSAO_INSTALACOES_ESPECIAIS.map(({ nivel }) => (
+          <div key={nivel} style={{ marginBottom: 10 }}>
+            <span className="sectitle">Nível {nivel}</span>
+            <div className="grid">
+              {INSTALACOES_ESPECIAIS_DMG.filter((m) => m.nivel === nivel).map((m) => (
+                <button
+                  key={m.name}
+                  type="button"
+                  className="instalacaobtn"
+                  onClick={() =>
+                    sala.criarInstalacaoBastiao({
+                      name: m.name,
+                      categoria: "especial",
+                      tamanho: "Apertado",
+                      nivel_min: m.nivel,
+                      ordem: m.ordem,
+                    })
+                  }
+                >
+                  <div>
+                    <span className="nome">{m.name}</span>
+                    <span className="nivel">{m.ordem}</span>
+                  </div>
+                  <p className="instdesc">
+                    {m.descricao}
+                    {m.prerequisito && ` · pré-requisito: ${m.prerequisito}`}
+                  </p>
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
 
       <span className="sectitle">Instalações básicas ({basicas.length}) — só cenário, sem efeito de jogo</span>
       <div className="reslist" style={{ marginBottom: 12 }}>
         {basicas.map((i) => (
-          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} editavel={souMestre} />
+          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} />
         ))}
       </div>
-      {souMestre && (
-        <div className="grid" style={{ marginBottom: 16 }}>
-          {INSTALACOES_BASICAS_DMG.map((b) => (
-            <button
-              key={b.name}
-              type="button"
-              className="instalacaobtn"
-              onClick={() => sala.criarInstalacaoBastiao({ name: b.name, categoria: "basica" })}
-            >
-              <span className="nome">{b.name}</span>
-              <p className="instdesc">{b.descricao}</p>
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="grid" style={{ marginBottom: 16 }}>
+        {INSTALACOES_BASICAS_DMG.map((b) => (
+          <button
+            key={b.name}
+            type="button"
+            className="instalacaobtn"
+            onClick={() => sala.criarInstalacaoBastiao({ name: b.name, categoria: "basica" })}
+          >
+            <span className="nome">{b.name}</span>
+            <p className="instdesc">{b.descricao}</p>
+          </button>
+        ))}
+      </div>
 
       <details className="bastiaoeventos">
         <summary>Tabela de eventos (d100) — referência rápida</summary>
@@ -150,7 +136,7 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
         </div>
       </details>
 
-      {souMestre && <RegistrarEvento sala={sala} />}
+      <RegistrarEvento sala={sala} />
 
       {sala.logBastiao.length > 0 && (
         <div className="loglist" style={{ marginTop: 14 }}>
@@ -168,103 +154,60 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
   );
 }
 
-function LinhaInstalacao({
-  instalacao: i,
-  sala,
-  editavel,
-}: {
-  instalacao: InstalacaoBastiao;
-  sala: Sala;
-  editavel: boolean;
-}) {
+function LinhaInstalacao({ instalacao: i, sala }: { instalacao: InstalacaoBastiao; sala: Sala }) {
   const patch = (mudanca: Partial<InstalacaoBastiao>) => sala.atualizarInstalacaoBastiao(i.id, mudanca);
   const descricao = descricaoInstalacao(i.name);
   const trabalhando = i.ultimo_turno_executado === sala.bastiao.turno;
   return (
     <div>
       <div className={`resrow${i.ativa ? "" : " inativa"}`}>
-        {editavel ? (
-          <CampoTexto valor={i.name} maxLength={40} onCommit={(v) => patch({ name: v })} />
-        ) : (
-          <span>{i.name}</span>
-        )}
-        {editavel ? (
-          <select value={i.tamanho} onChange={(e) => patch({ tamanho: e.target.value as InstalacaoBastiao["tamanho"] })}>
-            {TAMANHOS_INSTALACAO.map((t) => (
-              <option key={t} value={t}>
-                {t}
+        <CampoTexto valor={i.name} maxLength={40} onCommit={(v) => patch({ name: v })} />
+        <select value={i.tamanho} onChange={(e) => patch({ tamanho: e.target.value as InstalacaoBastiao["tamanho"] })}>
+          {TAMANHOS_INSTALACAO.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        {i.categoria === "especial" && (
+          <select value={i.ordem} onChange={(e) => patch({ ordem: e.target.value })}>
+            <option value="">sem ordem</option>
+            {ORDENS_BASTIAO.map((o) => (
+              <option key={o} value={o}>
+                {o}
               </option>
             ))}
           </select>
-        ) : (
-          <span className="empty-note" style={{ padding: 0 }}>
-            {i.tamanho}
-          </span>
         )}
-        {i.categoria === "especial" &&
-          (editavel ? (
-            <select value={i.ordem} onChange={(e) => patch({ ordem: e.target.value })}>
-              <option value="">sem ordem</option>
-              {ORDENS_BASTIAO.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span className="empty-note" style={{ padding: 0 }}>
-              {i.ordem || "sem ordem"}
-            </span>
-          ))}
-        {editavel ? (
-          <CampoTexto
-            valor={i.contratado}
-            maxLength={40}
-            placeholder="contratado"
-            onCommit={(v) => patch({ contratado: v })}
-          />
-        ) : (
-          i.contratado && (
-            <span className="empty-note" style={{ padding: 0 }}>
-              {i.contratado}
-            </span>
-          )
-        )}
-        {i.categoria === "especial" &&
-          i.ativa &&
-          (editavel ? (
-            <button
-              type="button"
-              className="chip flag"
-              aria-pressed={trabalhando}
-              onClick={() => patch({ ultimo_turno_executado: trabalhando ? null : sala.bastiao.turno })}
-            >
-              {trabalhando ? "trabalhando este turno" : "não trabalhou este turno"}
-            </button>
-          ) : (
-            <span className="chip flag" aria-pressed={trabalhando}>
-              {trabalhando ? "trabalhando este turno" : "não trabalhou este turno"}
-            </span>
-          ))}
-        {editavel ? (
-          <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
-            {i.ativa ? "ativa" : "inativa"}
-          </button>
-        ) : (
-          <span className={`chip flag${i.ativa ? "" : " danger"}`}>{i.ativa ? "ativa" : "inativa"}</span>
-        )}
-        {editavel && (
+        <CampoTexto
+          valor={i.contratado}
+          maxLength={40}
+          placeholder="contratado"
+          onCommit={(v) => patch({ contratado: v })}
+        />
+        {i.categoria === "especial" && i.ativa && (
           <button
             type="button"
-            className="rm"
-            aria-label={`remover ${i.name}`}
-            onClick={() => {
-              if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
-            }}
+            className="chip flag"
+            aria-pressed={trabalhando}
+            onClick={() => patch({ ultimo_turno_executado: trabalhando ? null : sala.bastiao.turno })}
           >
-            ✕
+            {trabalhando ? "trabalhando este turno" : "não trabalhou este turno"}
           </button>
         )}
+        <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
+          {i.ativa ? "ativa" : "inativa"}
+        </button>
+        <button
+          type="button"
+          className="rm"
+          aria-label={`remover ${i.name}`}
+          onClick={() => {
+            if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
+          }}
+        >
+          ✕
+        </button>
       </div>
       {descricao && <p className="instdesc">{descricao}</p>}
     </div>
