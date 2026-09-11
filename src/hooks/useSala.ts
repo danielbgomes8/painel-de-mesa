@@ -56,7 +56,7 @@ export type Sala = {
   criarEntradaDiario: (dados: NovaEntradaDiario) => Promise<void>;
   atualizarEntradaDiario: (id: string, patch: Partial<EntradaDiario>) => Promise<void>;
   removerEntradaDiario: (id: string) => Promise<void>;
-  definirBastiao: (patch: Partial<Bastiao>) => Promise<void>;
+  definirBastiao: (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => Promise<Bastiao>;
   criarInstalacaoBastiao: (dados: NovaInstalacaoBastiao) => Promise<void>;
   atualizarInstalacaoBastiao: (id: string, patch: Partial<InstalacaoBastiao>) => Promise<void>;
   removerInstalacaoBastiao: (id: string) => Promise<void>;
@@ -459,14 +459,13 @@ export function useSala(codigo: string): Sala {
   }, []);
 
   const definirBastiao = useCallback(
-    async (patch: Partial<Bastiao>) => {
-      const proximo = { ...ref.current.bastiao, ...patch };
+    async (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => {
+      const parcial = typeof patch === "function" ? patch(ref.current.bastiao) : patch;
+      const proximo = { ...ref.current.bastiao, ...parcial };
       setBastiao(proximo);
-      const { error } = await supabase
-        .from("bastiao")
-        .update({ turno: proximo.turno, tesouro_po: proximo.tesouro_po, defensores: proximo.defensores, notes: proximo.notes })
-        .eq("room_code", codigo);
+      const { error } = await supabase.from("bastiao").update(parcial).eq("room_code", codigo);
       if (error) console.error("definirBastiao", error);
+      return proximo;
     },
     [codigo],
   );

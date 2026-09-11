@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { ItemIniciativa, ModeloNpc } from "@/lib/tipos";
+import type { ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import {
   nomeExibidoIniciativa,
@@ -19,9 +19,11 @@ const NOVO_NPC = "__novo__";
 export function RastreadorCombate({
   sala,
   souMestre,
+  meuPersonagem,
 }: {
   sala: Sala;
   souMestre: boolean;
+  meuPersonagem: Personagem | null;
 }) {
   const { combate, personagens } = sala;
 
@@ -215,6 +217,10 @@ export function RastreadorCombate({
         })}
       </div>
 
+      {!souMestre && meuPersonagem && !naOrdem.has(meuPersonagem.slug) && (
+        <MinhaIniciativa sala={sala} personagem={meuPersonagem} />
+      )}
+
       {souMestre && (
         <>
           <div className="combatctrls" style={{ marginTop: 12 }}>
@@ -303,6 +309,47 @@ export function RastreadorCombate({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** Deixa o próprio jogador rolar/digitar a iniciativa do seu personagem, em
+ *  vez do Mestre ter que fazer isso manualmente por cada um. */
+function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Personagem }) {
+  const [ini, setIni] = useState("");
+
+  function rolar() {
+    setIni(String(d20() + personagem.init_mod));
+  }
+
+  async function entrar() {
+    const init = Number.parseInt(ini, 10);
+    const iniciativa = Number.isNaN(init) ? 0 : init;
+    const item: ItemIniciativa = { slug: personagem.slug, name: personagem.name, init: iniciativa };
+    await sala.definirCombate({ order: ordenarPorIniciativa([...sala.combate.order, item]) });
+    sala.registrarLog(`${personagem.name} entrou no combate (iniciativa ${iniciativa})`);
+    setIni("");
+  }
+
+  return (
+    <div className="addcombatant" style={{ marginTop: 12 }}>
+      <input
+        className="num"
+        type="number"
+        inputMode="numeric"
+        placeholder="sua iniciativa"
+        value={ini}
+        onChange={(e) => setIni(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") entrar();
+        }}
+      />
+      <button type="button" className="btn" aria-label="Rolar iniciativa" onClick={rolar}>
+        🎲
+      </button>
+      <button type="button" className="btn" onClick={entrar} disabled={!ini}>
+        Entrar no combate
+      </button>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { InstalacaoBastiao } from "@/lib/tipos";
 import {
+  descricaoInstalacao,
   EVENTOS_BASTIAO_DMG,
   INSTALACOES_BASICAS_DMG,
   INSTALACOES_ESPECIAIS_DMG,
@@ -14,15 +15,16 @@ import {
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 
-/** Painel do Bastião (DMG 2024, cap. 8) — um só, compartilhado pela mesa. */
-export function PainelBastiao({ sala }: { sala: Sala }) {
+/** Painel do Bastião (DMG 2024, cap. 8) — um só, compartilhado pela mesa;
+ *  só o Mestre mexe, os jogadores acompanham (mesmo padrão do Diário). */
+export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: boolean }) {
   const { bastiao, instalacoesBastiao: instalacoes } = sala;
   const especiais = instalacoes.filter((i) => i.categoria === "especial");
   const basicas = instalacoes.filter((i) => i.categoria === "basica");
 
-  function avancarTurno() {
-    sala.definirBastiao({ turno: bastiao.turno + 1 });
-    sala.registrarLogBastiao(`Turno ${bastiao.turno + 1} começou`);
+  async function avancarTurno() {
+    const proximo = await sala.definirBastiao((atual) => ({ turno: atual.turno + 1 }));
+    sala.registrarLogBastiao(`Turno ${proximo.turno} começou`);
   }
 
   return (
@@ -35,14 +37,27 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
       </div>
 
       <div className="combatctrls" style={{ marginBottom: 14 }}>
-        <button type="button" className="btn primary" onClick={avancarTurno}>
-          Próximo turno →
-        </button>
+        {souMestre && (
+          <button type="button" className="btn primary" onClick={avancarTurno}>
+            Próximo turno →
+          </button>
+        )}
         <span className="bastiaostat">
-          Tesouro <CampoNumero className="campnum" valor={bastiao.tesouro_po} onCommit={(n) => sala.definirBastiao({ tesouro_po: Math.max(0, n) })} /> PO
+          Tesouro{" "}
+          {souMestre ? (
+            <CampoNumero className="campnum" valor={bastiao.tesouro_po} onCommit={(n) => sala.definirBastiao({ tesouro_po: Math.max(0, n) })} />
+          ) : (
+            <b>{bastiao.tesouro_po}</b>
+          )}{" "}
+          PO
         </span>
         <span className="bastiaostat">
-          Defensores <CampoNumero className="campnum" valor={bastiao.defensores} onCommit={(n) => sala.definirBastiao({ defensores: Math.max(0, n) })} />
+          Defensores{" "}
+          {souMestre ? (
+            <CampoNumero className="campnum" valor={bastiao.defensores} onCommit={(n) => sala.definirBastiao({ defensores: Math.max(0, n) })} />
+          ) : (
+            <b>{bastiao.defensores}</b>
+          )}
         </span>
       </div>
 
@@ -52,49 +67,54 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
       </p>
       <div className="reslist" style={{ marginBottom: 12 }}>
         {especiais.map((i) => (
-          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} />
+          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} editavel={souMestre} />
         ))}
       </div>
-      <div className="chips" style={{ marginBottom: 16 }}>
-        {INSTALACOES_ESPECIAIS_DMG.map((m) => (
-          <button
-            key={m.name}
-            type="button"
-            className="chip"
-            title={m.prerequisito ? `nível ${m.nivel} · ${m.prerequisito}` : `nível ${m.nivel}`}
-            onClick={() =>
-              sala.criarInstalacaoBastiao({
-                name: m.name,
-                categoria: "especial",
-                tamanho: "Apertado",
-                nivel_min: m.nivel,
-                ordem: m.ordem,
-              })
-            }
-          >
-            {m.name} · nv.{m.nivel}
-          </button>
-        ))}
-      </div>
+      {souMestre && (
+        <div className="chips" style={{ marginBottom: 16 }}>
+          {INSTALACOES_ESPECIAIS_DMG.map((m) => (
+            <button
+              key={m.name}
+              type="button"
+              className="chip"
+              title={`nível ${m.nivel} · ${m.descricao}${m.prerequisito ? ` · ${m.prerequisito}` : ""}`}
+              onClick={() =>
+                sala.criarInstalacaoBastiao({
+                  name: m.name,
+                  categoria: "especial",
+                  tamanho: "Apertado",
+                  nivel_min: m.nivel,
+                  ordem: m.ordem,
+                })
+              }
+            >
+              {m.name} · nv.{m.nivel}
+            </button>
+          ))}
+        </div>
+      )}
 
       <span className="sectitle">Instalações básicas ({basicas.length}) — só cenário, sem efeito de jogo</span>
       <div className="reslist" style={{ marginBottom: 12 }}>
         {basicas.map((i) => (
-          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} />
+          <LinhaInstalacao key={i.id} instalacao={i} sala={sala} editavel={souMestre} />
         ))}
       </div>
-      <div className="chips" style={{ marginBottom: 16 }}>
-        {INSTALACOES_BASICAS_DMG.map((nome) => (
-          <button
-            key={nome}
-            type="button"
-            className="chip"
-            onClick={() => sala.criarInstalacaoBastiao({ name: nome, categoria: "basica" })}
-          >
-            {nome}
-          </button>
-        ))}
-      </div>
+      {souMestre && (
+        <div className="chips" style={{ marginBottom: 16 }}>
+          {INSTALACOES_BASICAS_DMG.map((b) => (
+            <button
+              key={b.name}
+              type="button"
+              className="chip"
+              title={b.descricao}
+              onClick={() => sala.criarInstalacaoBastiao({ name: b.name, categoria: "basica" })}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <details className="bastiaoeventos">
         <summary>Tabela de eventos (d100) — referência rápida</summary>
@@ -108,7 +128,7 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
         </div>
       </details>
 
-      <RegistrarEvento sala={sala} />
+      {souMestre && <RegistrarEvento sala={sala} />}
 
       {sala.logBastiao.length > 0 && (
         <div className="loglist" style={{ marginTop: 14 }}>
@@ -126,47 +146,84 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
   );
 }
 
-function LinhaInstalacao({ instalacao: i, sala }: { instalacao: InstalacaoBastiao; sala: Sala }) {
+function LinhaInstalacao({
+  instalacao: i,
+  sala,
+  editavel,
+}: {
+  instalacao: InstalacaoBastiao;
+  sala: Sala;
+  editavel: boolean;
+}) {
   const patch = (mudanca: Partial<InstalacaoBastiao>) => sala.atualizarInstalacaoBastiao(i.id, mudanca);
   return (
-    <div className={`resrow${i.ativa ? "" : " inativa"}`}>
-      <CampoTexto valor={i.name} maxLength={40} onCommit={(v) => patch({ name: v })} />
-      <select value={i.tamanho} onChange={(e) => patch({ tamanho: e.target.value as InstalacaoBastiao["tamanho"] })}>
-        {TAMANHOS_INSTALACAO.map((t) => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
-      {i.categoria === "especial" && (
-        <select value={i.ordem} onChange={(e) => patch({ ordem: e.target.value })}>
-          <option value="">sem ordem</option>
-          {ORDENS_BASTIAO.map((o) => (
-            <option key={o} value={o}>
-              {o}
+    <div className={`resrow${i.ativa ? "" : " inativa"}`} title={descricaoInstalacao(i.name)}>
+      {editavel ? (
+        <CampoTexto valor={i.name} maxLength={40} onCommit={(v) => patch({ name: v })} />
+      ) : (
+        <span>{i.name}</span>
+      )}
+      {editavel ? (
+        <select value={i.tamanho} onChange={(e) => patch({ tamanho: e.target.value as InstalacaoBastiao["tamanho"] })}>
+          {TAMANHOS_INSTALACAO.map((t) => (
+            <option key={t} value={t}>
+              {t}
             </option>
           ))}
         </select>
+      ) : (
+        <span className="empty-note" style={{ padding: 0 }}>
+          {i.tamanho}
+        </span>
       )}
-      <CampoTexto
-        valor={i.contratado}
-        maxLength={40}
-        placeholder="contratado"
-        onCommit={(v) => patch({ contratado: v })}
-      />
-      <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
-        {i.ativa ? "ativa" : "inativa"}
-      </button>
-      <button
-        type="button"
-        className="rm"
-        aria-label={`remover ${i.name}`}
-        onClick={() => {
-          if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
-        }}
-      >
-        ✕
-      </button>
+      {i.categoria === "especial" &&
+        (editavel ? (
+          <select value={i.ordem} onChange={(e) => patch({ ordem: e.target.value })}>
+            <option value="">sem ordem</option>
+            {ORDENS_BASTIAO.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="empty-note" style={{ padding: 0 }}>
+            {i.ordem || "sem ordem"}
+          </span>
+        ))}
+      {editavel ? (
+        <CampoTexto
+          valor={i.contratado}
+          maxLength={40}
+          placeholder="contratado"
+          onCommit={(v) => patch({ contratado: v })}
+        />
+      ) : (
+        i.contratado && (
+          <span className="empty-note" style={{ padding: 0 }}>
+            {i.contratado}
+          </span>
+        )
+      )}
+      {editavel ? (
+        <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
+          {i.ativa ? "ativa" : "inativa"}
+        </button>
+      ) : (
+        <span className={`chip flag${i.ativa ? "" : " danger"}`}>{i.ativa ? "ativa" : "inativa"}</span>
+      )}
+      {editavel && (
+        <button
+          type="button"
+          className="rm"
+          aria-label={`remover ${i.name}`}
+          onClick={() => {
+            if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
+          }}
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

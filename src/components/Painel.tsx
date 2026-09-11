@@ -135,9 +135,9 @@ function PainelSala({ codigo }: { codigo: string }) {
       )}
 
       <DiarioCampanha sala={sala} souMestre={souMestre} />
-      <PainelBastiao sala={sala} />
+      <PainelBastiao sala={sala} souMestre={souMestre} />
 
-      <RastreadorCombate sala={sala} souMestre={souMestre} />
+      <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} />
       <LogCombate log={sala.log} />
 
       {souMestre && <AcoesEmMassa sala={sala} />}

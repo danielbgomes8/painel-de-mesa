@@ -16,58 +16,70 @@ export const ORDENS_BASTIAO = [
 
 export const TAMANHOS_INSTALACAO = ["Apertado", "Amplo", "Vasto"] as const;
 
+export type InstalacaoBasicaDmg = { name: string; descricao: string };
+
 /** As duas instalações básicas iniciais (grátis) vêm desta lista; não têm
  *  efeito de jogo, só cenário pra história. */
-export const INSTALACOES_BASICAS_DMG = [
-  "Quarto",
-  "Sala de Jantar",
-  "Salão",
-  "Pátio",
-  "Cozinha",
-  "Depósito",
-] as const;
+export const INSTALACOES_BASICAS_DMG: InstalacaoBasicaDmg[] = [
+  { name: "Quarto", descricao: "onde os moradores do bastião dormem" },
+  { name: "Sala de Jantar", descricao: "onde a mesa janta e recebe visitas" },
+  { name: "Salão", descricao: "espaço amplo pra reuniões e eventos" },
+  { name: "Pátio", descricao: "área externa aberta, entrada do bastião" },
+  { name: "Cozinha", descricao: "onde a comida da casa é preparada" },
+  { name: "Depósito", descricao: "guarda suprimentos e tralha sem uso imediato" },
+];
 
 export type InstalacaoEspecialDmg = {
   name: string;
   nivel: 5 | 9 | 13 | 17;
   prerequisito: string;
   ordem: (typeof ORDENS_BASTIAO)[number];
+  descricao: string;
 };
 
 /** As 27 instalações especiais oficiais — nível mínimo, pré-requisito e a
  *  ordem que cada uma aceita. Progressão real: nível 5 = 2 instalações
  *  especiais, nível 9 = 4, nível 13 = 5, nível 17 = 6 (soma, não substitui). */
 export const INSTALACOES_ESPECIAIS_DMG: InstalacaoEspecialDmg[] = [
-  { name: "Estudo Arcano", nivel: 5, prerequisito: "usa Foco Arcano ou ferramenta como foco de conjuração", ordem: "Fabricar" },
-  { name: "Arsenal", nivel: 5, prerequisito: "", ordem: "Comerciar" },
-  { name: "Alojamento", nivel: 5, prerequisito: "", ordem: "Recrutar" },
-  { name: "Jardim", nivel: 5, prerequisito: "", ordem: "Colher" },
-  { name: "Biblioteca", nivel: 5, prerequisito: "", ordem: "Pesquisar" },
-  { name: "Santuário", nivel: 5, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Fabricar" },
-  { name: "Ferraria", nivel: 5, prerequisito: "", ordem: "Fabricar" },
-  { name: "Armazém", nivel: 5, prerequisito: "", ordem: "Comerciar" },
-  { name: "Oficina", nivel: 5, prerequisito: "", ordem: "Fabricar" },
-  { name: "Salão de Jogos", nivel: 9, prerequisito: "", ordem: "Comerciar" },
-  { name: "Estufa", nivel: 9, prerequisito: "", ordem: "Colher" },
-  { name: "Laboratório", nivel: 9, prerequisito: "(algumas ordens têm pré-requisito extra)", ordem: "Fabricar" },
-  { name: "Sacristia", nivel: 9, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Fabricar" },
-  { name: "Scriptório", nivel: 9, prerequisito: "(algumas ordens têm pré-requisito extra)", ordem: "Fabricar" },
-  { name: "Estábulo", nivel: 9, prerequisito: "", ordem: "Comerciar" },
-  { name: "Círculo de Teleporte", nivel: 9, prerequisito: "", ordem: "Recrutar" },
-  { name: "Teatro", nivel: 9, prerequisito: "", ordem: "Fortalecer" },
-  { name: "Área de Treinamento", nivel: 9, prerequisito: "", ordem: "Fortalecer" },
-  { name: "Sala de Troféus", nivel: 9, prerequisito: "", ordem: "Pesquisar" },
-  { name: "Arquivo", nivel: 13, prerequisito: "", ordem: "Pesquisar" },
-  { name: "Câmara de Meditação", nivel: 13, prerequisito: "", ordem: "Fortalecer" },
-  { name: "Reserva de Criaturas", nivel: 13, prerequisito: "", ordem: "Recrutar" },
-  { name: "Observatório", nivel: 13, prerequisito: "usa foco de conjuração", ordem: "Fortalecer" },
-  { name: "Taverna", nivel: 13, prerequisito: "", ordem: "Pesquisar" },
-  { name: "Relicário", nivel: 13, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Colher" },
-  { name: "Semiplano", nivel: 17, prerequisito: "usa Foco Arcano ou ferramenta como foco de conjuração", ordem: "Fortalecer" },
-  { name: "Sede de Guilda", nivel: 17, prerequisito: "Especialização (Expertise) em uma perícia", ordem: "Recrutar" },
-  { name: "Sacrário", nivel: 17, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Fortalecer" },
-  { name: "Sala de Guerra", nivel: 17, prerequisito: "talento Estilo de Luta ou Defesa sem Armadura", ordem: "Recrutar" },
+  { name: "Estudo Arcano", nivel: 5, prerequisito: "usa Foco Arcano ou ferramenta como foco de conjuração", ordem: "Fabricar", descricao: "prepara pergaminhos e pesquisa magias novas" },
+  { name: "Arsenal", nivel: 5, prerequisito: "", ordem: "Comerciar", descricao: "guarda e fornece armas e armaduras pros aliados" },
+  { name: "Alojamento", nivel: 5, prerequisito: "", ordem: "Recrutar", descricao: "hospeda e recruta mais defensores" },
+  { name: "Jardim", nivel: 5, prerequisito: "", ordem: "Colher", descricao: "cultiva ervas, venenos e ingredientes" },
+  { name: "Biblioteca", nivel: 5, prerequisito: "", ordem: "Pesquisar", descricao: "pesquisa lendas e ajuda a identificar itens mágicos" },
+  { name: "Santuário", nivel: 5, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Fabricar", descricao: "cura ferimentos leves e remove maldições entre aventuras" },
+  { name: "Ferraria", nivel: 5, prerequisito: "", ordem: "Fabricar", descricao: "fabrica e repara armas e armaduras" },
+  { name: "Armazém", nivel: 5, prerequisito: "", ordem: "Comerciar", descricao: "estoca e vende suprimentos, rende tesouro por turno" },
+  { name: "Oficina", nivel: 5, prerequisito: "", ordem: "Fabricar", descricao: "fabrica ferramentas e engenhocas" },
+  { name: "Salão de Jogos", nivel: 9, prerequisito: "", ordem: "Comerciar", descricao: "casa de jogos que rende ouro" },
+  { name: "Estufa", nivel: 9, prerequisito: "", ordem: "Colher", descricao: "cultiva plantas raras pra poções e venenos" },
+  { name: "Laboratório", nivel: 9, prerequisito: "(algumas ordens têm pré-requisito extra)", ordem: "Fabricar", descricao: "prepara poções e venenos mais avançados" },
+  { name: "Sacristia", nivel: 9, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Fabricar", descricao: "consagra itens sagrados e cura doenças" },
+  { name: "Scriptório", nivel: 9, prerequisito: "(algumas ordens têm pré-requisito extra)", ordem: "Fabricar", descricao: "copia grimórios e produz obras escritas" },
+  { name: "Estábulo", nivel: 9, prerequisito: "", ordem: "Comerciar", descricao: "cuida e treina montarias" },
+  { name: "Círculo de Teleporte", nivel: 9, prerequisito: "", ordem: "Recrutar", descricao: "teleporta o grupo pra outro círculo conhecido" },
+  { name: "Teatro", nivel: 9, prerequisito: "", ordem: "Fortalecer", descricao: "apresenta espetáculos que erguem o moral e rendem ouro" },
+  { name: "Área de Treinamento", nivel: 9, prerequisito: "", ordem: "Fortalecer", descricao: "treina defensores e ajuda a praticar perícias e armas" },
+  { name: "Sala de Troféus", nivel: 9, prerequisito: "", ordem: "Pesquisar", descricao: "expõe troféus de conquistas passadas" },
+  { name: "Arquivo", nivel: 13, prerequisito: "", ordem: "Pesquisar", descricao: "guarda registros raros pra pesquisas profundas" },
+  { name: "Câmara de Meditação", nivel: 13, prerequisito: "", ordem: "Fortalecer", descricao: "ajuda a recuperar o foco e reduzir exaustão" },
+  { name: "Reserva de Criaturas", nivel: 13, prerequisito: "", ordem: "Recrutar", descricao: "abriga e cuida de criaturas capturadas ou domesticadas" },
+  { name: "Observatório", nivel: 13, prerequisito: "usa foco de conjuração", ordem: "Fortalecer", descricao: "observa os céus e ajuda em rituais de adivinhação" },
+  { name: "Taverna", nivel: 13, prerequisito: "", ordem: "Pesquisar", descricao: "ponto de encontro pra ouvir rumores e contratar gente" },
+  { name: "Relicário", nivel: 13, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Colher", descricao: "guarda e consagra relíquias sagradas" },
+  { name: "Semiplano", nivel: 17, prerequisito: "usa Foco Arcano ou ferramenta como foco de conjuração", ordem: "Fortalecer", descricao: "espaço extradimensional particular do bastião" },
+  { name: "Sede de Guilda", nivel: 17, prerequisito: "Especialização (Expertise) em uma perícia", ordem: "Recrutar", descricao: "sede de um ofício que treina especialização" },
+  { name: "Sacrário", nivel: 17, prerequisito: "usa Símbolo Sagrado ou Foco Druídico como foco de conjuração", ordem: "Fortalecer", descricao: "santuário reservado pra rituais e devoção mais intensa" },
+  { name: "Sala de Guerra", nivel: 17, prerequisito: "talento Estilo de Luta ou Defesa sem Armadura", ordem: "Recrutar", descricao: "planeja táticas e comanda tropas em conflitos maiores" },
 ];
+
+/** Descrição curta (paráfrase, não é texto do livro) de uma instalação já
+ *  criada, básica ou especial, pra mostrar como dica ao passar o mouse. */
+export function descricaoInstalacao(nome: string): string | undefined {
+  return (
+    INSTALACOES_ESPECIAIS_DMG.find((m) => m.name === nome)?.descricao ??
+    INSTALACOES_BASICAS_DMG.find((b) => b.name === nome)?.descricao
+  );
+}
 
 /** Progressão oficial: quantas instalações especiais o nível dá direito a ter. */
 export const PROGRESSAO_INSTALACOES_ESPECIAIS = [
