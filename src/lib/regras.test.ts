@@ -23,6 +23,7 @@ import {
   ordenarPorIniciativa,
   penalidadeD20,
   proximoTurno,
+  pvExibidoIniciativa,
   recuperarDadosDeVida,
   reducaoDeslocamento,
   reduzirPrazosCondicao,
@@ -235,6 +236,26 @@ describe("nome na iniciativa (anti-spoiler de NPC)", () => {
     const ordem = [{ slug: "goblin-1" }, { slug: "tiberio" }, { slug: "goblin-2" }];
     const ehNpc = (slug: string) => slug.startsWith("goblin");
     expect(numerarNpcsNaOrdem(ordem, ehNpc)).toEqual([1, 1, 2]);
+  });
+});
+
+describe("PV na iniciativa (anti-spoiler de NPC)", () => {
+  it("Mestre sempre vê o PV", () => {
+    expect(pvExibidoIniciativa({ is_npc: true, hp: 10, hp_max: 30 }, true)).toEqual({
+      hp: 10,
+      hp_max: 30,
+    });
+  });
+
+  it("jogador vê PV de personagem de jogador normalmente", () => {
+    expect(pvExibidoIniciativa({ is_npc: false, hp: 40, hp_max: 65 }, false)).toEqual({
+      hp: 40,
+      hp_max: 65,
+    });
+  });
+
+  it("jogador nunca vê PV de NPC, mesmo revelado", () => {
+    expect(pvExibidoIniciativa({ is_npc: true, hp: 10, hp_max: 30 }, false)).toBeNull();
   });
 });
 

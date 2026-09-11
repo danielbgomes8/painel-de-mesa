@@ -1,7 +1,7 @@
 "use client";
 
 import type { Sala } from "@/hooks/useSala";
-import { nomeExibidoIniciativa, numerarNpcsNaOrdem } from "@/lib/regras";
+import { nomeExibidoIniciativa, numerarNpcsNaOrdem, pvExibidoIniciativa } from "@/lib/regras";
 
 /** Tela grande só com "de quem é a vez" — pensada pra um televisor/notebook
  *  central da mesa, não pro celular de ninguém. Sempre trata quem olha como
@@ -19,6 +19,7 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
       ? nomeExibidoIniciativa(pv, contagensNpc[combate.turn], false)
       : atual.name
     : null;
+  const pvVisivel = pv ? pvExibidoIniciativa(pv, false) : null;
 
   return (
     <div className="telao">
@@ -29,9 +30,9 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
         <>
           <div className="telao-label">é a vez de</div>
           <div className="telao-nome">{nomeExibido}</div>
-          {pv && (
+          {pvVisivel && (
             <div className="telao-pv">
-              {pv.hp} / {pv.hp_max} PV
+              {pvVisivel.hp} / {pvVisivel.hp_max} PV
             </div>
           )}
         </>

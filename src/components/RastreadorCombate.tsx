@@ -9,6 +9,7 @@ import {
   numerarNpcsNaOrdem,
   ordenarPorIniciativa,
   proximoTurno,
+  pvExibidoIniciativa,
   reduzirPrazosCondicao,
   turnoAposRemover,
   turnoAposTrocar,
@@ -152,7 +153,8 @@ export function RastreadorCombate({
 
         {combate.order.map((c, i) => {
             const pv = pvDe(c.slug);
-            const critico = pv ? pv.hp <= 0 : false;
+            const pvVisivel = pv ? pvExibidoIniciativa(pv, souMestre) : null;
+            const critico = pvVisivel ? pvVisivel.hp <= 0 : false;
             const nomeExibido = pv
               ? nomeExibidoIniciativa(pv, contagensNpc[i], souMestre)
               : c.name;
@@ -161,9 +163,9 @@ export function RastreadorCombate({
               <div className="n">{c.init}</div>
               <div className="who">
                 <span className="nm">{nomeExibido}</span>
-                {pv && (
+                {pvVisivel && (
                   <span className={`hpmini${critico ? " crit" : ""}`}>
-                    {pv.hp}/{pv.hp_max} PV
+                    {pvVisivel.hp}/{pvVisivel.hp_max} PV
                   </span>
                 )}
               </div>

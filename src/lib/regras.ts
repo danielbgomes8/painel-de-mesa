@@ -219,6 +219,19 @@ export function nomeExibidoIniciativa(
 }
 
 /**
+ * PV exibido na ordem de iniciativa (e no telão): PV de NPC é informação só
+ * do Mestre, sempre — diferente do nome, revelar o NPC não mostra o PV pro
+ * jogador (ele continua sem saber o quão perto da morte o monstro está).
+ */
+export function pvExibidoIniciativa(
+  item: { is_npc: boolean; hp: number; hp_max: number },
+  souMestre: boolean,
+): { hp: number; hp_max: number } | null {
+  if (souMestre || !item.is_npc) return { hp: item.hp, hp_max: item.hp_max };
+  return null;
+}
+
+/**
  * Numeração estável de NPC ao longo da ordem de iniciativa (1, 2, 3...),
  * pra virar "Inimigo N" — construída sem mutar variável durante o render
  * (regra do compilador do React).
