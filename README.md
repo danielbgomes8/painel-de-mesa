@@ -115,6 +115,12 @@ Pré-requisito: `gh auth login` e `vercel login` já feitos.
 2. **Supabase** — criar um projeto novo (conta separada do gb-reserva, plano
    gratuito). Em *Project Settings → Data API*, copiar **Project URL** e a chave
    **anon / public**.
+
+   O plano gratuito é mais que suficiente pra uma mesa (500 MB de banco, muito
+   acima do que fichas de RPG ocupam). A única pegadinha: **projeto sem uso por
+   ~1 semana pausa sozinho.** Como a mesa não joga todo dia, antes de uma sessão
+   depois de um tempo parado, abra o painel do Supabase e clique em
+   *Restore/Unpause* — leva menos de um minuto e evita surpresa em cima da hora.
 3. **Migrations** — no *SQL Editor* do Supabase, rodar
    [`supabase/migrations/0001_inicial.sql`](supabase/migrations/0001_inicial.sql)
    e depois [`supabase/seed.sql`](supabase/seed.sql).
