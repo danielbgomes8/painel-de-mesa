@@ -50,7 +50,8 @@ export type Sala = {
   definirCombate: (patch: Partial<EstadoCombate>) => Promise<void>;
   definirNotasMestre: (texto: string) => Promise<void>;
   registrarLog: (texto: string) => Promise<void>;
-  criarModeloNpc: (dados: NovoModeloNpc) => Promise<void>;
+  /** Devolve false quando a escrita falha, pra tela não confirmar o que não aconteceu. */
+  criarModeloNpc: (dados: NovoModeloNpc) => Promise<boolean>;
   atualizarModeloNpc: (id: string, patch: Partial<ModeloNpc>) => Promise<void>;
   removerModeloNpc: (id: string) => Promise<void>;
   criarEntradaDiario: (dados: NovaEntradaDiario) => Promise<void>;
@@ -412,10 +413,11 @@ export function useSala(codigo: string): Sala {
       const { data, error } = await supabase.from("npc_templates").insert(linha).select().single();
       if (error) {
         console.error("criarModeloNpc", error);
-        return;
+        return false;
       }
       const criado = data as ModeloNpc;
       setModelosNpc((atual) => (atual.some((m) => m.id === criado.id) ? atual : [...atual, criado]));
+      return true;
     },
     [codigo],
   );

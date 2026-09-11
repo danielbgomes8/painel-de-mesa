@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { ModeloNpc } from "@/lib/tipos";
+import type { ModeloNpc, NovoModeloNpc } from "@/lib/tipos";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
-import { MONSTROS_SRD } from "@/lib/monstrosSrd";
+import { MONSTROS_SRD, buscarMonstros } from "@/lib/monstrosSrd";
 
 /** Prep de mesa: NPCs/monstros que podem aparecer ou não, com ficha básica e
  *  notas de tática, prontos pra puxar no rastreador de combate quando
@@ -38,24 +38,64 @@ export function BibliotecaNpcs({ sala }: { sala: Sala }) {
 }
 
 function CatalogoSrd({ sala }: { sala: Sala }) {
+  const [busca, setBusca] = useState("");
+  const [verTodos, setVerTodos] = useState(false);
+  const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
+
+  const procurando = busca.trim().length > 0;
+  const achados = procurando ? buscarMonstros(busca) : verTodos ? MONSTROS_SRD : [];
+
+  async function copiar(m: Required<NovoModeloNpc>) {
+    const deuCerto = await sala.criarModeloNpc(m);
+    setAviso(
+      deuCerto
+        ? { texto: `✓ ${m.name} copiado pra sua biblioteca, lá em cima.`, falhou: false }
+        : { texto: `Não deu pra copiar ${m.name}. Confira a conexão e toque de novo.`, falhou: true },
+    );
+  }
+
   return (
     <div className="npccatalogo">
       <span className="sectitle">
-        Catálogo D&amp;D (SRD 5.2) — clique pra copiar pra sua biblioteca
+        Catálogo D&amp;D (SRD 5.2) — busque e toque pra copiar pra sua biblioteca
       </span>
-      <div className="chips">
-        {MONSTROS_SRD.map((m) => (
-          <button
-            key={m.name}
-            type="button"
-            className="chip"
-            title={m.notes}
-            onClick={() => sala.criarModeloNpc(m)}
-          >
-            {m.name} · CA{m.ac} · {m.hp_max}PV
+
+      <div className="catbusca">
+        <input
+          type="search"
+          aria-label="Buscar monstro no catálogo do SRD"
+          placeholder={`buscar entre ${MONSTROS_SRD.length} monstros (ex.: goblin, morto-vivo)…`}
+          value={busca}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        <button type="button" className="btn" onClick={() => setVerTodos(!verTodos)}>
+          {verTodos ? "esconder lista" : `ver todos (${MONSTROS_SRD.length})`}
+        </button>
+      </div>
+
+      <p className={aviso?.falhou ? "catcopiado falhou" : "catcopiado"} aria-live="polite">
+        {aviso ? aviso.texto : ""}
+      </p>
+
+      {procurando && achados.length === 0 ? (
+        <p className="empty-note">Nenhum monstro com esse nome no catálogo.</p>
+      ) : null}
+
+      <div className="catresultados">
+        {achados.map((m) => (
+          <button key={m.name} type="button" className="catitem" onClick={() => copiar(m)}>
+            <span className="catnome">{m.name}</span>
+            <span className="catstats">
+              CA {m.ac} · {m.hp_max} PV · {m.speed}m · inic. {m.init_mod >= 0 ? "+" : ""}
+              {m.init_mod} · {m.cls}
+            </span>
+            {m.notes ? <span className="catnota">{m.notes}</span> : null}
           </button>
         ))}
       </div>
+
       <p className="fine">
         Números de partida do SRD 5.2 (licença CC-BY-4.0, Wizards of the Coast) — confira contra
         o livro antes de uma luta importante; depois de copiado é só editar à vontade.
