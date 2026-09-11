@@ -540,9 +540,9 @@ button {
   gap: 14px;
 }
 
-.stats3 {
+.statsrow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
   gap: 10px;
 }
 .stat {
@@ -854,6 +854,82 @@ button {
   box-shadow: var(--shadow);
 }
 
+/* ---------- modo telão ---------- */
+.telao {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+  padding: 24px;
+}
+.telao-eyebrow {
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.telao-label {
+  font-size: 28px;
+  color: var(--muted);
+}
+.telao-nome {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: clamp(48px, 10vw, 120px);
+  color: var(--accent);
+  line-height: 1.1;
+}
+.telao-pv {
+  font-family: var(--f-mono);
+  font-size: 32px;
+  color: var(--ink);
+}
+
+/* ---------- diário da campanha ---------- */
+.diariolist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.diarioentry {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diarioentry p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  white-space: pre-wrap;
+}
+.diarioentryhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diarioentryhead h3 {
+  font-size: 15px;
+  flex: 1;
+}
+.diarioentryhead .campotexto {
+  flex: 1;
+  font-size: 14px;
+}
+.diarioentryhead .hora {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--dim);
+  flex: none;
+}
+
 @media (max-width: 520px) {
   body {
     padding: 16px 12px 48px;
@@ -908,6 +984,19 @@ button {
 }
 .resrow .rm {
   margin-left: auto;
+}
+.condprazos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.condprazo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
 }
 .checklabel {
   display: flex;

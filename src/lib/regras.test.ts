@@ -17,11 +17,13 @@ import {
   mensagemAjustePV,
   mensagemDanoAbsorvido,
   nomeExibidoIniciativa,
+  numerarNpcsNaOrdem,
   ordenarPorIniciativa,
   penalidadeD20,
   proximoTurno,
   recuperarDadosDeVida,
   reducaoDeslocamento,
+  reduzirPrazosCondicao,
   situacaoMorte,
   turnoAposRemover,
   turnoAposTrocar,
@@ -220,6 +222,29 @@ describe("nome na iniciativa (anti-spoiler de NPC)", () => {
     expect(nomeExibidoIniciativa({ name: "Dragão Ancião", is_npc: true, revealed: true }, 1, false)).toBe(
       "Dragão Ancião",
     );
+  });
+
+  it("numera só os NPC, na ordem, ignorando jogador no meio", () => {
+    const ordem = [{ slug: "goblin-1" }, { slug: "tiberio" }, { slug: "goblin-2" }];
+    const ehNpc = (slug: string) => slug.startsWith("goblin");
+    expect(numerarNpcsNaOrdem(ordem, ehNpc)).toEqual([1, 1, 2]);
+  });
+});
+
+describe("condição com prazo", () => {
+  it("desconta 1 rodada; ao chegar a 0, desliga e some do mapa", () => {
+    const r = reduzirPrazosCondicao({ Amedrontado: true }, { Amedrontado: 1 });
+    expect(r).toEqual({ cond: { Amedrontado: false }, cond_prazo: {}, expiraram: ["Amedrontado"] });
+  });
+
+  it("com mais de 1 rodada restante, só desconta e mantém ligada", () => {
+    const r = reduzirPrazosCondicao({ Atordoado: true }, { Atordoado: 3 });
+    expect(r).toEqual({ cond: { Atordoado: true }, cond_prazo: { Atordoado: 2 }, expiraram: [] });
+  });
+
+  it("condição sem prazo marcado não é mexida", () => {
+    const r = reduzirPrazosCondicao({ Caído: true }, {});
+    expect(r).toEqual({ cond: { Caído: true }, cond_prazo: {}, expiraram: [] });
   });
 });
 

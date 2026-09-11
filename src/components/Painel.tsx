@@ -4,12 +4,14 @@ import { useMemo } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCodigoSala } from "@/hooks/useCodigoSala";
 import { useIdentidade } from "@/hooks/useIdentidade";
+import { useModoTelao } from "@/hooks/useModoTelao";
 import {
   limparIdentidade,
   salvarIdentidade,
   type Identidade,
 } from "@/lib/identidade";
 import { rotuloDaSala } from "@/lib/sala";
+import { baixarJson, montarBackup } from "@/lib/backup";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
 import { AcoesEmMassa } from "@/components/AcoesEmMassa";
@@ -18,6 +20,8 @@ import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
 import { LogCombate } from "@/components/LogCombate";
 import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
+import { DiarioCampanha } from "@/components/DiarioCampanha";
+import { Telao } from "@/components/Telao";
 
 export function Painel() {
   const codigo = useCodigoSala();
@@ -29,6 +33,7 @@ export function Painel() {
 function PainelSala({ codigo }: { codigo: string }) {
   const sala = useSala(codigo);
   const identidade = useIdentidade(codigo);
+  const telao = useModoTelao();
   const rotulo = rotuloDaSala(codigo);
 
   function entrar(id: Identidade) {
@@ -36,6 +41,23 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
   function trocar() {
     limparIdentidade(codigo);
+  }
+  function abrirTelao() {
+    const params = new URLSearchParams(window.location.search);
+    params.set("telao", "1");
+    window.open(`${window.location.pathname}?${params.toString()}`, "_blank");
+  }
+  function baixarBackup() {
+    const dados = montarBackup({
+      rotulo,
+      personagens: sala.personagens,
+      combate: sala.combate,
+      notasMestre: sala.notasMestre,
+      modelosNpc: sala.modelosNpc,
+      log: sala.log,
+      diario: sala.diario,
+    });
+    baixarJson(dados, `painel-de-mesa-${codigo}-${new Date().toISOString().slice(0, 10)}.json`);
   }
 
   const souMestre = identidade?.tipo === "mestre";
@@ -63,6 +85,10 @@ function PainelSala({ codigo }: { codigo: string }) {
     );
   }
 
+  if (telao) {
+    return <Telao sala={sala} rotulo={rotulo} />;
+  }
+
   if (!identidade) {
     return <Portao sala={sala} rotulo={rotulo} onEntrar={entrar} />;
   }
@@ -87,6 +113,16 @@ function PainelSala({ codigo }: { codigo: string }) {
           <span>
             Entrou como <b>{quem}</b>
           </span>
+          {souMestre && (
+            <>
+              <button className="linkbtn" type="button" onClick={abrirTelao}>
+                📺 modo telão
+              </button>
+              <button className="linkbtn" type="button" onClick={baixarBackup}>
+                ⬇ backup
+              </button>
+            </>
+          )}
           <button className="linkbtn" type="button" onClick={trocar}>
             trocar
           </button>
@@ -96,6 +132,8 @@ function PainelSala({ codigo }: { codigo: string }) {
       {identidade.tipo === "jogador" && (
         <BannerSuaVez combate={sala.combate} meuSlug={identidade.slug} />
       )}
+
+      <DiarioCampanha sala={sala} souMestre={souMestre} />
 
       <RastreadorCombate sala={sala} souMestre={souMestre} />
       <LogCombate log={sala.log} />

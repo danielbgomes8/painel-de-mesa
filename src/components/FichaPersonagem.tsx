@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { Personagem, Recurso } from "@/lib/tipos";
+import type { ItemEquip, Personagem, Recurso } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import {
   ajustarPV,
@@ -185,7 +185,7 @@ export function FichaPersonagem({
             ))}
         </div>
 
-        <div className="stats3">
+        <div className="statsrow">
           <div className="stat">
             <div className="lbl">CA</div>
             {editavel ? (
@@ -209,6 +209,47 @@ export function FichaPersonagem({
             ) : (
               <div className="val">{p.speed}</div>
             )}
+          </div>
+          <div className="stat">
+            <div className="lbl">Perc. passiva</div>
+            {editavel ? (
+              <CampoNumero valor={p.pp} onCommit={(n) => patch({ pp: Math.max(0, n) })} />
+            ) : (
+              <div className="val">{p.pp}</div>
+            )}
+          </div>
+          <div className="stat">
+            <div className="lbl">CD de magia</div>
+            {editavel ? (
+              <CampoNumero valor={p.spell_dc} onCommit={(n) => patch({ spell_dc: Math.max(0, n) })} />
+            ) : (
+              <div className="val">{p.spell_dc}</div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <span className="sectitle">Bônus de resistência (saves)</span>
+          <div className="statsrow">
+            {(
+              [
+                ["Força", "save_str"],
+                ["Destreza", "save_dex"],
+                ["Constituição", "save_con"],
+                ["Inteligência", "save_int"],
+                ["Sabedoria", "save_wis"],
+                ["Carisma", "save_cha"],
+              ] as const
+            ).map(([rotulo, campo]) => (
+              <div key={campo} className="stat">
+                <div className="lbl">{rotulo}</div>
+                {editavel ? (
+                  <CampoNumero valor={p[campo]} onCommit={(n) => patch({ [campo]: n })} />
+                ) : (
+                  <div className="val">{sinal(p[campo])}</div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -335,13 +376,38 @@ export function FichaPersonagem({
                   className="chip"
                   aria-pressed={ativa}
                   disabled={!editavel}
-                  onClick={() => patch({ cond: { ...p.cond, [nome]: !ativa } })}
+                  onClick={() => {
+                    const ligar = !ativa;
+                    const cond_prazo = { ...p.cond_prazo };
+                    if (!ligar) delete cond_prazo[nome];
+                    patch({ cond: { ...p.cond, [nome]: ligar }, cond_prazo });
+                  }}
                 >
                   {nome}
                 </button>
               );
             })}
           </div>
+          {editavel && (
+            <div className="condprazos">
+              {CONDICOES.filter((nome) => p.cond?.[nome]).map((nome) => (
+                <label key={nome} className="condprazo">
+                  {nome} dura
+                  <CampoNumero
+                    className="campnum"
+                    valor={p.cond_prazo[nome] ?? 0}
+                    onCommit={(n) => {
+                      const cond_prazo = { ...p.cond_prazo };
+                      if (n <= 0) delete cond_prazo[nome];
+                      else cond_prazo[nome] = n;
+                      patch({ cond_prazo });
+                    }}
+                  />
+                  rodada(s) — 0 = tira à mão
+                </label>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>
@@ -394,6 +460,49 @@ export function FichaPersonagem({
           {editavel && (
             <FormRecurso onAdicionar={(novo) => patch({ resources: [...p.resources, novo] })} />
           )}
+        </div>
+
+        <div>
+          <span className="sectitle">Munição e equipamento</span>
+          {p.items.length === 0 && (
+            <p className="empty-note">
+              {editavel ? "Nada cadastrado — flechas, tochas, o estado de uma arma..." : "Nada cadastrado."}
+            </p>
+          )}
+          <div className="reslist">
+            {p.items.map((it, i) => (
+              <div key={i} className="resrow">
+                <span className="resnome">{it.name}</span>
+                <div className="pips">
+                  {Array.from({ length: it.max }, (_, k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className="pip"
+                      aria-label={`${it.name} ${k + 1}`}
+                      aria-pressed={k < it.cur}
+                      disabled={!editavel}
+                      onClick={() => {
+                        const cur = limitarPV(alternarPips(k, it.cur), it.max);
+                        patch({ items: p.items.map((x, idx) => (idx === i ? { ...x, cur } : x)) });
+                      }}
+                    />
+                  ))}
+                </div>
+                {editavel && (
+                  <button
+                    type="button"
+                    className="rm"
+                    aria-label={`remover ${it.name}`}
+                    onClick={() => patch({ items: p.items.filter((_, idx) => idx !== i) })}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {editavel && <FormItem onAdicionar={(novo) => patch({ items: [...p.items, novo] })} />}
         </div>
 
         {editavel ? (
@@ -479,6 +588,47 @@ function FormRecurso({ onAdicionar }: { onAdicionar: (r: Recurso) => void }) {
       </label>
       <button type="button" className="btn" onClick={adicionar}>
         + recurso
+      </button>
+    </div>
+  );
+}
+
+/** Formulário pra cadastrar munição/equipamento (sem reset em descanso). */
+function FormItem({ onAdicionar }: { onAdicionar: (i: ItemEquip) => void }) {
+  const [nome, setNome] = useState("");
+  const [max, setMax] = useState("");
+
+  function adicionar() {
+    const nomeLimpo = nome.trim();
+    const maximo = Number.parseInt(max, 10);
+    if (!nomeLimpo || Number.isNaN(maximo) || maximo <= 0) return;
+    onAdicionar({ name: nomeLimpo, max: maximo, cur: maximo });
+    setNome("");
+    setMax("");
+  }
+
+  return (
+    <div className="addcombatant" style={{ marginTop: 8 }}>
+      <input
+        type="text"
+        placeholder="nome (ex.: Flechas, Tochas, Espada longa)"
+        maxLength={40}
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+      />
+      <input
+        className="num"
+        type="number"
+        inputMode="numeric"
+        placeholder="quantidade/estados"
+        value={max}
+        onChange={(e) => setMax(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") adicionar();
+        }}
+      />
+      <button type="button" className="btn" onClick={adicionar}>
+        + item
       </button>
     </div>
   );

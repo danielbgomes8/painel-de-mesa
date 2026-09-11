@@ -6,8 +6,10 @@ import type { ItemIniciativa, ModeloNpc } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import {
   nomeExibidoIniciativa,
+  numerarNpcsNaOrdem,
   ordenarPorIniciativa,
   proximoTurno,
+  reduzirPrazosCondicao,
   turnoAposRemover,
   turnoAposTrocar,
 } from "@/lib/regras";
@@ -38,13 +40,7 @@ export function RastreadorCombate({
     return personagens.find((p) => p.slug === slug) ?? null;
   }
 
-  // Numeração estável de NPC ("Inimigo 1", "Inimigo 2"...) pra quem entra como
-  // jogador — construída sem mutar variável (regra do compilador do React).
-  const contagensNpc = combate.order.reduce<number[]>((acc, c) => {
-    const anterior = acc.length > 0 ? acc[acc.length - 1] : 0;
-    const ehNpc = Boolean(pvDe(c.slug)?.is_npc);
-    return [...acc, ehNpc ? anterior + 1 : anterior];
-  }, []);
+  const contagensNpc = numerarNpcsNaOrdem(combate.order, (slug) => Boolean(pvDe(slug)?.is_npc));
 
   function usarModelo(m: ModeloNpc) {
     setNomeNpc(m.name);
@@ -100,7 +96,17 @@ export function RastreadorCombate({
 
   function avancarTurno() {
     const proximo = proximoTurno(combate);
-    if (proximo.round !== combate.round) sala.registrarLog(`Rodada ${proximo.round} começou`);
+    if (proximo.round !== combate.round) {
+      sala.registrarLog(`Rodada ${proximo.round} começou`);
+      for (const p of personagens) {
+        if (Object.keys(p.cond_prazo).length === 0) continue;
+        const resultado = reduzirPrazosCondicao(p.cond, p.cond_prazo);
+        sala.atualizarPersonagem(p.id, { cond: resultado.cond, cond_prazo: resultado.cond_prazo });
+        for (const nome of resultado.expiraram) {
+          sala.registrarLog(`${p.name} não está mais ${nome} (prazo esgotado)`);
+        }
+      }
+    }
     sala.definirCombate(proximo);
   }
 

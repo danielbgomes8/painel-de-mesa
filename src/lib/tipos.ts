@@ -11,6 +11,14 @@ export type Recurso = {
   short_rest: boolean;
 };
 
+/** Munição ou estado de equipamento (ex.: "Flechas" 14/20, "Espada longa"
+ *  1/3 pra marcar desgaste) — nunca reseta em descanso, só muda na mão. */
+export type ItemEquip = {
+  name: string;
+  max: number;
+  cur: number;
+};
+
 export type Personagem = {
   id: string;
   room_code: string;
@@ -38,6 +46,19 @@ export type Personagem = {
   hd_cur: number;
   hd_die: string;
   resources: Recurso[];
+  /** Rodadas restantes por condição ativa; some da lista quando chega a 0. */
+  cond_prazo: Record<string, number>;
+  /** Percepção passiva e CD de magia — só consulta, ninguém calcula sozinho. */
+  pp: number;
+  spell_dc: number;
+  /** Bônus de resistência de atributo (saves) — idem, só consulta. */
+  save_str: number;
+  save_dex: number;
+  save_con: number;
+  save_int: number;
+  save_wis: number;
+  save_cha: number;
+  items: ItemEquip[];
   created_at: string;
   updated_at: string;
 };
@@ -98,4 +119,18 @@ export type LinhaLog = {
   room_code: string;
   text: string;
   created_at: string;
+};
+
+/** Uma entrada do diário da campanha — visível pra todo mundo, o Mestre escreve. */
+export type EntradaDiario = {
+  id: string;
+  room_code: string;
+  title: string;
+  text: string;
+  created_at: string;
+};
+
+export type NovaEntradaDiario = {
+  title: string;
+  text: string;
 };

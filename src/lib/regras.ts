@@ -213,6 +213,21 @@ export function nomeExibidoIniciativa(
   return `Inimigo ${numeroDoNpc}`;
 }
 
+/**
+ * Numeração estável de NPC ao longo da ordem de iniciativa (1, 2, 3...),
+ * pra virar "Inimigo N" — construída sem mutar variável durante o render
+ * (regra do compilador do React).
+ */
+export function numerarNpcsNaOrdem(
+  order: { slug: string }[],
+  ehNpc: (slug: string) => boolean,
+): number[] {
+  return order.reduce<number[]>((acc, c) => {
+    const anterior = acc.length > 0 ? acc[acc.length - 1] : 0;
+    return [...acc, ehNpc(c.slug) ? anterior + 1 : anterior];
+  }, []);
+}
+
 /** Próximo turno: anda na ordem; ao dar a volta, incrementa a rodada. */
 export function proximoTurno(
   estado: { round: number; turn: number; order: unknown[] },
@@ -251,4 +266,32 @@ export function turnoAposTrocar(turnoAtual: number, i: number, j: number): numbe
   if (turnoAtual === i) return j;
   if (turnoAtual === j) return i;
   return turnoAtual;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Condição com prazo (some sozinha depois de N rodadas)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A cada rodada nova, desconta 1 de cada condição com prazo marcado; ao
+ * chegar a 0, desliga a condição e tira ela do mapa de prazos. Devolve
+ * também quais condições expiraram agora, pra registrar no log.
+ */
+export function reduzirPrazosCondicao(
+  cond: Record<string, boolean>,
+  prazo: Record<string, number>,
+): { cond: Record<string, boolean>; cond_prazo: Record<string, number>; expiraram: string[] } {
+  const novoCond = { ...cond };
+  const novoPrazo: Record<string, number> = {};
+  const expiraram: string[] = [];
+  for (const [nome, restante] of Object.entries(prazo)) {
+    const restanteNovo = restante - 1;
+    if (restanteNovo <= 0) {
+      novoCond[nome] = false;
+      expiraram.push(nome);
+    } else {
+      novoPrazo[nome] = restanteNovo;
+    }
+  }
+  return { cond: novoCond, cond_prazo: novoPrazo, expiraram };
 }

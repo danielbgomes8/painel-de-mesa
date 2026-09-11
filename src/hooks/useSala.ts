@@ -5,10 +5,12 @@ import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { slugUnico } from "@/lib/sala";
 import {
   COMBATE_VAZIO,
+  type EntradaDiario,
   type EstadoCombate,
   type ItemIniciativa,
   type LinhaLog,
   type ModeloNpc,
+  type NovaEntradaDiario,
   type NovoModeloNpc,
   type NovoPersonagem,
   type Personagem,
@@ -32,6 +34,7 @@ export type Sala = {
   notasMestre: string;
   log: LinhaLog[];
   modelosNpc: ModeloNpc[];
+  diario: EntradaDiario[];
   criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
   removerPersonagem: (id: string) => Promise<void>;
@@ -41,6 +44,9 @@ export type Sala = {
   criarModeloNpc: (dados: NovoModeloNpc) => Promise<void>;
   atualizarModeloNpc: (id: string, patch: Partial<ModeloNpc>) => Promise<void>;
   removerModeloNpc: (id: string) => Promise<void>;
+  criarEntradaDiario: (dados: NovaEntradaDiario) => Promise<void>;
+  atualizarEntradaDiario: (id: string, patch: Partial<EntradaDiario>) => Promise<void>;
+  removerEntradaDiario: (id: string) => Promise<void>;
 };
 
 /** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
@@ -72,6 +78,7 @@ export function useSala(codigo: string): Sala {
   const [notasMestre, setNotasMestre] = useState("");
   const [log, setLog] = useState<LinhaLog[]>([]);
   const [modelosNpc, setModelosNpc] = useState<ModeloNpc[]>([]);
+  const [diario, setDiario] = useState<EntradaDiario[]>([]);
 
   // Espelho síncrono do estado, pra montar patches sem depender do closure.
   // Atualizado depois do commit (não durante o render).
@@ -99,7 +106,7 @@ export function useSala(codigo: string): Sala {
           .upsert({ room_code: codigo }, { onConflict: "room_code", ignoreDuplicates: true }),
       ]);
 
-      const [pc, cs, dn, lg, mn] = await Promise.all([
+      const [pc, cs, dn, lg, mn, di] = await Promise.all([
         supabase.from("characters").select("*").eq("room_code", codigo),
         supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle(),
         supabase.from("dm_notes").select("*").eq("room_code", codigo).maybeSingle(),
@@ -110,6 +117,11 @@ export function useSala(codigo: string): Sala {
           .order("created_at", { ascending: false })
           .limit(TAMANHO_LOG),
         supabase.from("npc_templates").select("*").eq("room_code", codigo),
+        supabase
+          .from("diario")
+          .select("*")
+          .eq("room_code", codigo)
+          .order("created_at", { ascending: false }),
       ]);
 
       if (!vivo) return;
@@ -125,6 +137,7 @@ export function useSala(codigo: string): Sala {
       setNotasMestre((dn.data?.text ?? "") as string);
       setLog((lg.data ?? []) as LinhaLog[]);
       setModelosNpc((mn.data ?? []) as ModeloNpc[]);
+      setDiario((di.data ?? []) as EntradaDiario[]);
       setCarregando(false);
     }
 
@@ -190,6 +203,21 @@ export function useSala(codigo: string): Sala {
             const novo = msg.new as ModeloNpc;
             const semEle = atual.filter((m) => m.id !== novo.id);
             return [...semEle, novo];
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "diario", filter: filtro },
+        (msg) => {
+          setDiario((atual) => {
+            if (msg.eventType === "DELETE") {
+              const id = (msg.old as { id?: string }).id;
+              return atual.filter((e) => e.id !== id);
+            }
+            const nova = msg.new as EntradaDiario;
+            const semEla = atual.filter((e) => e.id !== nova.id);
+            return [nova, ...semEla].sort((a, b) => b.created_at.localeCompare(a.created_at));
           });
         },
       )
@@ -340,6 +368,32 @@ export function useSala(codigo: string): Sala {
     if (error) console.error("removerModeloNpc", error);
   }, []);
 
+  const criarEntradaDiario = useCallback(
+    async (dados: NovaEntradaDiario) => {
+      const linha = { room_code: codigo, title: dados.title, text: dados.text };
+      const { data, error } = await supabase.from("diario").insert(linha).select().single();
+      if (error) {
+        console.error("criarEntradaDiario", error);
+        return;
+      }
+      const criada = data as EntradaDiario;
+      setDiario((atual) => (atual.some((e) => e.id === criada.id) ? atual : [criada, ...atual]));
+    },
+    [codigo],
+  );
+
+  const atualizarEntradaDiario = useCallback(async (id: string, patch: Partial<EntradaDiario>) => {
+    setDiario((atual) => atual.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+    const { error } = await supabase.from("diario").update(patch).eq("id", id);
+    if (error) console.error("atualizarEntradaDiario", error);
+  }, []);
+
+  const removerEntradaDiario = useCallback(async (id: string) => {
+    setDiario((atual) => atual.filter((e) => e.id !== id));
+    const { error } = await supabase.from("diario").delete().eq("id", id);
+    if (error) console.error("removerEntradaDiario", error);
+  }, []);
+
   return {
     carregando: supabaseConfigurado && carregando,
     conectado,
@@ -349,6 +403,7 @@ export function useSala(codigo: string): Sala {
     notasMestre,
     log,
     modelosNpc,
+    diario,
     criarPersonagem,
     atualizarPersonagem,
     removerPersonagem,
@@ -358,5 +413,8 @@ export function useSala(codigo: string): Sala {
     criarModeloNpc,
     atualizarModeloNpc,
     removerModeloNpc,
+    criarEntradaDiario,
+    atualizarEntradaDiario,
+    removerEntradaDiario,
   };
 }
