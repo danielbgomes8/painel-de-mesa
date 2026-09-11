@@ -16,18 +16,32 @@ lista, ou digita um nome novo). Essa escolha fica salva só no navegador dela.
 ## O que cada um vê
 
 **Jogador** — só o próprio card:
-PV atual/máx com +/− e ajuste do máximo · CA, Iniciativa e Deslocamento
-editáveis · Exaustão 0–6 em pips, com o efeito calculado em texto · testes de
-resistência contra a morte · aviso de "Caído" quando o PV zera · as 14 condições
-do 2024 como chips · notas rápidas · banner **"É a sua vez!"** no turno dele ·
-rastreador de combate em modo leitura.
+PV atual/máx/temporário com +/− (dano desconta do temporário primeiro) · CA,
+Iniciativa e Deslocamento editáveis · Exaustão 0–6 em pips, com o efeito
+calculado em texto · dados de vida + **descanso curto/longo** (o longo cura
+tudo, tira 1 exaustão, recupera metade dos dados de vida e zera os recursos) ·
+testes de resistência contra a morte · aviso de "Caído" quando o PV zera · as
+14 condições do 2024 como chips · **Inspiração Heroica** e **concentração**
+(com nota de "em quê") · **recursos de classe genéricos** — cada jogador
+cadastra o que a própria classe usa (Fúria, Pontos de Foco, Surto de Ação,
+Canalizar Divindade, espaços de magia por nível…), com opção de recuperar no
+descanso curto · notas rápidas · banner **"É a sua vez!"** (com vibração/bipe)
+no turno dele · rastreador de combate em modo leitura, com nomes de NPC ainda
+não revelados aparecendo como "Inimigo N" · log de combate ("o que
+aconteceu") visível pra todos.
 
 **Mestre** — tudo:
 todos os cards, editáveis · rastreador de iniciativa (adicionar personagem
-cadastrado ou NPC/monstro avulso, ordenar por iniciativa, reordenar na mão,
-marcar o turno, avançar rodada, reiniciar) · **ações em massa** (selecionar
-vários e aplicar dano/cura ou uma condição de uma vez) · **notas privadas** que
-só o Mestre enxerga · remover personagens e NPCs.
+cadastrado ou NPC/monstro avulso, **rolar iniciativa** d20+mod, ordenar,
+reordenar na mão, marcar o turno, avançar rodada, reiniciar) · **revelar/
+ocultar NPC** — jogador só vê o nome real depois que o Mestre revela ·
+**biblioteca de NPCs** pra preparar a mesa com antecedência — ficha completa
+(classe, PV, CA, deslocamento, iniciativa) mais um campo de notas de tática
+("foge com PV baixo", "resistente a fogo"...), editável a qualquer momento e
+reaproveitável entre combates e sessões ·
+**ações em massa** (selecionar vários e aplicar dano/cura ou uma condição de
+uma vez) · **notas privadas** que só o Mestre enxerga · remover personagens e
+NPCs.
 
 ---
 
@@ -41,7 +55,14 @@ Estão em [`src/lib/regras.ts`](src/lib/regras.ts), cada uma pura e coberta por
   nível. Nível 6 = morte. Descanso longo tira **1 nível** (não zera).
 - **Testes de morte** zeram sozinhos assim que a criatura recupera **qualquer PV
   acima de 0**.
-- **PV** nunca passa do máximo nem fica negativo (trava em 0).
+- **PV** nunca passa do máximo nem fica negativo (trava em 0). **Dano desconta
+  do PV temporário antes do PV normal**; cura não mexe no temporário.
+- **Descanso longo**: PV cheio, −1 exaustão, recupera metade dos dados de vida
+  (mínimo 1) e zera todos os recursos de classe. **Descanso curto**: só os
+  recursos marcados como "recupera no descanso curto".
+- **NPC não revelado** aparece pro jogador como "Inimigo N" na ordem de
+  iniciativa — Mestre revela quando quiser (evita entregar o monstro antes da
+  hora).
 
 ---
 
@@ -54,11 +75,17 @@ Tudo roda no navegador: não há backend próprio nem segredo de servidor.
 src/
   app/            layout, página única, globals.css (tema "taverna")
   components/     Painel (orquestra) · Portao · RastreadorCombate ·
-                  AcoesEmMassa · NotasDoMestre · FichaPersonagem · BannerSuaVez
+                  AcoesEmMassa · BibliotecaNpcs · NotasDoMestre ·
+                  FichaPersonagem · BannerSuaVez · LogCombate ·
+                  CampoNumero · CampoTexto (campos reutilizáveis)
   hooks/useSala   carrega a sala + assina o Realtime + expõe as mutações
-  lib/            regras · condicoes · identidade · sala · supabase · tipos
+  lib/            regras · condicoes · identidade · sala · supabase · tipos ·
+                  dados (rolagem d20) · alerta (vibração/bipe de turno)
 supabase/
   migrations/     0001_inicial.sql  (tabelas, triggers, Realtime, RLS)
+                  0002_recursos_e_registro.sql  (PV temp, recursos de classe,
+                  dados de vida, revelar NPC, biblioteca de modelos, log)
+                  0003_biblioteca_notas.sql  (notas de tática na biblioteca)
   seed.sql        dados da sala "setimo-raio" (Tibério Vaz)
 ```
 

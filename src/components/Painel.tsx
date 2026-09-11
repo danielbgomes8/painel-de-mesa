@@ -16,6 +16,8 @@ import { AcoesEmMassa } from "@/components/AcoesEmMassa";
 import { NotasDoMestre } from "@/components/NotasDoMestre";
 import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
+import { LogCombate } from "@/components/LogCombate";
+import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 
 export function Painel() {
   const codigo = useCodigoSala();
@@ -96,8 +98,10 @@ function PainelSala({ codigo }: { codigo: string }) {
       )}
 
       <RastreadorCombate sala={sala} souMestre={souMestre} />
+      <LogCombate log={sala.log} />
 
       {souMestre && <AcoesEmMassa sala={sala} />}
+      {souMestre && <BibliotecaNpcs sala={sala} />}
       {souMestre && (
         <NotasDoMestre valor={sala.notasMestre} onSalvar={sala.definirNotasMestre} />
       )}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import { CONDICOES } from "@/lib/condicoes";
-import { ajustarPV } from "@/lib/regras";
+import { aplicarCura, aplicarDano, mensagemAjustePV, mensagemDanoAbsorvido } from "@/lib/regras";
 
 /** Área de efeito: seleciona vários personagens/NPCs e aplica dano, cura ou
  *  uma condição em todos de uma vez. Só o Mestre vê. */
@@ -23,9 +23,24 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
 
   function aplicarPV(sinal: 1 | -1) {
     const n = Number.parseInt(valor, 10);
-    if (Number.isNaN(n)) return;
+    if (Number.isNaN(n) || n <= 0) return;
     for (const p of selecionados) {
-      sala.atualizarPersonagem(p.id, ajustarPV(p, p.hp + sinal * n));
+      if (sinal > 0) {
+        const resultado = aplicarCura(p, n);
+        sala.atualizarPersonagem(p.id, resultado);
+        if (resultado.hp !== p.hp) {
+          sala.registrarLog(mensagemAjustePV(p.name, resultado.hp - p.hp, resultado.hp, p.hp_max));
+        }
+        continue;
+      }
+      const resultado = aplicarDano(p, n);
+      sala.atualizarPersonagem(p.id, resultado);
+      const deltaReal = resultado.hp - p.hp;
+      if (deltaReal !== 0) {
+        sala.registrarLog(mensagemAjustePV(p.name, deltaReal, resultado.hp, p.hp_max));
+      } else if (resultado.hp_temp < p.hp_temp) {
+        sala.registrarLog(mensagemDanoAbsorvido(p.name, p.hp_temp - resultado.hp_temp));
+      }
     }
   }
 

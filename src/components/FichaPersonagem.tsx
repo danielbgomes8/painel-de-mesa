@@ -1,24 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { Personagem } from "@/lib/tipos";
+import type { Personagem, Recurso } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import {
   ajustarPV,
+  aplicarCura,
+  aplicarDano,
+  aplicarDescansoCurto,
+  aplicarDescansoLongo,
   alternarPips,
-  descansoLongo,
   deslocamentoEfetivo,
   efeitoExaustao,
   EXAUSTAO_MAX,
   faixaPV,
   formatarMetros,
+  gastarDadoDeVida,
   limitarExaustao,
   limitarPV,
   limitarTesteMorte,
+  mensagemAjustePV,
+  mensagemDanoAbsorvido,
   situacaoMorte,
   TESTES_MORTE_MAX,
 } from "@/lib/regras";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
+import { CampoNumero } from "@/components/CampoNumero";
+import { CampoTexto } from "@/components/CampoTexto";
+
+const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
 export function FichaPersonagem({
   personagem: p,
@@ -35,6 +46,29 @@ export function FichaPersonagem({
 }) {
   const patch = (mudanca: Partial<Personagem>) => sala.atualizarPersonagem(p.id, mudanca);
 
+  /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no log. */
+  function mudarPV(delta: number) {
+    if (delta >= 0) {
+      const resultado = aplicarCura(p, delta);
+      patch(resultado);
+      if (resultado.hp !== p.hp) sala.registrarLog(mensagemAjustePV(p.name, resultado.hp - p.hp, resultado.hp, p.hp_max));
+      return;
+    }
+    const resultado = aplicarDano(p, -delta);
+    patch(resultado);
+    const deltaReal = resultado.hp - p.hp;
+    if (deltaReal !== 0) {
+      sala.registrarLog(mensagemAjustePV(p.name, deltaReal, resultado.hp, p.hp_max));
+    } else if (resultado.hp_temp < p.hp_temp) {
+      sala.registrarLog(mensagemDanoAbsorvido(p.name, p.hp_temp - resultado.hp_temp));
+    }
+  }
+
+  function descansoLongoCompleto() {
+    if (!confirm(`Aplicar descanso longo em ${p.name}? Cura tudo, tira 1 nível de exaustão, recupera dados de vida e zera os recursos.`)) return;
+    patch(aplicarDescansoLongo(p));
+  }
+
   const faixa = faixaPV(p.hp, p.hp_max);
   const largura = p.hp_max > 0 ? Math.max(0, Math.min(1, p.hp / p.hp_max)) : 0;
   const caido = p.hp <= 0;
@@ -50,6 +84,16 @@ export function FichaPersonagem({
           </h3>
           {p.cls && <div className="cls">{p.cls}</div>}
         </div>
+        {souMestre && p.is_npc && (
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={p.revealed}
+            onClick={() => patch({ revealed: !p.revealed })}
+          >
+            {p.revealed ? "revelado" : "oculto pro jogador"}
+          </button>
+        )}
       </div>
 
       <div className="body">
@@ -67,22 +111,13 @@ export function FichaPersonagem({
           <span className="hpnum">
             {p.hp} / {p.hp_max}
           </span>
+          {p.hp_temp > 0 && <span className="hptemp">+{p.hp_temp} temp</span>}
           {editavel && (
             <div className="hpbtns">
-              <button
-                type="button"
-                className="pbtn"
-                aria-label="Tirar 1 PV"
-                onClick={() => patch(ajustarPV(p, p.hp - 1))}
-              >
+              <button type="button" className="pbtn" aria-label="Tirar 1 PV" onClick={() => mudarPV(-1)}>
                 −
               </button>
-              <button
-                type="button"
-                className="pbtn"
-                aria-label="Somar 1 PV"
-                onClick={() => patch(ajustarPV(p, p.hp + 1))}
-              >
+              <button type="button" className="pbtn" aria-label="Somar 1 PV" onClick={() => mudarPV(1)}>
                 +
               </button>
             </div>
@@ -98,8 +133,57 @@ export function FichaPersonagem({
             />
             <span>atual</span>
             <CampoNumero valor={p.hp} onCommit={(n) => patch(ajustarPV(p, n))} />
+            <span>temp</span>
+            <CampoNumero valor={p.hp_temp} onCommit={(n) => patch({ hp_temp: Math.max(0, n) })} />
           </div>
         )}
+
+        {editavel && (
+          <div className="combatctrls">
+            <button type="button" className="btn" onClick={() => patch(aplicarDescansoCurto(p))}>
+              Descanso curto
+            </button>
+            <button type="button" className="btn" onClick={descansoLongoCompleto}>
+              Descanso longo
+            </button>
+          </div>
+        )}
+
+        <div className="chips">
+          <button
+            type="button"
+            className="chip flag"
+            aria-pressed={p.inspiration}
+            disabled={!editavel}
+            onClick={() => patch({ inspiration: !p.inspiration })}
+          >
+            ⭐ Inspiração
+          </button>
+          <button
+            type="button"
+            className="chip flag"
+            aria-pressed={p.concentration}
+            disabled={!editavel}
+            onClick={() =>
+              patch({
+                concentration: !p.concentration,
+                concentration_on: p.concentration ? "" : p.concentration_on,
+              })
+            }
+          >
+            🔮 Concentração
+          </button>
+          {p.concentration &&
+            (editavel ? (
+              <CampoTexto
+                valor={p.concentration_on}
+                placeholder="em quê?"
+                onCommit={(texto) => patch({ concentration_on: texto })}
+              />
+            ) : (
+              p.concentration_on && <span className="concnota">em {p.concentration_on}</span>
+            ))}
+        </div>
 
         <div className="stats3">
           <div className="stat">
@@ -157,14 +241,40 @@ export function FichaPersonagem({
               </>
             )}
           </div>
-          {editavel && p.exh > 0 && (
-            <div className="linha-descanso">
+        </div>
+
+        <div>
+          <div className="subrow">
+            <span className="lbl">Dados de vida</span>
+            <span className="lbl mono">
+              {p.hd_cur}/{p.hd_max}
+              {p.hd_max > 0 ? ` ${p.hd_die}` : ""}
+            </span>
+          </div>
+          {editavel && (
+            <div className="hpsetrow">
+              <span>máx</span>
+              <CampoNumero
+                valor={p.hd_max}
+                onCommit={(n) => {
+                  const max = Math.max(0, n);
+                  patch({ hd_max: max, hd_cur: Math.min(p.hd_cur, max) });
+                }}
+              />
+              <select value={p.hd_die} onChange={(e) => patch({ hd_die: e.target.value })}>
+                {TIPOS_DADO.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 className="minilink"
-                onClick={() => patch({ exh: descansoLongo(p.exh) })}
+                disabled={p.hd_cur <= 0}
+                onClick={() => patch({ hd_cur: gastarDadoDeVida(p.hd_cur) })}
               >
-                descanso longo (−1 nível)
+                gastar 1 dado
               </button>
             </div>
           )}
@@ -234,6 +344,58 @@ export function FichaPersonagem({
           </div>
         </div>
 
+        <div>
+          <span className="sectitle">Recursos (Fúria, Ki, espaços de magia…)</span>
+          {p.resources.length === 0 && (
+            <p className="empty-note">
+              {editavel ? "Nenhum ainda — cadastre o que a sua classe usa." : "Nenhum cadastrado."}
+            </p>
+          )}
+          <div className="reslist">
+            {p.resources.map((r, i) => (
+              <div key={i} className="resrow">
+                <span className="resnome">
+                  {r.name}
+                  {r.short_rest && " · desc. curto"}
+                </span>
+                <div className="pips">
+                  {Array.from({ length: r.max }, (_, k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className="pip"
+                      aria-label={`${r.name} uso ${k + 1}`}
+                      aria-pressed={k < r.cur}
+                      disabled={!editavel}
+                      onClick={() => {
+                        const cur = limitarPV(alternarPips(k, r.cur), r.max);
+                        patch({
+                          resources: p.resources.map((x, idx) => (idx === i ? { ...x, cur } : x)),
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+                {editavel && (
+                  <button
+                    type="button"
+                    className="rm"
+                    aria-label={`remover recurso ${r.name}`}
+                    onClick={() =>
+                      patch({ resources: p.resources.filter((_, idx) => idx !== i) })
+                    }
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {editavel && (
+            <FormRecurso onAdicionar={(novo) => patch({ resources: [...p.resources, novo] })} />
+          )}
+        </div>
+
         {editavel ? (
           <div className="notesbox">
             <span className="sectitle">Notas rápidas</span>
@@ -275,34 +437,49 @@ function sinal(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
-function CampoNumero({
-  valor,
-  onCommit,
-  className = "",
-}: {
-  valor: number;
-  onCommit: (n: number) => void;
-  className?: string;
-}) {
-  function commit(el: HTMLInputElement) {
-    const n = Number.parseInt(el.value, 10);
-    if (Number.isNaN(n)) {
-      el.value = String(valor);
-      return;
-    }
-    if (n !== valor) onCommit(n);
+/** Formulário pra cadastrar um recurso novo (nome livre + quantidade de usos). */
+function FormRecurso({ onAdicionar }: { onAdicionar: (r: Recurso) => void }) {
+  const [nome, setNome] = useState("");
+  const [max, setMax] = useState("");
+  const [curto, setCurto] = useState(false);
+
+  function adicionar() {
+    const nomeLimpo = nome.trim();
+    const maximo = Number.parseInt(max, 10);
+    if (!nomeLimpo || Number.isNaN(maximo) || maximo <= 0) return;
+    onAdicionar({ name: nomeLimpo, max: maximo, cur: maximo, short_rest: curto });
+    setNome("");
+    setMax("");
+    setCurto(false);
   }
+
   return (
-    <input
-      key={valor}
-      className={className}
-      type="number"
-      inputMode="numeric"
-      defaultValue={valor}
-      onBlur={(e) => commit(e.currentTarget)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-    />
+    <div className="addcombatant" style={{ marginTop: 8 }}>
+      <input
+        type="text"
+        placeholder="nome (ex.: Fúria, Pontos de Foco, Espaços Nv.1)"
+        maxLength={40}
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+      />
+      <input
+        className="num"
+        type="number"
+        inputMode="numeric"
+        placeholder="usos"
+        value={max}
+        onChange={(e) => setMax(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") adicionar();
+        }}
+      />
+      <label className="checklabel">
+        <input type="checkbox" checked={curto} onChange={(e) => setCurto(e.target.checked)} />
+        recupera no descanso curto
+      </label>
+      <button type="button" className="btn" onClick={adicionar}>
+        + recurso
+      </button>
+    </div>
   );
 }

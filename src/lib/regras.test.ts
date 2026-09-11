@@ -1,17 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
   ajustarPV,
+  aplicarCura,
+  aplicarDano,
+  aplicarDescansoCurto,
+  aplicarDescansoLongo,
   alternarPips,
   descansoLongo,
   deslocamentoEfetivo,
   efeitoExaustao,
   faixaPV,
   formatarMetros,
+  gastarDadoDeVida,
   limitarExaustao,
   limitarPV,
+  mensagemAjustePV,
+  mensagemDanoAbsorvido,
+  nomeExibidoIniciativa,
   ordenarPorIniciativa,
   penalidadeD20,
   proximoTurno,
+  recuperarDadosDeVida,
   reducaoDeslocamento,
   situacaoMorte,
   turnoAposRemover,
@@ -57,6 +66,37 @@ describe("PV", () => {
   });
 });
 
+describe("PV temporário", () => {
+  it("dano desconta do temporário antes do PV normal", () => {
+    expect(aplicarDano({ hp: 20, hp_max: 20, dss: 0, dsf: 0, hp_temp: 5 }, 3)).toEqual({
+      hp: 20,
+      hp_temp: 2,
+    });
+  });
+
+  it("dano que estoura o temporário passa o resto pro PV normal", () => {
+    expect(aplicarDano({ hp: 20, hp_max: 20, dss: 0, dsf: 0, hp_temp: 5 }, 8)).toEqual({
+      hp: 17,
+      hp_temp: 0,
+    });
+  });
+
+  it("cura não mexe no PV temporário", () => {
+    expect(aplicarCura({ hp: 10, hp_max: 20, dss: 0, dsf: 0 }, 5)).toEqual({ hp: 15 });
+  });
+
+  it("mensagem de log usa a variação real de PV", () => {
+    expect(mensagemAjustePV("Tibério", -5, 10, 20)).toBe("Tibério sofreu 5 de dano (10/20)");
+    expect(mensagemAjustePV("Goblin", 3, 8, 8)).toBe("Goblin recuperou 3 PV (8/8)");
+  });
+
+  it("mensagem quando o dano some todo no PV temporário", () => {
+    expect(mensagemDanoAbsorvido("Tibério", 3)).toBe(
+      "Tibério sofreu 3 de dano, todo absorvido pelo PV temporário",
+    );
+  });
+});
+
 describe("exaustão 2024", () => {
   it("trilha 0–6", () => {
     expect(limitarExaustao(-2)).toBe(0);
@@ -94,6 +134,52 @@ describe("exaustão 2024", () => {
   });
 });
 
+describe("dados de vida e descanso", () => {
+  it("descanso longo recupera metade dos dados, no mínimo 1", () => {
+    expect(recuperarDadosDeVida(10, 4)).toBe(9);
+    expect(recuperarDadosDeVida(10, 0)).toBe(5);
+    expect(recuperarDadosDeVida(3, 0)).toBe(1);
+  });
+
+  it("recuperação não passa do máximo", () => {
+    expect(recuperarDadosDeVida(4, 4)).toBe(4);
+  });
+
+  it("gastar dado de vida não fica negativo", () => {
+    expect(gastarDadoDeVida(1)).toBe(0);
+    expect(gastarDadoDeVida(0)).toBe(0);
+  });
+
+  it("descanso longo cura tudo, tira 1 exaustão, recupera dados e zera recursos", () => {
+    const resultado = aplicarDescansoLongo({
+      hp_max: 30,
+      exh: 2,
+      hd_max: 6,
+      hd_cur: 1,
+      resources: [{ name: "Fúria", max: 3, cur: 0, short_rest: false }],
+    });
+    expect(resultado).toEqual({
+      hp: 30,
+      exh: 1,
+      hd_cur: 4,
+      resources: [{ name: "Fúria", max: 3, cur: 3, short_rest: false }],
+    });
+  });
+
+  it("descanso curto só recupera recursos marcados pra isso", () => {
+    const resultado = aplicarDescansoCurto({
+      resources: [
+        { name: "Surto de Ação", max: 1, cur: 0, short_rest: true },
+        { name: "Espaços de magia Nv.1", max: 4, cur: 1, short_rest: false },
+      ],
+    });
+    expect(resultado.resources).toEqual([
+      { name: "Surto de Ação", max: 1, cur: 1, short_rest: true },
+      { name: "Espaços de magia Nv.1", max: 4, cur: 1, short_rest: false },
+    ]);
+  });
+});
+
 describe("testes de morte", () => {
   it("3 sucessos = estável, 3 falhas = morto", () => {
     expect(situacaoMorte(0, 0)).toBe("em-jogo");
@@ -108,6 +194,32 @@ describe("pips", () => {
   });
   it("clicar no último preenchido esvazia até ele", () => {
     expect(alternarPips(2, 3)).toBe(2);
+  });
+});
+
+describe("nome na iniciativa (anti-spoiler de NPC)", () => {
+  it("Mestre sempre vê o nome real", () => {
+    expect(nomeExibidoIniciativa({ name: "Dragão Ancião", is_npc: true, revealed: false }, 1, true)).toBe(
+      "Dragão Ancião",
+    );
+  });
+
+  it("jogador vê personagem de jogador normalmente", () => {
+    expect(nomeExibidoIniciativa({ name: "Tibério Vaz", is_npc: false, revealed: false }, 1, false)).toBe(
+      "Tibério Vaz",
+    );
+  });
+
+  it("jogador vê NPC não revelado como 'Inimigo N'", () => {
+    expect(nomeExibidoIniciativa({ name: "Dragão Ancião", is_npc: true, revealed: false }, 2, false)).toBe(
+      "Inimigo 2",
+    );
+  });
+
+  it("jogador vê o nome real depois que o Mestre revela", () => {
+    expect(nomeExibidoIniciativa({ name: "Dragão Ancião", is_npc: true, revealed: true }, 1, false)).toBe(
+      "Dragão Ancião",
+    );
   });
 });
 

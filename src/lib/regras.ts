@@ -3,6 +3,8 @@
  * Cada função é pura pra poder testar sozinha (ver regras.test.ts).
  */
 
+import type { Recurso } from "./tipos";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Pontos de vida
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,6 +48,34 @@ export function faixaPV(hp: number, hpMax: number): FaixaPV {
 /** PV a 0 = Caído: inconsciente, faz os testes de morte. */
 export function estaCaido(hp: number): boolean {
   return hp <= 0;
+}
+
+type EstadoVidaTemp = EstadoVida & { hp_temp: number };
+type PatchVidaTemp = PatchVida & { hp_temp: number };
+
+/** Dano desconta primeiro do PV temporário, só depois do PV normal. */
+export function aplicarDano(alvo: EstadoVidaTemp, dano: number): PatchVidaTemp {
+  const d = Math.max(0, Math.round(dano));
+  const doTemp = Math.min(alvo.hp_temp, d);
+  const doHp = d - doTemp;
+  return { ...ajustarPV(alvo, alvo.hp - doHp), hp_temp: alvo.hp_temp - doTemp };
+}
+
+/** Cura não mexe no PV temporário (são coisas independentes). */
+export function aplicarCura(alvo: EstadoVida, cura: number): PatchVida {
+  return ajustarPV(alvo, alvo.hp + Math.max(0, Math.round(cura)));
+}
+
+/** Frase pro log de combate a partir da variação real de PV já aplicada. */
+export function mensagemAjustePV(nome: string, delta: number, hpDepois: number, hpMax: number): string {
+  const verbo = delta >= 0 ? "recuperou" : "sofreu";
+  const rotulo = delta >= 0 ? "PV" : "de dano";
+  return `${nome} ${verbo} ${Math.abs(delta)} ${rotulo} (${hpDepois}/${hpMax})`;
+}
+
+/** Log pro caso em que o dano some inteiro no PV temporário (PV real não muda). */
+export function mensagemDanoAbsorvido(nome: string, absorvidoPeloTemp: number): string {
+  return `${nome} sofreu ${absorvidoPeloTemp} de dano, todo absorvido pelo PV temporário`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,7 +144,46 @@ export function situacaoMorte(dss: number, dsf: number): SituacaoMorte {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pips clicáveis (exaustão e testes de morte usam a mesma lógica)
+// Dados de vida e descanso
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Descanso longo recupera metade dos dados de vida gastos, no mínimo 1. */
+export function recuperarDadosDeVida(max: number, atual: number): number {
+  const recuperar = Math.max(1, Math.floor(max / 2));
+  return Math.min(max, atual + recuperar);
+}
+
+/** Gastar 1 dado de vida no descanso curto (a cura em si o jogador aplica à mão). */
+export function gastarDadoDeVida(atual: number): number {
+  return Math.max(0, atual - 1);
+}
+
+/**
+ * Descanso longo: PV cheio, -1 nível de exaustão, recupera dados de vida e
+ * zera todos os recursos de classe (voltam ao máximo).
+ */
+export function aplicarDescansoLongo(p: {
+  hp_max: number;
+  exh: number;
+  hd_max: number;
+  hd_cur: number;
+  resources: Recurso[];
+}): { hp: number; exh: number; hd_cur: number; resources: Recurso[] } {
+  return {
+    hp: p.hp_max,
+    exh: descansoLongo(p.exh),
+    hd_cur: recuperarDadosDeVida(p.hd_max, p.hd_cur),
+    resources: p.resources.map((r) => ({ ...r, cur: r.max })),
+  };
+}
+
+/** Descanso curto: só os recursos marcados como "recupera no descanso curto". */
+export function aplicarDescansoCurto(p: { resources: Recurso[] }): { resources: Recurso[] } {
+  return { resources: p.resources.map((r) => (r.short_rest ? { ...r, cur: r.max } : r)) };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pips clicáveis (exaustão, testes de morte e recursos usam a mesma lógica)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -128,6 +197,21 @@ export function alternarPips(indiceClicado: number, preenchidosAgora: number): n
 // ─────────────────────────────────────────────────────────────────────────────
 // Iniciativa / combate
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Nome exibido na ordem de iniciativa: o Mestre e o próprio nome de
+ * personagem de jogador sempre veem o nome real. NPC ainda não revelado
+ * aparece como "Inimigo N" pra jogador — evita entregar o monstro antes da
+ * hora (ex.: nome do chefão na lista assim que o combate começa).
+ */
+export function nomeExibidoIniciativa(
+  item: { name: string; is_npc: boolean; revealed: boolean },
+  numeroDoNpc: number,
+  souMestre: boolean,
+): string {
+  if (souMestre || !item.is_npc || item.revealed) return item.name;
+  return `Inimigo ${numeroDoNpc}`;
+}
 
 /** Próximo turno: anda na ordem; ao dar a volta, incrementa a rodada. */
 export function proximoTurno(

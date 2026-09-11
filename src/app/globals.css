@@ -374,7 +374,7 @@ button {
 }
 .initrow {
   display: grid;
-  grid-template-columns: 44px 1fr auto auto;
+  grid-template-columns: 44px 1fr auto auto auto;
   gap: 10px;
   align-items: center;
   padding: 9px 12px;
@@ -859,6 +859,136 @@ button {
     padding: 16px 12px 48px;
   }
   .initrow {
-    grid-template-columns: 36px 1fr auto auto;
+    grid-template-columns: 36px 1fr auto auto auto;
   }
+}
+
+/* ---------- PV temporário, descanso, flags, recursos ---------- */
+.hptemp {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--accent);
+  flex: none;
+}
+.chip.flag[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.campotexto {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.concnota {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: center;
+}
+.reslist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.resrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.resrow .resnome {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 90px;
+  flex: none;
+}
+.resrow .rm {
+  margin-left: auto;
+}
+.checklabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* ---------- biblioteca de NPCs ---------- */
+.npclib {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.npclibrow {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.npclibhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.npclibhead .campotexto {
+  flex: 1;
+  font-size: 14px;
+  padding: 6px 10px;
+}
+.npclibstats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.npclibstats label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.campnum {
+  width: 52px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  padding: 3px 5px;
+  text-align: center;
+  font-size: 12px;
+}
+.npclibform {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- log de combate ---------- */
+.loglist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.logrow {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.logrow .hora {
+  font-family: var(--f-mono);
+  color: var(--dim);
+  flex: none;
 }

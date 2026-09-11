@@ -25,6 +25,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - O visual saiu do protótipo (Artifact) validado com a mesa: paleta e classes
   CSS estão em `src/app/globals.css`, praticamente iguais às do protótipo.
 
+## Pendência (11/09/2026) — código novo ainda não commitado/publicado
+
+Migrations `0002_recursos_e_registro.sql` e `0003_biblioteca_notas.sql` **já
+rodaram** no Supabase de produção (mesmo projeto que o Vercel usa) — o banco
+já tem PV temporário, ocultar/revelar NPC, inspiração, concentração, dados de
+vida, recursos de classe genéricos, biblioteca de NPCs (com notas) e log de
+combate. O que falta é só o lado do código: as mudanças estão testadas
+localmente (`npm run teste`, lint, build, e manualmente no navegador) mas
+ainda **não foram commitadas nem enviadas pro GitHub/Vercel** — a versão em
+produção (painel-de-mesa.vercel.app) ainda é a antiga. Precisa de `git add` +
+commit + push (ou pedir pro agente) pra ir ao ar. Depois de publicado, apagar
+esta seção.
+
 ## Estado (11/09/2026) — já está tudo publicado e funcionando
 
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta

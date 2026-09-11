@@ -7,9 +7,14 @@ import {
   COMBATE_VAZIO,
   type EstadoCombate,
   type ItemIniciativa,
+  type LinhaLog,
+  type ModeloNpc,
+  type NovoModeloNpc,
   type NovoPersonagem,
   type Personagem,
 } from "@/lib/tipos";
+
+const TAMANHO_LOG = 40;
 
 type LinhaCombate = {
   room_code: string;
@@ -25,11 +30,17 @@ export type Sala = {
   personagens: Personagem[];
   combate: EstadoCombate;
   notasMestre: string;
+  log: LinhaLog[];
+  modelosNpc: ModeloNpc[];
   criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
   removerPersonagem: (id: string) => Promise<void>;
   definirCombate: (patch: Partial<EstadoCombate>) => Promise<void>;
   definirNotasMestre: (texto: string) => Promise<void>;
+  registrarLog: (texto: string) => Promise<void>;
+  criarModeloNpc: (dados: NovoModeloNpc) => Promise<void>;
+  atualizarModeloNpc: (id: string, patch: Partial<ModeloNpc>) => Promise<void>;
+  removerModeloNpc: (id: string) => Promise<void>;
 };
 
 /** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
@@ -59,6 +70,8 @@ export function useSala(codigo: string): Sala {
   const [personagens, setPersonagens] = useState<Personagem[]>([]);
   const [combate, setCombate] = useState<EstadoCombate>(COMBATE_VAZIO);
   const [notasMestre, setNotasMestre] = useState("");
+  const [log, setLog] = useState<LinhaLog[]>([]);
+  const [modelosNpc, setModelosNpc] = useState<ModeloNpc[]>([]);
 
   // Espelho síncrono do estado, pra montar patches sem depender do closure.
   // Atualizado depois do commit (não durante o render).
@@ -86,10 +99,17 @@ export function useSala(codigo: string): Sala {
           .upsert({ room_code: codigo }, { onConflict: "room_code", ignoreDuplicates: true }),
       ]);
 
-      const [pc, cs, dn] = await Promise.all([
+      const [pc, cs, dn, lg, mn] = await Promise.all([
         supabase.from("characters").select("*").eq("room_code", codigo),
         supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle(),
         supabase.from("dm_notes").select("*").eq("room_code", codigo).maybeSingle(),
+        supabase
+          .from("combat_log")
+          .select("*")
+          .eq("room_code", codigo)
+          .order("created_at", { ascending: false })
+          .limit(TAMANHO_LOG),
+        supabase.from("npc_templates").select("*").eq("room_code", codigo),
       ]);
 
       if (!vivo) return;
@@ -103,6 +123,8 @@ export function useSala(codigo: string): Sala {
       setPersonagens(ordenar((pc.data ?? []) as Personagem[]));
       setCombate(comoCombate((cs.data ?? null) as LinhaCombate | null));
       setNotasMestre((dn.data?.text ?? "") as string);
+      setLog((lg.data ?? []) as LinhaLog[]);
+      setModelosNpc((mn.data ?? []) as ModeloNpc[]);
       setCarregando(false);
     }
 
@@ -144,6 +166,31 @@ export function useSala(codigo: string): Sala {
         (msg) => {
           if (msg.eventType === "DELETE") return;
           setNotasMestre(((msg.new as { text?: string }).text ?? "") as string);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "combat_log", filter: filtro },
+        (msg) => {
+          const nova = msg.new as LinhaLog;
+          setLog((atual) =>
+            atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "npc_templates", filter: filtro },
+        (msg) => {
+          setModelosNpc((atual) => {
+            if (msg.eventType === "DELETE") {
+              const id = (msg.old as { id?: string }).id;
+              return atual.filter((m) => m.id !== id);
+            }
+            const novo = msg.new as ModeloNpc;
+            const semEle = atual.filter((m) => m.id !== novo.id);
+            return [...semEle, novo];
+          });
         },
       )
       .subscribe((status) => {
@@ -241,6 +288,58 @@ export function useSala(codigo: string): Sala {
     [codigo],
   );
 
+  const registrarLog = useCallback(
+    async (texto: string) => {
+      const { data, error } = await supabase
+        .from("combat_log")
+        .insert({ room_code: codigo, text: texto })
+        .select()
+        .single();
+      if (error) {
+        console.error("registrarLog", error);
+        return;
+      }
+      const nova = data as LinhaLog;
+      setLog((atual) => (atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG)));
+    },
+    [codigo],
+  );
+
+  const criarModeloNpc = useCallback(
+    async (dados: NovoModeloNpc) => {
+      const linha = {
+        room_code: codigo,
+        name: dados.name,
+        cls: dados.cls ?? "",
+        ac: dados.ac ?? 12,
+        hp_max: dados.hp_max ?? 10,
+        speed: dados.speed ?? 9,
+        init_mod: dados.init_mod ?? 0,
+        notes: dados.notes ?? "",
+      };
+      const { data, error } = await supabase.from("npc_templates").insert(linha).select().single();
+      if (error) {
+        console.error("criarModeloNpc", error);
+        return;
+      }
+      const criado = data as ModeloNpc;
+      setModelosNpc((atual) => (atual.some((m) => m.id === criado.id) ? atual : [...atual, criado]));
+    },
+    [codigo],
+  );
+
+  const atualizarModeloNpc = useCallback(async (id: string, patch: Partial<ModeloNpc>) => {
+    setModelosNpc((atual) => atual.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    const { error } = await supabase.from("npc_templates").update(patch).eq("id", id);
+    if (error) console.error("atualizarModeloNpc", error);
+  }, []);
+
+  const removerModeloNpc = useCallback(async (id: string) => {
+    setModelosNpc((atual) => atual.filter((m) => m.id !== id));
+    const { error } = await supabase.from("npc_templates").delete().eq("id", id);
+    if (error) console.error("removerModeloNpc", error);
+  }, []);
+
   return {
     carregando: supabaseConfigurado && carregando,
     conectado,
@@ -248,10 +347,16 @@ export function useSala(codigo: string): Sala {
     personagens,
     combate,
     notasMestre,
+    log,
+    modelosNpc,
     criarPersonagem,
     atualizarPersonagem,
     removerPersonagem,
     definirCombate,
     definirNotasMestre,
+    registrarLog,
+    criarModeloNpc,
+    atualizarModeloNpc,
+    removerModeloNpc,
   };
 }

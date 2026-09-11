@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { ItemIniciativa } from "@/lib/tipos";
+import type { ItemIniciativa, ModeloNpc } from "@/lib/tipos";
+import { d20 } from "@/lib/dados";
 import {
+  nomeExibidoIniciativa,
   ordenarPorIniciativa,
   proximoTurno,
   turnoAposRemover,
@@ -25,6 +27,7 @@ export function RastreadorCombate({
   const [nomeNpc, setNomeNpc] = useState("");
   const [pvNpc, setPvNpc] = useState("");
   const [caNpc, setCaNpc] = useState("");
+  const [extrasModelo, setExtrasModelo] = useState<{ cls?: string; speed?: number; init_mod?: number }>({});
   const [ini, setIni] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -33,6 +36,26 @@ export function RastreadorCombate({
 
   function pvDe(slug: string) {
     return personagens.find((p) => p.slug === slug) ?? null;
+  }
+
+  // Numeração estável de NPC ("Inimigo 1", "Inimigo 2"...) pra quem entra como
+  // jogador — construída sem mutar variável (regra do compilador do React).
+  const contagensNpc = combate.order.reduce<number[]>((acc, c) => {
+    const anterior = acc.length > 0 ? acc[acc.length - 1] : 0;
+    const ehNpc = Boolean(pvDe(c.slug)?.is_npc);
+    return [...acc, ehNpc ? anterior + 1 : anterior];
+  }, []);
+
+  function usarModelo(m: ModeloNpc) {
+    setNomeNpc(m.name);
+    setPvNpc(String(m.hp_max));
+    setCaNpc(String(m.ac));
+    setExtrasModelo({ cls: m.cls, speed: m.speed, init_mod: m.init_mod });
+  }
+
+  function rolarIniciativa() {
+    const mod = quem !== NOVO_NPC ? personagens.find((x) => x.slug === quem)?.init_mod ?? 0 : extrasModelo.init_mod ?? 0;
+    setIni(String(d20() + mod));
   }
 
   async function adicionar() {
@@ -54,6 +77,7 @@ export function RastreadorCombate({
         hp: Number.isNaN(pvMax) ? 10 : pvMax,
         hp_max: Number.isNaN(pvMax) ? 10 : pvMax,
         ac: Number.isNaN(ca) ? 12 : ca,
+        ...extrasModelo,
       });
       setOcupado(false);
       if (!criado) return;
@@ -61,6 +85,7 @@ export function RastreadorCombate({
       setNomeNpc("");
       setPvNpc("");
       setCaNpc("");
+      setExtrasModelo({});
     } else {
       const p = personagens.find((x) => x.slug === quem);
       if (!p) return;
@@ -69,15 +94,19 @@ export function RastreadorCombate({
 
     const ordem = ordenarPorIniciativa([...combate.order, item]);
     await sala.definirCombate({ order: ordem });
+    sala.registrarLog(`${item.name} entrou no combate (iniciativa ${item.init})`);
     setIni("");
   }
 
   function avancarTurno() {
-    sala.definirCombate(proximoTurno(combate));
+    const proximo = proximoTurno(combate);
+    if (proximo.round !== combate.round) sala.registrarLog(`Rodada ${proximo.round} começou`);
+    sala.definirCombate(proximo);
   }
 
   function reiniciar() {
     sala.definirCombate({ round: 1, turn: 0, order: [] });
+    sala.registrarLog("Combate reiniciado");
   }
 
   function remover(i: number) {
@@ -114,19 +143,33 @@ export function RastreadorCombate({
         )}
 
         {combate.order.map((c, i) => {
-          const pv = pvDe(c.slug);
-          const critico = pv ? pv.hp <= 0 : false;
+            const pv = pvDe(c.slug);
+            const critico = pv ? pv.hp <= 0 : false;
+            const nomeExibido = pv
+              ? nomeExibidoIniciativa(pv, contagensNpc[i], souMestre)
+              : c.name;
           return (
             <div key={`${c.slug}-${i}`} className={`initrow${i === combate.turn ? " turn" : ""}`}>
               <div className="n">{c.init}</div>
               <div className="who">
-                <span className="nm">{c.name}</span>
+                <span className="nm">{nomeExibido}</span>
                 {pv && (
                   <span className={`hpmini${critico ? " crit" : ""}`}>
                     {pv.hp}/{pv.hp_max} PV
                   </span>
                 )}
               </div>
+              {souMestre && pv?.is_npc ? (
+                <button
+                  type="button"
+                  className="minilink"
+                  onClick={() => sala.atualizarPersonagem(pv.id, { revealed: !pv.revealed })}
+                >
+                  {pv.revealed ? "revelado" : "revelar"}
+                </button>
+              ) : (
+                <span />
+              )}
               {souMestre ? (
                 <div className="reorder">
                   <button
@@ -232,10 +275,26 @@ export function RastreadorCombate({
                 if (e.key === "Enter") adicionar();
               }}
             />
+            <button type="button" className="btn" aria-label="Rolar iniciativa" onClick={rolarIniciativa}>
+              🎲
+            </button>
             <button type="button" className="btn" onClick={adicionar} disabled={ocupado}>
               Adicionar à ordem
             </button>
           </div>
+
+          {quem === NOVO_NPC && sala.modelosNpc.length > 0 && (
+            <div className="chips" style={{ marginTop: 8 }}>
+              <span className="empty-note" style={{ padding: 0 }}>
+                da biblioteca:
+              </span>
+              {sala.modelosNpc.map((m) => (
+                <button key={m.id} type="button" className="chip" onClick={() => usarModelo(m)}>
+                  {m.name}
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
