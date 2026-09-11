@@ -89,19 +89,22 @@ export const PROGRESSAO_INSTALACOES_ESPECIAIS = [
   { nivel: 17, total: 6 },
 ] as const;
 
-/** Tabela de eventos (d100) — só a faixa e o nome, pra consulta rápida.
+export type EventoBastiaoDmg = { faixa: string; min: number; max: number; nome: string };
+
+/** Tabela de eventos (d100) — faixa de exibição + limites numéricos (pra
+ *  achar o evento a partir de uma rolagem) e o nome, pra consulta rápida.
  *  O efeito de cada evento está no livro; o app só dá espaço pra registrar
  *  o resultado no log do turno. */
-export const EVENTOS_BASTIAO_DMG = [
-  { faixa: "01–50", nome: "Tudo Bem" },
-  { faixa: "51–55", nome: "Ataque" },
-  { faixa: "56–58", nome: "Contratado Criminoso" },
-  { faixa: "59–63", nome: "Oportunidade Extraordinária" },
-  { faixa: "64–72", nome: "Visitantes Amigáveis" },
-  { faixa: "73–76", nome: "Convidado" },
-  { faixa: "77–79", nome: "Contratados Perdidos" },
-  { faixa: "80–83", nome: "Descoberta Mágica" },
-  { faixa: "84–91", nome: "Refugiados" },
-  { faixa: "92–98", nome: "Pedido de Ajuda" },
-  { faixa: "99–00", nome: "Tesouro" },
-] as const;
+export const EVENTOS_BASTIAO_DMG: EventoBastiaoDmg[] = [
+  { faixa: "01–50", min: 1, max: 50, nome: "Tudo Bem" },
+  { faixa: "51–55", min: 51, max: 55, nome: "Ataque" },
+  { faixa: "56–58", min: 56, max: 58, nome: "Contratado Criminoso" },
+  { faixa: "59–63", min: 59, max: 63, nome: "Oportunidade Extraordinária" },
+  { faixa: "64–72", min: 64, max: 72, nome: "Visitantes Amigáveis" },
+  { faixa: "73–76", min: 73, max: 76, nome: "Convidado" },
+  { faixa: "77–79", min: 77, max: 79, nome: "Contratados Perdidos" },
+  { faixa: "80–83", min: 80, max: 83, nome: "Descoberta Mágica" },
+  { faixa: "84–91", min: 84, max: 91, nome: "Refugiados" },
+  { faixa: "92–98", min: 92, max: 98, nome: "Pedido de Ajuda" },
+  { faixa: "99–00", min: 99, max: 100, nome: "Tesouro" },
+];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCodigoSala } from "@/hooks/useCodigoSala";
 import { useIdentidade } from "@/hooks/useIdentidade";
@@ -23,6 +23,7 @@ import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { Telao } from "@/components/Telao";
+import { BarraAbas, type Aba } from "@/components/BarraAbas";
 
 export function Painel() {
   const codigo = useCodigoSala();
@@ -62,6 +63,8 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
 
   const souMestre = identidade?.tipo === "mestre";
+  const [aba, setAba] = useState<Aba>("diario");
+  const abaEfetiva: Aba = aba === "mestre" && !souMestre ? "diario" : aba;
 
   const meuPersonagem = useMemo(() => {
     if (identidade?.tipo !== "jogador") return null;
@@ -134,51 +137,61 @@ function PainelSala({ codigo }: { codigo: string }) {
         <BannerSuaVez combate={sala.combate} meuSlug={identidade.slug} />
       )}
 
-      <DiarioCampanha sala={sala} souMestre={souMestre} />
-      <PainelBastiao sala={sala} souMestre={souMestre} />
+      <BarraAbas aba={abaEfetiva} onMudar={setAba} souMestre={souMestre} />
 
-      <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} />
-      <LogCombate log={sala.log} />
+      {abaEfetiva === "diario" && <DiarioCampanha sala={sala} souMestre={souMestre} />}
 
-      {souMestre && <AcoesEmMassa sala={sala} />}
-      {souMestre && <BibliotecaNpcs sala={sala} />}
-      {souMestre && (
-        <NotasDoMestre valor={sala.notasMestre} onSalvar={sala.definirNotasMestre} />
+      {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} souMestre={souMestre} />}
+
+      {abaEfetiva === "combate" && (
+        <>
+          <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} />
+          {souMestre && <AcoesEmMassa sala={sala} />}
+          <LogCombate log={sala.log} />
+        </>
       )}
 
-      {personagemSumiu ? (
-        <div className="tela-centro">
-          <h1>Seu personagem não está mais na sala</h1>
-          <p>
-            O Mestre pode ter removido ou renomeado. Toque em <b>trocar</b> no
-            topo pra escolher de novo.
-          </p>
-        </div>
-      ) : (
-        <div className="grid">
-          {souMestre
-            ? sala.personagens.map((p) => (
-                <FichaPersonagem
-                  key={p.id}
-                  personagem={p}
-                  editavel
-                  souMestre
-                  ehMinha={false}
-                  sala={sala}
-                />
-              ))
-            : meuPersonagem && (
-                <FichaPersonagem
-                  key={meuPersonagem.id}
-                  personagem={meuPersonagem}
-                  editavel
-                  souMestre={false}
-                  ehMinha
-                  sala={sala}
-                />
-              )}
-        </div>
+      {abaEfetiva === "mestre" && souMestre && (
+        <>
+          <BibliotecaNpcs sala={sala} />
+          <NotasDoMestre valor={sala.notasMestre} onSalvar={sala.definirNotasMestre} />
+        </>
       )}
+
+      {abaEfetiva === "fichas" &&
+        (personagemSumiu ? (
+          <div className="tela-centro">
+            <h1>Seu personagem não está mais na sala</h1>
+            <p>
+              O Mestre pode ter removido ou renomeado. Toque em <b>trocar</b> no
+              topo pra escolher de novo.
+            </p>
+          </div>
+        ) : (
+          <div className="grid">
+            {souMestre
+              ? sala.personagens.map((p) => (
+                  <FichaPersonagem
+                    key={p.id}
+                    personagem={p}
+                    editavel
+                    souMestre
+                    ehMinha={false}
+                    sala={sala}
+                  />
+                ))
+              : meuPersonagem && (
+                  <FichaPersonagem
+                    key={meuPersonagem.id}
+                    personagem={meuPersonagem}
+                    editavel
+                    souMestre={false}
+                    ehMinha
+                    sala={sala}
+                  />
+                )}
+          </div>
+        ))}
     </>
   );
 }

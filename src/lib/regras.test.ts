@@ -9,6 +9,7 @@ import {
   descansoLongo,
   deslocamentoEfetivo,
   efeitoExaustao,
+  eventoBastiaoPara,
   faixaPV,
   formatarMetros,
   gastarDadoDeVida,
@@ -283,5 +284,24 @@ describe("combate", () => {
     expect(turnoAposTrocar(1, 1, 0)).toBe(0);
     expect(turnoAposTrocar(0, 1, 0)).toBe(1);
     expect(turnoAposTrocar(4, 1, 0)).toBe(4);
+  });
+});
+
+describe("evento do Bastião (d100)", () => {
+  const tabela = [
+    { min: 1, max: 50, nome: "Tudo Bem" },
+    { min: 51, max: 55, nome: "Ataque" },
+    { min: 99, max: 100, nome: "Tesouro" },
+  ];
+
+  it("acha o evento da faixa que contém a rolagem", () => {
+    expect(eventoBastiaoPara(1, tabela)).toBe("Tudo Bem");
+    expect(eventoBastiaoPara(50, tabela)).toBe("Tudo Bem");
+    expect(eventoBastiaoPara(51, tabela)).toBe("Ataque");
+    expect(eventoBastiaoPara(100, tabela)).toBe("Tesouro");
+  });
+
+  it("devolve undefined se a rolagem não cai em nenhuma faixa", () => {
+    expect(eventoBastiaoPara(60, tabela)).toBeUndefined();
   });
 });

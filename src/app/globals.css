@@ -137,6 +137,34 @@ button {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
+
+/* ---------- abas (menu principal) ---------- */
+.abas {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.aba {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 16px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.aba:hover {
+  color: var(--ink);
+}
+.aba[aria-pressed="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
 .brand {
   display: flex;
   align-items: baseline;
@@ -1125,6 +1153,37 @@ button {
   color: var(--dim);
   flex: none;
   width: 56px;
+}
+.instalacaobtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+.instalacaobtn:hover {
+  border-color: var(--accent);
+}
+.instalacaobtn .nome {
+  font-weight: 600;
+  font-size: 13px;
+}
+.instalacaobtn .nivel {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-left: 8px;
+}
+.instdesc {
+  color: var(--dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 4px 0 0;
 }
 
 /* ---------- log de combate ---------- */

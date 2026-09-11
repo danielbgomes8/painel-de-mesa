@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { InstalacaoBastiao } from "@/lib/tipos";
+import { d100 } from "@/lib/dados";
+import { eventoBastiaoPara } from "@/lib/regras";
 import {
   descricaoInstalacao,
   EVENTOS_BASTIAO_DMG,
@@ -21,6 +23,8 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
   const { bastiao, instalacoesBastiao: instalacoes } = sala;
   const especiais = instalacoes.filter((i) => i.categoria === "especial");
   const basicas = instalacoes.filter((i) => i.categoria === "basica");
+  const especiaisAtivas = especiais.filter((i) => i.ativa);
+  const trabalhandoAgora = especiaisAtivas.filter((i) => i.ultimo_turno_executado === bastiao.turno).length;
 
   async function avancarTurno() {
     const proximo = await sala.definirBastiao((atual) => ({ turno: atual.turno + 1 }));
@@ -59,6 +63,11 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
             <b>{bastiao.defensores}</b>
           )}
         </span>
+        {especiaisAtivas.length > 0 && (
+          <span className="bastiaostat">
+            {trabalhandoAgora}/{especiaisAtivas.length} instalações trabalhando
+          </span>
+        )}
       </div>
 
       <span className="sectitle">Instalações especiais ({especiais.length})</span>
@@ -71,25 +80,38 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
         ))}
       </div>
       {souMestre && (
-        <div className="chips" style={{ marginBottom: 16 }}>
-          {INSTALACOES_ESPECIAIS_DMG.map((m) => (
-            <button
-              key={m.name}
-              type="button"
-              className="chip"
-              title={`nível ${m.nivel} · ${m.descricao}${m.prerequisito ? ` · ${m.prerequisito}` : ""}`}
-              onClick={() =>
-                sala.criarInstalacaoBastiao({
-                  name: m.name,
-                  categoria: "especial",
-                  tamanho: "Apertado",
-                  nivel_min: m.nivel,
-                  ordem: m.ordem,
-                })
-              }
-            >
-              {m.name} · nv.{m.nivel}
-            </button>
+        <div style={{ marginBottom: 16 }}>
+          {PROGRESSAO_INSTALACOES_ESPECIAIS.map(({ nivel }) => (
+            <div key={nivel} style={{ marginBottom: 10 }}>
+              <span className="sectitle">Nível {nivel}</span>
+              <div className="grid">
+                {INSTALACOES_ESPECIAIS_DMG.filter((m) => m.nivel === nivel).map((m) => (
+                  <button
+                    key={m.name}
+                    type="button"
+                    className="instalacaobtn"
+                    onClick={() =>
+                      sala.criarInstalacaoBastiao({
+                        name: m.name,
+                        categoria: "especial",
+                        tamanho: "Apertado",
+                        nivel_min: m.nivel,
+                        ordem: m.ordem,
+                      })
+                    }
+                  >
+                    <div>
+                      <span className="nome">{m.name}</span>
+                      <span className="nivel">{m.ordem}</span>
+                    </div>
+                    <p className="instdesc">
+                      {m.descricao}
+                      {m.prerequisito && ` · pré-requisito: ${m.prerequisito}`}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -101,16 +123,16 @@ export function PainelBastiao({ sala, souMestre }: { sala: Sala; souMestre: bool
         ))}
       </div>
       {souMestre && (
-        <div className="chips" style={{ marginBottom: 16 }}>
+        <div className="grid" style={{ marginBottom: 16 }}>
           {INSTALACOES_BASICAS_DMG.map((b) => (
             <button
               key={b.name}
               type="button"
-              className="chip"
-              title={b.descricao}
+              className="instalacaobtn"
               onClick={() => sala.criarInstalacaoBastiao({ name: b.name, categoria: "basica" })}
             >
-              {b.name}
+              <span className="nome">{b.name}</span>
+              <p className="instdesc">{b.descricao}</p>
             </button>
           ))}
         </div>
@@ -156,87 +178,119 @@ function LinhaInstalacao({
   editavel: boolean;
 }) {
   const patch = (mudanca: Partial<InstalacaoBastiao>) => sala.atualizarInstalacaoBastiao(i.id, mudanca);
+  const descricao = descricaoInstalacao(i.name);
+  const trabalhando = i.ultimo_turno_executado === sala.bastiao.turno;
   return (
-    <div className={`resrow${i.ativa ? "" : " inativa"}`} title={descricaoInstalacao(i.name)}>
-      {editavel ? (
-        <CampoTexto valor={i.name} maxLength={40} onCommit={(v) => patch({ name: v })} />
-      ) : (
-        <span>{i.name}</span>
-      )}
-      {editavel ? (
-        <select value={i.tamanho} onChange={(e) => patch({ tamanho: e.target.value as InstalacaoBastiao["tamanho"] })}>
-          {TAMANHOS_INSTALACAO.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span className="empty-note" style={{ padding: 0 }}>
-          {i.tamanho}
-        </span>
-      )}
-      {i.categoria === "especial" &&
-        (editavel ? (
-          <select value={i.ordem} onChange={(e) => patch({ ordem: e.target.value })}>
-            <option value="">sem ordem</option>
-            {ORDENS_BASTIAO.map((o) => (
-              <option key={o} value={o}>
-                {o}
+    <div>
+      <div className={`resrow${i.ativa ? "" : " inativa"}`}>
+        {editavel ? (
+          <CampoTexto valor={i.name} maxLength={40} onCommit={(v) => patch({ name: v })} />
+        ) : (
+          <span>{i.name}</span>
+        )}
+        {editavel ? (
+          <select value={i.tamanho} onChange={(e) => patch({ tamanho: e.target.value as InstalacaoBastiao["tamanho"] })}>
+            {TAMANHOS_INSTALACAO.map((t) => (
+              <option key={t} value={t}>
+                {t}
               </option>
             ))}
           </select>
         ) : (
           <span className="empty-note" style={{ padding: 0 }}>
-            {i.ordem || "sem ordem"}
+            {i.tamanho}
           </span>
-        ))}
-      {editavel ? (
-        <CampoTexto
-          valor={i.contratado}
-          maxLength={40}
-          placeholder="contratado"
-          onCommit={(v) => patch({ contratado: v })}
-        />
-      ) : (
-        i.contratado && (
-          <span className="empty-note" style={{ padding: 0 }}>
-            {i.contratado}
-          </span>
-        )
-      )}
-      {editavel ? (
-        <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
-          {i.ativa ? "ativa" : "inativa"}
-        </button>
-      ) : (
-        <span className={`chip flag${i.ativa ? "" : " danger"}`}>{i.ativa ? "ativa" : "inativa"}</span>
-      )}
-      {editavel && (
-        <button
-          type="button"
-          className="rm"
-          aria-label={`remover ${i.name}`}
-          onClick={() => {
-            if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
-          }}
-        >
-          ✕
-        </button>
-      )}
+        )}
+        {i.categoria === "especial" &&
+          (editavel ? (
+            <select value={i.ordem} onChange={(e) => patch({ ordem: e.target.value })}>
+              <option value="">sem ordem</option>
+              {ORDENS_BASTIAO.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="empty-note" style={{ padding: 0 }}>
+              {i.ordem || "sem ordem"}
+            </span>
+          ))}
+        {editavel ? (
+          <CampoTexto
+            valor={i.contratado}
+            maxLength={40}
+            placeholder="contratado"
+            onCommit={(v) => patch({ contratado: v })}
+          />
+        ) : (
+          i.contratado && (
+            <span className="empty-note" style={{ padding: 0 }}>
+              {i.contratado}
+            </span>
+          )
+        )}
+        {i.categoria === "especial" &&
+          i.ativa &&
+          (editavel ? (
+            <button
+              type="button"
+              className="chip flag"
+              aria-pressed={trabalhando}
+              onClick={() => patch({ ultimo_turno_executado: trabalhando ? null : sala.bastiao.turno })}
+            >
+              {trabalhando ? "trabalhando este turno" : "não trabalhou este turno"}
+            </button>
+          ) : (
+            <span className="chip flag" aria-pressed={trabalhando}>
+              {trabalhando ? "trabalhando este turno" : "não trabalhou este turno"}
+            </span>
+          ))}
+        {editavel ? (
+          <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
+            {i.ativa ? "ativa" : "inativa"}
+          </button>
+        ) : (
+          <span className={`chip flag${i.ativa ? "" : " danger"}`}>{i.ativa ? "ativa" : "inativa"}</span>
+        )}
+        {editavel && (
+          <button
+            type="button"
+            className="rm"
+            aria-label={`remover ${i.name}`}
+            onClick={() => {
+              if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
+            }}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      {descricao && <p className="instdesc">{descricao}</p>}
     </div>
   );
 }
 
 function RegistrarEvento({ sala }: { sala: Sala }) {
   const [texto, setTexto] = useState("");
+
+  function rolarEvento() {
+    const rolagem = d100();
+    const nome = eventoBastiaoPara(rolagem, EVENTOS_BASTIAO_DMG) ?? "evento desconhecido";
+    setTexto(`Evento (d100 ${rolagem}): ${nome} — `);
+  }
+
   function registrar() {
     if (!texto.trim()) return;
     sala.registrarLogBastiao(texto.trim());
     setTexto("");
   }
+
   return (
     <div className="addcombatant" style={{ marginTop: 12 }}>
+      <button type="button" className="btn" onClick={rolarEvento}>
+        🎲 rolar evento (d100)
+      </button>
       <input
         type="text"
         placeholder="registrar evento/resultado deste turno..."

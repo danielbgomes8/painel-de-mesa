@@ -300,3 +300,15 @@ export function reduzirPrazosCondicao(
   }
   return { cond: novoCond, cond_prazo: novoPrazo, expiraram };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bastião — evento do turno (d100)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type FaixaEventoBastiao = { min: number; max: number; nome: string };
+
+/** Acha o nome do evento cuja faixa (min–max, inclusive) contém a rolagem de
+ *  d100; undefined se não cair em nenhuma faixa da tabela. */
+export function eventoBastiaoPara(rolagem: number, tabela: FaixaEventoBastiao[]): string | undefined {
+  return tabela.find((e) => rolagem >= e.min && rolagem <= e.max)?.nome;
+}

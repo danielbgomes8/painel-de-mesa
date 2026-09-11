@@ -155,6 +155,9 @@ export type InstalacaoBastiao = {
   ordem: string;
   contratado: string;
   ativa: boolean;
+  /** Turno em que foi marcada "trabalhando" pela última vez (null = não está
+   *  trabalhando). Comparar com bastiao.turno decide se é ESTE turno. */
+  ultimo_turno_executado: number | null;
   notes: string;
   created_at: string;
 };
