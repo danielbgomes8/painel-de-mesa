@@ -134,3 +134,43 @@ export type NovaEntradaDiario = {
   title: string;
   text: string;
 };
+
+/** Estado do Bastião compartilhado (um por sala). */
+export type Bastiao = {
+  room_code: string;
+  turno: number;
+  tesouro_po: number;
+  defensores: number;
+  notes: string;
+};
+
+/** Uma instalação do Bastião — básica (só cenário) ou especial (dá ordem). */
+export type InstalacaoBastiao = {
+  id: string;
+  room_code: string;
+  name: string;
+  categoria: "basica" | "especial";
+  tamanho: "Apertado" | "Amplo" | "Vasto";
+  nivel_min: number;
+  ordem: string;
+  contratado: string;
+  ativa: boolean;
+  notes: string;
+  created_at: string;
+};
+
+export type NovaInstalacaoBastiao = {
+  name: string;
+  categoria: "basica" | "especial";
+  tamanho?: "Apertado" | "Amplo" | "Vasto";
+  nivel_min?: number;
+  ordem?: string;
+};
+
+/** Uma linha do log do Bastião (eventos, turnos). */
+export type LinhaLogBastiao = {
+  id: string;
+  room_code: string;
+  text: string;
+  created_at: string;
+};

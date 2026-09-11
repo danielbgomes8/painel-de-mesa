@@ -5,18 +5,24 @@ import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { slugUnico } from "@/lib/sala";
 import {
   COMBATE_VAZIO,
+  type Bastiao,
   type EntradaDiario,
   type EstadoCombate,
+  type InstalacaoBastiao,
   type ItemIniciativa,
   type LinhaLog,
+  type LinhaLogBastiao,
   type ModeloNpc,
   type NovaEntradaDiario,
+  type NovaInstalacaoBastiao,
   type NovoModeloNpc,
   type NovoPersonagem,
   type Personagem,
 } from "@/lib/tipos";
 
 const TAMANHO_LOG = 40;
+
+const BASTIAO_VAZIO: Bastiao = { room_code: "", turno: 1, tesouro_po: 0, defensores: 0, notes: "" };
 
 type LinhaCombate = {
   room_code: string;
@@ -35,6 +41,9 @@ export type Sala = {
   log: LinhaLog[];
   modelosNpc: ModeloNpc[];
   diario: EntradaDiario[];
+  bastiao: Bastiao;
+  instalacoesBastiao: InstalacaoBastiao[];
+  logBastiao: LinhaLogBastiao[];
   criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
   removerPersonagem: (id: string) => Promise<void>;
@@ -47,6 +56,11 @@ export type Sala = {
   criarEntradaDiario: (dados: NovaEntradaDiario) => Promise<void>;
   atualizarEntradaDiario: (id: string, patch: Partial<EntradaDiario>) => Promise<void>;
   removerEntradaDiario: (id: string) => Promise<void>;
+  definirBastiao: (patch: Partial<Bastiao>) => Promise<void>;
+  criarInstalacaoBastiao: (dados: NovaInstalacaoBastiao) => Promise<void>;
+  atualizarInstalacaoBastiao: (id: string, patch: Partial<InstalacaoBastiao>) => Promise<void>;
+  removerInstalacaoBastiao: (id: string) => Promise<void>;
+  registrarLogBastiao: (texto: string) => Promise<void>;
 };
 
 /** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
@@ -79,12 +93,15 @@ export function useSala(codigo: string): Sala {
   const [log, setLog] = useState<LinhaLog[]>([]);
   const [modelosNpc, setModelosNpc] = useState<ModeloNpc[]>([]);
   const [diario, setDiario] = useState<EntradaDiario[]>([]);
+  const [bastiao, setBastiao] = useState<Bastiao>(BASTIAO_VAZIO);
+  const [instalacoesBastiao, setInstalacoesBastiao] = useState<InstalacaoBastiao[]>([]);
+  const [logBastiao, setLogBastiao] = useState<LinhaLogBastiao[]>([]);
 
   // Espelho síncrono do estado, pra montar patches sem depender do closure.
   // Atualizado depois do commit (não durante o render).
-  const ref = useRef({ personagens, combate });
+  const ref = useRef({ personagens, combate, bastiao });
   useEffect(() => {
-    ref.current = { personagens, combate };
+    ref.current = { personagens, combate, bastiao };
   });
 
   useEffect(() => {
@@ -104,9 +121,12 @@ export function useSala(codigo: string): Sala {
         supabase
           .from("dm_notes")
           .upsert({ room_code: codigo }, { onConflict: "room_code", ignoreDuplicates: true }),
+        supabase
+          .from("bastiao")
+          .upsert({ room_code: codigo }, { onConflict: "room_code", ignoreDuplicates: true }),
       ]);
 
-      const [pc, cs, dn, lg, mn, di] = await Promise.all([
+      const [pc, cs, dn, lg, mn, di, ba, bi, bl] = await Promise.all([
         supabase.from("characters").select("*").eq("room_code", codigo),
         supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle(),
         supabase.from("dm_notes").select("*").eq("room_code", codigo).maybeSingle(),
@@ -122,6 +142,14 @@ export function useSala(codigo: string): Sala {
           .select("*")
           .eq("room_code", codigo)
           .order("created_at", { ascending: false }),
+        supabase.from("bastiao").select("*").eq("room_code", codigo).maybeSingle(),
+        supabase.from("bastiao_instalacoes").select("*").eq("room_code", codigo),
+        supabase
+          .from("bastiao_log")
+          .select("*")
+          .eq("room_code", codigo)
+          .order("created_at", { ascending: false })
+          .limit(TAMANHO_LOG),
       ]);
 
       if (!vivo) return;
@@ -138,6 +166,9 @@ export function useSala(codigo: string): Sala {
       setLog((lg.data ?? []) as LinhaLog[]);
       setModelosNpc((mn.data ?? []) as ModeloNpc[]);
       setDiario((di.data ?? []) as EntradaDiario[]);
+      setBastiao((ba.data ?? { ...BASTIAO_VAZIO, room_code: codigo }) as Bastiao);
+      setInstalacoesBastiao((bi.data ?? []) as InstalacaoBastiao[]);
+      setLogBastiao((bl.data ?? []) as LinhaLogBastiao[]);
       setCarregando(false);
     }
 
@@ -219,6 +250,39 @@ export function useSala(codigo: string): Sala {
             const semEla = atual.filter((e) => e.id !== nova.id);
             return [nova, ...semEla].sort((a, b) => b.created_at.localeCompare(a.created_at));
           });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bastiao", filter: filtro },
+        (msg) => {
+          if (msg.eventType === "DELETE") return;
+          setBastiao(msg.new as Bastiao);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bastiao_instalacoes", filter: filtro },
+        (msg) => {
+          setInstalacoesBastiao((atual) => {
+            if (msg.eventType === "DELETE") {
+              const id = (msg.old as { id?: string }).id;
+              return atual.filter((i) => i.id !== id);
+            }
+            const nova = msg.new as InstalacaoBastiao;
+            const semEla = atual.filter((i) => i.id !== nova.id);
+            return [...semEla, nova];
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "bastiao_log", filter: filtro },
+        (msg) => {
+          const nova = msg.new as LinhaLogBastiao;
+          setLogBastiao((atual) =>
+            atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG),
+          );
         },
       )
       .subscribe((status) => {
@@ -394,6 +458,69 @@ export function useSala(codigo: string): Sala {
     if (error) console.error("removerEntradaDiario", error);
   }, []);
 
+  const definirBastiao = useCallback(
+    async (patch: Partial<Bastiao>) => {
+      const proximo = { ...ref.current.bastiao, ...patch };
+      setBastiao(proximo);
+      const { error } = await supabase
+        .from("bastiao")
+        .update({ turno: proximo.turno, tesouro_po: proximo.tesouro_po, defensores: proximo.defensores, notes: proximo.notes })
+        .eq("room_code", codigo);
+      if (error) console.error("definirBastiao", error);
+    },
+    [codigo],
+  );
+
+  const criarInstalacaoBastiao = useCallback(
+    async (dados: NovaInstalacaoBastiao) => {
+      const linha = {
+        room_code: codigo,
+        name: dados.name,
+        categoria: dados.categoria,
+        tamanho: dados.tamanho ?? "Apertado",
+        nivel_min: dados.nivel_min ?? 5,
+        ordem: dados.ordem ?? "",
+      };
+      const { data, error } = await supabase.from("bastiao_instalacoes").insert(linha).select().single();
+      if (error) {
+        console.error("criarInstalacaoBastiao", error);
+        return;
+      }
+      const criada = data as InstalacaoBastiao;
+      setInstalacoesBastiao((atual) => (atual.some((i) => i.id === criada.id) ? atual : [...atual, criada]));
+    },
+    [codigo],
+  );
+
+  const atualizarInstalacaoBastiao = useCallback(async (id: string, patch: Partial<InstalacaoBastiao>) => {
+    setInstalacoesBastiao((atual) => atual.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    const { error } = await supabase.from("bastiao_instalacoes").update(patch).eq("id", id);
+    if (error) console.error("atualizarInstalacaoBastiao", error);
+  }, []);
+
+  const removerInstalacaoBastiao = useCallback(async (id: string) => {
+    setInstalacoesBastiao((atual) => atual.filter((i) => i.id !== id));
+    const { error } = await supabase.from("bastiao_instalacoes").delete().eq("id", id);
+    if (error) console.error("removerInstalacaoBastiao", error);
+  }, []);
+
+  const registrarLogBastiao = useCallback(
+    async (texto: string) => {
+      const { data, error } = await supabase
+        .from("bastiao_log")
+        .insert({ room_code: codigo, text: texto })
+        .select()
+        .single();
+      if (error) {
+        console.error("registrarLogBastiao", error);
+        return;
+      }
+      const nova = data as LinhaLogBastiao;
+      setLogBastiao((atual) => (atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG)));
+    },
+    [codigo],
+  );
+
   return {
     carregando: supabaseConfigurado && carregando,
     conectado,
@@ -404,6 +531,9 @@ export function useSala(codigo: string): Sala {
     log,
     modelosNpc,
     diario,
+    bastiao,
+    instalacoesBastiao,
+    logBastiao,
     criarPersonagem,
     atualizarPersonagem,
     removerPersonagem,
@@ -416,5 +546,10 @@ export function useSala(codigo: string): Sala {
     criarEntradaDiario,
     atualizarEntradaDiario,
     removerEntradaDiario,
+    definirBastiao,
+    criarInstalacaoBastiao,
+    atualizarInstalacaoBastiao,
+    removerInstalacaoBastiao,
+    registrarLogBastiao,
   };
 }

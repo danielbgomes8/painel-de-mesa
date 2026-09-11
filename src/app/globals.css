@@ -1073,6 +1073,60 @@ button {
   line-height: 1.6;
 }
 
+/* ---------- bastião ---------- */
+.bastiaostat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.resrow select {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+.resrow .campotexto {
+  min-width: 120px;
+}
+.resrow.inativa {
+  opacity: 0.55;
+}
+.chip.flag.danger[aria-pressed="true"] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.bastiaoeventos {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.bastiaoeventos summary {
+  cursor: pointer;
+  color: var(--dim);
+}
+.eventoslist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.eventorow {
+  display: flex;
+  gap: 10px;
+}
+.eventorow .mono {
+  font-family: var(--f-mono);
+  color: var(--dim);
+  flex: none;
+  width: 56px;
+}
+
 /* ---------- log de combate ---------- */
 .loglist {
   display: flex;

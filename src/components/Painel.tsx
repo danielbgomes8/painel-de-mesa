@@ -21,6 +21,7 @@ import { BannerSuaVez } from "@/components/BannerSuaVez";
 import { LogCombate } from "@/components/LogCombate";
 import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
+import { PainelBastiao } from "@/components/PainelBastiao";
 import { Telao } from "@/components/Telao";
 
 export function Painel() {
@@ -134,6 +135,7 @@ function PainelSala({ codigo }: { codigo: string }) {
       )}
 
       <DiarioCampanha sala={sala} souMestre={souMestre} />
+      <PainelBastiao sala={sala} />
 
       <RastreadorCombate sala={sala} souMestre={souMestre} />
       <LogCombate log={sala.log} />
