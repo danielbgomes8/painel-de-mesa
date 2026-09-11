@@ -6,6 +6,7 @@ import type { ModeloNpc } from "@/lib/tipos";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
+import { MONSTROS_SRD } from "@/lib/monstrosSrd";
 
 /** Prep de mesa: NPCs/monstros que podem aparecer ou não, com ficha básica e
  *  notas de tática, prontos pra puxar no rastreador de combate quando
@@ -19,7 +20,7 @@ export function BibliotecaNpcs({ sala }: { sala: Sala }) {
 
       {sala.modelosNpc.length === 0 && (
         <p className="empty-note">
-          Nenhum NPC preparado ainda — cadastre abaixo os que podem aparecer na campanha.
+          Nenhum NPC preparado ainda — cadastre abaixo, ou use um do catálogo.
         </p>
       )}
 
@@ -30,6 +31,35 @@ export function BibliotecaNpcs({ sala }: { sala: Sala }) {
       </div>
 
       <FormNovoModelo sala={sala} />
+
+      <CatalogoSrd sala={sala} />
+    </div>
+  );
+}
+
+function CatalogoSrd({ sala }: { sala: Sala }) {
+  return (
+    <div className="npccatalogo">
+      <span className="sectitle">
+        Catálogo D&amp;D (SRD 5.2) — clique pra copiar pra sua biblioteca
+      </span>
+      <div className="chips">
+        {MONSTROS_SRD.map((m) => (
+          <button
+            key={m.name}
+            type="button"
+            className="chip"
+            title={m.notes}
+            onClick={() => sala.criarModeloNpc(m)}
+          >
+            {m.name} · CA{m.ac} · {m.hp_max}PV
+          </button>
+        ))}
+      </div>
+      <p className="fine">
+        Números de partida do SRD 5.2 (licença CC-BY-4.0, Wizards of the Coast) — confira contra
+        o livro antes de uma luta importante; depois de copiado é só editar à vontade.
+      </p>
     </div>
   );
 }
