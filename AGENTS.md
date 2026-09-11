@@ -24,3 +24,24 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   "consertar" achando que é falha.
 - O visual saiu do protótipo (Artifact) validado com a mesa: paleta e classes
   CSS estão em `src/app/globals.css`, praticamente iguais às do protótipo.
+
+## Estado (11/09/2026) — já está tudo publicado e funcionando
+
+- **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
+  (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
+- **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
+  (privado), conectado ao Vercel — push na `main` já republica sozinho.
+- **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
+  Paulo), separado do gb-reserva. Migrations `0001_inicial.sql` e `seed.sql`
+  já rodadas. **Pegadinha real já resolvida uma vez**: se criar tabela nova
+  sem "Automatically expose new tables", ela não pega GRANT pro `anon`
+  automaticamente — RLS sozinho não basta, tem que dar `grant select,
+  insert, update, delete ... to anon, authenticated` explícito (ver fim de
+  `0001_inicial.sql`). Sem isso dá "permission denied" mesmo com policy certa.
+- **Chaves**: `.env.local` (na máquina do Daniel, fora do Git) e as env vars
+  do Vercel (Production/Preview/Development) já configuradas com a URL e a
+  chave `sb_publishable_...` do projeto Supabase acima. `.vercel/` também já
+  linkado localmente.
+- **Não commitado / local só desta máquina**: `.env.local`, `.vercel/` —
+  ambos re-obteníveis (`vercel env pull`, ou o painel do Supabase) se
+  precisar reconfigurar em outra máquina.
