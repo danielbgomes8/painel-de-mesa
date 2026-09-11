@@ -1,0 +1,27 @@
+# dependências
+/node_modules
+
+# build
+/.next
+/out
+/build
+
+# variáveis de ambiente (segredos — nunca versionar)
+.env
+.env*.local
+
+# logs / SO
+*.log
+.DS_Store
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# vercel
+.vercel
+
+# cache do typescript
+*.tsbuildinfo
+next-env.d.ts
