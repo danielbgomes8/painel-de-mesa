@@ -25,10 +25,16 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
   const basicas = instalacoes.filter((i) => i.categoria === "basica");
   const especiaisAtivas = especiais.filter((i) => i.ativa);
   const trabalhandoAgora = especiaisAtivas.filter((i) => i.ultimo_turno_executado === bastiao.turno).length;
+  const [avancando, setAvancando] = useState(false);
 
   async function avancarTurno() {
+    if (avancando) return;
+    setAvancando(true);
     const proximo = await sala.definirBastiao((atual) => ({ turno: atual.turno + 1 }));
-    sala.registrarLogBastiao(`Turno ${proximo.turno} começou`);
+    setAvancando(false);
+    // null = a escrita falhou e o turno já voltou pro valor anterior; não
+    // anuncia um avanço que não aconteceu de verdade.
+    if (proximo) sala.registrarLogBastiao(`Turno ${proximo.turno} começou`);
   }
 
   return (
@@ -41,7 +47,7 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
       </div>
 
       <div className="combatctrls" style={{ marginBottom: 14 }}>
-        <button type="button" className="btn primary" onClick={avancarTurno}>
+        <button type="button" className="btn primary" onClick={avancarTurno} disabled={avancando}>
           Próximo turno →
         </button>
         <span className="bastiaostat">

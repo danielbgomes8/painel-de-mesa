@@ -177,11 +177,14 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
   const [ini, setIni] = useState("");
   const [ataque, setAtaque] = useState("");
   const [notas, setNotas] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
 
-  function adicionar() {
+  async function adicionar() {
     const nomeLimpo = nome.trim();
-    if (!nomeLimpo) return;
-    sala.criarModeloNpc({
+    if (!nomeLimpo || enviando) return;
+    setEnviando(true);
+    const deuCerto = await sala.criarModeloNpc({
       name: nomeLimpo,
       cls: cls.trim(),
       hp_max: Number.parseInt(pv, 10) || 10,
@@ -191,6 +194,13 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
       ataque: ataque.trim(),
       notes: notas.trim(),
     });
+    setEnviando(false);
+    if (!deuCerto) {
+      // Não limpa o formulário: a escrita falhou, o Mestre não perde o que digitou.
+      setAviso({ texto: "Não deu pra salvar. Confira a conexão e toque em adicionar de novo.", falhou: true });
+      return;
+    }
+    setAviso(null);
     setNome("");
     setCls("");
     setPv("");
@@ -266,8 +276,12 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
           onChange={(e) => setNotas(e.target.value)}
         />
       </div>
-      <button type="button" className="btn" disabled={!nome.trim()} onClick={adicionar}>
-        + adicionar à biblioteca
+      <p className={aviso?.falhou ? "catcopiado falhou" : "catcopiado"} aria-live="polite">
+        {aviso ? aviso.texto : ""}
+      </p>
+
+      <button type="button" className="btn" disabled={!nome.trim() || enviando} onClick={adicionar}>
+        {enviando ? "salvando…" : "+ adicionar à biblioteca"}
       </button>
     </div>
   );

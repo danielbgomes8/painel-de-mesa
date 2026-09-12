@@ -35,6 +35,11 @@ export type Sala = {
   carregando: boolean;
   conectado: boolean;
   erro: string | null;
+  /** Aviso curto e não-bloqueante de que a ÚLTIMA escrita falhou (a tela já
+   *  reverteu pro valor anterior). Diferente de `erro`, que é fatal e troca a
+   *  tela inteira. Fica até a próxima falha ou até `limparAvisoFalha()`. */
+  avisoFalha: string | null;
+  limparAvisoFalha: () => void;
   personagens: Personagem[];
   combate: EstadoCombate;
   notasMestre: string;
@@ -47,7 +52,13 @@ export type Sala = {
   criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
   removerPersonagem: (id: string) => Promise<void>;
-  definirCombate: (patch: Partial<EstadoCombate>) => Promise<void>;
+  /** Aceita um patch pronto ou uma função (atual) => patch, resolvida contra o
+   *  estado mais recente conhecido — evite montar o patch a partir do
+   *  `combate` de fora depois de um `await`, pode já estar velho. Devolve
+   *  null quando a escrita falha (e já reverteu o estado local). */
+  definirCombate: (
+    patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>),
+  ) => Promise<EstadoCombate | null>;
   definirNotasMestre: (texto: string) => Promise<void>;
   registrarLog: (texto: string) => Promise<void>;
   /** Devolve false quando a escrita falha, pra tela não confirmar o que não aconteceu. */
@@ -57,7 +68,9 @@ export type Sala = {
   criarEntradaDiario: (dados: NovaEntradaDiario) => Promise<void>;
   atualizarEntradaDiario: (id: string, patch: Partial<EntradaDiario>) => Promise<void>;
   removerEntradaDiario: (id: string) => Promise<void>;
-  definirBastiao: (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => Promise<Bastiao>;
+  /** Devolve null quando a escrita falha (e já reverteu o estado local),
+   *  pra quem chama não anunciar um avanço que não aconteceu de verdade. */
+  definirBastiao: (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => Promise<Bastiao | null>;
   criarInstalacaoBastiao: (dados: NovaInstalacaoBastiao) => Promise<void>;
   atualizarInstalacaoBastiao: (id: string, patch: Partial<InstalacaoBastiao>) => Promise<void>;
   removerInstalacaoBastiao: (id: string) => Promise<void>;
@@ -84,10 +97,14 @@ function comoCombate(linha: LinhaCombate | null): EstadoCombate {
 const MSG_SEM_CONFIG =
   "Supabase não configurado. Crie o arquivo .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY (veja o README).";
 
+const AVISO_FALHA_ESCRITA = "Não salvou — confira a conexão e tente de novo.";
+
 export function useSala(codigo: string): Sala {
   const [carregando, setCarregando] = useState(supabaseConfigurado);
   const [conectado, setConectado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [avisoFalha, setAvisoFalha] = useState<string | null>(null);
+  const limparAvisoFalha = useCallback(() => setAvisoFalha(null), []);
   const [personagens, setPersonagens] = useState<Personagem[]>([]);
   const [combate, setCombate] = useState<EstadoCombate>(COMBATE_VAZIO);
   const [notasMestre, setNotasMestre] = useState("");
@@ -98,11 +115,12 @@ export function useSala(codigo: string): Sala {
   const [instalacoesBastiao, setInstalacoesBastiao] = useState<InstalacaoBastiao[]>([]);
   const [logBastiao, setLogBastiao] = useState<LinhaLogBastiao[]>([]);
 
-  // Espelho síncrono do estado, pra montar patches sem depender do closure.
-  // Atualizado depois do commit (não durante o render).
-  const ref = useRef({ personagens, combate, bastiao });
+  // Espelho síncrono do estado, pra montar patches e reverter uma escrita que
+  // falhou sem depender do closure. Atualizado depois do commit (não durante
+  // o render).
+  const ref = useRef({ personagens, combate, bastiao, notasMestre, modelosNpc, diario, instalacoesBastiao });
   useEffect(() => {
-    ref.current = { personagens, combate, bastiao };
+    ref.current = { personagens, combate, bastiao, notasMestre, modelosNpc, diario, instalacoesBastiao };
   });
 
   useEffect(() => {
@@ -114,8 +132,20 @@ export function useSala(codigo: string): Sala {
 
     async function iniciar() {
       // Garante que a sala existe (deixa qualquer ?sala=novo-codigo funcionar).
-      await supabase.from("rooms").upsert({ code: codigo }, { onConflict: "code", ignoreDuplicates: true });
-      await Promise.all([
+      // Sem checar erro aqui, uma falha passava batido e todo update/insert
+      // seguinte pra essa sala virava um "sucesso" de 0 linhas afetadas —
+      // o painel resetava pro padrão a cada recarregamento sem avisar nada.
+      const preparo = await supabase
+        .from("rooms")
+        .upsert({ code: codigo }, { onConflict: "code", ignoreDuplicates: true });
+      if (!vivo) return;
+      if (preparo.error) {
+        setErro(`Não consegui preparar a sala: ${preparo.error.message}`);
+        setCarregando(false);
+        return;
+      }
+
+      const dependentes = await Promise.all([
         supabase
           .from("combat_state")
           .upsert({ room_code: codigo }, { onConflict: "room_code", ignoreDuplicates: true }),
@@ -126,6 +156,13 @@ export function useSala(codigo: string): Sala {
           .from("bastiao")
           .upsert({ room_code: codigo }, { onConflict: "room_code", ignoreDuplicates: true }),
       ]);
+      if (!vivo) return;
+      const falhaDependente = dependentes.find((r) => r.error);
+      if (falhaDependente?.error) {
+        setErro(`Não consegui preparar a sala: ${falhaDependente.error.message}`);
+        setCarregando(false);
+        return;
+      }
 
       const [pc, cs, dn, lg, mn, di, ba, bi, bl] = await Promise.all([
         supabase.from("characters").select("*").eq("room_code", codigo),
@@ -299,9 +336,14 @@ export function useSala(codigo: string): Sala {
 
   const atualizarPersonagem = useCallback(
     async (id: string, patch: Partial<Personagem>) => {
+      const anterior = ref.current.personagens;
       setPersonagens((atual) => atual.map((p) => (p.id === id ? { ...p, ...patch } : p)));
       const { error } = await supabase.from("characters").update(patch).eq("id", id);
-      if (error) console.error("atualizarPersonagem", error);
+      if (error) {
+        console.error("atualizarPersonagem", error);
+        setPersonagens(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+      }
     },
     [],
   );
@@ -326,10 +368,13 @@ export function useSala(codigo: string): Sala {
       let resp = await supabase.from("characters").insert(linha).select().single();
 
       // Corrida: duas pessoas entrando ao mesmo tempo com nomes parecidos.
+      // Casa por is_npc também: sem isso, criar um NPC de combate com o mesmo
+      // nome de um jogador de verdade (ex.: "Guarda") devolvia a ficha do
+      // jogador como se fosse o monstro criado.
       if (resp.error?.code === "23505") {
         const { data } = await supabase.from("characters").select("*").eq("room_code", codigo);
         const jaExiste = (data ?? []).find(
-          (p) => p.name.toLowerCase() === dados.name.toLowerCase(),
+          (p) => p.name.toLowerCase() === dados.name.toLowerCase() && p.is_npc === (dados.is_npc ?? false),
         ) as Personagem | undefined;
         if (jaExiste) return jaExiste;
         linha.slug = slugUnico(dados.name + "-" + Date.now().toString(36), (data ?? []).map((p) => p.slug));
@@ -352,32 +397,54 @@ export function useSala(codigo: string): Sala {
   );
 
   const removerPersonagem = useCallback(async (id: string) => {
+    const anterior = ref.current.personagens;
     setPersonagens((atual) => atual.filter((p) => p.id !== id));
     const { error } = await supabase.from("characters").delete().eq("id", id);
-    if (error) console.error("removerPersonagem", error);
+    if (error) {
+      console.error("removerPersonagem", error);
+      setPersonagens(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const definirCombate = useCallback(
-    async (patch: Partial<EstadoCombate>) => {
-      const proximo = { ...ref.current.combate, ...patch };
+    async (patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>)) => {
+      // Resolve contra ref.current, não contra um `combate` de closure que pode
+      // já estar velho depois de um await (dois jogadores entrando na
+      // iniciativa quase juntos, ou um NPC sendo criado enquanto outra
+      // mudança de combate chega por realtime) — mesma solução do definirBastiao.
+      const anterior = ref.current.combate;
+      const parcial = typeof patch === "function" ? patch(anterior) : patch;
+      const proximo = { ...anterior, ...parcial };
       setCombate(proximo);
       const { error } = await supabase
         .from("combat_state")
         .update({ round: proximo.round, turn: proximo.turn, order_json: proximo.order })
         .eq("room_code", codigo);
-      if (error) console.error("definirCombate", error);
+      if (error) {
+        console.error("definirCombate", error);
+        setCombate(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return null;
+      }
+      return proximo;
     },
     [codigo],
   );
 
   const definirNotasMestre = useCallback(
     async (texto: string) => {
+      const anterior = ref.current.notasMestre;
       setNotasMestre(texto);
       const { error } = await supabase
         .from("dm_notes")
         .update({ text: texto })
         .eq("room_code", codigo);
-      if (error) console.error("definirNotasMestre", error);
+      if (error) {
+        console.error("definirNotasMestre", error);
+        setNotasMestre(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+      }
     },
     [codigo],
   );
@@ -391,6 +458,7 @@ export function useSala(codigo: string): Sala {
         .single();
       if (error) {
         console.error("registrarLog", error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
       const nova = data as LinhaLog;
@@ -425,15 +493,25 @@ export function useSala(codigo: string): Sala {
   );
 
   const atualizarModeloNpc = useCallback(async (id: string, patch: Partial<ModeloNpc>) => {
+    const anterior = ref.current.modelosNpc;
     setModelosNpc((atual) => atual.map((m) => (m.id === id ? { ...m, ...patch } : m)));
     const { error } = await supabase.from("npc_templates").update(patch).eq("id", id);
-    if (error) console.error("atualizarModeloNpc", error);
+    if (error) {
+      console.error("atualizarModeloNpc", error);
+      setModelosNpc(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const removerModeloNpc = useCallback(async (id: string) => {
+    const anterior = ref.current.modelosNpc;
     setModelosNpc((atual) => atual.filter((m) => m.id !== id));
     const { error } = await supabase.from("npc_templates").delete().eq("id", id);
-    if (error) console.error("removerModeloNpc", error);
+    if (error) {
+      console.error("removerModeloNpc", error);
+      setModelosNpc(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const criarEntradaDiario = useCallback(
@@ -442,6 +520,7 @@ export function useSala(codigo: string): Sala {
       const { data, error } = await supabase.from("diario").insert(linha).select().single();
       if (error) {
         console.error("criarEntradaDiario", error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
       const criada = data as EntradaDiario;
@@ -451,24 +530,40 @@ export function useSala(codigo: string): Sala {
   );
 
   const atualizarEntradaDiario = useCallback(async (id: string, patch: Partial<EntradaDiario>) => {
+    const anterior = ref.current.diario;
     setDiario((atual) => atual.map((e) => (e.id === id ? { ...e, ...patch } : e)));
     const { error } = await supabase.from("diario").update(patch).eq("id", id);
-    if (error) console.error("atualizarEntradaDiario", error);
+    if (error) {
+      console.error("atualizarEntradaDiario", error);
+      setDiario(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const removerEntradaDiario = useCallback(async (id: string) => {
+    const anterior = ref.current.diario;
     setDiario((atual) => atual.filter((e) => e.id !== id));
     const { error } = await supabase.from("diario").delete().eq("id", id);
-    if (error) console.error("removerEntradaDiario", error);
+    if (error) {
+      console.error("removerEntradaDiario", error);
+      setDiario(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const definirBastiao = useCallback(
     async (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => {
-      const parcial = typeof patch === "function" ? patch(ref.current.bastiao) : patch;
-      const proximo = { ...ref.current.bastiao, ...parcial };
+      const anterior = ref.current.bastiao;
+      const parcial = typeof patch === "function" ? patch(anterior) : patch;
+      const proximo = { ...anterior, ...parcial };
       setBastiao(proximo);
       const { error } = await supabase.from("bastiao").update(parcial).eq("room_code", codigo);
-      if (error) console.error("definirBastiao", error);
+      if (error) {
+        console.error("definirBastiao", error);
+        setBastiao(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return null;
+      }
       return proximo;
     },
     [codigo],
@@ -487,6 +582,7 @@ export function useSala(codigo: string): Sala {
       const { data, error } = await supabase.from("bastiao_instalacoes").insert(linha).select().single();
       if (error) {
         console.error("criarInstalacaoBastiao", error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
       const criada = data as InstalacaoBastiao;
@@ -496,15 +592,25 @@ export function useSala(codigo: string): Sala {
   );
 
   const atualizarInstalacaoBastiao = useCallback(async (id: string, patch: Partial<InstalacaoBastiao>) => {
+    const anterior = ref.current.instalacoesBastiao;
     setInstalacoesBastiao((atual) => atual.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     const { error } = await supabase.from("bastiao_instalacoes").update(patch).eq("id", id);
-    if (error) console.error("atualizarInstalacaoBastiao", error);
+    if (error) {
+      console.error("atualizarInstalacaoBastiao", error);
+      setInstalacoesBastiao(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const removerInstalacaoBastiao = useCallback(async (id: string) => {
+    const anterior = ref.current.instalacoesBastiao;
     setInstalacoesBastiao((atual) => atual.filter((i) => i.id !== id));
     const { error } = await supabase.from("bastiao_instalacoes").delete().eq("id", id);
-    if (error) console.error("removerInstalacaoBastiao", error);
+    if (error) {
+      console.error("removerInstalacaoBastiao", error);
+      setInstalacoesBastiao(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
   }, []);
 
   const registrarLogBastiao = useCallback(
@@ -516,6 +622,7 @@ export function useSala(codigo: string): Sala {
         .single();
       if (error) {
         console.error("registrarLogBastiao", error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
       const nova = data as LinhaLogBastiao;
@@ -528,6 +635,8 @@ export function useSala(codigo: string): Sala {
     carregando: supabaseConfigurado && carregando,
     conectado,
     erro: supabaseConfigurado ? erro : MSG_SEM_CONFIG,
+    avisoFalha,
+    limparAvisoFalha,
     personagens,
     combate,
     notasMestre,

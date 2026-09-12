@@ -96,14 +96,19 @@ export function RastreadorCombate({
       item = { slug: p.slug, name: p.name, init: iniciativa };
     }
 
-    const ordem = ordenarPorIniciativa([...combate.order, item]);
-    await sala.definirCombate({ order: ordem });
+    await sala.definirCombate((atual) => ({ order: ordenarPorIniciativa([...atual.order, item]) }));
     sala.registrarLog(`${item.name} entrou no combate (iniciativa ${item.init})`);
     setIni("");
   }
 
-  function avancarTurno() {
-    const proximo = proximoTurno(combate);
+  async function avancarTurno() {
+    if (ocupado) return;
+    setOcupado(true);
+    const proximo = await sala.definirCombate((atual) => proximoTurno(atual));
+    setOcupado(false);
+    // null = a escrita falhou e o combate já voltou pro estado anterior — não
+    // decrementa prazo de condição nem loga uma rodada que não avançou.
+    if (!proximo) return;
     if (proximo.round !== combate.round) {
       sala.registrarLog(`Rodada ${proximo.round} começou`);
       for (const p of personagens) {
@@ -115,7 +120,6 @@ export function RastreadorCombate({
         }
       }
     }
-    sala.definirCombate(proximo);
   }
 
   function reiniciar() {
@@ -124,18 +128,19 @@ export function RastreadorCombate({
   }
 
   function remover(i: number) {
-    const ordem = combate.order.filter((_, idx) => idx !== i);
-    sala.definirCombate({
-      order: ordem,
-      turn: turnoAposRemover(combate.turn, i, ordem.length),
+    sala.definirCombate((atual) => {
+      const ordem = atual.order.filter((_, idx) => idx !== i);
+      return { order: ordem, turn: turnoAposRemover(atual.turn, i, ordem.length) };
     });
   }
 
   function trocar(i: number, j: number) {
     if (j < 0 || j >= combate.order.length) return;
-    const ordem = [...combate.order];
-    [ordem[i], ordem[j]] = [ordem[j], ordem[i]];
-    sala.definirCombate({ order: ordem, turn: turnoAposTrocar(combate.turn, i, j) });
+    sala.definirCombate((atual) => {
+      const ordem = [...atual.order];
+      [ordem[i], ordem[j]] = [ordem[j], ordem[i]];
+      return { order: ordem, turn: turnoAposTrocar(atual.turn, i, j) };
+    });
   }
 
   return (
@@ -235,7 +240,7 @@ export function RastreadorCombate({
               type="button"
               className="btn primary"
               onClick={avancarTurno}
-              disabled={combate.order.length === 0}
+              disabled={combate.order.length === 0 || ocupado}
             >
               Próximo turno →
             </button>
@@ -333,7 +338,11 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
     const init = Number.parseInt(ini, 10);
     const iniciativa = Number.isNaN(init) ? 0 : init;
     const item: ItemIniciativa = { slug: personagem.slug, name: personagem.name, init: iniciativa };
-    await sala.definirCombate({ order: ordenarPorIniciativa([...sala.combate.order, item]) });
+    // Função, não objeto: se outro jogador entrar quase no mesmo instante, cada
+    // escrita parte do estado mais recente conhecido em vez de um `sala.combate`
+    // que pode já estar velho quando esta chega — reduz (não garante 100%, isso
+    // pediria uma escrita atômica no banco) o risco de uma sobrescrever a outra.
+    await sala.definirCombate((atual) => ({ order: ordenarPorIniciativa([...atual.order, item]) }));
     sala.registrarLog(`${personagem.name} entrou no combate (iniciativa ${iniciativa})`);
     setIni("");
   }

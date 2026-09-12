@@ -133,6 +133,15 @@ function PainelSala({ codigo }: { codigo: string }) {
         </div>
       </div>
 
+      {sala.avisoFalha && (
+        <div className="avisofalha" role="alert" aria-live="polite">
+          <span>⚠ {sala.avisoFalha}</span>
+          <button type="button" onClick={sala.limparAvisoFalha} aria-label="Dispensar aviso">
+            ✕
+          </button>
+        </div>
+      )}
+
       {identidade.tipo === "jogador" && (
         <BannerSuaVez combate={sala.combate} meuSlug={identidade.slug} />
       )}

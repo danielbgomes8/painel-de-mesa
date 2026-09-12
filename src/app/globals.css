@@ -868,6 +868,32 @@ button {
   padding: 9px 14px;
   border-radius: 9px;
 }
+.avisofalha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 13px;
+  padding: 8px 14px;
+  margin: 0 0 10px;
+  border-radius: 9px;
+}
+.avisofalha button {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+  padding: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.avisofalha button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 .turnbanner {
   background: var(--accent);
   color: var(--accent-ink);
