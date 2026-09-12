@@ -180,20 +180,12 @@ function PainelSala({ codigo }: { codigo: string }) {
           <div className="grid">
             {souMestre
               ? sala.personagens.map((p) => (
-                  <FichaPersonagem
-                    key={p.id}
-                    personagem={p}
-                    editavel
-                    souMestre
-                    ehMinha={false}
-                    sala={sala}
-                  />
+                  <FichaPersonagem key={p.id} personagem={p} souMestre ehMinha={false} sala={sala} />
                 ))
               : meuPersonagem && (
                   <FichaPersonagem
                     key={meuPersonagem.id}
                     personagem={meuPersonagem}
-                    editavel
                     souMestre={false}
                     ehMinha
                     sala={sala}

@@ -24,6 +24,7 @@ import {
   mensagemAjustePV,
   mensagemCondicao,
   mensagemDanoAbsorvido,
+  podeEditarPersonagem,
   situacaoMorte,
   TESTES_MORTE_MAX,
 } from "@/lib/regras";
@@ -36,18 +37,19 @@ const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
 export function FichaPersonagem({
   personagem: p,
-  editavel,
   souMestre,
   ehMinha,
   sala,
 }: {
   personagem: Personagem;
-  editavel: boolean;
   souMestre: boolean;
   ehMinha: boolean;
   sala: Sala;
 }) {
   const patch = (mudanca: Partial<Personagem>) => sala.atualizarPersonagem(p.id, mudanca);
+  // Permissão é da própria ficha, não de quem manda renderizar — ver
+  // podeEditarPersonagem em regras.ts.
+  const editavel = podeEditarPersonagem(souMestre, ehMinha);
   const [mostrarExtras, setMostrarExtras] = useState(false);
 
   /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no

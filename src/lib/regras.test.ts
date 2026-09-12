@@ -22,6 +22,7 @@ import {
   numerarNpcsNaOrdem,
   ordenarPorIniciativa,
   penalidadeD20,
+  podeEditarPersonagem,
   proximoTurno,
   pvExibidoIniciativa,
   recuperarDadosDeVida,
@@ -256,6 +257,20 @@ describe("PV na iniciativa (anti-spoiler de NPC)", () => {
 
   it("jogador nunca vê PV de NPC, mesmo revelado", () => {
     expect(pvExibidoIniciativa({ is_npc: true, hp: 10, hp_max: 30 }, false)).toBeNull();
+  });
+});
+
+describe("permissão de editar ficha", () => {
+  it("Mestre edita qualquer ficha", () => {
+    expect(podeEditarPersonagem(true, false)).toBe(true);
+  });
+
+  it("jogador edita a própria", () => {
+    expect(podeEditarPersonagem(false, true)).toBe(true);
+  });
+
+  it("jogador não edita ficha alheia", () => {
+    expect(podeEditarPersonagem(false, false)).toBe(false);
   });
 });
 

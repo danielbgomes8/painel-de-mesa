@@ -287,6 +287,21 @@ export function turnoAposTrocar(turnoAtual: number, i: number, j: number): numbe
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Permissões
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Quem pode editar a ficha de um personagem: o Mestre edita qualquer uma
+ * (jogador ou NPC), e o jogador edita a sua própria. Central pra não decidir
+ * de novo em cada tela que abre uma ficha — quem manda renderizar já escolhe
+ * qual ficha mostrar pra cada pessoa, mas a permissão de mexer nela é da
+ * própria ficha, não do chamador.
+ */
+export function podeEditarPersonagem(souMestre: boolean, ehMinha: boolean): boolean {
+  return souMestre || ehMinha;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Condição com prazo (some sozinha depois de N rodadas)
 // ─────────────────────────────────────────────────────────────────────────────
 
