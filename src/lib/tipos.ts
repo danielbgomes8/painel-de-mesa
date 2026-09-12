@@ -50,9 +50,11 @@ export type Personagem = {
   resources: Recurso[];
   /** Rodadas restantes por condição ativa; some da lista quando chega a 0. */
   cond_prazo: Record<string, number>;
-  /** Percepção passiva e CD de magia — só consulta, ninguém calcula sozinho. */
+  /** Percepção passiva e CD de magia — só consulta, ninguém calcula sozinho.
+   *  spell_dc é null até o Mestre preencher (ver migration 0009) — não usar
+   *  10 como sinal de "vazio", um NPC pode ter CD de magia 10 de verdade. */
   pp: number;
-  spell_dc: number;
+  spell_dc: number | null;
   /** Bônus de resistência de atributo (saves) — idem, só consulta. */
   save_str: number;
   save_dex: number;

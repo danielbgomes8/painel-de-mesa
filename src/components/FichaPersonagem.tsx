@@ -82,7 +82,9 @@ export function FichaPersonagem({
   const temSaves =
     p.save_str !== 0 || p.save_dex !== 0 || p.save_con !== 0 ||
     p.save_int !== 0 || p.save_wis !== 0 || p.save_cha !== 0;
-  const extrasEmBranco = p.is_npc && !temSaves && p.spell_dc === 10;
+  // spell_dc null é o sinal de "não preenchido" (migration 0009) — antes
+  // era "=== 10", que escondia à toa um NPC cujo CD de magia é 10 de verdade.
+  const extrasEmBranco = p.is_npc && !temSaves && p.spell_dc === null;
   const escondeExtras = extrasEmBranco && !mostrarExtras;
 
   return (
@@ -256,9 +258,11 @@ export function FichaPersonagem({
             <div className="stat">
               <div className="lbl">CD de magia</div>
               {editavel ? (
-                <CampoNumero valor={p.spell_dc} onCommit={(n) => patch({ spell_dc: Math.max(0, n) })} />
+                // Mostra 10 como ponto de partida se ainda não foi preenchido;
+                // só grava de verdade (tirando do null) quando o Mestre mexer.
+                <CampoNumero valor={p.spell_dc ?? 10} onCommit={(n) => patch({ spell_dc: Math.max(0, n) })} />
               ) : (
-                <div className="val">{p.spell_dc}</div>
+                <div className="val">{p.spell_dc ?? 10}</div>
               )}
             </div>
           )}
