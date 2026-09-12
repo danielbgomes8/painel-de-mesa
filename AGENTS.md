@@ -19,6 +19,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   componente — importar de lá. O mesmo vale pro catálogo de monstros:
   `buscarMonstros()` mora em `src/lib/monstrosSrd.ts`, testada em
   `monstrosSrd.test.ts`.
+- **A mesa joga D&D 2024 (SRD 5.2). Não confie na sua memória de monstro.**
+  O catálogo já esteve inteiro com números de 2014 — e 27 dos 41 estavam
+  errados. O que mais engana: em 2024 a **iniciativa do monstro é um bônus
+  próprio**, não o modificador de Destreza (o Gigante do fogo tem Destreza 9 e
+  iniciativa +3; o Lich tem +17). PV mudaram muito (Wight 45 → 82, Lich 135 →
+  315), goblinoides viraram fadas, o kobold virou dragão, e Orc, Observador e
+  Fera Deslocadora **não existem** no SRD 2024. Fonte estruturada e conferível:
+  `https://api.open5e.com/v2/creatures/?document__key=srd-2024` (331 criaturas,
+  com bônus de acerto e dados de dano por ataque). Conferir contra ela antes de
+  acrescentar ou editar qualquer monstro — `monstrosSrd.test.ts` tem uma guarda
+  de edição com três valores que mudaram entre 2014 e 2024.
 - **Isto é usado no celular, no meio do combate.** Antes de acrescentar
   qualquer lista na tela, meça a altura dela a 375px de largura. O catálogo
   de monstros já ensinou a lição: 41 pílulas lado a lado davam 959px de
@@ -53,13 +64,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
   (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
-- **Última mudança publicada**: catálogo do SRD passou de 16 pra 41 monstros
-  e ganhou busca (commit `db5b588`). A busca ignora acento de propósito —
-  no teclado do celular se digita "manticora", não "Mantícora" — e casa
-  também contra o tipo, então "morto-vivo" devolve todos os mortos-vivos.
-  Por isso o campo `cls` de cada monstro tem que seguir o padrão
-  "Monstruosidade média", "Morto-vivo médio": inventar outro formato tira o
-  bicho da busca por tipo.
+- **Catálogo de monstros**: 38 criaturas, todas conferidas contra o SRD 2024
+  (ver a regra de edição acima), com CA, PV, iniciativa e linha de ataque
+  (acerto + dano). A busca ignora acento de propósito — no teclado do celular
+  se digita "manticora", não "Mantícora" — e casa também contra o tipo, então
+  "morto-vivo" devolve todos os mortos-vivos. Por isso o campo `cls` tem que
+  seguir o padrão "Monstruosidade média", "Morto-vivo médio": inventar outro
+  formato tira o bicho da busca por tipo.
+- **Ataque do NPC** (`ataque`, migration `0008`): texto livre com acerto e
+  dano, vindo do catálogo, editável na biblioteca e na ficha, e carregado
+  junto quando o modelo entra no combate. Fica num campo que quebra linha, não
+  num input de uma linha — a linha do dragão tem 90 caracteres e sumia pela
+  direita no celular.
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São

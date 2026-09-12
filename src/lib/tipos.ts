@@ -36,6 +36,8 @@ export type Personagem = {
   dsf: number;
   cond: Record<string, boolean>;
   notes: string;
+  /** Acerto e dano em texto livre ("Garra +5, 2d6+3"). Só consulta; ninguém rola por ninguém. */
+  ataque: string;
   is_npc: boolean;
   /** Só importa pra NPC: enquanto false, jogador vê "Inimigo N" em vez do nome. */
   revealed: boolean;
@@ -72,6 +74,7 @@ export type NovoPersonagem = {
   speed?: number;
   hp?: number;
   hp_max?: number;
+  ataque?: string;
   is_npc?: boolean;
 };
 
@@ -100,6 +103,7 @@ export type ModeloNpc = {
   speed: number;
   init_mod: number;
   notes: string;
+  ataque: string;
   created_at: string;
 };
 
@@ -111,6 +115,7 @@ export type NovoModeloNpc = {
   speed?: number;
   init_mod?: number;
   notes?: string;
+  ataque?: string;
 };
 
 /** Uma linha do log curto de combate (dano/cura, rodadas, entradas na ordem). */

@@ -139,6 +139,24 @@ export function FichaPersonagem({
           </div>
         )}
 
+        {p.is_npc && (editavel || p.ataque) ? (
+          <div className="ataquebloco">
+            <span className="sectitle">Ataque</span>
+            {editavel ? (
+              <div className="notesbox">
+                <CampoTextoAdiado
+                  valor={p.ataque}
+                  maxLength={200}
+                  placeholder="ex.: Cimitarra +4, 1d6+2 cortante"
+                  onSalvar={(texto) => patch({ ataque: texto })}
+                />
+              </div>
+            ) : (
+              <p className="ataquetexto">{p.ataque}</p>
+            )}
+          </div>
+        ) : null}
+
         {editavel && (
           <div className="combatctrls">
             <button type="button" className="btn" onClick={() => patch(aplicarDescansoCurto(p))}>

@@ -32,7 +32,12 @@ export function RastreadorCombate({
   const [nomeNpc, setNomeNpc] = useState("");
   const [pvNpc, setPvNpc] = useState("");
   const [caNpc, setCaNpc] = useState("");
-  const [extrasModelo, setExtrasModelo] = useState<{ cls?: string; speed?: number; init_mod?: number }>({});
+  const [extrasModelo, setExtrasModelo] = useState<{
+    cls?: string;
+    speed?: number;
+    init_mod?: number;
+    ataque?: string;
+  }>({});
   const [ini, setIni] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -49,7 +54,7 @@ export function RastreadorCombate({
     setNomeNpc(m.name);
     setPvNpc(String(m.hp_max));
     setCaNpc(String(m.ac));
-    setExtrasModelo({ cls: m.cls, speed: m.speed, init_mod: m.init_mod });
+    setExtrasModelo({ cls: m.cls, speed: m.speed, init_mod: m.init_mod, ataque: m.ataque });
   }
 
   function rolarIniciativa() {

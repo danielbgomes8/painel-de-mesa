@@ -91,6 +91,7 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
               CA {m.ac} · {m.hp_max} PV · {m.speed}m · inic. {m.init_mod >= 0 ? "+" : ""}
               {m.init_mod} · {m.cls}
             </span>
+            {m.ataque ? <span className="catataque">⚔ {m.ataque}</span> : null}
             {m.notes ? <span className="catnota">{m.notes}</span> : null}
           </button>
         ))}
@@ -144,6 +145,17 @@ function LinhaModelo({ modelo: m, sala }: { modelo: ModeloNpc; sala: Sala }) {
           <CampoNumero className="campnum" valor={m.init_mod} onCommit={(n) => patch({ init_mod: n })} />
         </label>
       </div>
+      <div className="npclibataque">
+        <span className="sectitle">Ataque</span>
+        <div className="notesbox">
+          <CampoTextoAdiado
+            valor={m.ataque}
+            maxLength={200}
+            onSalvar={(texto) => patch({ ataque: texto })}
+            placeholder="ex.: Cimitarra +4, 1d6+2 cortante"
+          />
+        </div>
+      </div>
       <div className="notesbox">
         <CampoTextoAdiado
           valor={m.notes}
@@ -163,6 +175,7 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
   const [ca, setCa] = useState("");
   const [desl, setDesl] = useState("");
   const [ini, setIni] = useState("");
+  const [ataque, setAtaque] = useState("");
   const [notas, setNotas] = useState("");
 
   function adicionar() {
@@ -175,6 +188,7 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
       ac: Number.parseInt(ca, 10) || 12,
       speed: Number.parseInt(desl, 10) || 9,
       init_mod: Number.parseInt(ini, 10) || 0,
+      ataque: ataque.trim(),
       notes: notas.trim(),
     });
     setNome("");
@@ -183,6 +197,7 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
     setCa("");
     setDesl("");
     setIni("");
+    setAtaque("");
     setNotas("");
   }
 
@@ -234,6 +249,13 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
           placeholder="iniciativa"
           value={ini}
           onChange={(e) => setIni(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="ataque (ex.: Cimitarra +4, 1d6+2)"
+          maxLength={200}
+          value={ataque}
+          onChange={(e) => setAtaque(e.target.value)}
         />
       </div>
       <div className="notesbox">

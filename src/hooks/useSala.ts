@@ -319,6 +319,7 @@ export function useSala(codigo: string): Sala {
         speed: dados.speed ?? 9,
         hp: dados.hp ?? 10,
         hp_max: dados.hp_max ?? 10,
+        ataque: dados.ataque ?? "",
         is_npc: dados.is_npc ?? false,
       };
 
@@ -409,6 +410,7 @@ export function useSala(codigo: string): Sala {
         speed: dados.speed ?? 9,
         init_mod: dados.init_mod ?? 0,
         notes: dados.notes ?? "",
+        ataque: dados.ataque ?? "",
       };
       const { data, error } = await supabase.from("npc_templates").insert(linha).select().single();
       if (error) {
