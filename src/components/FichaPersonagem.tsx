@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { ItemEquip, Personagem, Recurso } from "@/lib/tipos";
+import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import {
   ajustarPV,
@@ -30,6 +30,7 @@ import {
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
+import { BotaoRemover } from "@/components/BotaoRemover";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
@@ -49,22 +50,28 @@ export function FichaPersonagem({
   const patch = (mudanca: Partial<Personagem>) => sala.atualizarPersonagem(p.id, mudanca);
   const [mostrarExtras, setMostrarExtras] = useState(false);
 
-  /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no log. */
-  function mudarPV(delta: number) {
+  /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no
+   *  log — mesma sequência "escreve, só loga se confirmar" das Ações em
+   *  Massa, reaproveitada aqui em vez de reimplementada. */
+  async function mudarPV(delta: number) {
+    let resultado: Partial<Personagem>;
+    let texto: string | null = null;
     if (delta >= 0) {
-      const resultado = aplicarCura(p, delta);
-      patch(resultado);
-      if (resultado.hp !== p.hp) sala.registrarLog(mensagemAjustePV(p.name, resultado.hp - p.hp, resultado.hp, p.hp_max));
-      return;
+      const r = aplicarCura(p, delta);
+      resultado = r;
+      if (r.hp !== p.hp) texto = mensagemAjustePV(p.name, r.hp - p.hp, r.hp, p.hp_max);
+    } else {
+      const r = aplicarDano(p, -delta);
+      resultado = r;
+      const deltaReal = r.hp - p.hp;
+      if (deltaReal !== 0) {
+        texto = mensagemAjustePV(p.name, deltaReal, r.hp, p.hp_max);
+      } else if (r.hp_temp < p.hp_temp) {
+        texto = mensagemDanoAbsorvido(p.name, p.hp_temp - r.hp_temp);
+      }
     }
-    const resultado = aplicarDano(p, -delta);
-    patch(resultado);
-    const deltaReal = resultado.hp - p.hp;
-    if (deltaReal !== 0) {
-      sala.registrarLog(mensagemAjustePV(p.name, deltaReal, resultado.hp, p.hp_max));
-    } else if (resultado.hp_temp < p.hp_temp) {
-      sala.registrarLog(mensagemDanoAbsorvido(p.name, p.hp_temp - resultado.hp_temp));
-    }
+    const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: resultado }]);
+    if (deuCerto && texto) sala.registrarVariosLogs([texto]);
   }
 
   function descansoLongoCompleto() {
@@ -428,12 +435,13 @@ export function FichaPersonagem({
                   className="chip"
                   aria-pressed={ativa}
                   disabled={!editavel}
-                  onClick={() => {
+                  onClick={async () => {
                     const ligar = !ativa;
                     const cond_prazo = { ...p.cond_prazo };
                     if (!ligar) delete cond_prazo[nome];
-                    patch({ cond: { ...p.cond, [nome]: ligar }, cond_prazo });
-                    sala.registrarLog(mensagemCondicao(p.name, nome, ligar));
+                    const mudanca = { cond: { ...p.cond, [nome]: ligar }, cond_prazo };
+                    const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: mudanca }]);
+                    if (deuCerto) sala.registrarVariosLogs([mensagemCondicao(p.name, nome, ligar)]);
                   }}
                 >
                   {nome}
@@ -471,48 +479,21 @@ export function FichaPersonagem({
               {editavel ? "Nenhum ainda — cadastre o que a sua classe usa." : "Nenhum cadastrado."}
             </p>
           )}
-          <div className="reslist">
-            {p.resources.map((r, i) => (
-              <div key={i} className="resrow">
-                <span className="resnome">
-                  {r.name}
-                  {r.short_rest && " · desc. curto"}
-                </span>
-                <div className="pips">
-                  {Array.from({ length: r.max }, (_, k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className="pip"
-                      aria-label={`${r.name} uso ${k + 1}`}
-                      aria-pressed={k < r.cur}
-                      disabled={!editavel}
-                      onClick={() => {
-                        const cur = limitarPV(alternarPips(k, r.cur), r.max);
-                        patch({
-                          resources: p.resources.map((x, idx) => (idx === i ? { ...x, cur } : x)),
-                        });
-                      }}
-                    />
-                  ))}
-                </div>
-                {editavel && (
-                  <button
-                    type="button"
-                    className="rm"
-                    aria-label={`remover recurso ${r.name}`}
-                    onClick={() =>
-                      patch({ resources: p.resources.filter((_, idx) => idx !== i) })
-                    }
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <TrilhaDeUsos
+            itens={p.resources}
+            editavel={editavel}
+            rotuloPip={(nome, k) => `${nome} uso ${k + 1}`}
+            rotuloRemover={(nome) => `remover recurso ${nome}`}
+            detalhe={(r) => r.short_rest && " · desc. curto"}
+            onAlterarCur={(i, cur) => patch({ resources: p.resources.map((x, idx) => (idx === i ? { ...x, cur } : x)) })}
+            onRemover={(i) => patch({ resources: p.resources.filter((_, idx) => idx !== i) })}
+          />
           {editavel && (
-            <FormRecurso onAdicionar={(novo) => patch({ resources: [...p.resources, novo] })} />
+            <FormContador
+              placeholderNome="nome (ex.: Fúria, Pontos de Foco, Espaços Nv.1)"
+              comDescansoCurto
+              onAdicionar={(novo) => patch({ resources: [...p.resources, { ...novo, short_rest: novo.short_rest ?? false }] })}
+            />
           )}
         </div>
         )}
@@ -525,40 +506,18 @@ export function FichaPersonagem({
               {editavel ? "Nada cadastrado — flechas, tochas, o estado de uma arma..." : "Nada cadastrado."}
             </p>
           )}
-          <div className="reslist">
-            {p.items.map((it, i) => (
-              <div key={i} className="resrow">
-                <span className="resnome">{it.name}</span>
-                <div className="pips">
-                  {Array.from({ length: it.max }, (_, k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className="pip"
-                      aria-label={`${it.name} ${k + 1}`}
-                      aria-pressed={k < it.cur}
-                      disabled={!editavel}
-                      onClick={() => {
-                        const cur = limitarPV(alternarPips(k, it.cur), it.max);
-                        patch({ items: p.items.map((x, idx) => (idx === i ? { ...x, cur } : x)) });
-                      }}
-                    />
-                  ))}
-                </div>
-                {editavel && (
-                  <button
-                    type="button"
-                    className="rm"
-                    aria-label={`remover ${it.name}`}
-                    onClick={() => patch({ items: p.items.filter((_, idx) => idx !== i) })}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          {editavel && <FormItem onAdicionar={(novo) => patch({ items: [...p.items, novo] })} />}
+          <TrilhaDeUsos
+            itens={p.items}
+            editavel={editavel}
+            onAlterarCur={(i, cur) => patch({ items: p.items.map((x, idx) => (idx === i ? { ...x, cur } : x)) })}
+            onRemover={(i) => patch({ items: p.items.filter((_, idx) => idx !== i) })}
+          />
+          {editavel && (
+            <FormContador
+              placeholderNome="nome (ex.: Flechas, Tochas, Espada longa)"
+              onAdicionar={(novo) => patch({ items: [...p.items, novo] })}
+            />
+          )}
         </div>
         )}
 
@@ -584,15 +543,14 @@ export function FichaPersonagem({
 
       {souMestre && (
         <div className="cardfoot">
-          <button
-            type="button"
+          <BotaoRemover
+            aria={`remover ${p.name}`}
+            confirmar={`Remover ${p.name} do painel?`}
+            onConfirmar={() => sala.removerPersonagem(p.id)}
             className="removechar"
-            onClick={() => {
-              if (confirm(`Remover ${p.name} do painel?`)) sala.removerPersonagem(p.id);
-            }}
           >
             remover {p.is_npc ? "NPC" : "personagem"}
-          </button>
+          </BotaoRemover>
         </div>
       )}
     </div>
@@ -603,8 +561,66 @@ function sinal(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
-/** Formulário pra cadastrar um recurso novo (nome livre + quantidade de usos). */
-function FormRecurso({ onAdicionar }: { onAdicionar: (r: Recurso) => void }) {
+type ContadorUso = { name: string; max: number; cur: number };
+
+/** Trilha de pips (usos restantes) com nome, contador clicável e remover —
+ *  mesmo desenho pra Recursos (Fúria, Ki...) e Munição/equipamento. */
+function TrilhaDeUsos<T extends ContadorUso>({
+  itens,
+  editavel,
+  onAlterarCur,
+  onRemover,
+  rotuloPip = (nome, k) => `${nome} ${k + 1}`,
+  rotuloRemover = (nome) => `remover ${nome}`,
+  detalhe,
+}: {
+  itens: T[];
+  editavel: boolean;
+  onAlterarCur: (indice: number, cur: number) => void;
+  onRemover: (indice: number) => void;
+  rotuloPip?: (nome: string, k: number) => string;
+  rotuloRemover?: (nome: string) => string;
+  detalhe?: (item: T) => React.ReactNode;
+}) {
+  return (
+    <div className="reslist">
+      {itens.map((item, i) => (
+        <div key={i} className="resrow">
+          <span className="resnome">
+            {item.name}
+            {detalhe?.(item)}
+          </span>
+          <div className="pips">
+            {Array.from({ length: item.max }, (_, k) => (
+              <button
+                key={k}
+                type="button"
+                className="pip"
+                aria-label={rotuloPip(item.name, k)}
+                aria-pressed={k < item.cur}
+                disabled={!editavel}
+                onClick={() => onAlterarCur(i, limitarPV(alternarPips(k, item.cur), item.max))}
+              />
+            ))}
+          </div>
+          {editavel && <BotaoRemover aria={rotuloRemover(item.name)} onConfirmar={() => onRemover(i)} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Formulário pra cadastrar um recurso ou item novo (nome livre + quantidade
+ *  de usos); o checkbox de descanso curto só faz sentido pra recursos. */
+function FormContador({
+  placeholderNome,
+  comDescansoCurto = false,
+  onAdicionar,
+}: {
+  placeholderNome: string;
+  comDescansoCurto?: boolean;
+  onAdicionar: (dados: { name: string; max: number; cur: number; short_rest?: boolean }) => void;
+}) {
   const [nome, setNome] = useState("");
   const [max, setMax] = useState("");
   const [curto, setCurto] = useState(false);
@@ -613,7 +629,12 @@ function FormRecurso({ onAdicionar }: { onAdicionar: (r: Recurso) => void }) {
     const nomeLimpo = nome.trim();
     const maximo = Number.parseInt(max, 10);
     if (!nomeLimpo || Number.isNaN(maximo) || maximo <= 0) return;
-    onAdicionar({ name: nomeLimpo, max: maximo, cur: maximo, short_rest: curto });
+    onAdicionar({
+      name: nomeLimpo,
+      max: maximo,
+      cur: maximo,
+      ...(comDescansoCurto ? { short_rest: curto } : {}),
+    });
     setNome("");
     setMax("");
     setCurto(false);
@@ -623,7 +644,7 @@ function FormRecurso({ onAdicionar }: { onAdicionar: (r: Recurso) => void }) {
     <div className="addcombatant" style={{ marginTop: 8 }}>
       <input
         type="text"
-        placeholder="nome (ex.: Fúria, Pontos de Foco, Espaços Nv.1)"
+        placeholder={placeholderNome}
         maxLength={40}
         value={nome}
         onChange={(e) => setNome(e.target.value)}
@@ -632,60 +653,21 @@ function FormRecurso({ onAdicionar }: { onAdicionar: (r: Recurso) => void }) {
         className="num"
         type="number"
         inputMode="numeric"
-        placeholder="usos"
+        placeholder={comDescansoCurto ? "usos" : "quantidade/estados"}
         value={max}
         onChange={(e) => setMax(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") adicionar();
         }}
       />
-      <label className="checklabel">
-        <input type="checkbox" checked={curto} onChange={(e) => setCurto(e.target.checked)} />
-        recupera no descanso curto
-      </label>
+      {comDescansoCurto && (
+        <label className="checklabel">
+          <input type="checkbox" checked={curto} onChange={(e) => setCurto(e.target.checked)} />
+          recupera no descanso curto
+        </label>
+      )}
       <button type="button" className="btn" onClick={adicionar}>
-        + recurso
-      </button>
-    </div>
-  );
-}
-
-/** Formulário pra cadastrar munição/equipamento (sem reset em descanso). */
-function FormItem({ onAdicionar }: { onAdicionar: (i: ItemEquip) => void }) {
-  const [nome, setNome] = useState("");
-  const [max, setMax] = useState("");
-
-  function adicionar() {
-    const nomeLimpo = nome.trim();
-    const maximo = Number.parseInt(max, 10);
-    if (!nomeLimpo || Number.isNaN(maximo) || maximo <= 0) return;
-    onAdicionar({ name: nomeLimpo, max: maximo, cur: maximo });
-    setNome("");
-    setMax("");
-  }
-
-  return (
-    <div className="addcombatant" style={{ marginTop: 8 }}>
-      <input
-        type="text"
-        placeholder="nome (ex.: Flechas, Tochas, Espada longa)"
-        maxLength={40}
-        value={nome}
-        onChange={(e) => setNome(e.target.value)}
-      />
-      <input
-        className="num"
-        type="number"
-        inputMode="numeric"
-        placeholder="quantidade/estados"
-        value={max}
-        onChange={(e) => setMax(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") adicionar();
-        }}
-      />
-      <button type="button" className="btn" onClick={adicionar}>
-        + item
+        + {comDescansoCurto ? "recurso" : "item"}
       </button>
     </div>
   );

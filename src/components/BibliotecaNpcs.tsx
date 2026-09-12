@@ -6,6 +6,7 @@ import type { ModeloNpc, NovoModeloNpc } from "@/lib/tipos";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
+import { BotaoRemover } from "@/components/BotaoRemover";
 import { MONSTROS_SRD, buscarMonstros } from "@/lib/monstrosSrd";
 
 /** Prep de mesa: NPCs/monstros que podem aparecer ou não, com ficha básica e
@@ -112,16 +113,11 @@ function LinhaModelo({ modelo: m, sala }: { modelo: ModeloNpc; sala: Sala }) {
     <div className="npclibrow">
       <div className="npclibhead">
         <CampoTexto valor={m.name} maxLength={40} placeholder="nome" onCommit={(v) => patch({ name: v })} />
-        <button
-          type="button"
-          className="rm"
-          aria-label={`remover ${m.name} da biblioteca`}
-          onClick={() => {
-            if (confirm(`Remover "${m.name}" da biblioteca?`)) sala.removerModeloNpc(m.id);
-          }}
-        >
-          ✕
-        </button>
+        <BotaoRemover
+          aria={`remover ${m.name} da biblioteca`}
+          confirmar={`Remover "${m.name}" da biblioteca?`}
+          onConfirmar={() => sala.removerModeloNpc(m.id)}
+        />
       </div>
       <div className="npclibstats">
         <label>

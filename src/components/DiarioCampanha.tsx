@@ -5,6 +5,7 @@ import type { Sala } from "@/hooks/useSala";
 import type { EntradaDiario } from "@/lib/tipos";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
+import { BotaoRemover } from "@/components/BotaoRemover";
 
 /** Resumo por sessão, escrito pelo Mestre, visível pra todo mundo — pra
  *  lembrar "onde paramos" na próxima mesa. */
@@ -52,16 +53,11 @@ function EntradaDiarioRow({
         )}
         <span className="hora">{new Date(e.created_at).toLocaleDateString("pt-BR")}</span>
         {editavel && (
-          <button
-            type="button"
-            className="rm"
-            aria-label={`remover entrada ${e.title}`}
-            onClick={() => {
-              if (confirm("Remover essa entrada do diário?")) sala.removerEntradaDiario(e.id);
-            }}
-          >
-            ✕
-          </button>
+          <BotaoRemover
+            aria={`remover entrada ${e.title}`}
+            confirmar="Remover essa entrada do diário?"
+            onConfirmar={() => sala.removerEntradaDiario(e.id)}
+          />
         )}
       </div>
       {editavel ? (

@@ -16,6 +16,8 @@ import {
 } from "@/lib/bastiaoDmg";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
+import { ListaLog } from "@/components/ListaLog";
+import { BotaoRemover } from "@/components/BotaoRemover";
 
 /** Painel do Bastião (DMG 2024, cap. 8) — um só, compartilhado pela mesa;
  *  é recurso do grupo, então Mestre e jogadores mexem igual. */
@@ -144,18 +146,7 @@ export function PainelBastiao({ sala }: { sala: Sala }) {
 
       <RegistrarEvento sala={sala} />
 
-      {sala.logBastiao.length > 0 && (
-        <div className="loglist" style={{ marginTop: 14 }}>
-          {sala.logBastiao.map((l) => (
-            <div key={l.id} className="logrow">
-              <span className="hora">
-                {new Date(l.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-              </span>
-              <span>{l.text}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <ListaLog log={sala.logBastiao} style={{ marginTop: 14 }} />
     </div>
   );
 }
@@ -204,16 +195,11 @@ function LinhaInstalacao({ instalacao: i, sala }: { instalacao: InstalacaoBastia
         <button type="button" className={`chip flag${i.ativa ? "" : " danger"}`} aria-pressed={!i.ativa} onClick={() => patch({ ativa: !i.ativa })}>
           {i.ativa ? "ativa" : "inativa"}
         </button>
-        <button
-          type="button"
-          className="rm"
-          aria-label={`remover ${i.name}`}
-          onClick={() => {
-            if (confirm(`Remover "${i.name}" do Bastião?`)) sala.removerInstalacaoBastiao(i.id);
-          }}
-        >
-          ✕
-        </button>
+        <BotaoRemover
+          aria={`remover ${i.name}`}
+          confirmar={`Remover "${i.name}" do Bastião?`}
+          onConfirmar={() => sala.removerInstalacaoBastiao(i.id)}
+        />
       </div>
       {descricao && <p className="instdesc">{descricao}</p>}
     </div>

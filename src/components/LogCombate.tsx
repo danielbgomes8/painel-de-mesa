@@ -1,6 +1,7 @@
 "use client";
 
 import type { LinhaLog } from "@/lib/tipos";
+import { ListaLog } from "@/components/ListaLog";
 
 /** O que aconteceu até agora — dano, cura, rodadas, entradas no combate.
  *  Todo mundo vê; ninguém edita. Mais recente primeiro. */
@@ -12,16 +13,7 @@ export function LogCombate({ log }: { log: LinhaLog[] }) {
       <div className="combat-head">
         <h2>O que aconteceu</h2>
       </div>
-      <div className="loglist">
-        {log.map((l) => (
-          <div key={l.id} className="logrow">
-            <span className="hora">
-              {new Date(l.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
-            <span>{l.text}</span>
-          </div>
-        ))}
-      </div>
+      <ListaLog log={log} />
     </div>
   );
 }
