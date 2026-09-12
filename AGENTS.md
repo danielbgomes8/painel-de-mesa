@@ -16,37 +16,57 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   sala na URL (`?sala=...`, padrão `setimo-raio` em `src/lib/sala.ts`).
 - **Regras de negócio fechadas** ficam em `src/lib/regras.ts`, cada uma pura e
   testada em `src/lib/regras.test.ts` (`npm run teste`). Não reimplementar em
-  componente — importar de lá.
+  componente — importar de lá. O mesmo vale pro catálogo de monstros:
+  `buscarMonstros()` mora em `src/lib/monstrosSrd.ts`, testada em
+  `monstrosSrd.test.ts`.
+- **Isto é usado no celular, no meio do combate.** Antes de acrescentar
+  qualquer lista na tela, meça a altura dela a 375px de largura. O catálogo
+  de monstros já ensinou a lição: 41 pílulas lado a lado davam 959px de
+  rolagem (mais de uma tela inteira), com alvos de toque de 27px. Virou
+  busca-primeiro — some por padrão, aparece ao digitar, cada resultado é uma
+  linha de ~100px de altura. **Não "melhore" isso voltando a despejar a
+  lista completa**; quem quer folhear usa o botão "ver todos".
+- **Alvo de toque e retorno visual**: elemento em que se toca precisa de
+  `touch-action: manipulation` (sem isso o navegador segura ~300ms esperando
+  duplo-toque, e o Mestre toca de novo achando que falhou, duplicando o
+  registro), foco visível (`:focus-visible`) e, quando a ação é assíncrona,
+  uma confirmação com `aria-live="polite"`.
+- **Escrita que pode falhar não se confirma antes da hora.** As mutações do
+  `useSala` engolem o erro no `console.error`; `criarModeloNpc` devolve
+  `boolean` justamente pra tela só dizer "copiado" depois do banco
+  confirmar. Ao criar mutação nova que tenha retorno na tela, siga isso —
+  senão o painel mente quando o Supabase está pausado ou a internet cai.
 - **Dados**: Supabase (Postgres + Realtime). Esquema em `supabase/migrations/`.
   O app fala com o banco só pelo cliente do navegador (`src/lib/supabase.ts`);
   não há rota de servidor nem segredo de servidor.
 - **RLS é policy aberta de propósito** — ver README, seção "Segurança". Não
   "consertar" achando que é falha.
+- **Pra testar, use uma sala separada**: abra `?sala=teste-ui` (ou outro
+  código) em vez de mexer na `setimo-raio`, que tem os dados reais da mesa.
+  A sala nasce sozinha no primeiro acesso. Pra apagar depois, basta remover
+  a linha dela em `rooms` — as nove tabelas filhas têm `on delete cascade`,
+  então some tudo junto e nada encosta na campanha.
 - O visual saiu do protótipo (Artifact) validado com a mesa: paleta e classes
   CSS estão em `src/app/globals.css`, praticamente iguais às do protótipo.
-
-## Pendência (11/09/2026) — código novo ainda não commitado/publicado
-
-Migrations `0002_recursos_e_registro.sql` e `0003_biblioteca_notas.sql` **já
-rodaram** no Supabase de produção (mesmo projeto que o Vercel usa) — o banco
-já tem PV temporário, ocultar/revelar NPC, inspiração, concentração, dados de
-vida, recursos de classe genéricos, biblioteca de NPCs (com notas) e log de
-combate. O que falta é só o lado do código: as mudanças estão testadas
-localmente (`npm run teste`, lint, build, e manualmente no navegador) mas
-ainda **não foram commitadas nem enviadas pro GitHub/Vercel** — a versão em
-produção (painel-de-mesa.vercel.app) ainda é a antiga. Precisa de `git add` +
-commit + push (ou pedir pro agente) pra ir ao ar. Depois de publicado, apagar
-esta seção.
 
 ## Estado (11/09/2026) — já está tudo publicado e funcionando
 
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
   (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
+- **Última mudança publicada**: catálogo do SRD passou de 16 pra 41 monstros
+  e ganhou busca (commit `db5b588`). A busca ignora acento de propósito —
+  no teclado do celular se digita "manticora", não "Mantícora" — e casa
+  também contra o tipo, então "morto-vivo" devolve todos os mortos-vivos.
+  Por isso o campo `cls` de cada monstro tem que seguir o padrão
+  "Monstruosidade média", "Morto-vivo médio": inventar outro formato tira o
+  bicho da busca por tipo.
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001_inicial.sql` e `seed.sql`
-  já rodadas. **Pegadinha real já resolvida uma vez**: se criar tabela nova
+  Paulo), separado do gb-reserva. Migrations `0001` a `0007` e o `seed.sql`
+  já rodadas — o banco tem as dez tabelas (`rooms` mais nove filhas, todas
+  com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
+  uma vez**: se criar tabela nova
   sem "Automatically expose new tables", ela não pega GRANT pro `anon`
   automaticamente — RLS sozinho não basta, tem que dar `grant select,
   insert, update, delete ... to anon, authenticated` explícito (ver fim de
