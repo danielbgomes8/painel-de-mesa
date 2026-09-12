@@ -76,6 +76,7 @@ export type NovoPersonagem = {
   hp_max?: number;
   ataque?: string;
   is_npc?: boolean;
+  notes?: string;
 };
 
 export type ItemIniciativa = {

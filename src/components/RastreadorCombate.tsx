@@ -5,6 +5,7 @@ import type { Sala } from "@/hooks/useSala";
 import type { ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import {
+  estaCaido,
   nomeExibidoIniciativa,
   numerarNpcsNaOrdem,
   ordenarPorIniciativa,
@@ -37,6 +38,7 @@ export function RastreadorCombate({
     speed?: number;
     init_mod?: number;
     ataque?: string;
+    notes?: string;
   }>({});
   const [ini, setIni] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -54,7 +56,9 @@ export function RastreadorCombate({
     setNomeNpc(m.name);
     setPvNpc(String(m.hp_max));
     setCaNpc(String(m.ac));
-    setExtrasModelo({ cls: m.cls, speed: m.speed, init_mod: m.init_mod, ataque: m.ataque });
+    // notes junto: sem isso, a tática que o Mestre preparou na biblioteca
+    // ("foge com menos de 10 PV"...) sumia ao puxar o NPC pro combate.
+    setExtrasModelo({ cls: m.cls, speed: m.speed, init_mod: m.init_mod, ataque: m.ataque, notes: m.notes });
   }
 
   function rolarIniciativa() {
@@ -164,7 +168,7 @@ export function RastreadorCombate({
         {combate.order.map((c, i) => {
             const pv = pvDe(c.slug);
             const pvVisivel = pv ? pvExibidoIniciativa(pv, souMestre) : null;
-            const critico = pvVisivel ? pvVisivel.hp <= 0 : false;
+            const critico = pvVisivel ? estaCaido(pvVisivel.hp) : false;
             const nomeExibido = pv
               ? nomeExibidoIniciativa(pv, contagensNpc[i], souMestre)
               : c.name;

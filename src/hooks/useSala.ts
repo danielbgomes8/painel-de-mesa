@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { slugUnico } from "@/lib/sala";
+import { turnoAposRemover } from "@/lib/regras";
 import {
   COMBATE_VAZIO,
   type Bastiao,
@@ -363,6 +364,7 @@ export function useSala(codigo: string): Sala {
         hp_max: dados.hp_max ?? 10,
         ataque: dados.ataque ?? "",
         is_npc: dados.is_npc ?? false,
+        notes: dados.notes ?? "",
       };
 
       let resp = await supabase.from("characters").insert(linha).select().single();
@@ -396,17 +398,6 @@ export function useSala(codigo: string): Sala {
     [codigo],
   );
 
-  const removerPersonagem = useCallback(async (id: string) => {
-    const anterior = ref.current.personagens;
-    setPersonagens((atual) => atual.filter((p) => p.id !== id));
-    const { error } = await supabase.from("characters").delete().eq("id", id);
-    if (error) {
-      console.error("removerPersonagem", error);
-      setPersonagens(anterior);
-      setAvisoFalha(AVISO_FALHA_ESCRITA);
-    }
-  }, []);
-
   const definirCombate = useCallback(
     async (patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>)) => {
       // Resolve contra ref.current, não contra um `combate` de closure que pode
@@ -430,6 +421,34 @@ export function useSala(codigo: string): Sala {
       return proximo;
     },
     [codigo],
+  );
+
+  const removerPersonagem = useCallback(
+    async (id: string) => {
+      const anterior = ref.current.personagens;
+      const removido = anterior.find((p) => p.id === id);
+      setPersonagens((atual) => atual.filter((p) => p.id !== id));
+      const { error } = await supabase.from("characters").delete().eq("id", id);
+      if (error) {
+        console.error("removerPersonagem", error);
+        setPersonagens(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return;
+      }
+      // Se estava na ordem de iniciativa, tira o slot dali também — senão
+      // fica um slug órfão apontando pra ninguém, e a numeração dos NPCs
+      // seguintes na ordem desloca (numerarNpcsNaOrdem não acha mais o
+      // is_npc de quem sumiu).
+      if (removido && ref.current.combate.order.some((o) => o.slug === removido.slug)) {
+        await definirCombate((atual) => {
+          const i = atual.order.findIndex((o) => o.slug === removido.slug);
+          if (i === -1) return {};
+          const ordem = atual.order.filter((_, idx) => idx !== i);
+          return { order: ordem, turn: turnoAposRemover(atual.turn, i, ordem.length) };
+        });
+      }
+    },
+    [definirCombate],
   );
 
   const definirNotasMestre = useCallback(

@@ -180,6 +180,13 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
 
+  // `|| padrao` trocaria um 0 digitado de propósito (ex.: deslocamento 0 de
+  // um limo ou objeto animado) pelo padrão, porque 0 é falsy em JS.
+  function numOu(texto: string, padrao: number): number {
+    const n = Number.parseInt(texto, 10);
+    return Number.isNaN(n) ? padrao : n;
+  }
+
   async function adicionar() {
     const nomeLimpo = nome.trim();
     if (!nomeLimpo || enviando) return;
@@ -187,10 +194,10 @@ function FormNovoModelo({ sala }: { sala: Sala }) {
     const deuCerto = await sala.criarModeloNpc({
       name: nomeLimpo,
       cls: cls.trim(),
-      hp_max: Number.parseInt(pv, 10) || 10,
-      ac: Number.parseInt(ca, 10) || 12,
-      speed: Number.parseInt(desl, 10) || 9,
-      init_mod: Number.parseInt(ini, 10) || 0,
+      hp_max: numOu(pv, 10),
+      ac: numOu(ca, 12),
+      speed: numOu(desl, 9),
+      init_mod: numOu(ini, 0),
       ataque: ataque.trim(),
       notes: notas.trim(),
     });

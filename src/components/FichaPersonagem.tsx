@@ -13,6 +13,7 @@ import {
   alternarPips,
   deslocamentoEfetivo,
   efeitoExaustao,
+  estaCaido,
   EXAUSTAO_MAX,
   faixaPV,
   formatarMetros,
@@ -73,7 +74,7 @@ export function FichaPersonagem({
 
   const faixa = faixaPV(p.hp, p.hp_max);
   const largura = p.hp_max > 0 ? Math.max(0, Math.min(1, p.hp / p.hp_max)) : 0;
-  const caido = p.hp <= 0;
+  const caido = estaCaido(p.hp);
   const morte = situacaoMorte(p.dss, p.dsf);
   // Monstro só mostra saves e CD de magia depois que alguém preenche: seis zeros
   // na tela atrapalham a leitura no meio do combate. O link abaixo traz de volta
@@ -109,7 +110,10 @@ export function FichaPersonagem({
       <div className="body">
         {caido && (
           <div className="downbanner">
-            ⚠ Caído — inconsciente, faça os testes de morte
+            {/* NPC não tem a seção de testes de morte abaixo (monstro não
+             *  rola morte no 2024) — banner não pode mandar fazer um teste
+             *  que não existe na própria ficha. */}
+            {p.is_npc ? "⚠ Caído — a 0 PV" : "⚠ Caído — inconsciente, faça os testes de morte"}
           </div>
         )}
 

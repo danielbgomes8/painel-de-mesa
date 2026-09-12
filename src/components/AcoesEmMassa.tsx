@@ -49,7 +49,13 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
     for (const p of selecionados) {
       const jaEstava = Boolean(p.cond?.[cond]);
       if (jaEstava === ligar) continue;
-      sala.atualizarPersonagem(p.id, { cond: { ...p.cond, [cond]: ligar } });
+      // Mesma limpeza do toggle individual na ficha: sem isso, remover a
+      // condição em massa deixava o prazo pendurado, e uma rodada depois ele
+      // "expirava" sozinho e logava um aviso pra uma condição que já tinha
+      // sido removida.
+      const cond_prazo = { ...p.cond_prazo };
+      if (!ligar) delete cond_prazo[cond];
+      sala.atualizarPersonagem(p.id, { cond: { ...p.cond, [cond]: ligar }, cond_prazo });
       sala.registrarLog(mensagemCondicao(p.name, cond, ligar));
     }
   }

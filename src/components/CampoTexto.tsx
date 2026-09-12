@@ -1,7 +1,10 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 /** Campo de texto de uma linha, grava ao perder o foco (mesmo espírito do
- *  CampoNumero). Usado nas fichas e na biblioteca de NPCs. */
+ *  CampoNumero, mesma guarda de foco do CampoTextoAdiado). Usado nas fichas
+ *  e na biblioteca de NPCs. */
 export function CampoTexto({
   valor,
   onCommit,
@@ -13,18 +16,32 @@ export function CampoTexto({
   placeholder?: string;
   maxLength?: number;
 }) {
-  function commit(el: HTMLInputElement) {
-    if (el.value !== valor) onCommit(el.value);
+  const [rascunho, setRascunho] = useState(valor);
+  const focado = useRef(false);
+
+  useEffect(() => {
+    if (!focado.current) setRascunho(valor);
+  }, [valor]);
+
+  function commit() {
+    if (rascunho !== valor) onCommit(rascunho);
   }
+
   return (
     <input
-      key={valor}
       type="text"
       className="campotexto"
       maxLength={maxLength}
       placeholder={placeholder}
-      defaultValue={valor}
-      onBlur={(e) => commit(e.currentTarget)}
+      value={rascunho}
+      onFocus={() => {
+        focado.current = true;
+      }}
+      onChange={(e) => setRascunho(e.target.value)}
+      onBlur={() => {
+        focado.current = false;
+        commit();
+      }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
       }}
