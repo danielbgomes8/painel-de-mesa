@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
+import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import { aplicarCura, aplicarDano, mensagemAjustePV, mensagemCondicao, mensagemDanoAbsorvido } from "@/lib/regras";
 
@@ -21,31 +22,41 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
     setAlvos((a) => ({ ...a, [id]: !a[id] }));
   }
 
-  function aplicarPV(sinal: 1 | -1) {
+  async function aplicarPV(sinal: 1 | -1) {
     const n = Number.parseInt(valor, 10);
     if (Number.isNaN(n) || n <= 0) return;
+    // Uma escrita só pros personagens todos, uma escrita só pro log —
+    // antes disparava até duas requisições por alvo selecionado.
+    const alvos: { id: string; patch: Partial<Personagem> }[] = [];
+    const textos: string[] = [];
     for (const p of selecionados) {
       if (sinal > 0) {
         const resultado = aplicarCura(p, n);
-        sala.atualizarPersonagem(p.id, resultado);
+        alvos.push({ id: p.id, patch: resultado });
         if (resultado.hp !== p.hp) {
-          sala.registrarLog(mensagemAjustePV(p.name, resultado.hp - p.hp, resultado.hp, p.hp_max));
+          textos.push(mensagemAjustePV(p.name, resultado.hp - p.hp, resultado.hp, p.hp_max));
         }
         continue;
       }
       const resultado = aplicarDano(p, n);
-      sala.atualizarPersonagem(p.id, resultado);
+      alvos.push({ id: p.id, patch: resultado });
       const deltaReal = resultado.hp - p.hp;
       if (deltaReal !== 0) {
-        sala.registrarLog(mensagemAjustePV(p.name, deltaReal, resultado.hp, p.hp_max));
+        textos.push(mensagemAjustePV(p.name, deltaReal, resultado.hp, p.hp_max));
       } else if (resultado.hp_temp < p.hp_temp) {
-        sala.registrarLog(mensagemDanoAbsorvido(p.name, p.hp_temp - resultado.hp_temp));
+        textos.push(mensagemDanoAbsorvido(p.name, p.hp_temp - resultado.hp_temp));
       }
     }
+    // Só loga depois que a escrita das fichas confirmar — senão o log jura
+    // uma cura que não aconteceu se a escrita falhar (achado ao testar).
+    const deuCerto = await sala.atualizarVariosPersonagens(alvos);
+    if (deuCerto) sala.registrarVariosLogs(textos);
     setValor("");
   }
 
-  function aplicarCondicao(ligar: boolean) {
+  async function aplicarCondicao(ligar: boolean) {
+    const alvos: { id: string; patch: Partial<Personagem> }[] = [];
+    const textos: string[] = [];
     for (const p of selecionados) {
       const jaEstava = Boolean(p.cond?.[cond]);
       if (jaEstava === ligar) continue;
@@ -55,9 +66,11 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
       // sido removida.
       const cond_prazo = { ...p.cond_prazo };
       if (!ligar) delete cond_prazo[cond];
-      sala.atualizarPersonagem(p.id, { cond: { ...p.cond, [cond]: ligar }, cond_prazo });
-      sala.registrarLog(mensagemCondicao(p.name, cond, ligar));
+      alvos.push({ id: p.id, patch: { cond: { ...p.cond, [cond]: ligar }, cond_prazo } });
+      textos.push(mensagemCondicao(p.name, cond, ligar));
     }
+    const deuCerto = await sala.atualizarVariosPersonagens(alvos);
+    if (deuCerto) sala.registrarVariosLogs(textos);
   }
 
   const n = selecionados.length;

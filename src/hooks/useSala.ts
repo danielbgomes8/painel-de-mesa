@@ -52,6 +52,12 @@ export type Sala = {
   logBastiao: LinhaLogBastiao[];
   criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
+  /** Igual a atualizarPersonagem, só que pra vários de uma vez em uma única
+   *  escrita (Ações em Massa) — usado quando o patch de cada um pode ter um
+   *  formato diferente (ex.: cura zera dss/dsf só de quem estava caído).
+   *  Devolve false quando a escrita falha (e já reverteu o estado local) —
+   *  quem chama não deve logar o que não aconteceu. */
+  atualizarVariosPersonagens: (alvos: { id: string; patch: Partial<Personagem> }[]) => Promise<boolean>;
   removerPersonagem: (id: string) => Promise<void>;
   /** Aceita um patch pronto ou uma função (atual) => patch, resolvida contra o
    *  estado mais recente conhecido — evite montar o patch a partir do
@@ -62,6 +68,8 @@ export type Sala = {
   ) => Promise<EstadoCombate | null>;
   definirNotasMestre: (texto: string) => Promise<void>;
   registrarLog: (texto: string) => Promise<void>;
+  /** Igual a registrarLog, várias linhas numa só escrita. */
+  registrarVariosLogs: (textos: string[]) => Promise<void>;
   /** Devolve false quando a escrita falha, pra tela não confirmar o que não aconteceu. */
   criarModeloNpc: (dados: NovoModeloNpc) => Promise<boolean>;
   atualizarModeloNpc: (id: string, patch: Partial<ModeloNpc>) => Promise<void>;
@@ -349,6 +357,43 @@ export function useSala(codigo: string): Sala {
     [],
   );
 
+  const atualizarVariosPersonagens = useCallback(
+    async (alvos: { id: string; patch: Partial<Personagem> }[]): Promise<boolean> => {
+      if (alvos.length === 0) return true;
+      const anterior = ref.current.personagens;
+      setPersonagens((atual) =>
+        atual.map((p) => {
+          const alvo = alvos.find((a) => a.id === p.id);
+          return alvo ? { ...p, ...alvo.patch } : p;
+        }),
+      );
+      // upsert em lote manda uma linha só pro Postgres construir, e ele
+      // confere as colunas "not null" (room_code, name...) mesmo em quem já
+      // existe — testado direto contra o banco: mandar só as colunas do
+      // patch quebra com "null value in column room_code violates not-null
+      // constraint". Por isso cada linha vai completa (personagem atual +
+      // patch por cima), não só as colunas tocadas — e por vir da MESMA
+      // linha em vez de reconstruída campo a campo, nenhuma coluna de quem
+      // não mudou nada corre risco de ser pisada pelo patch de outro
+      // personagem do lote.
+      const linhas = alvos
+        .map(({ id, patch }) => {
+          const atual = anterior.find((p) => p.id === id);
+          return atual ? { ...atual, ...patch } : null;
+        })
+        .filter((linha): linha is Personagem => linha !== null);
+      const { error } = await supabase.from("characters").upsert(linhas);
+      if (error) {
+        console.error("atualizarVariosPersonagens", error);
+        setPersonagens(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return false;
+      }
+      return true;
+    },
+    [],
+  );
+
   const criarPersonagem = useCallback(
     async (dados: NovoPersonagem): Promise<Personagem | null> => {
       const existentes = ref.current.personagens.map((p) => p.slug);
@@ -482,6 +527,29 @@ export function useSala(codigo: string): Sala {
       }
       const nova = data as LinhaLog;
       setLog((atual) => (atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG)));
+    },
+    [codigo],
+  );
+
+  const registrarVariosLogs = useCallback(
+    async (textos: string[]) => {
+      if (textos.length === 0) return;
+      const { data, error } = await supabase
+        .from("combat_log")
+        .insert(textos.map((text) => ({ room_code: codigo, text })))
+        .select();
+      if (error) {
+        console.error("registrarVariosLogs", error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return;
+      }
+      const novas = (data ?? []) as LinhaLog[];
+      // Mesma ordem visual de quem chamasse registrarLog um por um: o
+      // último texto do lote fica no topo.
+      setLog((atual) => {
+        const semElas = atual.filter((l) => !novas.some((n) => n.id === l.id));
+        return [...novas].reverse().concat(semElas).slice(0, TAMANHO_LOG);
+      });
     },
     [codigo],
   );
@@ -667,10 +735,12 @@ export function useSala(codigo: string): Sala {
     logBastiao,
     criarPersonagem,
     atualizarPersonagem,
+    atualizarVariosPersonagens,
     removerPersonagem,
     definirCombate,
     definirNotasMestre,
     registrarLog,
+    registrarVariosLogs,
     criarModeloNpc,
     atualizarModeloNpc,
     removerModeloNpc,
