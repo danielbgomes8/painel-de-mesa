@@ -46,6 +46,7 @@ export function FichaPersonagem({
   sala: Sala;
 }) {
   const patch = (mudanca: Partial<Personagem>) => sala.atualizarPersonagem(p.id, mudanca);
+  const [mostrarExtras, setMostrarExtras] = useState(false);
 
   /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no log. */
   function mudarPV(delta: number) {
@@ -74,6 +75,14 @@ export function FichaPersonagem({
   const largura = p.hp_max > 0 ? Math.max(0, Math.min(1, p.hp / p.hp_max)) : 0;
   const caido = p.hp <= 0;
   const morte = situacaoMorte(p.dss, p.dsf);
+  // Monstro só mostra saves e CD de magia depois que alguém preenche: seis zeros
+  // na tela atrapalham a leitura no meio do combate. O link abaixo traz de volta
+  // quando o Mestre quiser cadastrar (senão o campo somia sem como reaparecer).
+  const temSaves =
+    p.save_str !== 0 || p.save_dex !== 0 || p.save_con !== 0 ||
+    p.save_int !== 0 || p.save_wis !== 0 || p.save_cha !== 0;
+  const extrasEmBranco = p.is_npc && !temSaves && p.spell_dc === 10;
+  const escondeExtras = extrasEmBranco && !mostrarExtras;
 
   return (
     <div className={`card${ehMinha ? " mine" : ""}`}>
@@ -157,7 +166,7 @@ export function FichaPersonagem({
           </div>
         ) : null}
 
-        {editavel && (
+        {editavel && !p.is_npc ? (
           <div className="combatctrls">
             <button type="button" className="btn" onClick={() => patch(aplicarDescansoCurto(p))}>
               Descanso curto
@@ -166,18 +175,20 @@ export function FichaPersonagem({
               Descanso longo
             </button>
           </div>
-        )}
+        ) : null}
 
         <div className="chips">
-          <button
-            type="button"
-            className="chip flag"
-            aria-pressed={p.inspiration}
-            disabled={!editavel}
-            onClick={() => patch({ inspiration: !p.inspiration })}
-          >
-            ⭐ Inspiração
-          </button>
+          {p.is_npc ? null : (
+            <button
+              type="button"
+              className="chip flag"
+              aria-pressed={p.inspiration}
+              disabled={!editavel}
+              onClick={() => patch({ inspiration: !p.inspiration })}
+            >
+              ⭐ Inspiração
+            </button>
+          )}
           <button
             type="button"
             className="chip flag"
@@ -237,16 +248,25 @@ export function FichaPersonagem({
               <div className="val">{p.pp}</div>
             )}
           </div>
-          <div className="stat">
-            <div className="lbl">CD de magia</div>
-            {editavel ? (
-              <CampoNumero valor={p.spell_dc} onCommit={(n) => patch({ spell_dc: Math.max(0, n) })} />
-            ) : (
-              <div className="val">{p.spell_dc}</div>
-            )}
-          </div>
+          {escondeExtras ? null : (
+            <div className="stat">
+              <div className="lbl">CD de magia</div>
+              {editavel ? (
+                <CampoNumero valor={p.spell_dc} onCommit={(n) => patch({ spell_dc: Math.max(0, n) })} />
+              ) : (
+                <div className="val">{p.spell_dc}</div>
+              )}
+            </div>
+          )}
         </div>
 
+        {escondeExtras && editavel ? (
+          <button type="button" className="minilink" onClick={() => setMostrarExtras(true)}>
+            + saves e CD de magia
+          </button>
+        ) : null}
+
+        {escondeExtras ? null : (
         <div>
           <span className="sectitle">Bônus de resistência (saves)</span>
           <div className="statsrow">
@@ -271,6 +291,7 @@ export function FichaPersonagem({
             ))}
           </div>
         </div>
+        )}
 
         <div>
           <div className="subrow">
@@ -303,6 +324,7 @@ export function FichaPersonagem({
           </div>
         </div>
 
+        {p.is_npc ? null : (
         <div>
           <div className="subrow">
             <span className="lbl">Dados de vida</span>
@@ -339,7 +361,9 @@ export function FichaPersonagem({
             </div>
           )}
         </div>
+        )}
 
+        {p.is_npc ? null : (
         <div>
           <span className="sectitle">Testes de resistência contra a morte</span>
           <div className="deathsaves">
@@ -382,6 +406,7 @@ export function FichaPersonagem({
             </div>
           )}
         </div>
+        )}
 
         <div>
           <span className="sectitle">Condições</span>
@@ -430,6 +455,7 @@ export function FichaPersonagem({
           )}
         </div>
 
+        {p.is_npc ? null : (
         <div>
           <span className="sectitle">Recursos (Fúria, Ki, espaços de magia…)</span>
           {p.resources.length === 0 && (
@@ -481,7 +507,9 @@ export function FichaPersonagem({
             <FormRecurso onAdicionar={(novo) => patch({ resources: [...p.resources, novo] })} />
           )}
         </div>
+        )}
 
+        {p.is_npc ? null : (
         <div>
           <span className="sectitle">Munição e equipamento</span>
           {p.items.length === 0 && (
@@ -524,6 +552,7 @@ export function FichaPersonagem({
           </div>
           {editavel && <FormItem onAdicionar={(novo) => patch({ items: [...p.items, novo] })} />}
         </div>
+        )}
 
         {editavel ? (
           <div className="notesbox">
