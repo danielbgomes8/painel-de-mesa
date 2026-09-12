@@ -23,6 +23,11 @@ import {
 
 const TAMANHO_LOG = 40;
 
+// Tentativas de definirCombate antes de desistir e avisar (ver migration
+// 0010) — mais que suficiente pra qualquer contenção real numa mesa de RPG;
+// existe só pra não tentar pra sempre num cenário patológico.
+const MAX_TENTATIVAS_COMBATE = 5;
+
 const BASTIAO_VAZIO: Bastiao = { room_code: "", turno: 1, tesouro_po: 0, defensores: 0, notes: "" };
 
 type LinhaCombate = {
@@ -30,6 +35,7 @@ type LinhaCombate = {
   round: number;
   turn: number;
   order_json: ItemIniciativa[] | null;
+  version: number;
 };
 
 export type Sala = {
@@ -116,6 +122,11 @@ export function useSala(codigo: string): Sala {
   const limparAvisoFalha = useCallback(() => setAvisoFalha(null), []);
   const [personagens, setPersonagens] = useState<Personagem[]>([]);
   const [combate, setCombate] = useState<EstadoCombate>(COMBATE_VAZIO);
+  // Versão da linha de combat_state no banco — não é exibida em lugar nenhum,
+  // só serve pro controle de concorrência otimista de definirCombate (ver
+  // migration 0010). Fica fora de EstadoCombate de propósito: é detalhe de
+  // escrita, não estado de jogo.
+  const [combateVersao, setCombateVersao] = useState(0);
   const [notasMestre, setNotasMestre] = useState("");
   const [log, setLog] = useState<LinhaLog[]>([]);
   const [modelosNpc, setModelosNpc] = useState<ModeloNpc[]>([]);
@@ -127,9 +138,27 @@ export function useSala(codigo: string): Sala {
   // Espelho síncrono do estado, pra montar patches e reverter uma escrita que
   // falhou sem depender do closure. Atualizado depois do commit (não durante
   // o render).
-  const ref = useRef({ personagens, combate, bastiao, notasMestre, modelosNpc, diario, instalacoesBastiao });
+  const ref = useRef({
+    personagens,
+    combate,
+    combateVersao,
+    bastiao,
+    notasMestre,
+    modelosNpc,
+    diario,
+    instalacoesBastiao,
+  });
   useEffect(() => {
-    ref.current = { personagens, combate, bastiao, notasMestre, modelosNpc, diario, instalacoesBastiao };
+    ref.current = {
+      personagens,
+      combate,
+      combateVersao,
+      bastiao,
+      notasMestre,
+      modelosNpc,
+      diario,
+      instalacoesBastiao,
+    };
   });
 
   useEffect(() => {
@@ -209,6 +238,7 @@ export function useSala(codigo: string): Sala {
 
       setPersonagens(ordenar((pc.data ?? []) as Personagem[]));
       setCombate(comoCombate((cs.data ?? null) as LinhaCombate | null));
+      setCombateVersao((cs.data as LinhaCombate | null)?.version ?? 0);
       setNotasMestre((dn.data?.text ?? "") as string);
       setLog((lg.data ?? []) as LinhaLog[]);
       setModelosNpc((mn.data ?? []) as ModeloNpc[]);
@@ -248,7 +278,9 @@ export function useSala(codigo: string): Sala {
         { event: "*", schema: "public", table: "combat_state", filter: filtro },
         (msg) => {
           if (msg.eventType === "DELETE") return;
-          setCombate(comoCombate(msg.new as LinhaCombate));
+          const linha = msg.new as LinhaCombate;
+          setCombate(comoCombate(linha));
+          setCombateVersao(linha.version ?? 0);
         },
       )
       .on(
@@ -444,26 +476,76 @@ export function useSala(codigo: string): Sala {
   );
 
   const definirCombate = useCallback(
-    async (patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>)) => {
-      // Resolve contra ref.current, não contra um `combate` de closure que pode
-      // já estar velho depois de um await (dois jogadores entrando na
-      // iniciativa quase juntos, ou um NPC sendo criado enquanto outra
-      // mudança de combate chega por realtime) — mesma solução do definirBastiao.
-      const anterior = ref.current.combate;
-      const parcial = typeof patch === "function" ? patch(anterior) : patch;
-      const proximo = { ...anterior, ...parcial };
-      setCombate(proximo);
-      const { error } = await supabase
-        .from("combat_state")
-        .update({ round: proximo.round, turn: proximo.turn, order_json: proximo.order })
-        .eq("room_code", codigo);
-      if (error) {
-        console.error("definirCombate", error);
+    async (
+      patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>),
+    ): Promise<EstadoCombate | null> => {
+      const original = ref.current.combate;
+      const versaoOriginal = ref.current.combateVersao;
+      let anterior = original;
+      let versao = versaoOriginal;
+
+      // Resolver contra ref.current (em vez do `combate` de closure, que pode
+      // já estar velho depois de um await) encurta a janela da corrida, mas
+      // não fecha: dois clientes podem estar com o request em voo ao mesmo
+      // tempo, cada um sem saber do outro. A trava de verdade é o UPDATE só
+      // pegar se `version` ainda for a que este cliente leu — controle de
+      // concorrência otimista (ver migration 0010). Quando não pega, ninguém
+      // perdeu escrita: busca o estado de verdade e tenta de novo em cima
+      // dele, até um número razoável de tentativas.
+      for (let tentativa = 0; tentativa < MAX_TENTATIVAS_COMBATE; tentativa++) {
+        const parcial = typeof patch === "function" ? patch(anterior) : patch;
+        const proximo = { ...anterior, ...parcial };
+        setCombate(proximo);
+
+        const { data, error } = await supabase
+          .from("combat_state")
+          .update({ round: proximo.round, turn: proximo.turn, order_json: proximo.order, version: versao + 1 })
+          .eq("room_code", codigo)
+          .eq("version", versao)
+          .select()
+          .maybeSingle();
+
+        if (error) {
+          console.error("definirCombate", error);
+          setCombate(original);
+          setCombateVersao(versaoOriginal);
+          setAvisoFalha(AVISO_FALHA_ESCRITA);
+          return null;
+        }
+
+        if (data) {
+          const linha = data as LinhaCombate;
+          const atualizado = comoCombate(linha);
+          setCombate(atualizado);
+          setCombateVersao(linha.version);
+          return atualizado;
+        }
+
+        // Zero linhas afetadas = outro cliente escreveu entre a leitura e
+        // esta escrita. Releitura direta do banco, não confia em o realtime
+        // já ter entregue a notícia a tempo.
+        const { data: fresco, error: erroFresco } = await supabase
+          .from("combat_state")
+          .select("*")
+          .eq("room_code", codigo)
+          .maybeSingle();
+        if (erroFresco || !fresco) {
+          console.error("definirCombate (releitura)", erroFresco);
+          setCombate(original);
+          setCombateVersao(versaoOriginal);
+          setAvisoFalha(AVISO_FALHA_ESCRITA);
+          return null;
+        }
+        const linhaFresca = fresco as LinhaCombate;
+        anterior = comoCombate(linhaFresca);
+        versao = linhaFresca.version;
         setCombate(anterior);
-        setAvisoFalha(AVISO_FALHA_ESCRITA);
-        return null;
+        setCombateVersao(versao);
       }
-      return proximo;
+
+      console.error("definirCombate: contenção demais, desisti depois de", MAX_TENTATIVAS_COMBATE, "tentativas");
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+      return null;
     },
     [codigo],
   );
