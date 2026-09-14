@@ -19,6 +19,27 @@ export type ItemEquip = {
   cur: number;
 };
 
+/** Uma entrada de uma seção "lista" da ficha completa — uma característica,
+ *  uma magia, um item mágico, um trejeito... título + uma tag curta opcional
+ *  (nível, custo, raridade) + descrição livre. */
+export type ItemSecaoFicha = {
+  titulo: string;
+  tag?: string;
+  descricao: string;
+};
+
+/** Uma seção da ficha completa (ver migration 0012) — texto corrido (história)
+ *  ou lista de itens (características, magias, itens mágicos, trejeitos...).
+ *  Genérico de propósito: o app não sabe nada sobre o que tem dentro, quem
+ *  decide a forma é o jogador preenchendo a própria ficha. */
+export type SecaoFicha = {
+  titulo: string;
+  subtitulo?: string;
+  tipo: "texto" | "lista";
+  texto?: string;
+  itens?: ItemSecaoFicha[];
+};
+
 export type Personagem = {
   id: string;
   room_code: string;
@@ -41,6 +62,12 @@ export type Personagem = {
    *  não se perder no meio de lembretes soltos. Só pra personagem de jogador
    *  (ver migration 0011). */
   vantagens_resistencias: string;
+  /** Epígrafe curta sob o nome na ficha completa (ex.: uma frase de efeito).
+   *  Só pra personagem de jogador (ver migration 0012). */
+  ficha_epiteto: string;
+  /** Seções da ficha completa — história, características, magias, itens
+   *  mágicos, trejeitos... (ver migration 0012). */
+  ficha_secoes: SecaoFicha[];
   /** Acerto e dano em texto livre ("Garra +5, 2d6+3"). Só consulta; ninguém rola por ninguém. */
   ataque: string;
   is_npc: boolean;

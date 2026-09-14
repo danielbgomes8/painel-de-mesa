@@ -864,6 +864,93 @@ button:focus-visible {
   display: block;
 }
 
+/* ---------- ficha completa (história, características, magias...) ---------- */
+.fichacompleta {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 4px;
+}
+.fc-epiteto {
+  font-style: italic;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+.fc-secao {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fc-secao:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.fc-secao h4 {
+  font-size: 14px;
+  margin: 0;
+}
+.fc-sechead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fc-sechead .campotexto:first-child {
+  font-weight: 600;
+}
+.fc-sechead .rm {
+  margin-left: auto;
+}
+.fc-sub {
+  font-size: 11px;
+  color: var(--dim);
+}
+.fc-secao p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  white-space: pre-wrap;
+}
+.fc-itens {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fc-item {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fc-itemhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fc-itemhead h5 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+.fc-itemhead .rm {
+  margin-left: auto;
+}
+.fc-tag {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 2px 8px;
+}
+
 .downbanner {
   background: linear-gradient(90deg, var(--danger), var(--warn));
   color: #fff;

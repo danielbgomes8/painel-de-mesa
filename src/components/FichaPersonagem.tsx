@@ -32,6 +32,7 @@ import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { FichaCompleta } from "@/components/FichaCompleta";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
@@ -51,6 +52,7 @@ export function FichaPersonagem({
   // podeEditarPersonagem em regras.ts.
   const editavel = podeEditarPersonagem(souMestre, ehMinha);
   const [mostrarExtras, setMostrarExtras] = useState(false);
+  const [mostrarFichaCompleta, setMostrarFichaCompleta] = useState(false);
 
   /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no
    *  log — mesma sequência "escreve, só loga se confirmar" das Ações em
@@ -559,6 +561,19 @@ export function FichaPersonagem({
               <p>{p.notes}</p>
             </div>
           )
+        )}
+
+        {!p.is_npc && (
+          <div>
+            <button
+              type="button"
+              className="minilink"
+              onClick={() => setMostrarFichaCompleta((v) => !v)}
+            >
+              {mostrarFichaCompleta ? "− ficha completa" : "+ ver ficha completa"}
+            </button>
+            {mostrarFichaCompleta && <FichaCompleta personagem={p} editavel={editavel} patch={patch} />}
+          </div>
         )}
       </div>
 
