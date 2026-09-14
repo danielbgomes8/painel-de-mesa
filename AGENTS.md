@@ -60,10 +60,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - O visual saiu do protótipo (Artifact) validado com a mesa: paleta e classes
   CSS estão em `src/app/globals.css`, praticamente iguais às do protótipo.
 
-## Estado (11/09/2026) — já está tudo publicado e funcionando
+## Estado (14/09/2026) — já está tudo publicado e funcionando
 
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
   (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
+- **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
+  reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
+  vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
+  quando é a vez do próprio personagem — o Mestre continua sendo o único que
+  passa a vez de qualquer um.
+- **Vantagens & resistências** (`vantagens_resistencias`, migration `0011`):
+  campo próprio na ficha, separado das Notas rápidas, só pra personagem de
+  jogador. Antes isso ficava misturado em texto livre.
 - **Catálogo de monstros**: 38 criaturas, todas conferidas contra o SRD 2024
   (ver a regra de edição acima), com CA, PV, iniciativa e linha de ataque
   (acerto + dano). A busca ignora acento de propósito — no teclado do celular
@@ -79,7 +87,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0007` e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0011` e o `seed.sql`
   já rodadas — o banco tem as dez tabelas (`rooms` mais nove filhas, todas
   com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
   uma vez**: se criar tabela nova
