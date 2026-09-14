@@ -914,6 +914,19 @@ button:focus-visible {
   margin: 0;
   white-space: pre-wrap;
 }
+.fc-secao textarea,
+.fc-item textarea {
+  width: 100%;
+  min-height: 64px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 13px;
+  padding: 9px 11px;
+  resize: vertical;
+}
 .fc-itens {
   display: flex;
   flex-direction: column;
