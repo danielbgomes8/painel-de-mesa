@@ -36,6 +36,11 @@ export type Personagem = {
   dsf: number;
   cond: Record<string, boolean>;
   notes: string;
+  /** Vantagem em teste / resistência a dano em texto livre (ex.: "Vantagem
+   *  em Testes de Destreza", "Resistência a Fogo") — separado das notas pra
+   *  não se perder no meio de lembretes soltos. Só pra personagem de jogador
+   *  (ver migration 0011). */
+  vantagens_resistencias: string;
   /** Acerto e dano em texto livre ("Garra +5, 2d6+3"). Só consulta; ninguém rola por ninguém. */
   ataque: string;
   is_npc: boolean;

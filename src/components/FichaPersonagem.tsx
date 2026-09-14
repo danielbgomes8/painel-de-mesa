@@ -523,6 +523,25 @@ export function FichaPersonagem({
         </div>
         )}
 
+        {p.is_npc ? null : editavel ? (
+          <div className="notesbox">
+            <span className="sectitle">Vantagens &amp; resistências</span>
+            <CampoTextoAdiado
+              valor={p.vantagens_resistencias}
+              maxLength={300}
+              onSalvar={(texto) => patch({ vantagens_resistencias: texto })}
+              placeholder="ex.: Vantagem em Testes de Destreza; Resistência a Fogo"
+            />
+          </div>
+        ) : (
+          p.vantagens_resistencias && (
+            <div className="notesbox">
+              <span className="sectitle">Vantagens &amp; resistências</span>
+              <p>{p.vantagens_resistencias}</p>
+            </div>
+          )
+        )}
+
         {editavel ? (
           <div className="notesbox">
             <span className="sectitle">Notas rápidas</span>
