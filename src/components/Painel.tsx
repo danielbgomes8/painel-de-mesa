@@ -143,7 +143,7 @@ function PainelSala({ codigo }: { codigo: string }) {
       )}
 
       {identidade.tipo === "jogador" && (
-        <BannerSuaVez combate={sala.combate} meuSlug={identidade.slug} />
+        <BannerSuaVez sala={sala} meuSlug={identidade.slug} />
       )}
 
       <BarraAbas aba={abaEfetiva} onMudar={setAba} souMestre={souMestre} />

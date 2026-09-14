@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
+import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import {
   estaCaido,
@@ -17,6 +17,30 @@ import {
 } from "@/lib/regras";
 
 const NOVO_NPC = "__novo__";
+
+/** Avança pro próximo combatente da ordem; se a rodada virar, reduz prazo das
+ *  condições de todo mundo e loga quem parou de estar com o quê. Devolve
+ *  `null` quando a escrita falha (o combate já voltou pro estado anterior) —
+ *  quem chama não deve agir como se tivesse avançado de verdade. Usado tanto
+ *  pelo botão do Mestre quanto pelo "passar a vez" do jogador na sua vez. */
+export async function avancarTurno(sala: Sala): Promise<EstadoCombate | null> {
+  const rodadaAntes = sala.combate.round;
+  const personagens = sala.personagens;
+  const proximo = await sala.definirCombate((atual) => proximoTurno(atual));
+  if (!proximo) return null;
+  if (proximo.round !== rodadaAntes) {
+    sala.registrarLog(`Rodada ${proximo.round} começou`);
+    for (const p of personagens) {
+      if (Object.keys(p.cond_prazo).length === 0) continue;
+      const resultado = reduzirPrazosCondicao(p.cond, p.cond_prazo);
+      sala.atualizarPersonagem(p.id, { cond: resultado.cond, cond_prazo: resultado.cond_prazo });
+      for (const nome of resultado.expiraram) {
+        sala.registrarLog(`${p.name} não está mais ${nome} (prazo esgotado)`);
+      }
+    }
+  }
+  return proximo;
+}
 
 export function RastreadorCombate({
   sala,
@@ -105,25 +129,11 @@ export function RastreadorCombate({
     setIni("");
   }
 
-  async function avancarTurno() {
+  async function aoClicarProximoTurno() {
     if (ocupado) return;
     setOcupado(true);
-    const proximo = await sala.definirCombate((atual) => proximoTurno(atual));
+    await avancarTurno(sala);
     setOcupado(false);
-    // null = a escrita falhou e o combate já voltou pro estado anterior — não
-    // decrementa prazo de condição nem loga uma rodada que não avançou.
-    if (!proximo) return;
-    if (proximo.round !== combate.round) {
-      sala.registrarLog(`Rodada ${proximo.round} começou`);
-      for (const p of personagens) {
-        if (Object.keys(p.cond_prazo).length === 0) continue;
-        const resultado = reduzirPrazosCondicao(p.cond, p.cond_prazo);
-        sala.atualizarPersonagem(p.id, { cond: resultado.cond, cond_prazo: resultado.cond_prazo });
-        for (const nome of resultado.expiraram) {
-          sala.registrarLog(`${p.name} não está mais ${nome} (prazo esgotado)`);
-        }
-      }
-    }
   }
 
   function reiniciar() {
@@ -243,7 +253,7 @@ export function RastreadorCombate({
             <button
               type="button"
               className="btn primary"
-              onClick={avancarTurno}
+              onClick={aoClicarProximoTurno}
               disabled={combate.order.length === 0 || ocupado}
             >
               Próximo turno →

@@ -905,12 +905,36 @@ button:focus-visible {
   font-family: var(--f-display);
   font-weight: 700;
   font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
   text-align: center;
   padding: 14px 16px;
   border-radius: 12px;
   margin-bottom: 16px;
   letter-spacing: 0.02em;
   box-shadow: var(--shadow);
+}
+.turnbanner-pass {
+  background: var(--accent-ink);
+  color: var(--accent);
+  border: none;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.turnbanner-pass:hover {
+  opacity: 0.85;
+}
+.turnbanner-pass:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---------- modo telão ---------- */
