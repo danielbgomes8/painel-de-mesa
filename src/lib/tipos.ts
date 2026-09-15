@@ -40,6 +40,88 @@ export type SecaoFicha = {
   itens?: ItemSecaoFicha[];
 };
 
+export type Atributo = "for" | "des" | "con" | "int" | "sab" | "car";
+
+export type Atributos = Record<Atributo, number>;
+
+/** As dezoito perícias do SRD 2024 (conferidas contra a fonte — ver
+ *  PERICIAS em regras.ts). Nomeadas em português, chave sem acento. */
+export type Pericia =
+  | "acrobacia"
+  | "arcanismo"
+  | "atletismo"
+  | "atuacao"
+  | "enganacao"
+  | "furtividade"
+  | "historia"
+  | "intimidacao"
+  | "intuicao"
+  | "investigacao"
+  | "lidar_com_animais"
+  | "medicina"
+  | "natureza"
+  | "percepcao"
+  | "persuasao"
+  | "prestidigitacao"
+  | "religiao"
+  | "sobrevivencia";
+
+export type NivelProficiencia = "nenhuma" | "proficiente" | "especialista";
+
+export type Proficiencias = {
+  saves: Atributo[];
+  pericias: Partial<Record<Pericia, NivelProficiencia>>;
+};
+
+/** Progressão de espaços de magia: nenhum (Bárbaro, Guerreiro comum...),
+ *  terço (Cavaleiro Arcano, Trapaceiro Arcano), meio (Paladino, Patrulheiro),
+ *  completo (Bardo, Clérigo, Druida, Feiticeiro, Mago) ou pacto (Bruxo,
+ *  tabela própria — ver espacosDeMagia em regras.ts). */
+export type TipoConjurador = "nenhum" | "terco" | "meio" | "completo" | "pacto";
+
+/** As doze classes base do SRD 2024 — usada só pra achar as habilidades por
+ *  nível no catálogo (ver classesSrd.ts). Não é a mesma coisa que `cls`
+ *  (texto livre, pra rótulo); essa aqui alimenta busca, então tem forma fixa. */
+export type ClasseBase =
+  | "barbaro"
+  | "bardo"
+  | "bruxo"
+  | "clerigo"
+  | "druida"
+  | "feiticeiro"
+  | "guerreiro"
+  | "ladino"
+  | "mago"
+  | "monge"
+  | "paladino"
+  | "patrulheiro";
+
+/** Campo que um modificador condicional pode afetar — as seis resistências,
+ *  CD de magia ou percepção passiva. */
+export type CampoModificavel = Atributo | "cd_magia" | "pp";
+
+/** Uma entrada de classe do personagem — multiclasse é uma lista destas.
+ *  `nivel` é só daquela classe (bônus de proficiência usa a soma de todas,
+ *  ver nivelTotal em regras.ts); `conjurador`/`atributo_conjuracao` também
+ *  são por classe, porque cada classe conjuradora usa o próprio atributo. */
+export type ClassePersonagem = {
+  classe: ClasseBase;
+  nivel: number;
+  conjurador: TipoConjurador;
+  atributo_conjuracao: Atributo | null;
+};
+
+/** Um bônus/penalidade que liga e desliga (ex.: "Feitiçaria Inata: CD +1,
+ *  enquanto ativa") — o jogador cadastra quando a habilidade aparece; a
+ *  calculadora soma os que estão ativos. Sem regra de classe embutida, igual
+ *  Recurso e ItemEquip. */
+export type Modificador = {
+  nome: string;
+  campo: CampoModificavel;
+  delta: number;
+  ativo: boolean;
+};
+
 export type Personagem = {
   id: string;
   room_code: string;
@@ -68,6 +150,21 @@ export type Personagem = {
   /** Seções da ficha completa — história, características, magias, itens
    *  mágicos, trejeitos... (ver migration 0012). */
   ficha_secoes: SecaoFicha[];
+  /** Atributos e proficiências do personagem — base pra calcular
+   *  resistência/perícia/CD de magia/espaços (ver migration 0013/0014 e a
+   *  calculadora em FichaClasse.tsx). Só pra personagem de jogador, igual
+   *  ficha_secoes. */
+  atributos: Atributos;
+  proficiencias: Proficiencias;
+  /** Classes do personagem — uma entrada por classe (multiclasse é lista
+   *  com mais de uma). Nível total pro bônus de proficiência é a soma
+   *  (ver nivelTotal em regras.ts); cada classe guarda o próprio
+   *  conjurador/atributo de conjuração e alimenta o catálogo de
+   *  habilidades por classe+nível (ver classesSrd.ts) — independente de
+   *  `cls`, que é só rótulo em texto livre. */
+  classes: ClassePersonagem[];
+  /** Bônus/penalidade que liga e desliga, soma no cálculo quando ativo. */
+  modificadores: Modificador[];
   /** Acerto e dano em texto livre ("Garra +5, 2d6+3"). Só consulta; ninguém rola por ninguém. */
   ataque: string;
   is_npc: boolean;

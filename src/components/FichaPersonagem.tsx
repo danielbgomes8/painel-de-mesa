@@ -33,6 +33,7 @@ import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { FichaCompleta } from "@/components/FichaCompleta";
+import { FichaClasse } from "@/components/FichaClasse";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
@@ -572,7 +573,12 @@ export function FichaPersonagem({
             >
               {mostrarFichaCompleta ? "− ficha completa" : "+ ver ficha completa"}
             </button>
-            {mostrarFichaCompleta && <FichaCompleta personagem={p} editavel={editavel} patch={patch} />}
+            {mostrarFichaCompleta && (
+              <>
+                <FichaClasse personagem={p} editavel={editavel} patch={patch} />
+                <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
+              </>
+            )}
           </div>
         )}
       </div>

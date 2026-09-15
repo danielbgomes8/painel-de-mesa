@@ -5,6 +5,7 @@ import type { ItemSecaoFicha, Personagem, SecaoFicha } from "@/lib/tipos";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
 
 function atualizarSecao(secoes: SecaoFicha[], i: number, mudanca: Partial<SecaoFicha>): SecaoFicha[] {
   return secoes.map((s, idx) => (idx === i ? { ...s, ...mudanca } : s));
@@ -93,9 +94,10 @@ export function FichaCompleta({
       {vazia && !editavel && <p className="empty-note">Nada cadastrado ainda.</p>}
 
       {secoes.map((secao, i) => (
-        <div key={i} className="fc-secao">
-          <div className="fc-sechead">
-            {editavel ? (
+        <SecaoRecolhivel
+          key={i}
+          titulo={
+            editavel ? (
               <>
                 <CampoTexto
                   valor={secao.titulo}
@@ -115,16 +117,18 @@ export function FichaCompleta({
                 <h4>{secao.titulo}</h4>
                 {secao.subtitulo && <span className="fc-sub">{secao.subtitulo}</span>}
               </>
-            )}
-            {editavel && (
+            )
+          }
+          cabecalhoExtra={
+            editavel && (
               <BotaoRemover
                 aria={`remover seção ${secao.titulo}`}
                 confirmar={`Remover a seção "${secao.titulo}"?`}
                 onConfirmar={() => patch({ ficha_secoes: removerSecao(secoes, i) })}
               />
-            )}
-          </div>
-
+            )
+          }
+        >
           {secao.tipo === "texto" ? (
             editavel ? (
               <CampoTextoAdiado
@@ -193,7 +197,7 @@ export function FichaCompleta({
               )}
             </div>
           )}
-        </div>
+        </SecaoRecolhivel>
       ))}
 
       {editavel && (

@@ -3,7 +3,7 @@
  * Cada função é pura pra poder testar sozinha (ver regras.test.ts).
  */
 
-import type { Recurso } from "./tipos";
+import type { Atributo, Atributos, CampoModificavel, Modificador, Pericia, Proficiencias, Recurso, TipoConjurador } from "./tipos";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pontos de vida
@@ -327,6 +327,204 @@ export function reduzirPrazosCondicao(
     }
   }
   return { cond: novoCond, cond_prazo: novoPrazo, expiraram };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ficha de classe: atributos, proficiências, CD de magia, espaços
+// Fórmulas e tabelas conferidas contra o SRD 2024 (api.open5e.com/v2/classes,
+// mesma fonte/disciplina do catálogo de monstros — ver AGENTS.md) em 2026-09-15.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Modificador de um atributo — regra fixa, sem exceção de subclasse. */
+export function modificador(atributo: number): number {
+  return Math.floor((atributo - 10) / 2);
+}
+
+/** Nível total do personagem — soma de todas as classes (multiclasse).
+ *  Bônus de proficiência, resistência, perícia e PP sempre usam este total,
+ *  nunca o nível de uma classe isolada. */
+export function nivelTotal(classes: { nivel: number }[]): number {
+  return classes.reduce((soma, c) => soma + c.nivel, 0);
+}
+
+/** Bônus de proficiência por nível: +2 (1–4), +3 (5–8), +4 (9–12), +5
+ *  (13–16), +6 (17–20) — igual pra toda classe. */
+export function bonusProficiencia(nivel: number): number {
+  return 2 + Math.floor((Math.max(1, nivel) - 1) / 4);
+}
+
+/** As dezoito perícias do SRD 2024 e o atributo de cada uma. */
+export const PERICIAS: { chave: Pericia; nome: string; atributo: Atributo }[] = [
+  { chave: "atletismo", nome: "Atletismo", atributo: "for" },
+  { chave: "acrobacia", nome: "Acrobacia", atributo: "des" },
+  { chave: "furtividade", nome: "Furtividade", atributo: "des" },
+  { chave: "prestidigitacao", nome: "Prestidigitação", atributo: "des" },
+  { chave: "arcanismo", nome: "Arcanismo", atributo: "int" },
+  { chave: "historia", nome: "História", atributo: "int" },
+  { chave: "investigacao", nome: "Investigação", atributo: "int" },
+  { chave: "natureza", nome: "Natureza", atributo: "int" },
+  { chave: "religiao", nome: "Religião", atributo: "int" },
+  { chave: "lidar_com_animais", nome: "Lidar com Animais", atributo: "sab" },
+  { chave: "intuicao", nome: "Intuição", atributo: "sab" },
+  { chave: "medicina", nome: "Medicina", atributo: "sab" },
+  { chave: "percepcao", nome: "Percepção", atributo: "sab" },
+  { chave: "sobrevivencia", nome: "Sobrevivência", atributo: "sab" },
+  { chave: "atuacao", nome: "Atuação", atributo: "car" },
+  { chave: "enganacao", nome: "Enganação", atributo: "car" },
+  { chave: "intimidacao", nome: "Intimidação", atributo: "car" },
+  { chave: "persuasao", nome: "Persuasão", atributo: "car" },
+];
+
+/** Bônus de resistência (save) de um atributo. */
+export function bonusResistencia(
+  atributos: Atributos,
+  proficiencias: Proficiencias,
+  nivel: number,
+  atributo: Atributo,
+): number {
+  const mod = modificador(atributos[atributo]);
+  return proficiencias.saves.includes(atributo) ? mod + bonusProficiencia(nivel) : mod;
+}
+
+/** Bônus de uma perícia (especialista dobra o bônus de proficiência). */
+export function bonusPericia(atributos: Atributos, proficiencias: Proficiencias, nivel: number, pericia: Pericia): number {
+  const info = PERICIAS.find((p) => p.chave === pericia);
+  if (!info) return 0;
+  const mod = modificador(atributos[info.atributo]);
+  const prof = proficiencias.pericias[pericia] ?? "nenhuma";
+  const bp = bonusProficiencia(nivel);
+  if (prof === "especialista") return mod + bp * 2;
+  if (prof === "proficiente") return mod + bp;
+  return mod;
+}
+
+/** Percepção passiva = 10 + bônus de Percepção. */
+export function percepcaoPassiva(atributos: Atributos, proficiencias: Proficiencias, nivel: number): number {
+  return 10 + bonusPericia(atributos, proficiencias, nivel, "percepcao");
+}
+
+/** CD de magia = 8 + proficiência + modificador do atributo de conjuração.
+ *  null enquanto não tem conjuração (nenhum atributo escolhido). */
+export function cdMagia(atributos: Atributos, nivel: number, atributoConjuracao: Atributo | null): number | null {
+  if (!atributoConjuracao) return null;
+  return 8 + bonusProficiencia(nivel) + modificador(atributos[atributoConjuracao]);
+}
+
+/** Bônus de ataque de magia = proficiência + modificador do atributo de conjuração. */
+export function ataqueMagia(atributos: Atributos, nivel: number, atributoConjuracao: Atributo | null): number | null {
+  if (!atributoConjuracao) return null;
+  return bonusProficiencia(nivel) + modificador(atributos[atributoConjuracao]);
+}
+
+/** Espaços de magia por nível de personagem (índice 0 = nível 1), um valor
+ *  por nível de espaço 1º–9º — conjurador completo (Bardo, Clérigo, Druida,
+ *  Feiticeiro, Mago). */
+const ESPACOS_COMPLETO: number[][] = [
+  [2, 0, 0, 0, 0, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 0, 0, 0, 0, 0, 0, 0],
+  [4, 3, 2, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 0, 0, 0, 0, 0, 0],
+  [4, 3, 3, 1, 0, 0, 0, 0, 0],
+  [4, 3, 3, 2, 0, 0, 0, 0, 0],
+  [4, 3, 3, 3, 1, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 0, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 0, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 0, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 0],
+  [4, 3, 3, 3, 2, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 1, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 1, 1, 1],
+  [4, 3, 3, 3, 3, 2, 2, 1, 1],
+];
+
+/** Idem, meio-conjurador (Paladino, Patrulheiro) — só até espaço 5º. */
+const ESPACOS_MEIO: number[][] = [
+  [2, 0, 0, 0, 0],
+  [2, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [3, 0, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 2, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 0, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 2, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 0, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 1, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 2, 0],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 1],
+  [4, 3, 3, 3, 2],
+  [4, 3, 3, 3, 2],
+];
+
+/** Pacto de magia do Bruxo: todo espaço é do mesmo nível, e o nível do
+ *  espaço sobe sozinho — tabela própria, não é fatia da tabela normal. */
+const PACTO: { slots: number; espacoNivel: number }[] = [
+  { slots: 1, espacoNivel: 1 },
+  { slots: 2, espacoNivel: 1 },
+  { slots: 2, espacoNivel: 2 },
+  { slots: 2, espacoNivel: 2 },
+  { slots: 2, espacoNivel: 3 },
+  { slots: 2, espacoNivel: 3 },
+  { slots: 2, espacoNivel: 4 },
+  { slots: 2, espacoNivel: 4 },
+  { slots: 2, espacoNivel: 5 },
+  { slots: 2, espacoNivel: 5 },
+  { slots: 3, espacoNivel: 5 },
+  { slots: 3, espacoNivel: 5 },
+  { slots: 3, espacoNivel: 5 },
+  { slots: 3, espacoNivel: 5 },
+  { slots: 3, espacoNivel: 5 },
+  { slots: 3, espacoNivel: 5 },
+  { slots: 4, espacoNivel: 5 },
+  { slots: 4, espacoNivel: 5 },
+  { slots: 4, espacoNivel: 5 },
+  { slots: 4, espacoNivel: 5 },
+];
+
+/** Espaços de magia pro nível/tipo de conjurador dados — só as entradas com
+ *  algum espaço (max > 0). Terço-conjurador (Cavaleiro Arcano, Trapaceiro
+ *  Arcano) não tem tabela própria: conta como conjurador completo num terço
+ *  do nível, arredondado pra baixo — regra oficial de multiclasse (cap. 6),
+ *  reaproveitando a tabela já conferida em vez de outra tabela nova. */
+export function espacosDeMagia(conjurador: TipoConjurador, nivel: number): { nivel: number; max: number }[] {
+  const n = Math.max(1, Math.min(20, Math.round(nivel)));
+  if (conjurador === "nenhum") return [];
+  if (conjurador === "pacto") {
+    const { slots, espacoNivel } = PACTO[n - 1];
+    return [{ nivel: espacoNivel, max: slots }];
+  }
+  if (conjurador === "terco") {
+    const nivelEfetivo = Math.floor(n / 3);
+    if (nivelEfetivo < 1) return [];
+    return ESPACOS_COMPLETO[nivelEfetivo - 1]
+      .map((max, i) => ({ nivel: i + 1, max }))
+      .filter((e) => e.max > 0);
+  }
+  const tabela = conjurador === "meio" ? ESPACOS_MEIO : ESPACOS_COMPLETO;
+  return tabela[n - 1].map((max, i) => ({ nivel: i + 1, max })).filter((e) => e.max > 0);
+}
+
+/** Prefixo dos recursos gerados por espacosDeMagia, pra achar e substituir
+ *  só esses ao regenerar (preserva Fúria, Ki etc. cadastrados à mão). */
+export const PREFIXO_ESPACO_MAGIA = "Espaço de magia Nv. ";
+
+/** Soma os modificadores ligados que afetam um campo (ex.: Feitiçaria Inata
+ *  ativa somando +1 na CD de magia) — a calculadora usa em cima da fórmula
+ *  fixa, pra cobrir bônus situacional sem virar regra embutida. */
+export function somaModificadores(modificadores: Modificador[], campo: CampoModificavel): number {
+  return modificadores
+    .filter((m) => m.ativo && m.campo === campo)
+    .reduce((acc, m) => acc + m.delta, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

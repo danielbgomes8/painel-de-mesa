@@ -60,10 +60,33 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - O visual saiu do protótipo (Artifact) validado com a mesa: paleta e classes
   CSS estão em `src/app/globals.css`, praticamente iguais às do protótipo.
 
-## Estado (14/09/2026) — já está tudo publicado e funcionando
+## Estado (15/09/2026) — já está tudo publicado e funcionando
 
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
   (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
+- **Ficha completa** (`ficha_secoes`/`ficha_epiteto`, migration `0012`,
+  componente `FichaCompleta.tsx`): seções genéricas (texto ou lista de
+  título+tag+descrição) dentro da mesma linha do personagem — história,
+  características, magias, itens mágicos, trejeitos... Sem regra de D&D
+  embutida, igual `Recurso`/`ItemEquip`. Fica atrás de "+ ver ficha completa"
+  na aba Fichas, só pra jogador.
+- **Ficha de classe calculada** (`nivel`/`atributos`/`proficiencias`/
+  `conjurador`/`atributo_conjuracao`/`classe_base`/`modificadores`, migration
+  `0013`, componente `FichaClasse.tsx`, no mesmo toggle "+ ver ficha
+  completa"): calcula resistência/perícia/CD de magia/percepção passiva a
+  partir de atributo + nível + proficiência (fórmulas em `regras.ts`,
+  conferidas contra `api.open5e.com/v2/classes` — mesma disciplina do
+  catálogo de monstros). **Não sobrescreve os campos manuais sozinha** — só
+  mostra "calculado: X" com um botão "usar"; quem decide se aceita é o
+  jogador, porque item mágico e feito somam por cima da fórmula. "Gerar
+  espaços de magia" preenche `resources` com pips clicáveis (reaproveita
+  `TrilhaDeUsos`), igual Fúria/Ki. `Modificadores` é a peça pra bônus que
+  liga/desliga (ex.: Feitiçaria Inata do Feiticeiro, CD +1 por 1 minuto) —
+  cadastro livre, sem regra de classe embutida. O catálogo de habilidades por
+  nível (`classesSrd.ts`, `habilidadesAte()`) só cobre a classe **base**, sem
+  subclasse, e só tem Feiticeiro populado até agora — as outras 11 entram
+  conforme alguém da mesa jogar (mesmo padrão de crescimento do catálogo de
+  monstros).
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
@@ -87,7 +110,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0011` e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0013` e o `seed.sql`
   já rodadas — o banco tem as dez tabelas (`rooms` mais nove filhas, todas
   com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
   uma vez**: se criar tabela nova

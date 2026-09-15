@@ -31,7 +31,18 @@ import {
   situacaoMorte,
   turnoAposRemover,
   turnoAposTrocar,
+  ataqueMagia,
+  bonusPericia,
+  bonusProficiencia,
+  bonusResistencia,
+  cdMagia,
+  espacosDeMagia,
+  modificador,
+  nivelTotal,
+  percepcaoPassiva,
+  somaModificadores,
 } from "./regras";
+import type { Proficiencias } from "./tipos";
 
 describe("PV", () => {
   it("trava entre 0 e o máximo", () => {
@@ -339,5 +350,104 @@ describe("evento do Bastião (d100)", () => {
 
   it("devolve undefined se a rolagem não cai em nenhuma faixa", () => {
     expect(eventoBastiaoPara(60, tabela)).toBeUndefined();
+  });
+});
+
+describe("ficha de classe: atributos, proficiência, CD de magia", () => {
+  it("modificador segue a tabela padrão (score-10)/2 arredondado pra baixo", () => {
+    expect(modificador(9)).toBe(-1);
+    expect(modificador(10)).toBe(0);
+    expect(modificador(13)).toBe(1);
+    expect(modificador(19)).toBe(4);
+  });
+
+  it("bônus de proficiência: +2 (1-4), +3 (5-8), +4 (9-12), +5 (13-16), +6 (17-20)", () => {
+    expect(bonusProficiencia(1)).toBe(2);
+    expect(bonusProficiencia(4)).toBe(2);
+    expect(bonusProficiencia(5)).toBe(3);
+    expect(bonusProficiencia(8)).toBe(3);
+    expect(bonusProficiencia(9)).toBe(4);
+    expect(bonusProficiencia(12)).toBe(4);
+    expect(bonusProficiencia(13)).toBe(5);
+    expect(bonusProficiencia(17)).toBe(6);
+    expect(bonusProficiencia(20)).toBe(6);
+  });
+
+  // Fixture real: Tibério Vaz, Feiticeiro 7 (ficha "Marca do Sétimo Raio").
+  // Confere igual ao que a própria ficha mostra, sem o +1 de item que ela
+  // soma nos saves — a calculadora dá o valor "de livro", ver FichaClasse.
+  const atributosTiberio = { for: 9, des: 13, con: 14, int: 12, sab: 12, car: 19 };
+  const proficienciasTiberio: Proficiencias = {
+    saves: ["con", "car"],
+    pericias: { arcanismo: "proficiente", religiao: "proficiente", persuasao: "proficiente", intimidacao: "proficiente" },
+  };
+
+  it("bônus de resistência (Tibério nível 7: CON +5, CAR +7, sem proficiência FOR -1)", () => {
+    expect(bonusResistencia(atributosTiberio, proficienciasTiberio, 7, "con")).toBe(5);
+    expect(bonusResistencia(atributosTiberio, proficienciasTiberio, 7, "car")).toBe(7);
+    expect(bonusResistencia(atributosTiberio, proficienciasTiberio, 7, "for")).toBe(-1);
+  });
+
+  it("bônus de perícia (Tibério: Arcanismo +4, Persuasão +7, Atletismo -1 sem proficiência)", () => {
+    expect(bonusPericia(atributosTiberio, proficienciasTiberio, 7, "arcanismo")).toBe(4);
+    expect(bonusPericia(atributosTiberio, proficienciasTiberio, 7, "persuasao")).toBe(7);
+    expect(bonusPericia(atributosTiberio, proficienciasTiberio, 7, "atletismo")).toBe(-1);
+  });
+
+  it("percepção passiva (Tibério, sem proficiência em Percepção: 10 + 1)", () => {
+    expect(percepcaoPassiva(atributosTiberio, proficienciasTiberio, 7)).toBe(11);
+  });
+
+  it("CD e ataque de magia (Tibério, conjuração por Carisma: CD 15, ataque +7)", () => {
+    expect(cdMagia(atributosTiberio, 7, "car")).toBe(15);
+    expect(ataqueMagia(atributosTiberio, 7, "car")).toBe(7);
+  });
+
+  it("CD de magia é null sem atributo de conjuração", () => {
+    expect(cdMagia(atributosTiberio, 7, null)).toBeNull();
+  });
+
+  it("soma só os modificadores ligados que afetam o campo (Feitiçaria Inata)", () => {
+    const mods = [
+      { nome: "Feitiçaria Inata", campo: "cd_magia" as const, delta: 1, ativo: true },
+      { nome: "Aura desligada", campo: "cd_magia" as const, delta: 2, ativo: false },
+      { nome: "Outro campo", campo: "pp" as const, delta: 5, ativo: true },
+    ];
+    expect(somaModificadores(mods, "cd_magia")).toBe(1);
+    expect(somaModificadores(mods, "pp")).toBe(5);
+  });
+
+  it("espaços de magia: conjurador completo nível 7 bate com a ficha real do Tibério (4/3/3/1)", () => {
+    expect(espacosDeMagia("completo", 7)).toEqual([
+      { nivel: 1, max: 4 },
+      { nivel: 2, max: 3 },
+      { nivel: 3, max: 3 },
+      { nivel: 4, max: 1 },
+    ]);
+  });
+
+  it("espaços de magia: nenhum conjurador não tem espaço", () => {
+    expect(espacosDeMagia("nenhum", 10)).toEqual([]);
+  });
+
+  it("espaços de magia: meio-conjurador já começa com 2 espaços de 1º no nível 1 (2024 mudou isso — 2014 começava vazio)", () => {
+    expect(espacosDeMagia("meio", 1)).toEqual([{ nivel: 1, max: 2 }]);
+  });
+
+  it("espaços de magia: pacto (Bruxo) nível 11 é 3 espaços de 5º círculo", () => {
+    expect(espacosDeMagia("pacto", 11)).toEqual([{ nivel: 5, max: 3 }]);
+  });
+
+  it("espaços de magia: terço-conjurador usa a tabela completa em 1/3 do nível", () => {
+    expect(espacosDeMagia("terco", 2)).toEqual([]); // floor(2/3) = 0
+    expect(espacosDeMagia("terco", 3)).toEqual([{ nivel: 1, max: 2 }]); // floor(3/3) = 1
+  });
+
+  it("nível total: soma o nível de todas as classes (multiclasse)", () => {
+    expect(nivelTotal([{ nivel: 5 }, { nivel: 2 }])).toBe(7);
+  });
+
+  it("nível total: sem classe nenhuma cadastrada é 0", () => {
+    expect(nivelTotal([])).toBe(0);
   });
 });

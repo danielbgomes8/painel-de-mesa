@@ -904,6 +904,21 @@ button:focus-visible {
 .fc-sechead .rm {
   margin-left: auto;
 }
+.fc-chev {
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 5px;
+  line-height: 1;
+  flex: none;
+  touch-action: manipulation;
+}
+.fc-chev:hover,
+.fc-chev:focus-visible {
+  color: var(--accent);
+}
 .fc-sub {
   font-size: 11px;
   color: var(--dim);
@@ -962,6 +977,135 @@ button:focus-visible {
   border: 1px solid var(--line);
   border-radius: 99px;
   padding: 2px 8px;
+}
+
+.fichaclasse {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 4px;
+}
+.fc-atributos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 8px;
+}
+.fc-atributo {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fc-atributo .lbl {
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.fc-atributo .val,
+.fc-atributo input {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+}
+.fc-mod {
+  font-size: 11px;
+  color: var(--accent);
+}
+.fc-classes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.fc-classerow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.fc-classerow select,
+.fc-classerow input {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 9px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+.fc-classerow input.num {
+  width: 56px;
+  font-family: var(--f-mono);
+}
+.fc-calclist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fc-calcrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.fc-calcval {
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fc-periciaseditor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.fc-periciarow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.fc-periciaslista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.fc-mods {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fc-modrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fc-habilidade {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.fc-habilidade:last-child {
+  border-bottom: none;
+}
+.fc-habilidade p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 4px 0 0;
 }
 
 .downbanner {
