@@ -47,6 +47,17 @@ describe("buscarMonstros", () => {
     expect(pega("Goblin").hp_max, "Goblin tinha 7 PV em 2014, tem 10 em 2024").toBe(10);
     expect(pega("Zumbi").hp_max, "Zumbi tinha 22 PV em 2014, tem 15 em 2024").toBe(15);
     expect(pega("Lich").init_mod, "em 2024 a iniciativa é bônus próprio, não o mod de Destreza").toBe(17);
+    expect(pega("Águia gigante").cls, "virou Celestial em 2024 — era Fera em 2014").toBe("Celestial grande");
+    expect(pega("Assassino").hp_max, "Assassino tinha 78 PV em 2014, tem 97 em 2024").toBe(97);
+  });
+
+  it("acha os elementais e o mago/sacerdote/cavaleiro/guarda/assassino novos", () => {
+    expect(nomes("elemental")).toEqual(
+      expect.arrayContaining(["Elemental do fogo", "Elemental do ar", "Elemental da terra", "Elemental da água"]),
+    );
+    expect(nomes("humanoide")).toEqual(
+      expect.arrayContaining(["Guarda", "Cavaleiro", "Mago", "Sacerdote", "Assassino"]),
+    );
   });
 
   it("toda linha de ataque tem bônus de acerto e dado de dano", () => {

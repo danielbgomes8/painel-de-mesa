@@ -99,7 +99,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Vantagens & resistências** (`vantagens_resistencias`, migration `0011`):
   campo próprio na ficha, separado das Notas rápidas, só pra personagem de
   jogador. Antes isso ficava misturado em texto livre.
-- **Catálogo de monstros**: 38 criaturas, todas conferidas contra o SRD 2024
+- **Catálogo de monstros**: 56 criaturas, todas conferidas contra o SRD 2024
   (ver a regra de edição acima), com CA, PV, iniciativa e linha de ataque
   (acerto + dano). A busca ignora acento de propósito — no teclado do celular
   se digita "manticora", não "Mantícora" — e casa também contra o tipo, então
