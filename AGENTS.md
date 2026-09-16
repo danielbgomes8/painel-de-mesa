@@ -84,9 +84,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   liga/desliga (ex.: Feitiçaria Inata do Feiticeiro, CD +1 por 1 minuto) —
   cadastro livre, sem regra de classe embutida. O catálogo de habilidades por
   nível (`classesSrd.ts`, `habilidadesAte()`) só cobre a classe **base**, sem
-  subclasse, e só tem Feiticeiro populado até agora — as outras 11 entram
-  conforme alguém da mesa jogar (mesmo padrão de crescimento do catálogo de
-  monstros).
+  subclasse, e tem Feiticeiro, Bárbaro, Guerreiro e Monge populados até agora
+  — as outras 8 entram conforme alguém da mesa jogar (mesmo padrão de
+  crescimento do catálogo de monstros). **Pegadinha já achada aqui**: a
+  `open5e` erra o nível de algumas habilidades (viu isso no Monge — "Deflect
+  Attacks" veio sem nível, "Stunning Strike" veio em dois níveis diferentes);
+  quando o nível não fechar sozinho, cruzar com uma segunda fonte
+  (aidedd.org, Roll20 Compendium) antes de confiar.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece

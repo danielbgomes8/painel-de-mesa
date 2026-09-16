@@ -21,7 +21,32 @@ describe("habilidadesAte", () => {
   });
 
   it("classe sem catálogo ainda devolve lista vazia, não quebra", () => {
-    expect(habilidadesAte("monge", 10)).toEqual([]);
+    expect(habilidadesAte("mago", 10)).toEqual([]);
+  });
+
+  it("Guerreiro nível 2 tem Surto de Ação e Mente Tática, mas não Subclasse (3)", () => {
+    const nomes = habilidadesAte("guerreiro", 2).map((h) => h.nome);
+    expect(nomes).toContain("Surto de Ação");
+    expect(nomes).toContain("Mente Tática");
+    expect(nomes).not.toContain("Subclasse de Guerreiro");
+  });
+
+  it("Guerreiro nível 9 tem Indomável e Mestre Tático", () => {
+    expect(habilidadesAte("guerreiro", 9).map((h) => h.nome)).toContain("Indomável");
+    expect(habilidadesAte("guerreiro", 9).map((h) => h.nome)).toContain("Mestre Tático");
+  });
+
+  // Pegadinha da open5e (ver comentário no topo de classesSrd.ts): Desviar
+  // Ataques veio sem nível, Golpe Atordoante veio marcado em dois níveis (3 e
+  // 5) — conferido contra aidedd.org/Roll20, é nível 3 e 5 respectivamente.
+  it("Monge nível 3 tem Desviar Ataques, mas não Golpe Atordoante (5)", () => {
+    const nomes = habilidadesAte("monge", 3).map((h) => h.nome);
+    expect(nomes).toContain("Desviar Ataques");
+    expect(nomes).not.toContain("Golpe Atordoante");
+  });
+
+  it("Monge nível 5 já tem Golpe Atordoante", () => {
+    expect(habilidadesAte("monge", 5).map((h) => h.nome)).toContain("Golpe Atordoante");
   });
 
   it("multiclasse: concatena as habilidades de cada classe, marcadas com o índice de origem", () => {

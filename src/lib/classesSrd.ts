@@ -8,8 +8,15 @@ import type { CampoModificavel, ClasseBase } from "./tipos";
  * essas características à parte na ficha completa (seções), porque
  * subclasse multiplica o conteúdo por 3-4 pra cada classe.
  *
- * Populado por prioridade — Feiticeiro e Bárbaro primeiro (mesa toca essas
- * classes hoje). As outras 10 entram conforme alguém da mesa jogar.
+ * Populado por prioridade, conforme alguém da mesa joga a classe: Feiticeiro,
+ * Bárbaro, Guerreiro e Monge feitos. As outras 8 entram do mesmo jeito.
+ *
+ * Pegadinha já encontrada aqui (guarda em classesSrd.test.ts): a `open5e` erra
+ * o nível de algumas habilidades do Monge — "Deflect Attacks" veio sem nível
+ * nenhum e "Stunning Strike" veio marcada em dois níveis (3 e 5). Conferido
+ * contra aidedd.org e o Roll20 Compendium: os dois concordam em nível 3 e 5
+ * respectivamente. Não confiar só na `open5e` pra "em que nível" — cruzar com
+ * uma segunda fonte quando a resposta não fechar sozinha.
  */
 export type HabilidadeClasse = {
   classe: ClasseBase;
@@ -208,6 +215,240 @@ export const HABILIDADES_CLASSE: HabilidadeClasse[] = [
     nivel: 20,
     nome: "Campeão Primevo",
     descricao: "Força e Constituição sobem +4 (máximo 25).",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 1,
+    nome: "Estilo de Combate",
+    descricao: "Ganha um feito de Estilo de Combate à escolha (Defesa é recomendado) — pode trocar a cada novo nível de Guerreiro.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 1,
+    nome: "Segundo Fôlego",
+    descricao:
+      "Ação bônus: recupera 1d10 + nível de Guerreiro em PV. 2 usos (3 a partir do nível 4, 4 a partir do 10) — recupera 1 uso no descanso curto, todos no longo.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 1,
+    nome: "Maestria em Armas",
+    descricao:
+      "Usa a propriedade de maestria de 3 tipos de arma simples/marcial (4 a partir do nível 4, 5 a partir do 10, 6 a partir do 16) — troca uma escolha ao final de um descanso longo.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 2,
+    nome: "Mente Tática",
+    descricao:
+      "Ao falhar um teste de habilidade, pode gastar 1 uso de Segundo Fôlego: rola 1d10 e soma ao teste, em vez de curar PV. Se ainda falhar, o uso não é gasto.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 2,
+    nome: "Surto de Ação",
+    descricao:
+      "Faz uma ação extra no seu turno (menos a ação Magia). 1x por descanso curto/longo (2x a partir do nível 17, mas só 1 por turno).",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 3,
+    nome: "Subclasse de Guerreiro",
+    descricao: "Escolhe a subclasse (Campeão...) — as características dela ficam na ficha completa.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 6, 8, 12, 14 e 16).",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 5,
+    nome: "Ataque Extra",
+    descricao: "Ataca duas vezes toda vez que usa a ação Atacar.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 5,
+    nome: "Mudança Tática",
+    descricao: "Ao usar Segundo Fôlego com ação bônus, pode se mover até metade do deslocamento sem provocar Ataques de Oportunidade.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 9,
+    nome: "Indomável",
+    descricao:
+      "Falhou uma resistência? Rola de nova somando o nível de Guerreiro — precisa usar o novo resultado. 1x por descanso longo (2x a partir do 13, 3x a partir do 17).",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 9,
+    nome: "Mestre Tático",
+    descricao: "Ao atacar com arma cuja maestria pode usar, troca a propriedade dela por Empurrar, Enfraquecer ou Retardar nesse ataque.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 11,
+    nome: "Dois Ataques Extras",
+    descricao: "Ataca três vezes toda vez que usa a ação Atacar.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 13,
+    nome: "Ataques Estudados",
+    descricao: "Errou um ataque contra uma criatura? Vantagem no próximo ataque contra ela até o fim do seu próximo turno.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "guerreiro",
+    nivel: 20,
+    nome: "Três Ataques Extras",
+    descricao: "Ataca quatro vezes toda vez que usa a ação Atacar.",
+  },
+  {
+    classe: "monge",
+    nivel: 1,
+    nome: "Artes Marciais",
+    descricao:
+      "Desarmado ou com arma de monge (simples, ou marcial leve), sem armadura/escudo: ataque desarmado como ação bônus, rola o dado de Artes Marciais (1d6, sobe com o nível) no lugar do dano normal, e usa Destreza em vez de Força pra acerto, dano e CD de agarrar/empurrar.",
+  },
+  {
+    classe: "monge",
+    nivel: 1,
+    nome: "Defesa sem Armadura",
+    descricao: "Sem armadura ou escudo, CA = 10 + Destreza + Sabedoria.",
+  },
+  {
+    classe: "monge",
+    nivel: 2,
+    nome: "Foco do Monge",
+    descricao:
+      "Ganha Pontos de Foco (cadastre em Recursos, quantidade = nível de Monge) pra usar em Rajada de Golpes, Defesa Paciente e Passo do Vento. CD desses efeitos = 8 + Sabedoria + proficiência. Recupera tudo num descanso curto ou longo.",
+  },
+  {
+    classe: "monge",
+    nivel: 2,
+    nome: "Movimento sem Armadura",
+    descricao: "Deslocamento +3m sem armadura/escudo — sobe mais nos níveis 6, 10, 14 e 18.",
+  },
+  {
+    classe: "monge",
+    nivel: 2,
+    nome: "Metabolismo Inaudito",
+    descricao:
+      "Ao rolar iniciativa, recupera todos os Pontos de Foco e cura PV igual ao nível de Monge + uma rolagem do dado de Artes Marciais. 1x por descanso longo.",
+  },
+  {
+    classe: "monge",
+    nivel: 3,
+    nome: "Desviar Ataques",
+    descricao:
+      "Reação contra um ataque que causa dano de porrete/perfurante/cortante: reduz o dano em 1d10 + Destreza + nível de Monge. Se zerar o dano, pode gastar 1 Ponto de Foco pra atingir outra criatura por perto (resistência de Destreza ou leva 2 rolagens do dado de Artes Marciais + Destreza).",
+  },
+  {
+    classe: "monge",
+    nivel: 3,
+    nome: "Subclasse de Monge",
+    descricao: "Escolhe a tradição (Mão Aberta...) — as características dela ficam na ficha completa.",
+  },
+  {
+    classe: "monge",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "monge",
+    nivel: 4,
+    nome: "Queda Suave",
+    descricao: "Reação ao cair: reduz o dano da queda em 5x o nível de Monge.",
+  },
+  {
+    classe: "monge",
+    nivel: 5,
+    nome: "Ataque Extra",
+    descricao: "Ataca duas vezes toda vez que usa a ação Atacar.",
+  },
+  {
+    classe: "monge",
+    nivel: 5,
+    nome: "Golpe Atordoante",
+    descricao:
+      "Uma vez por turno, ao acertar com arma de monge ou ataque desarmado, gasta 1 Ponto de Foco: teste de Constituição do alvo. Falhou = Atordoado até o início do seu próximo turno. Passou = deslocamento pela metade e o próximo ataque contra ele tem vantagem, até lá.",
+  },
+  {
+    classe: "monge",
+    nivel: 6,
+    nome: "Golpes Fortalecidos",
+    descricao: "O dano do ataque desarmado pode ser do tipo Força, em vez do tipo normal.",
+  },
+  {
+    classe: "monge",
+    nivel: 7,
+    nome: "Evasão",
+    descricao:
+      "Numa resistência de Destreza que causaria metade do dano: passou = não leva nada; falhou = leva só metade. Não funciona se estiver Incapacitado.",
+  },
+  {
+    classe: "monge",
+    nivel: 9,
+    nome: "Movimento Acrobático",
+    descricao: "Sem armadura/escudo, anda em superfícies verticais e sobre líquidos sem cair durante o movimento.",
+  },
+  {
+    classe: "monge",
+    nivel: 10,
+    nome: "Foco Aprimorado",
+    descricao:
+      "Rajada de Golpes gasta 1 Foco pra virar 3 ataques em vez de 2; Defesa Paciente gasta 1 Foco pra dar PV temporário igual a 2 rolagens do dado de Artes Marciais; Passo do Vento gasta 1 Foco pra levar junto uma criatura Grande ou menor.",
+  },
+  {
+    classe: "monge",
+    nivel: 10,
+    nome: "Autorrestauração",
+    descricao: "No fim de cada turno, remove de si Enfeitiçado, Amedrontado ou Envenenado. Passar fome/sede não causa mais Exaustão.",
+  },
+  {
+    classe: "monge",
+    nivel: 13,
+    nome: "Desviar Energia",
+    descricao: "Desviar Ataques passa a funcionar contra qualquer tipo de dano, não só porrete/perfurante/cortante.",
+  },
+  {
+    classe: "monge",
+    nivel: 14,
+    nome: "Sobrevivente Disciplinado",
+    descricao: "Proficiência em todas as resistências. Falhou uma? Pode gastar 1 Ponto de Foco pra rolar de novo (usa o novo resultado).",
+  },
+  {
+    classe: "monge",
+    nivel: 15,
+    nome: "Foco Perfeito",
+    descricao: "Ao rolar iniciativa sem usar Metabolismo Inaudito: com 3 Pontos de Foco ou menos, sobe pra 4.",
+  },
+  {
+    classe: "monge",
+    nivel: 18,
+    nome: "Defesa Superior",
+    descricao: "Ação: gasta 3 Pontos de Foco, resistência a todo dano (menos Força) por 1 minuto ou até ficar Incapacitado.",
+  },
+  {
+    classe: "monge",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "monge",
+    nivel: 20,
+    nome: "Corpo e Mente",
+    descricao: "Destreza e Sabedoria sobem +4 (máximo 25).",
   },
 ];
 
