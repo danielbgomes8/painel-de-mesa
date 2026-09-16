@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { habilidadesAte, habilidadesMulticlasse } from "./classesSrd";
+import { HABILIDADES_CLASSE, habilidadesAte, habilidadesMulticlasse } from "./classesSrd";
+import type { ClasseBase } from "./tipos";
+
+const TODAS_AS_CLASSES: ClasseBase[] = [
+  "barbaro",
+  "bardo",
+  "bruxo",
+  "clerigo",
+  "druida",
+  "feiticeiro",
+  "guerreiro",
+  "ladino",
+  "mago",
+  "monge",
+  "paladino",
+  "patrulheiro",
+];
 
 describe("habilidadesAte", () => {
   it("devolve só as habilidades até o nível dado, em ordem", () => {
@@ -20,8 +36,33 @@ describe("habilidadesAte", () => {
     expect(nomes).not.toContain("Dádiva Épica");
   });
 
-  it("classe sem catálogo ainda devolve lista vazia, não quebra", () => {
-    expect(habilidadesAte("mago", 10)).toEqual([]);
+  it("classe sem catálogo (hipotética) devolve lista vazia, não quebra", () => {
+    expect(habilidadesAte("nenhuma-classe-assim" as ClasseBase, 10)).toEqual([]);
+  });
+
+  it("as 12 classes base têm catálogo, cada uma escolhendo subclasse no nível 3", () => {
+    for (const classe of TODAS_AS_CLASSES) {
+      const nivel1 = habilidadesAte(classe, 1);
+      expect(nivel1.length, `${classe} sem nenhuma habilidade de nível 1`).toBeGreaterThan(0);
+      const ate3 = habilidadesAte(classe, 3).map((h) => h.nome);
+      expect(
+        ate3.some((n) => n.toLowerCase().startsWith("subclasse")),
+        `${classe} deveria escolher subclasse até o nível 3`,
+      ).toBe(true);
+    }
+  });
+
+  // Mesma pegadinha de "nível vazio" da open5e que já pegou o Monge (ver
+  // comentário no topo de classesSrd.ts) — "Bard Subclass" veio sem nível.
+  // Conferido contra aidedd.org: nível 3, igual a todas as outras classes.
+  it("Bardo nível 2 não tem Subclasse ainda; nível 3 tem", () => {
+    expect(habilidadesAte("bardo", 2).map((h) => h.nome)).not.toContain("Subclasse de Bardo");
+    expect(habilidadesAte("bardo", 3).map((h) => h.nome)).toContain("Subclasse de Bardo");
+  });
+
+  it("não tem habilidade duplicada (mesma classe+nível+nome) no catálogo", () => {
+    const chaves = HABILIDADES_CLASSE.map((h) => `${h.classe}:${h.nivel}:${h.nome}`);
+    expect(new Set(chaves).size).toBe(chaves.length);
   });
 
   it("Guerreiro nível 2 tem Surto de Ação e Mente Tática, mas não Subclasse (3)", () => {

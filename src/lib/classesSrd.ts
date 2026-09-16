@@ -8,15 +8,17 @@ import type { CampoModificavel, ClasseBase } from "./tipos";
  * essas características à parte na ficha completa (seções), porque
  * subclasse multiplica o conteúdo por 3-4 pra cada classe.
  *
- * Populado por prioridade, conforme alguém da mesa joga a classe: Feiticeiro,
- * Bárbaro, Guerreiro e Monge feitos. As outras 8 entram do mesmo jeito.
+ * As 12 classes base do SRD 2024 estão todas aqui.
  *
  * Pegadinha já encontrada aqui (guarda em classesSrd.test.ts): a `open5e` erra
  * o nível de algumas habilidades do Monge — "Deflect Attacks" veio sem nível
  * nenhum e "Stunning Strike" veio marcada em dois níveis (3 e 5). Conferido
  * contra aidedd.org e o Roll20 Compendium: os dois concordam em nível 3 e 5
- * respectivamente. Não confiar só na `open5e` pra "em que nível" — cruzar com
- * uma segunda fonte quando a resposta não fechar sozinha.
+ * respectivamente. Mesma coisa com "Bard Subclass": veio sem nível, e as duas
+ * fontes de conferência confirmam nível 3 — que é aliás o padrão universal
+ * (todas as 12 classes escolhem subclasse no nível 3). Não confiar só na
+ * `open5e` pra "em que nível" quando o campo vier vazio ou contraditório —
+ * cruzar com uma segunda fonte.
  */
 export type HabilidadeClasse = {
   classe: ClasseBase;
@@ -449,6 +451,663 @@ export const HABILIDADES_CLASSE: HabilidadeClasse[] = [
     nivel: 20,
     nome: "Corpo e Mente",
     descricao: "Destreza e Sabedoria sobem +4 (máximo 25).",
+  },
+  {
+    classe: "bardo",
+    nivel: 1,
+    nome: "Inspiração de Bardo",
+    descricao:
+      "Ação bônus: dá um dado de Inspiração (d6, sobe com o nível) pra uma criatura que veja/ouça você, a até 18m. Ela usa em até 1 hora, somando a um d20 que tenha falhado. Usos = modificador de Carisma (mínimo 1); recupera tudo num descanso longo.",
+  },
+  {
+    classe: "bardo",
+    nivel: 1,
+    nome: "Conjuração",
+    descricao: "Sabe magias de Bardo preparadas de cor, usando um instrumento musical como foco — Carisma é o atributo de conjuração.",
+  },
+  {
+    classe: "bardo",
+    nivel: 2,
+    nome: "Especialização",
+    descricao: "Escolhe 2 perícias com proficiência e dobra o bônus nelas (mais 2 no nível 9).",
+  },
+  {
+    classe: "bardo",
+    nivel: 2,
+    nome: "Pau pra Toda Obra",
+    descricao: "Soma metade do bônus de proficiência (arredondado pra baixo) em qualquer teste de perícia em que não é proficiente.",
+  },
+  {
+    classe: "bardo",
+    nivel: 3,
+    nome: "Subclasse de Bardo",
+    descricao: "Escolhe o colégio (do Conhecimento...) — as características dele ficam na ficha completa.",
+  },
+  {
+    classe: "bardo",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "bardo",
+    nivel: 5,
+    nome: "Fonte de Inspiração",
+    descricao: "Recupera toda a Inspiração de Bardo num descanso curto ou longo. Também pode gastar um espaço de magia (sem ação) pra recuperar 1 uso.",
+  },
+  {
+    classe: "bardo",
+    nivel: 7,
+    nome: "Contracanto",
+    descricao: "Reação: alguém a até 9m (ou você) falhou contra Enfeitiçado/Amedrontado? Rola de novo, com vantagem.",
+  },
+  {
+    classe: "bardo",
+    nivel: 10,
+    nome: "Segredos Mágicos",
+    descricao: "Ao aumentar o número de magias preparadas, pode escolher entre as listas de Bardo, Clérigo, Druida ou Mago — contam como magia de Bardo pra você.",
+  },
+  {
+    classe: "bardo",
+    nivel: 18,
+    nome: "Inspiração Superior",
+    descricao: "Ao rolar iniciativa, recupera Inspiração de Bardo até ter pelo menos 2 usos.",
+  },
+  {
+    classe: "bardo",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "bardo",
+    nivel: 20,
+    nome: "Palavras da Criação",
+    descricao:
+      "Sempre tem Palavra do Poder: Curar e Palavra do Poder: Matar preparadas; ao lançar uma delas, pode atingir uma segunda criatura a até 3m da primeira.",
+  },
+  {
+    classe: "bruxo",
+    nivel: 1,
+    nome: "Invocações Místicas",
+    descricao: "Ganha uma Invocação Mística (habilidade extra, escolhida de uma lista própria) — troca ou ganha mais ao subir de nível.",
+  },
+  {
+    classe: "bruxo",
+    nivel: 1,
+    nome: "Magia de Pacto",
+    descricao:
+      "Sabe magias de Bruxo preparadas — Carisma é o atributo de conjuração. Poucos espaços, mas sempre no nível máximo e recarregam num descanso curto OU longo (diferente das outras classes conjuradoras).",
+  },
+  {
+    classe: "bruxo",
+    nivel: 2,
+    nome: "Astúcia Mágica",
+    descricao: "1 minuto de ritual: recupera até metade dos espaços de Magia de Pacto (arredondado pra cima). 1x por descanso longo.",
+  },
+  {
+    classe: "bruxo",
+    nivel: 3,
+    nome: "Subclasse de Bruxo",
+    descricao: "Escolhe o protetor (Corruptor...) — as características dele ficam na ficha completa.",
+  },
+  {
+    classe: "bruxo",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "bruxo",
+    nivel: 9,
+    nome: "Contato com o Protetor",
+    descricao: "Sempre tem Contatar Outro Plano preparada e pode lançá-la de graça 1x por descanso longo, com sucesso automático no teste.",
+  },
+  {
+    classe: "bruxo",
+    nivel: 11,
+    nome: "Arcano Místico",
+    descricao:
+      "Escolhe uma magia de nível 6 de Bruxo pra lançar 1x por descanso longo sem gastar espaço (ganha outra de nível 7 no 13, nível 8 no 15, nível 9 no 17).",
+  },
+  {
+    classe: "bruxo",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "bruxo",
+    nivel: 20,
+    nome: "Mestre Místico",
+    descricao: "Usar Astúcia Mágica recupera todos os espaços de Magia de Pacto, não só metade.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 1,
+    nome: "Ordem Divina",
+    descricao:
+      "Escolhe um papel: Protetor (proficiência em armas marciais e treino em armadura pesada) ou Taumaturgo (mais um truque, e bônus de Sabedoria — mín. +1 — em Arcanismo/Religião).",
+  },
+  {
+    classe: "clerigo",
+    nivel: 1,
+    nome: "Conjuração",
+    descricao: "Sabe magias de Clérigo preparadas de cor, usando um Símbolo Sagrado como foco — Sabedoria é o atributo de conjuração.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 2,
+    nome: "Canalizar Divindade",
+    descricao:
+      "2 usos (sobe com o nível): Fagulha Divina (cura ou dano necrótico/radiante à distância) ou Repelir Mortos-vivos (amedronta e incapacita mortos-vivos por perto). Recupera 1 uso no descanso curto, todos no longo.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 3,
+    nome: "Subclasses de Clérigo",
+    descricao: "Escolhe o domínio (da Vida...) — as características dele ficam na ficha completa.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "clerigo",
+    nivel: 5,
+    nome: "Repelir Mortos-vivos Fulminante",
+    descricao: "Ao usar Repelir Mortos-vivos, quem falhar no teste também leva dano radiante (dados = modificador de Sabedoria).",
+  },
+  {
+    classe: "clerigo",
+    nivel: 7,
+    nome: "Golpes Abençoados",
+    descricao:
+      "Escolhe: Investida Divina (1x por turno, +1d8 necrótico ou radiante num ataque de arma) ou Conjuração Potente (soma Sabedoria no dano de truque de Clérigo).",
+  },
+  {
+    classe: "clerigo",
+    nivel: 10,
+    nome: "Intervenção Divina",
+    descricao: "Ação: lança de graça, sem componente material, qualquer magia de Clérigo até nível 5 que não use reação. 1x por descanso longo.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 14,
+    nome: "Golpes Abençoados Aprimorados",
+    descricao: "A opção escolhida em Golpes Abençoados fica mais forte: Investida Divina vai a 2d8, ou Conjuração Potente também dá PV temporário.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "clerigo",
+    nivel: 20,
+    nome: "Intervenção Divina Maior",
+    descricao: "Intervenção Divina agora pode escolher Desejo; ao fazer isso, só pode usar de novo depois de 2d4 descansos longos.",
+  },
+  {
+    classe: "druida",
+    nivel: 1,
+    nome: "Druídico",
+    descricao: "Sabe o idioma secreto dos druidas e sempre tem Falar com Animais preparada.",
+  },
+  {
+    classe: "druida",
+    nivel: 1,
+    nome: "Ordem Primordial",
+    descricao:
+      "Escolhe: Mago (mais um truque, e bônus de Sabedoria — mín. +1 — em Arcanismo/Natureza) ou Guardião (proficiência em armas marciais e treino em armadura média).",
+  },
+  {
+    classe: "druida",
+    nivel: 1,
+    nome: "Conjuração",
+    descricao: "Sabe magias de Druida preparadas de cor, usando um foco druídico — Sabedoria é o atributo de conjuração.",
+  },
+  {
+    classe: "druida",
+    nivel: 2,
+    nome: "Companheiro Selvagem",
+    descricao: "Ação: gasta um espaço de magia ou um uso de Forma Selvagem pra conjurar Encontrar Familiar sem componente material (familiar Fada, some no descanso longo).",
+  },
+  {
+    classe: "druida",
+    nivel: 2,
+    nome: "Forma Selvagem",
+    descricao:
+      "Ação bônus: vira uma Fera que já conhece (CR até 1/4 no início, sem voo) por metade do nível de Druida em horas. 2 usos (sobe com o nível); recupera 1 no descanso curto, todos no longo. Conhece mais formas, com CR maior, à medida que sobe de nível.",
+  },
+  {
+    classe: "druida",
+    nivel: 3,
+    nome: "Subclasse de Druida",
+    descricao: "Escolhe o círculo (da Terra...) — as características dele ficam na ficha completa.",
+  },
+  {
+    classe: "druida",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "druida",
+    nivel: 5,
+    nome: "Ressurgimento Selvagem",
+    descricao:
+      "Sem usos de Forma Selvagem? Gasta um espaço de magia pra ganhar um (sem ação). Também pode virar 1 uso de Forma Selvagem num espaço de nível 1, 1x por descanso longo.",
+  },
+  {
+    classe: "druida",
+    nivel: 7,
+    nome: "Fúria Elemental",
+    descricao:
+      "Escolhe: Conjuração Potente (soma Sabedoria no dano de truque) ou Investida Primordial (1x por turno, +1d8 de frio/fogo/elétrico/trovão num ataque de arma ou de Forma Selvagem).",
+  },
+  {
+    classe: "druida",
+    nivel: 15,
+    nome: "Fúria Elemental Aprimorada",
+    descricao: "A opção escolhida fica mais forte: Conjuração Potente aumenta o alcance do truque em 90m, ou Investida Primordial vai a 2d8.",
+  },
+  {
+    classe: "druida",
+    nivel: 18,
+    nome: "Magias na Forma",
+    descricao: "Pode conjurar magias em Forma Selvagem, menos as que gastam componente material com custo.",
+  },
+  {
+    classe: "druida",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "druida",
+    nivel: 20,
+    nome: "Arquidruida",
+    descricao:
+      "Ao rolar iniciativa sem uso de Forma Selvagem, recupera um. Pode converter usos de Forma Selvagem num espaço de magia (2 níveis por uso, sem ação, 1x por descanso longo). Envelhece bem mais devagar.",
+  },
+  {
+    classe: "ladino",
+    nivel: 1,
+    nome: "Ataque Furtivo",
+    descricao:
+      "1x por turno, dano extra (1d6 no nível 1, sobe a cada dois níveis até 10d6 no 20) num ataque com vantagem usando arma sutil ou à distância — ou sem vantagem, se tiver aliado sem Incapacitado adjacente ao alvo e você não tiver desvantagem.",
+  },
+  {
+    classe: "ladino",
+    nivel: 1,
+    nome: "Cant dos Ladrões",
+    descricao: "Conhece o Cant dos Ladrões e mais um idioma à escolha.",
+  },
+  {
+    classe: "ladino",
+    nivel: 1,
+    nome: "Maestria em Armas",
+    descricao: "Usa a propriedade de maestria de 2 tipos de arma com proficiência — troca ao final de um descanso longo.",
+  },
+  {
+    classe: "ladino",
+    nivel: 1,
+    nome: "Especialização",
+    descricao: "Escolhe 2 perícias com proficiência e dobra o bônus nelas (mais 2 no nível 6).",
+  },
+  {
+    classe: "ladino",
+    nivel: 2,
+    nome: "Ação Ardilosa",
+    descricao: "Ação bônus: Disparada, Desengajar ou Esconder.",
+  },
+  {
+    classe: "ladino",
+    nivel: 3,
+    nome: "Subclasse de Ladino",
+    descricao: "Escolhe a especialidade (Ladrão...) — as características dela ficam na ficha completa.",
+  },
+  {
+    classe: "ladino",
+    nivel: 3,
+    nome: "Mira Firme",
+    descricao: "Ação bônus, sem ter se movido este turno: vantagem no próximo ataque. Deslocamento vira 0 até o fim do turno.",
+  },
+  {
+    classe: "ladino",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "ladino",
+    nivel: 5,
+    nome: "Esquiva Inata",
+    descricao: "Reação a ser acertado por quem você vê: reduz o dano à metade (arredondado pra baixo).",
+  },
+  {
+    classe: "ladino",
+    nivel: 5,
+    nome: "Golpe Ardiloso",
+    descricao: "No Ataque Furtivo, abre mão de dados de dano pra Envenenar (1d6, resistência de Constituição), Derrubar (1d6) ou Recuar metade do deslocamento sem provocar (1d6).",
+  },
+  {
+    classe: "ladino",
+    nivel: 7,
+    nome: "Evasão",
+    descricao: "Numa resistência de Destreza que causaria metade do dano: passou = nada; falhou = metade. Não funciona Incapacitado.",
+  },
+  {
+    classe: "ladino",
+    nivel: 7,
+    nome: "Talento Confiável",
+    descricao: "Num teste com perícia ou ferramenta proficiente, resultado 9 ou menos no d20 vira 10.",
+  },
+  {
+    classe: "ladino",
+    nivel: 11,
+    nome: "Golpe Ardiloso Aprimorado",
+    descricao: "Usa até dois efeitos de Golpe Ardiloso no mesmo Ataque Furtivo, pagando o custo de cada um.",
+  },
+  {
+    classe: "ladino",
+    nivel: 14,
+    nome: "Golpes Traiçoeiros",
+    descricao: "Golpe Ardiloso ganha mais opções: Atordoar (2d6), Nocautear (6d6, vira Inconsciente) ou Cegar (3d6).",
+  },
+  {
+    classe: "ladino",
+    nivel: 15,
+    nome: "Mente Escorregadia",
+    descricao: "Proficiência em resistência de Sabedoria e Carisma.",
+  },
+  {
+    classe: "ladino",
+    nivel: 18,
+    nome: "Ilusório",
+    descricao: "Ninguém tem vantagem pra te atacar, a menos que você esteja Incapacitado.",
+  },
+  {
+    classe: "ladino",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "ladino",
+    nivel: 20,
+    nome: "Golpe de Sorte",
+    descricao: "Falhou um teste de D20? Vira um 20. 1x por descanso curto ou longo.",
+  },
+  {
+    classe: "mago",
+    nivel: 1,
+    nome: "Conjuração",
+    descricao: "Sabe magias de Mago escritas num grimório e prepara uma lista delas a cada descanso longo — Inteligência é o atributo de conjuração.",
+  },
+  {
+    classe: "mago",
+    nivel: 1,
+    nome: "Recuperação Arcana",
+    descricao: "Num descanso curto, recupera espaços de magia com soma de níveis até metade do nível de Mago (arredondado pra cima, nenhum de nível 6+). 1x por descanso longo.",
+  },
+  {
+    classe: "mago",
+    nivel: 1,
+    nome: "Adepto em Rituais",
+    descricao: "Lança como Ritual qualquer magia com a tag Ritual que esteja no grimório, mesmo sem ter preparado — só precisa ler do livro.",
+  },
+  {
+    classe: "mago",
+    nivel: 2,
+    nome: "Erudito",
+    descricao: "Escolhe entre Arcanismo, História, Investigação, Medicina, Natureza ou Religião (com proficiência) e dobra o bônus nela.",
+  },
+  {
+    classe: "mago",
+    nivel: 3,
+    nome: "Subclasse de Mago",
+    descricao: "Escolhe a escola (de Evocação...) — as características dela ficam na ficha completa.",
+  },
+  {
+    classe: "mago",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "mago",
+    nivel: 5,
+    nome: "Memorizar Magia",
+    descricao: "Num descanso curto, troca uma magia preparada por outra do grimório.",
+  },
+  {
+    classe: "mago",
+    nivel: 18,
+    nome: "Maestria em Magias",
+    descricao: "Escolhe uma magia de nível 1 e uma de nível 2 do grimório (de ação, não ritual) — ficam sempre preparadas, lança na forma básica sem gastar espaço.",
+  },
+  {
+    classe: "mago",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "mago",
+    nivel: 20,
+    nome: "Magias de Assinatura",
+    descricao: "Escolhe duas magias de nível 3 do grimório — sempre preparadas, lança cada uma 1x de graça por descanso curto ou longo.",
+  },
+  {
+    classe: "paladino",
+    nivel: 1,
+    nome: "Impor as Mãos",
+    descricao:
+      "Reserva de cura = 5x nível de Paladino. Ação bônus: toca alguém e usa o quanto quiser da reserva pra curar PV, ou gasta 5 PV da reserva pra remover Envenenado.",
+  },
+  {
+    classe: "paladino",
+    nivel: 1,
+    nome: "Conjuração",
+    descricao: "Sabe magias de Paladino preparadas de cor — Carisma é o atributo de conjuração.",
+  },
+  {
+    classe: "paladino",
+    nivel: 1,
+    nome: "Maestria em Armas",
+    descricao: "Usa a propriedade de maestria de 2 tipos de arma com proficiência — troca ao final de um descanso longo.",
+  },
+  {
+    classe: "paladino",
+    nivel: 2,
+    nome: "Estilo de Combate",
+    descricao: "Ganha um feito de Estilo de Combate à escolha — pode trocar a cada novo nível de Paladino.",
+  },
+  {
+    classe: "paladino",
+    nivel: 2,
+    nome: "Investida do Paladino",
+    descricao: "Sempre tem Investida Divina preparada; lança de graça 1x por descanso longo.",
+  },
+  {
+    classe: "paladino",
+    nivel: 3,
+    nome: "Canalizar Divindade",
+    descricao:
+      "2 usos (mais um no nível 11): Sentido Divino (ação bônus, detecta Celestiais/Corruptores/Mortos-vivos por 10 min a 18m). Recupera 1 uso no descanso curto, todos no longo.",
+  },
+  {
+    classe: "paladino",
+    nivel: 3,
+    nome: "Subclasse de Paladino",
+    descricao: "Escolhe o juramento (da Devoção...) — as características dele ficam na ficha completa.",
+  },
+  {
+    classe: "paladino",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "paladino",
+    nivel: 5,
+    nome: "Ataque Extra",
+    descricao: "Ataca duas vezes toda vez que usa a ação Atacar.",
+  },
+  {
+    classe: "paladino",
+    nivel: 5,
+    nome: "Montaria Fiel",
+    descricao: "Sempre tem Encontrar Montaria preparada; lança de graça 1x por descanso longo.",
+  },
+  {
+    classe: "paladino",
+    nivel: 6,
+    nome: "Aura de Proteção",
+    descricao: "Emanação de 3m: você e aliados dentro ganham bônus em resistência = modificador de Carisma (mínimo +1).",
+  },
+  {
+    classe: "paladino",
+    nivel: 9,
+    nome: "Repelir Inimigos",
+    descricao: "Gasta um uso de Canalizar Divindade: criaturas à escolha (número = mod. de Carisma) a até 18m fazem resistência de Sabedoria ou ficam Amedrontadas por 1 minuto.",
+  },
+  {
+    classe: "paladino",
+    nivel: 10,
+    nome: "Aura de Coragem",
+    descricao: "Você e aliados na Aura de Proteção são imunes a Amedrontado.",
+  },
+  {
+    classe: "paladino",
+    nivel: 11,
+    nome: "Investidas Radiantes",
+    descricao: "Ataque corpo a corpo ou desarmado que acertar causa +1d8 radiante.",
+  },
+  {
+    classe: "paladino",
+    nivel: 14,
+    nome: "Toque Restaurador",
+    descricao: "Ao usar Impor as Mãos, também remove Cego, Enfeitiçado, Surdo, Amedrontado, Paralisado ou Atordoado — 5 PV da reserva por condição.",
+  },
+  {
+    classe: "paladino",
+    nivel: 18,
+    nome: "Expansão da Aura",
+    descricao: "Aura de Proteção vira uma Emanação de 9m.",
+  },
+  {
+    classe: "paladino",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 1,
+    nome: "Inimigo Favorito",
+    descricao: "Sempre tem Marca do Caçador preparada; lança de graça 2x (sobe com o nível), recupera tudo no descanso longo.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 1,
+    nome: "Conjuração",
+    descricao: "Sabe magias de Patrulheiro preparadas de cor — Sabedoria é o atributo de conjuração.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 1,
+    nome: "Maestria em Armas",
+    descricao: "Usa a propriedade de maestria de 2 tipos de arma com proficiência — troca ao final de um descanso longo.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 2,
+    nome: "Explorador Talentoso",
+    descricao: "Dobra o bônus de uma perícia à escolha (com proficiência) e aprende mais dois idiomas.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 2,
+    nome: "Estilo de Combate",
+    descricao: "Ganha um feito de Estilo de Combate à escolha — pode trocar a cada novo nível de Patrulheiro.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 3,
+    nome: "Subclasse de Patrulheiro",
+    descricao: "Escolhe a especialidade (Caçador...) — as características dela ficam na ficha completa.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 4,
+    nome: "Aprimoramento de Atributo",
+    descricao: "Ganha um feito ou +2 em atributos (de novo nos níveis 8, 12 e 16).",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 5,
+    nome: "Ataque Extra",
+    descricao: "Ataca duas vezes toda vez que usa a ação Atacar.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 6,
+    nome: "Vagueio",
+    descricao: "Deslocamento +3m sem armadura pesada; ganha deslocamento de escalada e de natação iguais ao normal.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 9,
+    nome: "Especialização",
+    descricao: "Escolhe 2 perícias com proficiência e dobra o bônus nelas.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 10,
+    nome: "Incansável",
+    descricao: "Ação: PV temporário = 1d8 + Sabedoria (mín. 1); usos = mod. de Sabedoria (mín. 1). Também tira 1 de Exaustão a cada descanso curto.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 13,
+    nome: "Caçador Implacável",
+    descricao: "Levar dano não quebra mais a concentração em Marca do Caçador.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 14,
+    nome: "Véu da Natureza",
+    descricao: "Ação bônus: fica Invisível até o fim do próximo turno. Usos = mod. de Sabedoria (mín. 1), recupera no descanso longo.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 17,
+    nome: "Caçador Preciso",
+    descricao: "Vantagem em ataques contra o alvo marcado por Marca do Caçador.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 18,
+    nome: "Sentidos Ferais",
+    descricao: "Visão às Cegas em 9m.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 19,
+    nome: "Dádiva Épica",
+    descricao: "Ganha um feito épico.",
+  },
+  {
+    classe: "patrulheiro",
+    nivel: 20,
+    nome: "Matador de Inimigos",
+    descricao: "O dado de Marca do Caçador vira d10 em vez de d6.",
   },
 ];
 
