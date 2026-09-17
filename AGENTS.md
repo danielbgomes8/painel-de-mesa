@@ -203,7 +203,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0013` e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0014` e o `seed.sql`
   já rodadas — o banco tem as dez tabelas (`rooms` mais nove filhas, todas
   com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
   uma vez**: se criar tabela nova
@@ -218,3 +218,39 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Não commitado / local só desta máquina**: `.env.local`, `.vercel/` —
   ambos re-obteníveis (`vercel env pull`, ou o painel do Supabase) se
   precisar reconfigurar em outra máquina.
+
+## Próximos passos (combinados em 17/09/2026)
+
+Lista de melhorias que o Daniel aprovou, na ordem. Os dois primeiros já
+foram feitos — ficam aqui pra deixar claro de onde a ordem veio.
+
+1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
+   `0347e01` (escrita que apagava a de outro celular, descanso longo
+   incompleto, modificador de CD entrando no ataque de magia).
+2. ~~Backup completo com restauração~~ — commit `60f4e1c`.
+3. **CI no GitHub**: rodar `npm run teste`, `npx tsc --noEmit` e
+   `npm run lint` a cada push, bloqueando o que quebra. **Não existe
+   `.github/` hoje** — o Vercel só faz o build, então um erro de regra vai
+   pro ar sem ninguém tropeçar nele antes da mesa de sábado. É o próximo.
+4. **Preparar encontro**: escolher monstros do catálogo, montar o grupo
+   inimigo e pôr todos na iniciativa de uma vez. Hoje é um por um, no meio
+   da sessão; isso vira preparo de antes.
+5. **Aplicar dano na própria linha da iniciativa**, sem ir até a aba Fichas
+   — é o gesto mais repetido do combate.
+6. **Desfazer a última ação** — o log já registra tudo, falta o botão.
+7. **Explicar a condição na hora**: tocar em "Atordoado" e ver o que ela faz
+   pelas regras de 2024.
+8. **Funcionar sem internet** por alguns minutos (app instalável de verdade),
+   pra queda de wi-fi no meio da luta.
+
+Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
+componentes não têm teste nenhum (as 126 que existem são das regras puras);
+`definirBastiao` não tem o controle de concorrência que `definirCombate`
+ganhou na migration `0010`, então dois aparelhos avançando o turno juntos
+podem contar errado; e `combat_log` nunca é podado.
+
+**Pendente com o Daniel** (não dá pra resolver sozinho): as fichas completas
+de **Sigha**, **Mordecai** e **Massaranduba** — os três estão com atributos
+10, então o botão "pôr todos na ordem" rola d20+0 pra eles; a classe do
+**Mistery Grey**; e confirmar se **"Kensei"** (subclasse de 2014) ainda vale
+pra Sigha nas regras de 2024.
