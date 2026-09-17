@@ -90,6 +90,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   níveis diferentes — e no Bardo, "Bard Subclass" veio sem nível);
   quando o nível não fechar sozinho, cruzar com uma segunda fonte
   (aidedd.org, Roll20 Compendium) antes de confiar.
+- **Tela que volta do descanso relê a sala** (`carregar()` em `useSala.ts`):
+  o tempo real do Supabase só entrega o que muda enquanto está conectado,
+  não repassa o que passou durante a queda. Celular com a tela apagada
+  voltava mostrando "sincronizado" com turno e PV velhos. Por isso a sala
+  inteira é relida a cada reconexão do canal e sempre que a aba volta a
+  ficar visível — **não tirar achando que é leitura repetida à toa**. Se um
+  evento chega no meio da releitura, ela descarta e lê de novo (a foto do
+  banco podia ser anterior ao evento). Testado derrubando o WebSocket de
+  propósito e mudando o PV enquanto estava caído.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece

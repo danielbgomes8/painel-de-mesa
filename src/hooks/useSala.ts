@@ -167,6 +167,11 @@ export function useSala(codigo: string): Sala {
     // Sem reset manual de estado aqui: o componente que chama useSala(codigo)
     // usa `key={codigo}`, então uma troca de sala remonta do zero.
     let vivo = true;
+    // Controle da recarga (ver `carregar`), tudo local a este efeito.
+    let carregada = false;
+    let recarregarQuandoCarregar = false;
+    let ultimaCarga = 0;
+    let eventosRecebidos = 0;
 
     async function iniciar() {
       // Garante que a sala existe (deixa qualquer ?sala=novo-codigo funcionar).
@@ -202,7 +207,29 @@ export function useSala(codigo: string): Sala {
         return;
       }
 
-      const [pc, cs, dn, lg, mn, di, ba, bi, bl] = await Promise.all([
+      await carregar(true);
+    }
+
+    /** Lê a sala inteira do banco e troca o estado da tela por ela.
+     *
+     *  Roda na abertura e de novo toda vez que a tela pode ter perdido algo:
+     *  quando o canal de tempo real (re)conecta e quando a pessoa volta pro
+     *  app. O tempo real só entrega o que muda ENQUANTO está conectado — sem
+     *  isso, o celular que apagou a tela e voltou ficava sem o turno que
+     *  passou e o PV que caiu, mostrando "sincronizado" mesmo assim.
+     *
+     *  Dois cuidados de corrida:
+     *  - duas cargas cruzadas (reconexão e volta pro app juntas): só a mais
+     *    recente escreve, senão a mais lenta botava dado velho por cima;
+     *  - evento de tempo real chegando no meio da carga: a foto do banco pode
+     *    ser anterior a ele e apagaria o que ele acabou de mostrar na tela.
+     *    Então lê de novo — até 3 vezes; na última aplica mesmo assim, pra
+     *    uma mesa muito agitada não deixar a tela presa em "carregando". */
+    async function carregar(inicial: boolean, tentativa = 1): Promise<void> {
+      const estaCarga = ++ultimaCarga;
+      const eventosAntes = eventosRecebidos;
+
+      const resultados = await Promise.all([
         supabase.from("characters").select("*").eq("room_code", codigo),
         supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle(),
         supabase.from("dm_notes").select("*").eq("room_code", codigo).maybeSingle(),
@@ -228,12 +255,28 @@ export function useSala(codigo: string): Sala {
           .limit(TAMANHO_LOG),
       ]);
 
-      if (!vivo) return;
+      if (!vivo || estaCarga !== ultimaCarga) return;
+      if (eventosRecebidos !== eventosAntes && tentativa < 3) {
+        return carregar(inicial, tentativa + 1);
+      }
 
-      if (pc.error) {
-        setErro(`Não consegui carregar a sala: ${pc.error.message}`);
-        setCarregando(false);
-        return;
+      const [pc, cs, dn, lg, mn, di, ba, bi, bl] = resultados;
+
+      if (inicial) {
+        if (pc.error) {
+          setErro(`Não consegui carregar a sala: ${pc.error.message}`);
+          setCarregando(false);
+          return;
+        }
+      } else {
+        // Recarga que falhou não troca a tela inteira pelo erro nem apaga
+        // lista nenhuma: fica o que já estava, e a próxima reconexão ou volta
+        // pro app tenta de novo.
+        const falha = resultados.find((r) => r.error);
+        if (falha?.error) {
+          console.error("recarregar sala", falha.error);
+          return;
+        }
       }
 
       setPersonagens(ordenar((pc.data ?? []) as Personagem[]));
@@ -247,7 +290,28 @@ export function useSala(codigo: string): Sala {
       setInstalacoesBastiao((bi.data ?? []) as InstalacaoBastiao[]);
       setLogBastiao((bl.data ?? []) as LinhaLogBastiao[]);
       setCarregando(false);
+
+      carregada = true;
+      if (recarregarQuandoCarregar) {
+        recarregarQuandoCarregar = false;
+        recarregar();
+      }
     }
+
+    function recarregar() {
+      // Canal que conectou antes da primeira carga terminar: as leituras dela
+      // podem ter saído antes da conexão, então relê logo depois.
+      if (!carregada) {
+        recarregarQuandoCarregar = true;
+        return;
+      }
+      carregar(false).catch((e) => console.error("recarregar sala", e));
+    }
+
+    function aoVoltarPraTela() {
+      if (document.visibilityState === "visible") recarregar();
+    }
+    document.addEventListener("visibilitychange", aoVoltarPraTela);
 
     iniciar().catch((e) => {
       if (!vivo) return;
@@ -262,6 +326,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "characters", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           setPersonagens((atual) => {
             if (msg.eventType === "DELETE") {
               const id = (msg.old as { id?: string }).id;
@@ -277,6 +342,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "combat_state", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           if (msg.eventType === "DELETE") return;
           const linha = msg.new as LinhaCombate;
           setCombate(comoCombate(linha));
@@ -287,6 +353,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "dm_notes", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           if (msg.eventType === "DELETE") return;
           setNotasMestre(((msg.new as { text?: string }).text ?? "") as string);
         },
@@ -295,6 +362,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "combat_log", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           const nova = msg.new as LinhaLog;
           setLog((atual) =>
             atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG),
@@ -305,6 +373,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "npc_templates", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           setModelosNpc((atual) => {
             if (msg.eventType === "DELETE") {
               const id = (msg.old as { id?: string }).id;
@@ -320,6 +389,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "diario", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           setDiario((atual) => {
             if (msg.eventType === "DELETE") {
               const id = (msg.old as { id?: string }).id;
@@ -335,6 +405,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "bastiao", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           if (msg.eventType === "DELETE") return;
           setBastiao(msg.new as Bastiao);
         },
@@ -343,6 +414,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "*", schema: "public", table: "bastiao_instalacoes", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           setInstalacoesBastiao((atual) => {
             if (msg.eventType === "DELETE") {
               const id = (msg.old as { id?: string }).id;
@@ -358,6 +430,7 @@ export function useSala(codigo: string): Sala {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "bastiao_log", filter: filtro },
         (msg) => {
+          eventosRecebidos++;
           const nova = msg.new as LinhaLogBastiao;
           setLogBastiao((atual) =>
             atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG),
@@ -367,10 +440,15 @@ export function useSala(codigo: string): Sala {
       .subscribe((status) => {
         if (!vivo) return;
         setConectado(status === "SUBSCRIBED");
+        // Chamado de novo a cada reconexão (o canal refaz a inscrição
+        // sozinho), não só na primeira — é quando dá pra recuperar o que
+        // mudou enquanto estava desconectado.
+        if (status === "SUBSCRIBED") recarregar();
       });
 
     return () => {
       vivo = false;
+      document.removeEventListener("visibilitychange", aoVoltarPraTela);
       supabase.removeChannel(canal);
     };
   }, [codigo]);
