@@ -3,7 +3,7 @@
  * Cada função é pura pra poder testar sozinha (ver regras.test.ts).
  */
 
-import type { Atributo, Atributos, CampoModificavel, Modificador, Pericia, Proficiencias, Recurso, TipoConjurador } from "./tipos";
+import type { Atributo, Atributos, CampoModificavel, ItemIniciativa, Modificador, Pericia, Proficiencias, Recurso, TipoConjurador } from "./tipos";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pontos de vida
@@ -375,6 +375,31 @@ export function ordenarPorIniciativa<T extends { init: number }>(itens: T[]): T[
     .map((item, i) => ({ item, i }))
     .sort((a, b) => b.item.init - a.item.init || a.i - b.i)
     .map(({ item }) => item);
+}
+
+/**
+ * Entra na ordem de iniciativa: junta os novos com quem já está, ignora quem
+ * já estava (mesmo `slug`) e devolve tudo ordenado.
+ *
+ * O filtro de repetido não é frescura: dois jogadores tocando "entrar no
+ * combate" quase juntos — ou um toque duplo no celular — faziam a mesma
+ * pessoa aparecer duas vezes na ordem, e aí ela jogava dois turnos.
+ *
+ * Devolve junto quem REALMENTE entrou, pra tela só logar isso: no toque duplo,
+ * a segunda escrita também dá certo (ela só não muda nada), e sem isso o log
+ * dizia duas vezes que a mesma pessoa entrou no combate.
+ */
+export function entrarNaOrdem(
+  ordemAtual: ItemIniciativa[],
+  novos: ItemIniciativa[],
+): { ordem: ItemIniciativa[]; entraram: ItemIniciativa[] } {
+  const jaEstao = new Set(ordemAtual.map((o) => o.slug));
+  const entraram = novos.filter((n) => {
+    if (jaEstao.has(n.slug)) return false;
+    jaEstao.add(n.slug);
+    return true;
+  });
+  return { ordem: ordenarPorIniciativa([...ordemAtual, ...entraram]), entraram };
 }
 
 /**

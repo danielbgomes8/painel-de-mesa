@@ -5,10 +5,10 @@ import type { Sala } from "@/hooks/useSala";
 import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import {
+  entrarNaOrdem,
   estaCaido,
   nomeExibidoIniciativa,
   numerarNpcsNaOrdem,
-  ordenarPorIniciativa,
   proximoTurno,
   pvExibidoIniciativa,
   reduzirPrazosCondicao,
@@ -69,6 +69,7 @@ export function RastreadorCombate({
 
   const naOrdem = new Set(combate.order.map((o) => o.slug));
   const disponiveis = personagens.filter((p) => !naOrdem.has(p.slug));
+  const jogadoresDeFora = disponiveis.filter((p) => !p.is_npc);
 
   function pvDe(slug: string) {
     return personagens.find((p) => p.slug === slug) ?? null;
@@ -124,9 +125,43 @@ export function RastreadorCombate({
       item = { slug: p.slug, name: p.name, init: iniciativa };
     }
 
-    await sala.definirCombate((atual) => ({ order: ordenarPorIniciativa([...atual.order, item]) }));
-    sala.registrarLog(`${item.name} entrou no combate (iniciativa ${item.init})`);
+    // `entrou` é preenchido dentro do callback porque ele roda de novo a cada
+    // tentativa do controle de concorrência — vale o da última, que é a que
+    // gravou de verdade.
+    let entrou = false;
+    const feito = await sala.definirCombate((atual) => {
+      const r = entrarNaOrdem(atual.order, [item]);
+      entrou = r.entraram.length > 0;
+      return { order: r.ordem };
+    });
+    if (feito && entrou) sala.registrarLog(`${item.name} entrou no combate (iniciativa ${item.init})`);
     setIni("");
+  }
+
+  /** Põe de uma vez todo jogador que ainda não está na ordem, cada um com a
+   *  própria rolagem (d20 + modificador da ficha). Era o gargalo do começo de
+   *  cada combate: o Mestre fazia isso um por um, no celular, com a mesa
+   *  esperando. NPC continua entrando na mão — monstro em grupo costuma usar
+   *  uma iniciativa só pro bando. */
+  async function porTodosOsJogadores() {
+    if (ocupado || jogadoresDeFora.length === 0) return;
+    setOcupado(true);
+    const novos: ItemIniciativa[] = jogadoresDeFora.map((p) => ({
+      slug: p.slug,
+      name: p.name,
+      init: d20() + p.init_mod,
+    }));
+    let entraram: ItemIniciativa[] = [];
+    const feito = await sala.definirCombate((atual) => {
+      const r = entrarNaOrdem(atual.order, novos);
+      entraram = r.entraram;
+      return { order: r.ordem };
+    });
+    setOcupado(false);
+    if (!feito) return;
+    sala.registrarVariosLogs(
+      entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init})`),
+    );
   }
 
   async function aoClicarProximoTurno() {
@@ -263,6 +298,18 @@ export function RastreadorCombate({
             </button>
           </div>
 
+          {jogadoresDeFora.length > 0 && (
+            <button
+              type="button"
+              className="btn"
+              style={{ marginTop: 12 }}
+              onClick={porTodosOsJogadores}
+              disabled={ocupado}
+            >
+              🎲 Pôr {jogadoresDeFora.length === 1 ? "1 jogador" : `os ${jogadoresDeFora.length} jogadores`} na ordem
+            </button>
+          )}
+
           <div className="addcombatant">
             <select value={quem} onChange={(e) => setQuem(e.target.value)}>
               <option value={NOVO_NPC}>Novo NPC / monstro…</option>
@@ -356,8 +403,13 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
     // escrita parte do estado mais recente conhecido em vez de um `sala.combate`
     // que pode já estar velho quando esta chega — reduz (não garante 100%, isso
     // pediria uma escrita atômica no banco) o risco de uma sobrescrever a outra.
-    await sala.definirCombate((atual) => ({ order: ordenarPorIniciativa([...atual.order, item]) }));
-    sala.registrarLog(`${personagem.name} entrou no combate (iniciativa ${iniciativa})`);
+    let entrou = false;
+    const feito = await sala.definirCombate((atual) => {
+      const r = entrarNaOrdem(atual.order, [item]);
+      entrou = r.entraram.length > 0;
+      return { order: r.ordem };
+    });
+    if (feito && entrou) sala.registrarLog(`${personagem.name} entrou no combate (iniciativa ${iniciativa})`);
     setIni("");
   }
 

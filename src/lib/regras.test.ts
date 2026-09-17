@@ -10,6 +10,7 @@ import {
   condicaoComLog,
   CONDICOES_QUE_QUEBRAM_CONCENTRACAO,
   danoComLog,
+  entrarNaOrdem,
   alternarPips,
   descansoLongo,
   deslocamentoEfetivo,
@@ -583,5 +584,39 @@ describe("concentração (D&D 2024)", () => {
     }
     // Petrificado inclui Incapacitado no 2024 — o resumo automático da fonte errou isso.
     expect(CONDICOES_QUE_QUEBRAM_CONCENTRACAO).toContain("Petrificado");
+  });
+});
+
+describe("entrarNaOrdem", () => {
+  const maga = { slug: "maga", name: "Maga", init: 14 };
+  const ladino = { slug: "ladino", name: "Ladino", init: 21 };
+  const goblin = { slug: "goblin", name: "Goblin", init: 9 };
+
+  it("põe vários de uma vez e devolve tudo ordenado, maior iniciativa primeiro", () => {
+    const r = entrarNaOrdem([goblin], [maga, ladino]);
+    expect(r.ordem).toEqual([ladino, maga, goblin]);
+    expect(r.entraram).toEqual([maga, ladino]);
+  });
+
+  it("quem já estava na ordem não entra de novo (toque duplo, dois jogadores juntos)", () => {
+    const r = entrarNaOrdem([maga], [{ ...maga, init: 3 }]);
+    expect(r.ordem).toEqual([maga]);
+    // Lista vazia é o que impede o log de dizer que ela entrou outra vez.
+    expect(r.entraram).toEqual([]);
+  });
+
+  it("repetido dentro da própria leva também é ignorado", () => {
+    const r = entrarNaOrdem([], [maga, { ...maga, init: 2 }, goblin]);
+    expect(r.ordem).toEqual([maga, goblin]);
+    expect(r.entraram).toEqual([maga, goblin]);
+  });
+
+  it("sem ninguém novo, a ordem continua igual", () => {
+    expect(entrarNaOrdem([ladino, goblin], [])).toEqual({ ordem: [ladino, goblin], entraram: [] });
+  });
+
+  it("empate mantém quem já estava na frente de quem chegou agora", () => {
+    const igual = { slug: "clerigo", name: "Clerigo", init: 14 };
+    expect(entrarNaOrdem([maga], [igual]).ordem).toEqual([maga, igual]);
   });
 });

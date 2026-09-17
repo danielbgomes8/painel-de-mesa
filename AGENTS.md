@@ -109,6 +109,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   o resumo automático dela errou e disse que Petrificado não inclui
   Incapacitado. O − da ficha e as Ações em Massa usam a mesma função — não
   voltar a montar a mensagem de dano em cada componente.
+- **Montar a iniciativa** (`entrarNaOrdem` em `regras.ts`): o Mestre tem um
+  botão "🎲 Pôr os N jogadores na ordem" que rola d20 + modificador da ficha
+  de cada jogador que ainda não está na ordem, numa escrita só — era o
+  gargalo do começo do combate, feito um por um no celular. NPC continua
+  entrando na mão (monstro em grupo costuma usar uma iniciativa só). Os três
+  caminhos de entrada (botão, formulário do Mestre, "sua iniciativa" do
+  jogador) passam pela mesma função, que **ignora quem já está na ordem** e
+  devolve `entraram` — sem isso, toque duplo no celular punha a pessoa duas
+  vezes na ordem (dois turnos) e, depois de corrigido, ainda logava duas
+  vezes que ela entrou. Achado testando com dois toques de propósito.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
