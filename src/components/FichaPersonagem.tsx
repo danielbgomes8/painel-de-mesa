@@ -290,18 +290,22 @@ export function FichaPersonagem({
         <div>
           <span className="sectitle">Bônus de resistência (saves)</span>
           <div className="statsrow">
+            {/* Sigla, não o nome: o quadrinho tem ~51px úteis no celular e
+             *  "CONSTITUIÇÃO" em maiúscula espaçada ocupa 90px — cortava. */}
             {(
               [
-                ["Força", "save_str"],
-                ["Destreza", "save_dex"],
-                ["Constituição", "save_con"],
-                ["Inteligência", "save_int"],
-                ["Sabedoria", "save_wis"],
-                ["Carisma", "save_cha"],
+                ["FOR", "Força", "save_str"],
+                ["DES", "Destreza", "save_dex"],
+                ["CON", "Constituição", "save_con"],
+                ["INT", "Inteligência", "save_int"],
+                ["SAB", "Sabedoria", "save_wis"],
+                ["CAR", "Carisma", "save_cha"],
               ] as const
-            ).map(([rotulo, campo]) => (
+            ).map(([sigla, nome, campo]) => (
               <div key={campo} className="stat">
-                <div className="lbl">{rotulo}</div>
+                <div className="lbl" title={nome}>
+                  {sigla}
+                </div>
                 {editavel ? (
                   <CampoNumero valor={p[campo]} onCommit={(n) => patch({ [campo]: n })} />
                 ) : (
