@@ -119,6 +119,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   devolve `entraram` — sem isso, toque duplo no celular punha a pessoa duas
   vezes na ordem (dois turnos) e, depois de corrigido, ainda logava duas
   vezes que ela entrou. Achado testando com dois toques de propósito.
+- **Telão** (`?telao=1`, `Telao.tsx`): mostra de quem é a vez e, abaixo, os 3
+  próximos da ordem (`proximosDaOrdem` em `regras.ts`, que dá a volta na
+  virada de rodada). Só **nomes** na lista do "a seguir" — PV de NPC é
+  informação do Mestre e o telão é visto pela mesa inteira, então continua
+  passando por `nomeExibidoIniciativa`/`pvExibidoIniciativa` com
+  `souMestre=false` (NPC não revelado aparece como "Inimigo 2").
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece

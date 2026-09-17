@@ -30,6 +30,7 @@ import {
   penalidadeD20,
   podeEditarPersonagem,
   proximoTurno,
+  proximosDaOrdem,
   pvExibidoIniciativa,
   recuperarDadosDeVida,
   reducaoDeslocamento,
@@ -618,5 +619,27 @@ describe("entrarNaOrdem", () => {
   it("empate mantém quem já estava na frente de quem chegou agora", () => {
     const igual = { slug: "clerigo", name: "Clerigo", init: 14 };
     expect(entrarNaOrdem([maga], [igual]).ordem).toEqual([maga, igual]);
+  });
+});
+
+describe("proximosDaOrdem", () => {
+  it("devolve os próximos índices depois do turno atual", () => {
+    expect(proximosDaOrdem(6, 0, 3)).toEqual([1, 2, 3]);
+    expect(proximosDaOrdem(6, 2, 3)).toEqual([3, 4, 5]);
+  });
+
+  it("dá a volta no fim da ordem (a próxima rodada começa de novo no primeiro)", () => {
+    expect(proximosDaOrdem(4, 3, 3)).toEqual([0, 1, 2]);
+    expect(proximosDaOrdem(4, 2, 3)).toEqual([3, 0, 1]);
+  });
+
+  it("não repete quem está jogando agora, mesmo pedindo mais do que cabe", () => {
+    expect(proximosDaOrdem(3, 0, 5)).toEqual([1, 2]);
+    expect(proximosDaOrdem(2, 1, 3)).toEqual([0]);
+  });
+
+  it("ordem com uma pessoa só (ou vazia) não tem próximo", () => {
+    expect(proximosDaOrdem(1, 0, 3)).toEqual([]);
+    expect(proximosDaOrdem(0, 0, 3)).toEqual([]);
   });
 });

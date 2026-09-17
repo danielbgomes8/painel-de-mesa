@@ -1217,6 +1217,39 @@ button:focus-visible {
   font-size: 32px;
   color: var(--ink);
 }
+/* "A seguir" no telão: bem menor que o nome de quem está jogando, pra a mesa
+   se preparar sem tirar o olho de quem é a vez. Só nomes — PV de NPC é
+   informação do Mestre (ver pvExibidoIniciativa). */
+.telao-proximos {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.telao-proximos-rotulo {
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.telao-proximos ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+}
+.telao-proximos li {
+  font-family: var(--f-display);
+  font-size: clamp(20px, 3vw, 34px);
+  color: var(--muted);
+}
+.telao-proximos li + li {
+  color: var(--dim);
+}
 
 /* ---------- diário da campanha ---------- */
 .diariolist {

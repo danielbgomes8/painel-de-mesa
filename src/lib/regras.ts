@@ -369,6 +369,18 @@ export function proximoTurno(
   return { round, turn };
 }
 
+/**
+ * Quem vem depois na ordem, pra mostrar no telão: os `quantos` próximos
+ * índices depois do turno atual, dando a volta quando chega no fim (a ordem é
+ * um ciclo — quem estava no começo joga de novo na rodada seguinte). Nunca
+ * repete quem está jogando agora, então com 3 na ordem só dá 2 "próximos",
+ * mesmo pedindo mais.
+ */
+export function proximosDaOrdem(tamanho: number, turnoAtual: number, quantos: number): number[] {
+  const total = Math.min(Math.max(0, quantos), Math.max(0, tamanho - 1));
+  return Array.from({ length: total }, (_, k) => (turnoAtual + 1 + k) % tamanho);
+}
+
 /** Ordena por iniciativa, maior primeiro (empates ficam na ordem de entrada). */
 export function ordenarPorIniciativa<T extends { init: number }>(itens: T[]): T[] {
   return itens
