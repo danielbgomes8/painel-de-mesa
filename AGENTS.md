@@ -119,6 +119,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   junto quando o modelo entra no combate. Fica num campo que quebra linha, não
   num input de uma linha — a linha do dragão tem 90 caracteres e sumia pela
   direita no celular.
+- **Ataques do jogador** (`AtaquesPersonagem.tsx`, mesma coluna `ataque`, sem
+  migration): no topo da ficha, logo abaixo do PV, uma linha por ataque no
+  formato "Nome: acerto, dano" (`separarAtaques()` em `regras.ts` só separa o
+  nome pra destacar — não interpreta número). Aparece como lista de ler, com
+  "editar" atrás: a ficha do jogador está sempre editável pra ele e pro
+  Mestre, e um campo de texto rolando por dentro não dá pra ler no turno.
+  Antes os ataques do jogador ficavam escondidos em "+ ver ficha completa".
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São

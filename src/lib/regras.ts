@@ -538,3 +538,26 @@ export type FaixaEventoBastiao = { min: number; max: number; nome: string };
 export function eventoBastiaoPara(rolagem: number, tabela: FaixaEventoBastiao[]): string | undefined {
   return tabela.find((e) => rolagem >= e.min && rolagem <= e.max)?.nome;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ataques do personagem de jogador — leitura no meio do combate
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type LinhaAtaque = { nome: string | null; detalhe: string };
+
+/** Quebra o campo `ataque` (texto livre) em uma linha por ataque, com o nome
+ *  separado do resto quando a linha vem no formato "Nome: acerto, dano" — só
+ *  pra destacar o nome na tela. Não entende acerto nem dano de propósito:
+ *  item mágico e feito mudam os números, e quem sabe é o jogador. Linha sem
+ *  ":" (ou com ":" na ponta) volta inteira como detalhe. */
+export function separarAtaques(texto: string): LinhaAtaque[] {
+  return texto
+    .split("\n")
+    .map((linha) => linha.trim())
+    .filter(Boolean)
+    .map((linha) => {
+      const i = linha.indexOf(":");
+      if (i <= 0 || i === linha.length - 1) return { nome: null, detalhe: linha };
+      return { nome: linha.slice(0, i).trim(), detalhe: linha.slice(i + 1).trim() };
+    });
+}

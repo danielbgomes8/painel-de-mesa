@@ -32,6 +32,7 @@ import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
 
@@ -183,6 +184,14 @@ export function FichaPersonagem({
             )}
           </div>
         ) : null}
+
+        {p.is_npc ? null : (
+          <AtaquesPersonagem
+            texto={p.ataque ?? ""}
+            editavel={editavel}
+            onSalvar={(texto) => patch({ ataque: texto })}
+          />
+        )}
 
         {editavel && !p.is_npc ? (
           <div className="combatctrls">

@@ -28,6 +28,7 @@ import {
   recuperarDadosDeVida,
   reducaoDeslocamento,
   reduzirPrazosCondicao,
+  separarAtaques,
   situacaoMorte,
   turnoAposRemover,
   turnoAposTrocar,
@@ -449,5 +450,39 @@ describe("ficha de classe: atributos, proficiência, CD de magia", () => {
 
   it("nível total: sem classe nenhuma cadastrada é 0", () => {
     expect(nivelTotal([])).toBe(0);
+  });
+});
+
+describe("separarAtaques", () => {
+  it("uma linha por ataque, com o nome antes do primeiro ':' separado", () => {
+    expect(separarAtaques("Malho +1: +7, 2d6+9 contundente\nMachado Grande: +6, 1d12+8 cortante")).toEqual([
+      { nome: "Malho +1", detalhe: "+7, 2d6+9 contundente" },
+      { nome: "Machado Grande", detalhe: "+6, 1d12+8 cortante" },
+    ]);
+  });
+
+  it("linha sem ':' volta inteira como detalhe (formato do NPC vindo do catálogo)", () => {
+    expect(separarAtaques("Adaga +4, 1d4+2 perfurante")).toEqual([
+      { nome: null, detalhe: "Adaga +4, 1d4+2 perfurante" },
+    ]);
+  });
+
+  it("ignora linha em branco e espaço sobrando (Enter a mais no celular)", () => {
+    expect(separarAtaques("\n  Arco: +7, 1d8+4  \n\n")).toEqual([{ nome: "Arco", detalhe: "+7, 1d8+4" }]);
+  });
+
+  it("':' na ponta não vira nome vazio nem detalhe vazio", () => {
+    expect(separarAtaques(": +5, 1d6")).toEqual([{ nome: null, detalhe: ": +5, 1d6" }]);
+    expect(separarAtaques("Rajada:")).toEqual([{ nome: null, detalhe: "Rajada:" }]);
+  });
+
+  it("só o primeiro ':' separa — o resto fica no detalhe", () => {
+    expect(separarAtaques("Fúria Divina: extra: +1d6+3")).toEqual([
+      { nome: "Fúria Divina", detalhe: "extra: +1d6+3" },
+    ]);
+  });
+
+  it("campo vazio não tem ataque nenhum", () => {
+    expect(separarAtaques("")).toEqual([]);
   });
 });
