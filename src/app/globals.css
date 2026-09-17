@@ -1264,6 +1264,19 @@ button:focus-visible {
   body {
     padding: 16px 12px 48px;
   }
+  /* As 5 abas do Mestre pediam 455px num celular de 375 — a barra rolava pro
+     lado e o "Diário" sumia depois de trocar de aba. Aperta a folga lateral e
+     a letra (a altura de toque continua 40px) pra caber sem rolagem. E se
+     ainda não couber (celular mais estreito, ou letra que renderiza mais
+     larga), quebra em duas linhas em vez de esconder aba pra fora da tela. */
+  .abas {
+    gap: 2px;
+    flex-wrap: wrap;
+  }
+  .aba {
+    font-size: 13px;
+    padding: 10px 5px;
+  }
   .initrow {
     grid-template-columns: 36px 1fr auto auto auto;
   }
