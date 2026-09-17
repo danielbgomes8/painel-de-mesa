@@ -190,10 +190,28 @@ describe("dados de vida e descanso", () => {
     });
     expect(resultado).toEqual({
       hp: 30,
+      hp_temp: 0,
+      dss: 0,
+      dsf: 0,
       exh: 1,
       hd_cur: 4,
       resources: [{ name: "Fúria", max: 3, cur: 3, short_rest: false }],
     });
+  });
+
+  it("descanso longo limpa PV temporário e testes de morte de quem caiu", () => {
+    const resultado = aplicarDescansoLongo({
+      hp_max: 40,
+      exh: 0,
+      hd_max: 7,
+      hd_cur: 7,
+      resources: [],
+    });
+    // PV temporário dura até o próximo descanso longo; e quem acorda com PV
+    // cheio não pode manter sucesso/falha de teste de morte marcados.
+    expect(resultado.hp_temp).toBe(0);
+    expect(resultado.dss).toBe(0);
+    expect(resultado.dsf).toBe(0);
   });
 
   it("descanso curto só recupera recursos marcados pra isso", () => {

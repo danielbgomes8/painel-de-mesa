@@ -301,7 +301,11 @@ export function FichaClasse({
           return (
             <div key={i} className="fc-calcrow">
               <span>
-                CD de magia ({nomeClasse}) {atk !== null && `· ataque ${sinal(atk + somaModificadores(modificadores, "cd_magia"))}`}
+                {/* Modificador de CD não entra no ataque: Feitiçaria Inata,
+                    por exemplo, sobe a CD e dá vantagem no ataque, não +1 de
+                    acerto. Quem sobe os dois (varinha) cadastra as duas linhas. */}
+                CD de magia ({nomeClasse}){" "}
+                {atk !== null && `· ataque ${sinal(atk + somaModificadores(modificadores, "ataque_magia"))}`}
               </span>
               <span className="fc-calcval">
                 calculado {cdComMods}
@@ -439,6 +443,7 @@ const NOME_CAMPO: Record<CampoModificavel, string> = {
   sab: "Sabedoria",
   car: "Carisma",
   cd_magia: "CD de magia",
+  ataque_magia: "Ataque de magia",
   pp: "PP",
 };
 

@@ -97,8 +97,11 @@ export type ClasseBase =
   | "patrulheiro";
 
 /** Campo que um modificador condicional pode afetar — as seis resistências,
- *  CD de magia ou percepção passiva. */
-export type CampoModificavel = Atributo | "cd_magia" | "pp";
+ *  CD de magia, ataque de magia ou percepção passiva.
+ *  CD e ataque são campos separados de propósito: há habilidade que sobe só
+ *  a CD (Feitiçaria Inata) e item que sobe os dois (varinha do mago de
+ *  guerra) — quem sobe os dois cadastra duas linhas. */
+export type CampoModificavel = Atributo | "cd_magia" | "ataque_magia" | "pp";
 
 /** Uma entrada de classe do personagem — multiclasse é uma lista destas.
  *  `nivel` é só daquela classe (bônus de proficiência usa a soma de todas,

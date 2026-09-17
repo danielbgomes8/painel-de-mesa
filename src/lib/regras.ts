@@ -275,6 +275,12 @@ export function gastarDadoDeVida(atual: number): number {
 /**
  * Descanso longo: PV cheio, -1 nível de exaustão, recupera dados de vida e
  * zera todos os recursos de classe (voltam ao máximo).
+ *
+ * Também limpa o que sobra de quando a criatura caiu: **PV temporário**
+ * (dura até o próximo descanso longo, regra explícita de 2024) e os
+ * **testes de morte** (o próprio `ajustarPV` já zera ao recuperar qualquer PV
+ * acima de 0 — sem isto aqui o personagem levantava do descanso com uma
+ * falha marcada e morria mais cedo no combate seguinte).
  */
 export function aplicarDescansoLongo(p: {
   hp_max: number;
@@ -282,9 +288,20 @@ export function aplicarDescansoLongo(p: {
   hd_max: number;
   hd_cur: number;
   resources: Recurso[];
-}): { hp: number; exh: number; hd_cur: number; resources: Recurso[] } {
+}): {
+  hp: number;
+  hp_temp: number;
+  dss: number;
+  dsf: number;
+  exh: number;
+  hd_cur: number;
+  resources: Recurso[];
+} {
   return {
     hp: p.hp_max,
+    hp_temp: 0,
+    dss: 0,
+    dsf: 0,
     exh: descansoLongo(p.exh),
     hd_cur: recuperarDadosDeVida(p.hd_max, p.hd_cur),
     resources: p.resources.map((r) => ({ ...r, cur: r.max })),

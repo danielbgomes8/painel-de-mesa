@@ -56,6 +56,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `boolean` justamente pra tela só dizer "copiado" depois do banco
   confirmar. Ao criar mutação nova que tenha retorno na tela, siga isso —
   senão o painel mente quando o Supabase está pausado ou a internet cai.
+- **Escrita de personagem manda só as colunas que mudaram.** Nunca gravar a
+  linha inteira a partir da cópia que o aparelho tem na memória: são vários
+  celulares na mesma sala, e a linha inteira leva junto o valor VELHO de tudo
+  o que outra pessoa mexeu nesse meio-tempo. `atualizarVariosPersonagens` já
+  foi um `upsert` em lote (uma requisição só, linha completa) e apagava, por
+  exemplo, a nota gravada de outro celular 100ms antes quando o Mestre
+  aplicava dano em massa — reproduzido contra o banco. Hoje são N `update`
+  parciais em paralelo. `upsert` parcial não é saída: o Postgres cobra as
+  colunas `not null` (`room_code`, `name`...) mesmo em quem já existe.
 - **Dados**: Supabase (Postgres + Realtime). Esquema em `supabase/migrations/`.
   O app fala com o banco só pelo cliente do navegador (`src/lib/supabase.ts`);
   não há rota de servidor nem segredo de servidor.
@@ -118,6 +127,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   o resumo automático dela errou e disse que Petrificado não inclui
   Incapacitado. O − da ficha e as Ações em Massa usam a mesma função — não
   voltar a montar a mensagem de dano em cada componente.
+- **Descanso longo limpa o que sobra de quem caiu** (`aplicarDescansoLongo`):
+  além de PV cheio, −1 de exaustão, dados de vida e recursos, zera
+  `hp_temp` (PV temporário dura até o próximo descanso longo, regra explícita
+  de 2024) e `dss`/`dsf`. Sem isso o personagem levantava do descanso com uma
+  falha de teste de morte já marcada e morria mais cedo no combate seguinte —
+  e contradizia o `ajustarPV`, que zera os testes ao recuperar PV.
+- **CD de magia e ataque de magia são modificadores separados**
+  (`CampoModificavel`): o bônus de `cd_magia` **não** entra no ataque. A
+  Feitiçaria Inata do Feiticeiro, por exemplo, sobe a CD em 1 e dá **vantagem**
+  no ataque, não +1 de acerto — somar os dois mostrava "ataque +8" onde o certo
+  é +7. Item que sobe os dois (varinha do mago de guerra) é cadastrado como
+  duas linhas de modificador.
 - **Montar a iniciativa** (`entrarNaOrdem` em `regras.ts`): o Mestre tem um
   botão "🎲 Pôr os N jogadores na ordem" que rola d20 + modificador da ficha
   de cada jogador que ainda não está na ordem, numa escrita só — era o

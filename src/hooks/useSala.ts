@@ -477,24 +477,23 @@ export function useSala(codigo: string): Sala {
           return alvo ? { ...p, ...alvo.patch } : p;
         }),
       );
-      // upsert em lote manda uma linha só pro Postgres construir, e ele
-      // confere as colunas "not null" (room_code, name...) mesmo em quem já
-      // existe — testado direto contra o banco: mandar só as colunas do
-      // patch quebra com "null value in column room_code violates not-null
-      // constraint". Por isso cada linha vai completa (personagem atual +
-      // patch por cima), não só as colunas tocadas — e por vir da MESMA
-      // linha em vez de reconstruída campo a campo, nenhuma coluna de quem
-      // não mudou nada corre risco de ser pisada pelo patch de outro
-      // personagem do lote.
-      const linhas = alvos
-        .map(({ id, patch }) => {
-          const atual = anterior.find((p) => p.id === id);
-          return atual ? { ...atual, ...patch } : null;
-        })
-        .filter((linha): linha is Personagem => linha !== null);
-      const { error } = await supabase.from("characters").upsert(linhas);
-      if (error) {
-        console.error("atualizarVariosPersonagens", error);
+      // Uma escrita por personagem, todas em paralelo, mandando SÓ as colunas
+      // do patch. Já foi `upsert` em lote (uma requisição só), mas upsert
+      // manda a LINHA INTEIRA — e a linha inteira vinha da cópia que este
+      // aparelho tinha na memória. Resultado testado contra o banco: uma nota
+      // gravada de outro celular 100ms antes voltava a ficar vazia quando o
+      // Mestre aplicava dano em massa. Como isto aqui também serve o − e as
+      // condições da ficha, era o caminho da maioria das escritas do app.
+      // (Upsert parcial não resolve: o Postgres cobra as colunas "not null"
+      // — room_code, name... — mesmo em quem já existe.)
+      const respostas = await Promise.all(
+        alvos.map(({ id, patch }) => supabase.from("characters").update(patch).eq("id", id)),
+      );
+      const erro = respostas.find((r) => r.error)?.error;
+      if (erro) {
+        console.error("atualizarVariosPersonagens", erro);
+        // Volta ao estado de antes; quem gravou de verdade no meio do lote é
+        // reposto pelo evento de tempo real da própria escrita.
         setPersonagens(anterior);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return false;
