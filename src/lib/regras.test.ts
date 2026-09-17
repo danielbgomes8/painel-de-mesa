@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { CONDICOES } from "./condicoes";
 import {
   ajustarPV,
   aplicarCura,
   aplicarDano,
   aplicarDescansoCurto,
   aplicarDescansoLongo,
+  cdConcentracao,
+  condicaoComLog,
+  CONDICOES_QUE_QUEBRAM_CONCENTRACAO,
+  danoComLog,
   alternarPips,
   descansoLongo,
   deslocamentoEfetivo,
@@ -484,5 +489,99 @@ describe("separarAtaques", () => {
 
   it("campo vazio não tem ataque nenhum", () => {
     expect(separarAtaques("")).toEqual([]);
+  });
+});
+
+describe("concentração (D&D 2024)", () => {
+  const tiberio = {
+    name: "Tibério",
+    hp: 65,
+    hp_max: 65,
+    hp_temp: 0,
+    dss: 0,
+    dsf: 0,
+    concentration: true,
+    concentration_on: "Voo",
+  };
+
+  it("dificuldade: 10 ou metade do dano (pra baixo), o que for maior, no máximo 30", () => {
+    expect(cdConcentracao(0)).toBe(10);
+    expect(cdConcentracao(1)).toBe(10);
+    expect(cdConcentracao(21)).toBe(10); // metade = 10,5 -> 10
+    expect(cdConcentracao(22)).toBe(11);
+    expect(cdConcentracao(45)).toBe(22);
+    expect(cdConcentracao(61)).toBe(30);
+    expect(cdConcentracao(200)).toBe(30);
+  });
+
+  it("dano em quem está concentrado: mesma linha do log já traz o teste de CON", () => {
+    const r = danoComLog(tiberio, 30);
+    expect(r.texto).toBe("Tibério sofreu 30 de dano (35/65) · 🔮 concentrado em Voo: teste de CON, CD 15");
+    expect(r.patch).toEqual({ hp: 35, hp_temp: 0 });
+  });
+
+  it("dano em quem NÃO está concentrado: log igual ao de sempre", () => {
+    const r = danoComLog({ ...tiberio, concentration: false, concentration_on: "" }, 14);
+    expect(r.texto).toBe("Tibério sofreu 14 de dano (51/65)");
+  });
+
+  it("PV temporário absorvendo tudo ainda é dano — o teste continua valendo", () => {
+    const r = danoComLog({ ...tiberio, hp_temp: 10 }, 6);
+    expect(r.texto).toBe(
+      "Tibério sofreu 6 de dano, todo absorvido pelo PV temporário · 🔮 concentrado em Voo: teste de CON, CD 10",
+    );
+    expect(r.patch).toEqual({ hp: 65, hp_temp: 4 });
+  });
+
+  it("a dificuldade usa o dano inteiro, inclusive a parte que o PV temporário segurou", () => {
+    expect(danoComLog({ ...tiberio, hp_temp: 10 }, 40).texto).toContain("CD 20");
+  });
+
+  it("caiu a 0 PV concentrado: perde a concentração, sem teste", () => {
+    const r = danoComLog(tiberio, 80);
+    expect(r.patch).toEqual({ hp: 0, hp_temp: 0, concentration: false, concentration_on: "" });
+    expect(r.texto).toBe("Tibério sofreu 65 de dano (0/65) · 🔮 perdeu a concentração em Voo");
+  });
+
+  it("concentrado sem dizer em quê: o aviso não fica com um 'em' solto", () => {
+    expect(danoComLog({ ...tiberio, concentration_on: "  " }, 4).texto).toBe(
+      "Tibério sofreu 4 de dano (61/65) · 🔮 concentrado: teste de CON, CD 10",
+    );
+  });
+
+  it("PV digitado na mão até 0 também acaba com a concentração; cura não mexe nela", () => {
+    expect(ajustarPV({ ...tiberio }, 0)).toEqual({ hp: 0, concentration: false, concentration_on: "" });
+    expect(ajustarPV({ ...tiberio }, 20)).toEqual({ hp: 20 });
+    expect(aplicarCura({ ...tiberio, hp: 10 }, 5)).toEqual({ hp: 15 });
+  });
+
+  it("condição que inclui Incapacitado acaba com a concentração", () => {
+    const r = condicaoComLog({ ...tiberio, cond: {}, cond_prazo: {} }, "Atordoado", true);
+    expect(r.patch).toEqual({ cond: { Atordoado: true }, cond_prazo: {}, concentration: false, concentration_on: "" });
+    expect(r.texto).toBe("Tibério ficou Atordoado · 🔮 perdeu a concentração em Voo");
+  });
+
+  it("condição que NÃO inclui Incapacitado não mexe na concentração", () => {
+    const r = condicaoComLog({ ...tiberio, cond: {}, cond_prazo: {} }, "Agarrado", true);
+    expect(r.patch).toEqual({ cond: { Agarrado: true }, cond_prazo: {} });
+    expect(r.texto).toBe("Tibério ficou Agarrado");
+  });
+
+  it("tirar uma condição limpa o prazo dela e não mexe na concentração", () => {
+    const r = condicaoComLog(
+      { ...tiberio, cond: { Paralisado: true, Cego: true }, cond_prazo: { Paralisado: 2, Cego: 1 } },
+      "Paralisado",
+      false,
+    );
+    expect(r.patch).toEqual({ cond: { Paralisado: false, Cego: true }, cond_prazo: { Cego: 1 } });
+    expect(r.texto).toBe("Tibério não está mais Paralisado");
+  });
+
+  it("as condições que quebram concentração existem com esse nome na lista de condições", () => {
+    for (const c of CONDICOES_QUE_QUEBRAM_CONCENTRACAO) {
+      expect(CONDICOES as readonly string[]).toContain(c);
+    }
+    // Petrificado inclui Incapacitado no 2024 — o resumo automático da fonte errou isso.
+    expect(CONDICOES_QUE_QUEBRAM_CONCENTRACAO).toContain("Petrificado");
   });
 });

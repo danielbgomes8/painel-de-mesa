@@ -15,8 +15,8 @@ export function limitarPV(valor: number, maximo: number): number {
   return Math.max(0, Math.min(Math.round(valor), teto));
 }
 
-type EstadoVida = { hp: number; hp_max: number; dss: number; dsf: number };
-type PatchVida = { hp: number; dss?: number; dsf?: number };
+type EstadoVida = { hp: number; hp_max: number; dss: number; dsf: number; concentration?: boolean };
+type PatchVida = { hp: number; dss?: number; dsf?: number; concentration?: boolean; concentration_on?: string };
 
 /**
  * Monta o patch pra gravar quando o PV de alguém muda.
@@ -30,6 +30,14 @@ export function ajustarPV(alvo: EstadoVida, novoHp: number): PatchVida {
   if (estava0 && hp > 0 && (alvo.dss > 0 || alvo.dsf > 0)) {
     patch.dss = 0;
     patch.dsf = 0;
+  }
+  // A 0 PV o jogador fica Inconsciente (que inclui Incapacitado) e o monstro
+  // morre — nos dois casos a concentração acaba, sem teste (ver Concentração
+  // mais abaixo). Vale pra qualquer caminho que muda PV: dano, − e o campo
+  // "atual" digitado na mão.
+  if (alvo.concentration && estaCaido(hp)) {
+    patch.concentration = false;
+    patch.concentration_on = "";
   }
   return patch;
 }
@@ -81,6 +89,107 @@ export function mensagemDanoAbsorvido(nome: string, absorvidoPeloTemp: number): 
 /** Frase pro log quando uma condição é ligada/desligada (ações em massa ou card). */
 export function mensagemCondicao(nome: string, condicao: string, ligou: boolean): string {
   return ligou ? `${nome} ficou ${condicao}` : `${nome} não está mais ${condicao}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Concentração (D&D 2024)
+// Conferido no Rules Glossary das Regras Gratuitas 2024
+// (dndbeyond.com/sources/dnd/free-rules/rules-glossary — verbete Concentration
+// e o de cada condição) em 2026-09-17. Lido no texto bruto da página: o resumo
+// automático dela dizia que Petrificado não inclui Incapacitado, e inclui.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Condições que incluem Incapacitado — e Incapacitado quebra a concentração
+ *  na hora, sem teste. Nomes iguais aos de `CONDICOES` (condicoes.ts). */
+export const CONDICOES_QUE_QUEBRAM_CONCENTRACAO: readonly string[] = [
+  "Incapacitado",
+  "Paralisado",
+  "Petrificado",
+  "Atordoado",
+  "Inconsciente",
+];
+
+/** Dificuldade do teste de Constituição pra manter a concentração depois de
+ *  levar dano: 10 ou metade do dano (arredonda pra baixo), o que for maior,
+ *  no máximo 30. */
+export function cdConcentracao(dano: number): number {
+  return Math.min(30, Math.max(10, Math.floor(Math.max(0, dano) / 2)));
+}
+
+function emQue(concentracaoEm: string): string {
+  const alvo = concentracaoEm.trim();
+  return alvo ? ` em ${alvo}` : "";
+}
+
+type AlvoDano = EstadoVida & {
+  name: string;
+  hp_temp: number;
+  concentration: boolean;
+  concentration_on: string;
+};
+
+/**
+ * Dano "de verdade" num alvo (desconta do PV temporário primeiro) e a linha
+ * pro log. Se o alvo estava concentrado, a mesma linha já avisa o que fazer:
+ * o teste de Constituição com a dificuldade calculada, ou que a concentração
+ * acabou porque caiu a 0 PV. PV temporário absorvendo tudo ainda é dano — o
+ * teste continua valendo. `texto` null = nada mudou, não loga.
+ */
+export function danoComLog(alvo: AlvoDano, dano: number): { patch: PatchVidaTemp; texto: string | null } {
+  const d = Math.max(0, Math.round(dano));
+  const patch = aplicarDano(alvo, d);
+  const deltaReal = patch.hp - alvo.hp;
+  let texto: string | null = null;
+  if (deltaReal !== 0) {
+    texto = mensagemAjustePV(alvo.name, deltaReal, patch.hp, alvo.hp_max);
+  } else if (patch.hp_temp < alvo.hp_temp) {
+    texto = mensagemDanoAbsorvido(alvo.name, alvo.hp_temp - patch.hp_temp);
+  }
+  if (!alvo.concentration) return { patch, texto };
+
+  if (patch.concentration === false) {
+    const aviso = `perdeu a concentração${emQue(alvo.concentration_on)}`;
+    return { patch, texto: texto ? `${texto} · 🔮 ${aviso}` : `${alvo.name} ${aviso}` };
+  }
+  if (texto === null) return { patch, texto };
+  return {
+    patch,
+    texto: `${texto} · 🔮 concentrado${emQue(alvo.concentration_on)}: teste de CON, CD ${cdConcentracao(d)}`,
+  };
+}
+
+type AlvoCondicao = {
+  name: string;
+  cond: Record<string, boolean>;
+  cond_prazo: Record<string, number>;
+  concentration: boolean;
+  concentration_on: string;
+};
+
+/**
+ * Liga/desliga uma condição e monta a linha do log. Desligar também tira o
+ * prazo (senão ele "expirava" uma rodada depois e logava o fim de uma
+ * condição que já tinha saído). Ligar uma condição que inclui Incapacitado
+ * em quem está concentrado acaba com a concentração, na mesma linha do log.
+ */
+export function condicaoComLog(
+  alvo: AlvoCondicao,
+  condicao: string,
+  ligar: boolean,
+): {
+  patch: { cond: Record<string, boolean>; cond_prazo: Record<string, number>; concentration?: boolean; concentration_on?: string };
+  texto: string;
+} {
+  const cond_prazo = { ...alvo.cond_prazo };
+  if (!ligar) delete cond_prazo[condicao];
+  const patch: ReturnType<typeof condicaoComLog>["patch"] = { cond: { ...alvo.cond, [condicao]: ligar }, cond_prazo };
+  const texto = mensagemCondicao(alvo.name, condicao, ligar);
+  if (ligar && alvo.concentration && CONDICOES_QUE_QUEBRAM_CONCENTRACAO.includes(condicao)) {
+    patch.concentration = false;
+    patch.concentration_on = "";
+    return { patch, texto: `${texto} · 🔮 perdeu a concentração${emQue(alvo.concentration_on)}` };
+  }
+  return { patch, texto };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

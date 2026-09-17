@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
-import { aplicarCura, aplicarDano, mensagemAjustePV, mensagemCondicao, mensagemDanoAbsorvido } from "@/lib/regras";
+import { aplicarCura, condicaoComLog, danoComLog, mensagemAjustePV } from "@/lib/regras";
 
 /** Área de efeito: seleciona vários personagens/NPCs e aplica dano, cura ou
  *  uma condição em todos de uma vez. Só o Mestre vê. */
@@ -38,14 +38,10 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
         }
         continue;
       }
-      const resultado = aplicarDano(p, n);
-      alvos.push({ id: p.id, patch: resultado });
-      const deltaReal = resultado.hp - p.hp;
-      if (deltaReal !== 0) {
-        textos.push(mensagemAjustePV(p.name, deltaReal, resultado.hp, p.hp_max));
-      } else if (resultado.hp_temp < p.hp_temp) {
-        textos.push(mensagemDanoAbsorvido(p.name, p.hp_temp - resultado.hp_temp));
-      }
+      // danoComLog já avisa o teste de concentração (ou a perda dela a 0 PV).
+      const { patch, texto } = danoComLog(p, n);
+      alvos.push({ id: p.id, patch });
+      if (texto) textos.push(texto);
     }
     // Só loga depois que a escrita das fichas confirmar — senão o log jura
     // uma cura que não aconteceu se a escrita falhar (achado ao testar).
@@ -60,14 +56,11 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
     for (const p of selecionados) {
       const jaEstava = Boolean(p.cond?.[cond]);
       if (jaEstava === ligar) continue;
-      // Mesma limpeza do toggle individual na ficha: sem isso, remover a
-      // condição em massa deixava o prazo pendurado, e uma rodada depois ele
-      // "expirava" sozinho e logava um aviso pra uma condição que já tinha
-      // sido removida.
-      const cond_prazo = { ...p.cond_prazo };
-      if (!ligar) delete cond_prazo[cond];
-      alvos.push({ id: p.id, patch: { cond: { ...p.cond, [cond]: ligar }, cond_prazo } });
-      textos.push(mensagemCondicao(p.name, cond, ligar));
+      // Mesma regra do toggle individual na ficha (limpa o prazo ao tirar,
+      // quebra a concentração ao ligar Atordoado/Inconsciente/...).
+      const { patch, texto } = condicaoComLog(p, cond, ligar);
+      alvos.push({ id: p.id, patch });
+      textos.push(texto);
     }
     const deuCerto = await sala.atualizarVariosPersonagens(alvos);
     if (deuCerto) sala.registrarVariosLogs(textos);

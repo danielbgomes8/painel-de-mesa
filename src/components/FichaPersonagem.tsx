@@ -7,10 +7,11 @@ import { CONDICOES } from "@/lib/condicoes";
 import {
   ajustarPV,
   aplicarCura,
-  aplicarDano,
   aplicarDescansoCurto,
   aplicarDescansoLongo,
   alternarPips,
+  condicaoComLog,
+  danoComLog,
   deslocamentoEfetivo,
   efeitoExaustao,
   estaCaido,
@@ -22,8 +23,6 @@ import {
   limitarPV,
   limitarTesteMorte,
   mensagemAjustePV,
-  mensagemCondicao,
-  mensagemDanoAbsorvido,
   podeEditarPersonagem,
   situacaoMorte,
   TESTES_MORTE_MAX,
@@ -67,14 +66,8 @@ export function FichaPersonagem({
       resultado = r;
       if (r.hp !== p.hp) texto = mensagemAjustePV(p.name, r.hp - p.hp, r.hp, p.hp_max);
     } else {
-      const r = aplicarDano(p, -delta);
-      resultado = r;
-      const deltaReal = r.hp - p.hp;
-      if (deltaReal !== 0) {
-        texto = mensagemAjustePV(p.name, deltaReal, r.hp, p.hp_max);
-      } else if (r.hp_temp < p.hp_temp) {
-        texto = mensagemDanoAbsorvido(p.name, p.hp_temp - r.hp_temp);
-      }
+      // danoComLog já avisa o teste de concentração (ou a perda dela a 0 PV).
+      ({ patch: resultado, texto } = danoComLog(p, -delta));
     }
     const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: resultado }]);
     if (deuCerto && texto) sala.registrarVariosLogs([texto]);
@@ -454,12 +447,9 @@ export function FichaPersonagem({
                   aria-pressed={ativa}
                   disabled={!editavel}
                   onClick={async () => {
-                    const ligar = !ativa;
-                    const cond_prazo = { ...p.cond_prazo };
-                    if (!ligar) delete cond_prazo[nome];
-                    const mudanca = { cond: { ...p.cond, [nome]: ligar }, cond_prazo };
+                    const { patch: mudanca, texto } = condicaoComLog(p, nome, !ativa);
                     const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: mudanca }]);
-                    if (deuCerto) sala.registrarVariosLogs([mensagemCondicao(p.name, nome, ligar)]);
+                    if (deuCerto) sala.registrarVariosLogs([texto]);
                   }}
                 >
                   {nome}

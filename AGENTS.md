@@ -99,6 +99,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   evento chega no meio da releitura, ela descarta e lê de novo (a foto do
   banco podia ser anterior ao evento). Testado derrubando o WebSocket de
   propósito e mudando o PV enquanto estava caído.
+- **Concentração** (`danoComLog`/`condicaoComLog`/`cdConcentracao` em
+  `regras.ts`, sem migration): dano em quem está com 🔮 ligado já sai no log
+  com o teste de CON e a dificuldade (10 ou metade do dano, teto 30 — PV
+  temporário absorvendo tudo ainda conta como dano). Cair a 0 PV (em
+  `ajustarPV`, então vale até pro PV digitado na mão) ou ganhar uma condição
+  que inclui Incapacitado desliga a concentração sozinho. Regra conferida no
+  Rules Glossary das Regras Gratuitas 2024 **lendo o texto bruto da página**:
+  o resumo automático dela errou e disse que Petrificado não inclui
+  Incapacitado. O − da ficha e as Ações em Massa usam a mesma função — não
+  voltar a montar a mensagem de dano em cada componente.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
