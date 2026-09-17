@@ -42,6 +42,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   duplo-toque, e o Mestre toca de novo achando que falhou, duplicando o
   registro), foco visível (`:focus-visible`) e, quando a ação é assíncrona,
   uma confirmação com `aria-live="polite"`.
+  **Piso medido a 375px: 32px de altura** (medido em 2026-09-17 — estava tudo
+  entre 13px e 28px). Dois truques usados, pra não engordar a tela:
+  `.minilink`/`.removechar` ganham a área de toque num `::after` absoluto
+  (inset negativo), então o alvo tem ~37px **sem** mexer no layout; e o `.pip`
+  (exaustão, testes de morte, trilhas de uso) virou um botão de 30px com o
+  quadradinho de 20px desenhado no `::before` — mexer no tamanho do `.pip` sem
+  olhar o `::before` desalinha o desenho. **`.rm` (o ✕ do `BotaoRemover`) só
+  tinha estilo dentro de `.initrow`**; fora dela caía no botão padrão do
+  navegador (fundo cinza, borda branca) — hoje tem regra base, não tirar.
 - **Escrita que pode falhar não se confirma antes da hora.** As mutações do
   `useSala` engolem o erro no `console.error`; `criarModeloNpc` devolve
   `boolean` justamente pra tela só dizer "copiado" depois do banco
