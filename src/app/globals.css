@@ -1763,3 +1763,96 @@ button:focus-visible {
   color: var(--dim);
   flex: none;
 }
+
+/* ---------- backup e restauração (aba do Mestre) ---------- */
+.bkpexplica {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+.bkptitulo {
+  font-size: 15px;
+  margin: 22px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+/* Input de arquivo do navegador não dá pra estilizar; o <label> vira o botão
+   e o input fica escondido dentro dele (continua clicável e no teclado). */
+.bkparquivo input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.bkparquivo {
+  display: inline-block;
+  position: relative;
+}
+.bkparquivo .btn {
+  display: inline-block;
+  min-height: 34px;
+  line-height: 18px;
+}
+.bkparquivo:focus-within .btn {
+  border-color: var(--accent);
+}
+.bkpconfirma {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+.bkpconfirma p {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.bkpconfirma b {
+  color: var(--ink);
+}
+.bkparquivonome {
+  font-family: var(--f-mono);
+  font-size: 11.5px !important;
+  color: var(--dim) !important;
+}
+.bkpaviso {
+  color: var(--warn) !important;
+}
+.bkpcodigo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 12px 0;
+}
+.bkpcodigo input {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 14px;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+.bkpbotoes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn.perigo {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+.btn.perigo:disabled {
+  background: var(--surface2);
+  border-color: var(--line);
+  color: var(--ink);
+}

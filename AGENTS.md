@@ -182,6 +182,24 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   "editar" atrás: a ficha do jogador está sempre editável pra ele e pro
   Mestre, e um campo de texto rolando por dentro não dá pra ler no turno.
   Antes os ataques do jogador ficavam escondidos em "+ ver ficha completa".
+- **Backup e restauração** (`backup.ts` + `BackupSala.tsx`, aba do Mestre, sem
+  migration): o arquivo leva a sala inteira — as nove tabelas, com o log
+  **completo** (lido do banco na hora por `exportarSala`, em páginas de 1000;
+  o que está na tela são só as últimas 40 linhas) e o Bastião. Antes o backup
+  não levava nada de Bastião e cortava o log — parecia seguro e não era.
+  Restaurar é a única ação do app que apaga em massa, então tem três travas:
+  a tela compara "o arquivo tem" com "a sala de agora tem" (relendo o banco
+  primeiro, porque o tempo real **não entrega apagamento feito em outro
+  aparelho** e o número na memória mente justo na hora de decidir), exige o
+  código da sala digitado à mão, e baixa sozinha um backup do estado atual
+  antes de encostar no banco — se falhar em baixar essa rede, não restaura.
+  As linhas voltam **sem o `id` antigo** (`linhasParaInserir`, que também
+  iguala as chaves de todas as linhas; o insert em lote do PostgREST recusa
+  formatos diferentes) e com as colunas tiradas do próprio arquivo, pra
+  coluna nova de migration futura voltar sozinha. **Arquivo antigo (versão 1)
+  não tem Bastião — e "não tem" é diferente de "tem vazio": nesse caso o
+  Bastião da sala não é apagado**, que é o que o aviso da tela promete;
+  achado testando, porque a primeira versão apagava as instalações.
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São

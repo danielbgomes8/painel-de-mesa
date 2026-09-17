@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { slugUnico } from "@/lib/sala";
 import { turnoAposRemover } from "@/lib/regras";
+import { linhasParaInserir, type Backup } from "@/lib/backup";
 import {
   COMBATE_VAZIO,
   type Bastiao,
@@ -23,6 +24,11 @@ import {
 
 const TAMANHO_LOG = 40;
 
+/** Quantas linhas por página ao ler uma tabela INTEIRA (backup). O PostgREST
+ *  corta a resposta num teto próprio, então log de mesa antiga sairia pela
+ *  metade sem paginar — e backup pela metade é pior que backup nenhum. */
+const PAGINA_EXPORTACAO = 1000;
+
 // Tentativas de definirCombate antes de desistir e avisar (ver migration
 // 0010) — mais que suficiente pra qualquer contenção real numa mesa de RPG;
 // existe só pra não tentar pra sempre num cenário patológico.
@@ -36,6 +42,20 @@ type LinhaCombate = {
   turn: number;
   order_json: ItemIniciativa[] | null;
   version: number;
+};
+
+/** A sala inteira lida do banco na hora (não o que está na tela): o log vai
+ *  completo, não só as últimas linhas. É o que vira arquivo de backup. */
+export type SalaInteira = {
+  personagens: Personagem[];
+  combate: EstadoCombate;
+  notasMestre: string;
+  modelosNpc: ModeloNpc[];
+  log: LinhaLog[];
+  diario: EntradaDiario[];
+  bastiao: Bastiao;
+  instalacoesBastiao: InstalacaoBastiao[];
+  logBastiao: LinhaLogBastiao[];
 };
 
 export type Sala = {
@@ -90,7 +110,46 @@ export type Sala = {
   atualizarInstalacaoBastiao: (id: string, patch: Partial<InstalacaoBastiao>) => Promise<void>;
   removerInstalacaoBastiao: (id: string) => Promise<void>;
   registrarLogBastiao: (texto: string) => Promise<void>;
+  /** Relê a sala inteira do banco agora (o mesmo que acontece quando o app
+   *  volta pra tela). Serve pra quem precisa comparar com o banco de verdade
+   *  e não com o que sobrou na memória — o tempo real, por exemplo, não
+   *  entrega apagamentos feitos em outro aparelho. */
+  recarregarSala: () => void;
+  /** Lê a sala inteira do banco pro arquivo de backup. null quando falha. */
+  exportarSala: () => Promise<SalaInteira | null>;
+  /** Apaga o conteúdo da sala e põe o do arquivo no lugar. Devolve a frase do
+   *  erro quando não deu — a tela precisa dizer o que aconteceu, não só que
+   *  "falhou". */
+  restaurarBackup: (backup: Backup) => Promise<{ ok: boolean; erro?: string }>;
 };
+
+/** Lê uma tabela da sala INTEIRA, em páginas, da mais antiga pra mais nova. */
+async function lerTudoDaTabela(
+  tabela: string,
+  codigo: string,
+): Promise<{ dados: Record<string, unknown>[]; erro: string | null }> {
+  const tudo: Record<string, unknown>[] = [];
+  for (let inicio = 0; ; inicio += PAGINA_EXPORTACAO) {
+    const { data, error } = await supabase
+      .from(tabela)
+      .select("*")
+      .eq("room_code", codigo)
+      .order("created_at", { ascending: true })
+      .range(inicio, inicio + PAGINA_EXPORTACAO - 1);
+    if (error) return { dados: [], erro: `${tabela}: ${error.message}` };
+    const pagina = (data ?? []) as Record<string, unknown>[];
+    tudo.push(...pagina);
+    if (pagina.length < PAGINA_EXPORTACAO) return { dados: tudo, erro: null };
+  }
+}
+
+/** Quebra uma lista em pedaços — insert de log de campanha inteira numa
+ *  requisição só passaria do tamanho que o PostgREST aceita. */
+function pedacos<T>(lista: T[], tamanho: number): T[][] {
+  const saida: T[][] = [];
+  for (let i = 0; i < lista.length; i += tamanho) saida.push(lista.slice(i, i + tamanho));
+  return saida;
+}
 
 /** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
 function ordenar(lista: Personagem[]): Personagem[] {
@@ -160,6 +219,10 @@ export function useSala(codigo: string): Sala {
       instalacoesBastiao,
     };
   });
+
+  // Ponte pro `recarregar` que mora dentro do efeito: quem restaura um backup
+  // precisa reler a sala inteira depois de trocar o banco.
+  const recarregarRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -308,6 +371,8 @@ export function useSala(codigo: string): Sala {
       carregar(false).catch((e) => console.error("recarregar sala", e));
     }
 
+    recarregarRef.current = recarregar;
+
     function aoVoltarPraTela() {
       if (document.visibilityState === "visible") recarregar();
     }
@@ -448,6 +513,7 @@ export function useSala(codigo: string): Sala {
 
     return () => {
       vivo = false;
+      recarregarRef.current = () => {};
       document.removeEventListener("visibilitychange", aoVoltarPraTela);
       supabase.removeChannel(canal);
     };
@@ -877,6 +943,111 @@ export function useSala(codigo: string): Sala {
     [codigo],
   );
 
+  const recarregarSala = useCallback(() => recarregarRef.current(), []);
+
+  const exportarSala = useCallback(async (): Promise<SalaInteira | null> => {
+    const [pc, mn, lg, di, bi, bl] = await Promise.all([
+      lerTudoDaTabela("characters", codigo),
+      lerTudoDaTabela("npc_templates", codigo),
+      lerTudoDaTabela("combat_log", codigo),
+      lerTudoDaTabela("diario", codigo),
+      lerTudoDaTabela("bastiao_instalacoes", codigo),
+      lerTudoDaTabela("bastiao_log", codigo),
+    ]);
+    const [cs, dn, ba] = await Promise.all([
+      supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle(),
+      supabase.from("dm_notes").select("*").eq("room_code", codigo).maybeSingle(),
+      supabase.from("bastiao").select("*").eq("room_code", codigo).maybeSingle(),
+    ]);
+
+    const falha =
+      [pc, mn, lg, di, bi, bl].find((r) => r.erro)?.erro ??
+      [cs, dn, ba].find((r) => r.error)?.error?.message ??
+      null;
+    if (falha) {
+      // Backup pela metade seria pior que nenhum: prefere não entregar
+      // arquivo nenhum e avisar.
+      console.error("exportarSala", falha);
+      setAvisoFalha("Não consegui ler a sala inteira pro backup — confira a conexão e tente de novo.");
+      return null;
+    }
+
+    return {
+      personagens: pc.dados as unknown as Personagem[],
+      combate: comoCombate((cs.data ?? null) as LinhaCombate | null),
+      notasMestre: (dn.data?.text ?? "") as string,
+      modelosNpc: mn.dados as unknown as ModeloNpc[],
+      log: lg.dados as unknown as LinhaLog[],
+      diario: di.dados as unknown as EntradaDiario[],
+      bastiao: (ba.data ?? { ...BASTIAO_VAZIO, room_code: codigo }) as Bastiao,
+      instalacoesBastiao: bi.dados as unknown as InstalacaoBastiao[],
+      logBastiao: bl.dados as unknown as LinhaLogBastiao[],
+    };
+  }, [codigo]);
+
+  const restaurarBackup = useCallback(
+    async (backup: Backup): Promise<{ ok: boolean; erro?: string }> => {
+      // Ordem: apaga tudo o que é lista, repõe do arquivo, depois arruma as
+      // linhas únicas (combate, notas, Bastião) pelas mutações de sempre —
+      // assim a versão de combat_state continua sendo respeitada.
+      const tabelas: [string, unknown[]][] = [
+        ["characters", backup.personagens],
+        ["npc_templates", backup.modelos_npc],
+        ["combat_log", backup.log],
+        ["diario", backup.diario],
+      ];
+      // Arquivo antigo não TEM Bastião (é diferente de ter um Bastião vazio):
+      // nesse caso ele não é apagado, é deixado como está — que é o que a tela
+      // promete no aviso. Achado testando com um backup de antes da migration
+      // 0006: as instalações sumiam sem ninguém pedir.
+      if (backup.bastiao) {
+        tabelas.push(["bastiao_instalacoes", backup.bastiao_instalacoes]);
+        tabelas.push(["bastiao_log", backup.bastiao_log]);
+      }
+
+      for (const [tabela] of tabelas) {
+        const { error } = await supabase.from(tabela).delete().eq("room_code", codigo);
+        if (error) {
+          console.error("restaurarBackup (limpar)", tabela, error);
+          return { ok: false, erro: `Parei ao limpar ${tabela}: ${error.message}` };
+        }
+      }
+
+      for (const [tabela, linhas] of tabelas) {
+        for (const parte of pedacos(linhasParaInserir(linhas, codigo), 500)) {
+          const { error } = await supabase.from(tabela).insert(parte);
+          if (error) {
+            console.error("restaurarBackup (repor)", tabela, error);
+            return { ok: false, erro: `Parei ao repor ${tabela}: ${error.message}` };
+          }
+        }
+      }
+
+      const combate = await definirCombate({
+        round: backup.combate.round,
+        turn: backup.combate.turn,
+        order: backup.combate.order,
+      });
+      if (!combate) return { ok: false, erro: "As fichas voltaram, mas não consegui repor o combate." };
+
+      await definirNotasMestre(backup.notas_mestre);
+      if (backup.bastiao) {
+        await definirBastiao({
+          turno: backup.bastiao.turno,
+          tesouro_po: backup.bastiao.tesouro_po,
+          defensores: backup.bastiao.defensores,
+          notes: backup.bastiao.notes,
+        });
+      }
+
+      // Relê do banco: o estado da tela foi virado do avesso por deletes e
+      // inserts, e o tempo real pode ter entregue só parte deles.
+      recarregarRef.current();
+      return { ok: true };
+    },
+    [codigo, definirCombate, definirNotasMestre, definirBastiao],
+  );
+
   return {
     carregando: supabaseConfigurado && carregando,
     conectado,
@@ -911,5 +1082,8 @@ export function useSala(codigo: string): Sala {
     atualizarInstalacaoBastiao,
     removerInstalacaoBastiao,
     registrarLogBastiao,
+    recarregarSala,
+    exportarSala,
+    restaurarBackup,
   };
 }

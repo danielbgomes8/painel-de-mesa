@@ -11,7 +11,7 @@ import {
   type Identidade,
 } from "@/lib/identidade";
 import { rotuloDaSala } from "@/lib/sala";
-import { baixarJson, montarBackup } from "@/lib/backup";
+import { BackupSala, baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
 import { AcoesEmMassa } from "@/components/AcoesEmMassa";
@@ -49,17 +49,13 @@ function PainelSala({ codigo }: { codigo: string }) {
     params.set("telao", "1");
     window.open(`${window.location.pathname}?${params.toString()}`, "_blank");
   }
-  function baixarBackup() {
-    const dados = montarBackup({
-      rotulo,
-      personagens: sala.personagens,
-      combate: sala.combate,
-      notasMestre: sala.notasMestre,
-      modelosNpc: sala.modelosNpc,
-      log: sala.log,
-      diario: sala.diario,
-    });
-    baixarJson(dados, `painel-de-mesa-${codigo}-${new Date().toISOString().slice(0, 10)}.json`);
+  // O arquivo vem de uma leitura nova do banco (não do que está na tela), pra
+  // levar o log inteiro e o Bastião — ver BackupSala.
+  const [baixandoBackup, setBaixandoBackup] = useState(false);
+  async function baixarBackup() {
+    setBaixandoBackup(true);
+    await baixarBackupDaSala(sala, codigo, rotulo);
+    setBaixandoBackup(false);
   }
 
   const souMestre = identidade?.tipo === "mestre";
@@ -122,8 +118,8 @@ function PainelSala({ codigo }: { codigo: string }) {
               <button className="linkbtn" type="button" onClick={abrirTelao}>
                 📺 modo telão
               </button>
-              <button className="linkbtn" type="button" onClick={baixarBackup}>
-                ⬇ backup
+              <button className="linkbtn" type="button" onClick={baixarBackup} disabled={baixandoBackup}>
+                {baixandoBackup ? "⬇ juntando…" : "⬇ backup"}
               </button>
             </>
           )}
@@ -164,6 +160,7 @@ function PainelSala({ codigo }: { codigo: string }) {
         <>
           <BibliotecaNpcs sala={sala} />
           <NotasDoMestre valor={sala.notasMestre} onSalvar={sala.definirNotasMestre} />
+          <BackupSala sala={sala} codigo={codigo} rotulo={rotulo} />
         </>
       )}
 
