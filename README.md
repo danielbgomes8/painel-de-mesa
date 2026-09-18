@@ -145,6 +145,13 @@ Sem o `.env.local` o app abre, mas mostra um aviso em vez do painel.
 Outros comandos: `npm run build`, `npm run lint`, `npm run teste`
 (regras de negócio), `npm run teste:assistir`.
 
+**`npm run verificar`** roda tudo de uma vez — testes, tipos e lint (uns 6
+segundos). É o mesmo comando que o Vercel roda antes de publicar
+(`vercel.json`): se alguma coisa falhar, o deploy falha e o painel continua
+na última versão que funcionava, em vez de ir pro ar quebrado. O GitHub
+também roda a mesma verificação a cada push (`.github/workflows/verificar.yml`)
+e marca o commit com ✓ ou ✗.
+
 Para abrir outra mesa no mesmo deploy, use `?sala=<codigo>` na URL
 (ex.: `/?sala=nova-campanha`). A sala é criada sozinha no primeiro acesso.
 

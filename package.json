@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "teste": "vitest run",
-    "teste:assistir": "vitest"
+    "teste:assistir": "vitest",
+    "verificar": "vitest run && next typegen && tsc --noEmit && eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",

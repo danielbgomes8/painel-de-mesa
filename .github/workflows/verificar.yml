@@ -1,0 +1,46 @@
+# Confere o painel a cada push e a cada pull request: testes das regras,
+# tipos, lint e o build de produção. Se algo quebrar, o commit ganha um ✗
+# vermelho no GitHub e quem fez o push recebe um e-mail.
+#
+# Isto AVISA, mas não segura o deploy sozinho: o Vercel publica em paralelo.
+# Quem impede uma versão quebrada de ir pro ar é o `vercel.json`, que roda o
+# mesmo `npm run verificar` antes do build — se falhar lá, o deploy falha e o
+# painel continua na última versão boa. Ver AGENTS.md, "Verificação antes
+# de publicar".
+
+name: Verificar
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Dois pushes seguidos no mesmo branch: só o último interessa.
+concurrency:
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes, tipos e lint
+        run: npm run verificar
+
+      # Sem as variáveis do Supabase o app compila do mesmo jeito (mostra o
+      # aviso de "não configurado" na tela) — aqui só interessa que compile.
+      - name: Build de produção
+        run: npm run build

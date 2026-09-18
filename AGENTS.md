@@ -19,6 +19,26 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   componente — importar de lá. O mesmo vale pro catálogo de monstros:
   `buscarMonstros()` mora em `src/lib/monstrosSrd.ts`, testada em
   `monstrosSrd.test.ts`.
+- **Verificação antes de publicar** (`npm run verificar` = testes +
+  `next typegen` + `tsc` + lint, ~6s). **O `next typegen` não é enfeite**:
+  tipos como `LayoutProps` são gerados pelo Next dentro de `.next/`, e o
+  `next-env.d.ts` fica fora do Git — num checkout limpo (Vercel, GitHub)
+  nada disso existe antes do build, e o `tsc` sozinho falhava com
+  "Cannot find name 'LayoutProps'". Na máquina de quem desenvolve passava,
+  porque o `.next/` já estava lá. Achado simulando um checkout limpo antes
+  do primeiro push — sem isso, a trava abaixo teria barrado **todo** deploy,
+  inclusive os bons. O `vercel.json` troca o comando de build do Vercel por
+  `npm run verificar && npm run build`. **É isso que trava uma versão
+  quebrada** — o deploy falha e o painel continua na última versão boa. O
+  `next build` do Next 16 sozinho confere tipos, mas **não roda lint nem os
+  testes** (ver `node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`,
+  "next lint Command"), então até 18/09/2026 um erro de regra ia pro ar sem
+  ninguém tropeçar. O workflow do GitHub (`.github/workflows/verificar.yml`)
+  roda a mesma coisa + o build a cada push e PR, mas só **avisa** (✗ no
+  commit, e-mail): ele corre em paralelo ao Vercel e não segura o deploy.
+  Não tirar a verificação do `vercel.json` achando que o GitHub já cobre.
+  Testado reintroduzindo de propósito o defeito do descanso longo: 2 testes
+  falharam e o build nem começou.
 - **A mesa joga D&D 2024 (SRD 5.2). Não confie na sua memória de monstro.**
   O catálogo já esteve inteiro com números de 2014 — e 27 dos 41 estavam
   errados. O que mais engana: em 2024 a **iniciativa do monstro é um bônus
@@ -221,17 +241,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Próximos passos (combinados em 17/09/2026)
 
-Lista de melhorias que o Daniel aprovou, na ordem. Os dois primeiros já
-foram feitos — ficam aqui pra deixar claro de onde a ordem veio.
+Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
+feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 4.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
    incompleto, modificador de CD entrando no ataque de magia).
 2. ~~Backup completo com restauração~~ — commit `60f4e1c`.
-3. **CI no GitHub**: rodar `npm run teste`, `npx tsc --noEmit` e
-   `npm run lint` a cada push, bloqueando o que quebra. **Não existe
-   `.github/` hoje** — o Vercel só faz o build, então um erro de regra vai
-   pro ar sem ninguém tropeçar nele antes da mesa de sábado. É o próximo.
+3. ~~CI no GitHub~~ — feito em 18/09/2026: `npm run verificar`, trava no
+   `vercel.json` e workflow no GitHub (ver "Verificação antes de publicar"
+   lá em cima).
 4. **Preparar encontro**: escolher monstros do catálogo, montar o grupo
    inimigo e pôr todos na iniciativa de uma vez. Hoje é um por um, no meio
    da sessão; isso vira preparo de antes.
