@@ -690,6 +690,37 @@ button:focus-visible {
 .initajuste .rm {
   margin-left: auto;
 }
+/* Jogador a 0 PV: etiqueta e testes de morte no painel da linha. */
+.condtag.caido {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.condtag.caido:hover,
+.condtag.caido[aria-expanded="true"] {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface);
+}
+.initmorte {
+  flex-basis: 100%;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.testesmorte .subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 6px;
+}
+.dsultimo {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
 /* Ataques rolados no painel da linha (RolarAtaques). */
 .initataques {
   flex-basis: 100%;

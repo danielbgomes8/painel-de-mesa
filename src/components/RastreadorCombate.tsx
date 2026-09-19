@@ -9,6 +9,7 @@ import { mudarPVComLog } from "@/components/FichaPersonagem";
 import { ExplicacaoCondicao, ExplicacaoExaustao } from "@/components/ExplicacaoCondicao";
 import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
 import { RolarAtaques } from "@/components/RolarAtaques";
+import { TestesDeMorte } from "@/components/TestesDeMorte";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 import {
@@ -333,6 +334,10 @@ export function RastreadorCombate({
             // precisa saber que o ataque dele tem vantagem.
             const conds = pv ? condicoesAtivas(pv.cond) : [];
             const exaustao = pv?.exh ?? 0;
+            // Jogador a 0 PV está Inconsciente pelas regras, mesmo sem
+            // ninguém ter ligado a condição na mão — e é a informação que
+            // mais importa na ordem: quem chegar perto acerta crítico.
+            const caido = Boolean(pv && !pv.is_npc && estaCaido(pv.hp));
             const explicacaoAqui = explicando?.slug === c.slug ? explicando.nome : null;
             const quem = (
               <>
@@ -417,8 +422,19 @@ export function RastreadorCombate({
                   <span />
                 )}
               </div>
-              {pv && (conds.length > 0 || exaustao > 0) && (
+              {pv && (caido || conds.length > 0 || exaustao > 0) && (
                 <div className="initconds">
+                  {caido && pv && (
+                    <button
+                      type="button"
+                      className="condtag caido"
+                      aria-expanded={explicacaoAqui === "Caído a 0 PV"}
+                      onClick={() => alternarExplicacao(c.slug, "Caído a 0 PV")}
+                    >
+                      Inconsciente · 0 PV
+                      {pv.dss + pv.dsf > 0 ? ` · ✓${pv.dss} ✗${pv.dsf}` : ""}
+                    </button>
+                  )}
                   {conds.map((nome) => {
                     const prazo = pv.cond_prazo[nome];
                     return (
@@ -445,6 +461,13 @@ export function RastreadorCombate({
                     </button>
                   )}
                 </div>
+              )}
+              {pv && caido && explicacaoAqui === "Caído a 0 PV" && (
+                <ExplicacaoCondicao
+                  nome="Inconsciente"
+                  detalhe="a 0 PV, faz os testes de morte"
+                  onFechar={() => setExplicando(null)}
+                />
               )}
               {pv && explicacaoAqui === "Exaustão" && exaustao > 0 && (
                 <ExplicacaoExaustao nivel={exaustao} onFechar={() => setExplicando(null)} />
@@ -681,6 +704,13 @@ function AcoesNaLinha({
         ✕
       </button>
       {notas.length > 0 && <p className="initajustenota">{notas.join(" · ")}</p>}
+      {/* A 0 PV a vez do jogador é rolar o teste de morte: fica antes do
+          resto, que é o que ele NÃO pode fazer. */}
+      {!p.is_npc && estaCaido(p.hp) && (
+        <div className="initmorte">
+          <TestesDeMorte sala={sala} personagem={p} editavel titulo="Testes de morte" />
+        </div>
+      )}
       <RolarAtaques texto={p.ataque ?? ""} />
       <div className="initajustecond">
         <span className="sectitle">Condições</span>

@@ -3,6 +3,7 @@ import { CONDICOES } from "./condicoes";
 import {
   ajustarPV,
   ajustePVComLog,
+  resolverTesteMorte,
   comPrazoCondicao,
   lerValorPV,
   metadeDoDano,
@@ -670,6 +671,35 @@ describe("log de combate é público (anti-spoiler de NPC)", () => {
     expect(danoComLog(tiberio, 5).texto).toBe("Tibério sofreu 5 de dano (35/65)");
     expect(pvNoLog(tiberio)).toBe(true);
     expect(pvNoLog(dragao)).toBe(false);
+  });
+});
+
+describe("teste de resistência contra a morte (2024)", () => {
+  it("10 ou mais é sucesso; 9 ou menos é falha", () => {
+    expect(resolverTesteMorte("Tibério", 0, 0, 10)).toMatchObject({ dss: 1, dsf: 0 });
+    expect(resolverTesteMorte("Tibério", 0, 0, 9)).toMatchObject({ dss: 0, dsf: 1 });
+    expect(resolverTesteMorte("Tibério", 0, 0, 12).texto).toBe("Tibério passou no teste de morte (12): 1 de 3 sucessos");
+  });
+
+  it("1 natural conta duas falhas", () => {
+    const r = resolverTesteMorte("Tibério", 1, 0, 1);
+    expect(r).toMatchObject({ dss: 1, dsf: 2, morreu: false });
+    expect(r.texto).toContain("1 natural: duas falhas");
+  });
+
+  it("20 natural acorda com 1 PV e zera a contagem", () => {
+    expect(resolverTesteMorte("Tibério", 2, 2, 20)).toMatchObject({ acordou: true, dss: 0, dsf: 0 });
+  });
+
+  it("três sucessos estabiliza; três falhas mata", () => {
+    expect(resolverTesteMorte("Tibério", 2, 1, 15)).toMatchObject({ estabilizou: true, dss: 3 });
+    const morte = resolverTesteMorte("Tibério", 0, 2, 5);
+    expect(morte).toMatchObject({ morreu: true, dsf: 3 });
+    expect(morte.texto).toContain("morreu");
+  });
+
+  it("1 natural com uma falha já na conta mata (duas falhas de uma vez)", () => {
+    expect(resolverTesteMorte("Tibério", 0, 1, 1)).toMatchObject({ dsf: 3, morreu: true });
   });
 });
 

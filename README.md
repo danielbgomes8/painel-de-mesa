@@ -48,7 +48,9 @@ condições direto na linha da iniciativa** (toca no nome, digita o número:
 dano, metade pra resistência ou teste que passou, ou cura; embaixo, os chips
 de condição com prazo, e os ataques da ficha como botões que rolam acerto e
 dano, com vantagem/desvantagem e crítico — o Mestre em qualquer linha, o
-jogador na do próprio personagem), **desfazer a última ação** (barra presa no
+jogador na do próprio personagem). Jogador a 0 PV mostra "Inconsciente" na
+ordem e faz os testes de morte ali mesmo — um toque rola pelas regras de
+2024 (20 natural acorda com 1 PV, 1 natural conta duas falhas), **desfazer a última ação** (barra presa no
 rodapé das abas Combate e Fichas; volta dano, cura, condição, turno, quem
 entrou ou saiu da ordem, encontro começado e combate reiniciado — só se nada
 do que a ação mexeu mudou depois), **condições na ordem de iniciativa**

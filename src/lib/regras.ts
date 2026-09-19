@@ -312,6 +312,61 @@ export function situacaoMorte(dss: number, dsf: number): SituacaoMorte {
   return "em-jogo";
 }
 
+export type ResultadoTesteMorte = {
+  d20: number;
+  dss: number;
+  dsf: number;
+  /** 20 natural: acordou com 1 PV. */
+  acordou: boolean;
+  estabilizou: boolean;
+  morreu: boolean;
+  /** Linha pro log — jogador tem nome no log (ver `nomeNoLog`). */
+  texto: string;
+};
+
+/**
+ * Um teste de resistência contra a morte (Regras 2024): 10 ou mais é
+ * sucesso, 9 ou menos é falha; 20 natural acorda com 1 PV (e zera a
+ * contagem); 1 natural conta DUAS falhas. Três sucessos estabiliza, três
+ * falhas mata.
+ */
+export function resolverTesteMorte(
+  nome: string,
+  dss: number,
+  dsf: number,
+  d20: number,
+): ResultadoTesteMorte {
+  if (d20 === 20) {
+    return {
+      d20,
+      dss: 0,
+      dsf: 0,
+      acordou: true,
+      estabilizou: false,
+      morreu: false,
+      texto: `${nome} tirou 20 no teste de morte e voltou com 1 PV`,
+    };
+  }
+  const passou = d20 >= 10;
+  const sucessos = limitarTesteMorte(passou ? dss + 1 : dss);
+  const falhas = limitarTesteMorte(passou ? dsf : dsf + (d20 === 1 ? 2 : 1));
+  const situacao = situacaoMorte(sucessos, falhas);
+  const morreu = situacao === "morto";
+  const estabilizou = situacao === "estavel";
+  const conta = passou ? `${sucessos} de ${TESTES_MORTE_MAX} sucessos` : `${falhas} de ${TESTES_MORTE_MAX} falhas`;
+  const comoFoi = passou ? `passou no teste de morte (${d20})` : `falhou o teste de morte (${d20}${d20 === 1 ? ", 1 natural: duas falhas" : ""})`;
+  const fim = morreu ? " — morreu" : estabilizou ? " — estabilizou" : "";
+  return {
+    d20,
+    dss: sucessos,
+    dsf: falhas,
+    acordou: false,
+    estabilizou,
+    morreu,
+    texto: `${nome} ${comoFoi}: ${conta}${fim}`,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Dados de vida e descanso
 // ─────────────────────────────────────────────────────────────────────────────

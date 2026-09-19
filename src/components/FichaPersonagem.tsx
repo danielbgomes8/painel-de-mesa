@@ -19,10 +19,7 @@ import {
   gastarDadoDeVida,
   limitarExaustao,
   limitarPV,
-  limitarTesteMorte,
   podeEditarPersonagem,
-  situacaoMorte,
-  TESTES_MORTE_MAX,
 } from "@/lib/regras";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { CampoNumero } from "@/components/CampoNumero";
@@ -33,6 +30,7 @@ import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
 import { CondicoesDaFicha } from "@/components/ExplicacaoCondicao";
 import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
+import { TestesDeMorte } from "@/components/TestesDeMorte";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
@@ -90,7 +88,6 @@ export function FichaPersonagem({
   const faixa = faixaPV(p.hp, p.hp_max);
   const largura = p.hp_max > 0 ? Math.max(0, Math.min(1, p.hp / p.hp_max)) : 0;
   const caido = estaCaido(p.hp);
-  const morte = situacaoMorte(p.dss, p.dsf);
   // Monstro só mostra saves e CD de magia depois que alguém preenche: seis zeros
   // na tela atrapalham a leitura no meio do combate. O link abaixo traz de volta
   // quando o Mestre quiser cadastrar (senão o campo somia sem como reaparecer).
@@ -401,48 +398,12 @@ export function FichaPersonagem({
         )}
 
         {p.is_npc ? null : (
-        <div>
-          <span className="sectitle">Testes de resistência contra a morte</span>
-          <div className="deathsaves">
-            <div className="dsblock">
-              <span className="lbl">Sucessos</span>
-              <div className="pips">
-                {Array.from({ length: TESTES_MORTE_MAX }, (_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className="pip death"
-                    aria-label={`Sucesso ${i + 1}`}
-                    aria-pressed={i < p.dss}
-                    disabled={!editavel}
-                    onClick={() => patch({ dss: limitarTesteMorte(alternarPips(i, p.dss)) })}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="dsblock">
-              <span className="lbl">Falhas</span>
-              <div className="pips">
-                {Array.from({ length: TESTES_MORTE_MAX }, (_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className="pip fail"
-                    aria-label={`Falha ${i + 1}`}
-                    aria-pressed={i < p.dsf}
-                    disabled={!editavel}
-                    onClick={() => patch({ dsf: limitarTesteMorte(alternarPips(i, p.dsf)) })}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-          {morte !== "em-jogo" && (
-            <div className={`dsnote ${morte}`}>
-              {morte === "estavel" ? "Estável (3 sucessos)" : "Morto (3 falhas)"}
-            </div>
-          )}
-        </div>
+          <TestesDeMorte
+            sala={sala}
+            personagem={p}
+            editavel={editavel}
+            titulo="Testes de resistência contra a morte"
+          />
         )}
 
         <div>

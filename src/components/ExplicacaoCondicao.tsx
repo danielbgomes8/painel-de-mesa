@@ -15,17 +15,20 @@ import type { Personagem } from "@/lib/tipos";
 export function ExplicacaoCondicao({
   nome,
   prazo,
+  detalhe,
   onFechar,
 }: {
   nome: Condicao;
   /** Rodadas que faltam pra ela acabar sozinha (sem prazo: não mostra). */
   prazo?: number;
+  /** Texto no lugar do prazo (ex.: "a 0 PV, faz os testes de morte"). */
+  detalhe?: string;
   onFechar?: () => void;
 }) {
   return (
     <Explicacao
       titulo={nome}
-      detalhe={prazo ? `acaba sozinha em ${textoPrazo(prazo)}` : undefined}
+      detalhe={detalhe ?? (prazo ? `acaba sozinha em ${textoPrazo(prazo)}` : undefined)}
       efeitos={EFEITOS_CONDICAO[nome]}
       onFechar={onFechar}
     />

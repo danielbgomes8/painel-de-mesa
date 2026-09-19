@@ -345,6 +345,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     pra um endereço que não responde.
 - **Faixa de 0 PV diz "Inconsciente"**, não "Caído" (19/09/2026): Caído é a
   condição de estar no chão (Prone), que agora tem explicação própria.
+- **Testes de morte** (19/09/2026, sem migration, segunda lista item 3):
+  jogador a 0 PV ganha na ordem a etiqueta "Inconsciente · 0 PV · ✓1 ✗2"
+  (tocar explica a condição Inconsciente, que ele tem pelas regras mesmo sem
+  ninguém ligar na mão) e, no painel da linha, a seção de testes de morte —
+  antes do resto, que é o que ele NÃO pode fazer. `resolverTesteMorte`
+  (regras.ts, testado): 10+ passa, 20 natural acorda com 1 PV pelo
+  `ajustarPV` (que zera a contagem), 1 natural conta duas falhas, 3 sucessos
+  estabiliza e 3 falhas mata. Vai pro log com nome (jogador nunca é
+  escondido) e dá pra desfazer. As marcas e o botão são o mesmo componente
+  da ficha (`TestesDeMorte.tsx`); o botão de rolar só aparece a 0 PV, e o
+  resultado na tela some se a contagem mudar (desfeito, ou outro aparelho).
 - **Ataques rolados** (19/09/2026, sem migration, segunda lista item 2): no
   painel da linha da iniciativa, os ataques do campo `ataque` viram botões
   "🎲 Cimitarra +4" (`RolarAtaques.tsx`). `lerAtaquesRolaveis` (regras.ts)
@@ -452,19 +463,19 @@ a lista seguinte está logo abaixo.
 ### Segunda lista (sugerida em 19/09/2026 — o Daniel respondeu "vamos seguir")
 
 Tudo gira em torno da linha da iniciativa, que virou o centro do combate. O
-próximo é o 3.
+próximo é o 4.
 
 1. ~~Condição direto na linha da iniciativa~~ — feito em 19/09/2026 (sem
    migration): o painel que abre ao tocar no nome ganhou os 14 chips e os
    prazos, os mesmos da ficha (`CondicoesEditaveis.tsx`).
 2. ~~Ataque rolado na iniciativa~~ — feito em 19/09/2026 (sem migration;
    ver "Ataques rolados" em Estado).
-3. **Jogador caído na iniciativa**: a 0 PV, a linha mostra Inconsciente e os
-   testes de morte, com os botões de sucesso/falha ali mesmo.
+3. ~~Jogador caído na iniciativa~~ — feito em 19/09/2026 (sem migration;
+   ver "Testes de morte" em Estado).
 4. **Telão com as condições** de quem está na vez.
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 214 que existem são todos de funções
+componentes não têm teste nenhum (os 219 que existem são todos de funções
 puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
