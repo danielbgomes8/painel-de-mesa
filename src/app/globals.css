@@ -690,6 +690,18 @@ button:focus-visible {
 .initajuste .rm {
   margin-left: auto;
 }
+/* Condições no painel da linha: ocupam a largura toda, abaixo do dano/cura. */
+.initajustecond {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.initajustecond .condprazos {
+  margin-top: 0;
+}
 .initajustenota {
   flex-basis: 100%;
   margin: 0;

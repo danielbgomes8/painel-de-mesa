@@ -3,6 +3,7 @@ import { CONDICOES } from "./condicoes";
 import {
   ajustarPV,
   ajustePVComLog,
+  comPrazoCondicao,
   lerValorPV,
   metadeDoDano,
   PV_DIGITADO_MAX,
@@ -669,6 +670,16 @@ describe("log de combate é público (anti-spoiler de NPC)", () => {
     expect(danoComLog(tiberio, 5).texto).toBe("Tibério sofreu 5 de dano (35/65)");
     expect(pvNoLog(tiberio)).toBe(true);
     expect(pvNoLog(dragao)).toBe(false);
+  });
+});
+
+describe("prazo de condição", () => {
+  it("põe, troca e tira o prazo sem mexer no das outras", () => {
+    const antes = { Envenenado: 3 };
+    expect(comPrazoCondicao(antes, "Atordoado", 2)).toEqual({ Envenenado: 3, Atordoado: 2 });
+    expect(comPrazoCondicao({ ...antes, Atordoado: 2 }, "Atordoado", 0)).toEqual({ Envenenado: 3 });
+    expect(comPrazoCondicao(antes, "Envenenado", -1)).toEqual({});
+    expect(antes).toEqual({ Envenenado: 3 });
   });
 });
 

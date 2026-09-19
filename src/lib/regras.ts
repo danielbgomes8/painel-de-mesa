@@ -678,6 +678,18 @@ export function podeEditarPersonagem(souMestre: boolean, ehMinha: boolean): bool
 // Condição com prazo (some sozinha depois de N rodadas)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Prazo de uma condição, em rodadas; 0 (ou menos) = sem prazo, sai à mão. */
+export function comPrazoCondicao(
+  prazos: Record<string, number>,
+  condicao: string,
+  rodadas: number,
+): Record<string, number> {
+  const novo = { ...prazos };
+  if (rodadas <= 0) delete novo[condicao];
+  else novo[condicao] = Math.round(rodadas);
+  return novo;
+}
+
 /**
  * A cada rodada nova, desconta 1 de cada condição com prazo marcado; ao
  * chegar a 0, desliga a condição e tira ela do mapa de prazos. Devolve

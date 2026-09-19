@@ -43,10 +43,11 @@ e Mestre editam igual — não é ferramenta só do Mestre.
 
 **Combate** — rastreador de iniciativa (adicionar personagem cadastrado ou
 NPC/monstro avulso do catálogo, **rolar iniciativa** d20+mod, ordenar,
-reordenar na mão, marcar o turno, avançar rodada, reiniciar), **dano e cura
-direto na linha da iniciativa** (toca no nome, digita o número: dano, metade
-pra resistência ou teste que passou, ou cura — o Mestre em qualquer linha, o
-jogador na do próprio personagem), **desfazer a última ação** (barra presa no
+reordenar na mão, marcar o turno, avançar rodada, reiniciar), **dano, cura e
+condições direto na linha da iniciativa** (toca no nome, digita o número:
+dano, metade pra resistência ou teste que passou, ou cura; embaixo, os chips
+de condição com prazo — o Mestre em qualquer linha, o jogador na do próprio
+personagem), **desfazer a última ação** (barra presa no
 rodapé das abas Combate e Fichas; volta dano, cura, condição, turno, quem
 entrou ou saiu da ordem, encontro começado e combate reiniciado — só se nada
 do que a ação mexeu mudou depois), **condições na ordem de iniciativa**

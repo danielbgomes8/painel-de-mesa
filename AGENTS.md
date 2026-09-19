@@ -261,7 +261,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   Jogador a 0 PV que leva dano não gera log; o retorno lembra que é falha no
   teste de morte (não marca sozinho: não dá pra saber se foi crítico). No
   celular o PV desce pra baixo do nome (`.pvlinha`, @media 520px) — com o
-  "±" a mais o nome virava "Go…" (achado testando).
+  "±" a mais o nome virava "Go…" (achado testando). O mesmo painel tem, embaixo,
+  os chips de condição e os prazos — **os mesmos componentes da ficha**
+  (`ChipsCondicao`/`PrazosCondicao` e `alternarCondicaoComLog` em
+  `CondicoesEditaveis.tsx`), então log anti-spoiler, quebra de concentração,
+  desfazer e fila sem internet valem igual. Dano fecha o painel; condição
+  não (dá pra ligar mais de uma).
 - **Desfazer** (19/09/2026, sem migration, roadmap item 6; regras puras em
   `lib/desfazer.ts`, pilha e escrita no `useSala`, botão em
   `BarraDesfazer.tsx`): cada aparelho desfaz o que **ele** fez — a pilha (até
@@ -410,7 +415,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
 feitos — ficam aqui pra deixar claro de onde a ordem veio. Os 8 foram feitos;
-a próxima lista sai de conversa nova com o Daniel.
+a lista seguinte está logo abaixo.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
@@ -430,8 +435,23 @@ a próxima lista sai de conversa nova com o Daniel.
 8. ~~Funcionar sem internet~~ — feito em 19/09/2026 (sem migration; ver
    "Sem internet" em Estado).
 
+### Segunda lista (sugerida em 19/09/2026 — o Daniel respondeu "vamos seguir")
+
+Tudo gira em torno da linha da iniciativa, que virou o centro do combate. O
+próximo é o 2.
+
+1. ~~Condição direto na linha da iniciativa~~ — feito em 19/09/2026 (sem
+   migration): o painel que abre ao tocar no nome ganhou os 14 chips e os
+   prazos, os mesmos da ficha (`CondicoesEditaveis.tsx`).
+2. **Ataque do monstro rolado na iniciativa**: a ficha do NPC tem a linha
+   de ataque em texto ("Cimitarra +4, 1d6+2") — um toque rolaria acerto e
+   dano.
+3. **Jogador caído na iniciativa**: a 0 PV, a linha mostra Inconsciente e os
+   testes de morte, com os botões de sucesso/falha ali mesmo.
+4. **Telão com as condições** de quem está na vez.
+
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 196 que existem são todos de funções
+componentes não têm teste nenhum (os 197 que existem são todos de funções
 puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava

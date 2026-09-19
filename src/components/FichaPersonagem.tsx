@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
-import { CONDICOES } from "@/lib/condicoes";
 import { mudancaDe, textoDesfeito } from "@/lib/desfazer";
 import {
   ajustarPV,
@@ -11,7 +10,6 @@ import {
   aplicarDescansoCurto,
   aplicarDescansoLongo,
   alternarPips,
-  condicaoComLog,
   deslocamentoEfetivo,
   efeitoExaustao,
   estaCaido,
@@ -22,7 +20,6 @@ import {
   limitarExaustao,
   limitarPV,
   limitarTesteMorte,
-  mensagemCondicao,
   podeEditarPersonagem,
   situacaoMorte,
   TESTES_MORTE_MAX,
@@ -35,6 +32,7 @@ import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
 import { CondicoesDaFicha } from "@/components/ExplicacaoCondicao";
+import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
@@ -449,55 +447,8 @@ export function FichaPersonagem({
 
         <div>
           <span className="sectitle">Condições</span>
-          <div className="chips">
-            {CONDICOES.map((nome) => {
-              const ativa = Boolean(p.cond?.[nome]);
-              return (
-                <button
-                  key={nome}
-                  type="button"
-                  className="chip"
-                  aria-pressed={ativa}
-                  disabled={!editavel}
-                  onClick={async () => {
-                    const { patch: mudanca, texto } = condicaoComLog(p, nome, !ativa);
-                    const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: mudanca }]);
-                    if (!deuCerto) return;
-                    sala.registrarVariosLogs([texto]);
-                    sala.lembrarDesfazer({
-                      rotulo: mensagemCondicao(p.name, nome, !ativa),
-                      textoLog: textoDesfeito([texto], ""),
-                      personagens: [mudancaDe(p, mudanca)],
-                      combate: null,
-                      criados: [],
-                    });
-                  }}
-                >
-                  {nome}
-                </button>
-              );
-            })}
-          </div>
-          {editavel && (
-            <div className="condprazos">
-              {CONDICOES.filter((nome) => p.cond?.[nome]).map((nome) => (
-                <label key={nome} className="condprazo">
-                  {nome} dura
-                  <CampoNumero
-                    className="campnum"
-                    valor={p.cond_prazo[nome] ?? 0}
-                    onCommit={(n) => {
-                      const cond_prazo = { ...p.cond_prazo };
-                      if (n <= 0) delete cond_prazo[nome];
-                      else cond_prazo[nome] = n;
-                      patch({ cond_prazo });
-                    }}
-                  />
-                  rodada(s) — 0 = tira à mão
-                </label>
-              ))}
-            </div>
-          )}
+          <ChipsCondicao sala={sala} personagem={p} editavel={editavel} />
+          {editavel && <PrazosCondicao sala={sala} personagem={p} />}
           <CondicoesDaFicha personagem={p} />
         </div>
 

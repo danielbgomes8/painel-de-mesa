@@ -7,6 +7,7 @@ import { d20 } from "@/lib/dados";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
 import { ExplicacaoCondicao, ExplicacaoExaustao } from "@/components/ExplicacaoCondicao";
+import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 import {
@@ -459,7 +460,8 @@ export function RastreadorCombate({
                     ),
                 )}
               {aberto && pv && (
-                <AjustePVNaLinha
+                <AcoesNaLinha
+                  sala={sala}
                   personagem={pv}
                   onAplicar={(delta) => aplicarAjuste(pv, delta)}
                   onFechar={() => setAjustando(null)}
@@ -588,14 +590,18 @@ export function RastreadorCombate({
   );
 }
 
-/** Campo de dano/cura que abre embaixo da linha da iniciativa: digita o
- *  número e escolhe dano, metade (resistência / passou no teste) ou cura.
- *  Enter = dano, que é o caso mais comum; Esc fecha. */
-function AjustePVNaLinha({
+/** Painel que abre embaixo da linha da iniciativa: dano/cura (digita o
+ *  número e escolhe dano, metade — resistência ou passou no teste — ou cura;
+ *  Enter = dano, que é o caso mais comum; Esc fecha) e as condições, com os
+ *  mesmos chips e prazos da ficha. Aplicar dano fecha o painel; mexer em
+ *  condição não, pra dar pra ligar mais de uma. */
+function AcoesNaLinha({
+  sala,
   personagem: p,
   onAplicar,
   onFechar,
 }: {
+  sala: Sala;
   personagem: Personagem;
   onAplicar: (delta: number) => Promise<void>;
   onFechar: () => void;
@@ -665,6 +671,11 @@ function AjustePVNaLinha({
         ✕
       </button>
       {notas.length > 0 && <p className="initajustenota">{notas.join(" · ")}</p>}
+      <div className="initajustecond">
+        <span className="sectitle">Condições</span>
+        <ChipsCondicao sala={sala} personagem={p} editavel />
+        <PrazosCondicao sala={sala} personagem={p} />
+      </div>
     </div>
   );
 }
