@@ -6,6 +6,8 @@ import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib
 import { d20 } from "@/lib/dados";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
+import { ExplicacaoCondicao, ExplicacaoExaustao } from "@/components/ExplicacaoCondicao";
+import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 import {
   entrarNaOrdem,
@@ -100,6 +102,12 @@ export function RastreadorCombate({
   // último ajuste, que fica embaixo da linha até a próxima ação.
   const [ajustando, setAjustando] = useState<string | null>(null);
   const [retorno, setRetorno] = useState<{ slug: string; texto: string } | null>(null);
+  // Etiqueta de condição tocada: a explicação abre embaixo daquela linha.
+  const [explicando, setExplicando] = useState<{ slug: string; nome: string } | null>(null);
+
+  function alternarExplicacao(slug: string, nome: string) {
+    setExplicando((atual) => (atual?.slug === slug && atual.nome === nome ? null : { slug, nome }));
+  }
 
   const naOrdem = new Set(combate.order.map((o) => o.slug));
   const disponiveis = personagens.filter((p) => !naOrdem.has(p.slug));
@@ -315,6 +323,12 @@ export function RastreadorCombate({
             // só na do próprio personagem.
             const podeAjustar = pv !== null && podeEditarPersonagem(souMestre, pv.slug === meuPersonagem?.slug);
             const aberto = podeAjustar && ajustando === c.slug;
+            // Condições valem pra todo mundo ver, NPC oculto inclusive: o log
+            // (público) já anuncia "Um inimigo ficou Atordoado", e o jogador
+            // precisa saber que o ataque dele tem vantagem.
+            const conds = pv ? condicoesAtivas(pv.cond) : [];
+            const exaustao = pv?.exh ?? 0;
+            const explicacaoAqui = explicando?.slug === c.slug ? explicando.nome : null;
             const quem = (
               <>
                 <span className="nm">{nomeExibido}</span>
@@ -398,6 +412,50 @@ export function RastreadorCombate({
                   <span />
                 )}
               </div>
+              {pv && (conds.length > 0 || exaustao > 0) && (
+                <div className="initconds">
+                  {conds.map((nome) => {
+                    const prazo = pv.cond_prazo[nome];
+                    return (
+                      <button
+                        key={nome}
+                        type="button"
+                        className="condtag"
+                        aria-expanded={explicacaoAqui === nome}
+                        onClick={() => alternarExplicacao(c.slug, nome)}
+                      >
+                        {nome}
+                        {prazo ? ` · ${textoPrazo(prazo)}` : ""}
+                      </button>
+                    );
+                  })}
+                  {exaustao > 0 && (
+                    <button
+                      type="button"
+                      className="condtag"
+                      aria-expanded={explicacaoAqui === "Exaustão"}
+                      onClick={() => alternarExplicacao(c.slug, "Exaustão")}
+                    >
+                      Exaustão {exaustao}
+                    </button>
+                  )}
+                </div>
+              )}
+              {pv && explicacaoAqui === "Exaustão" && exaustao > 0 && (
+                <ExplicacaoExaustao nivel={exaustao} onFechar={() => setExplicando(null)} />
+              )}
+              {pv &&
+                conds.map(
+                  (nome) =>
+                    explicacaoAqui === nome && (
+                      <ExplicacaoCondicao
+                        key={nome}
+                        nome={nome}
+                        prazo={pv.cond_prazo[nome]}
+                        onFechar={() => setExplicando(null)}
+                      />
+                    ),
+                )}
               {aberto && pv && (
                 <AjustePVNaLinha
                   personagem={pv}

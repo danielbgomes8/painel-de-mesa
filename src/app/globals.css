@@ -331,6 +331,78 @@ button:focus-visible {
   line-height: 1.7;
 }
 
+/* ---------- condições: etiqueta na iniciativa e o que cada uma faz ---------- */
+/* Alinhada embaixo do nome (coluna da iniciativa 44px + folga 10 + borda 12). */
+.initconds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -2px;
+  padding: 0 12px 2px 66px;
+}
+.condtag {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 12px;
+  min-height: 30px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.condtag:hover,
+.condtag[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.condexplica {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px 8px 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.condexplica ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.condexplica li {
+  margin: 2px 0;
+}
+.condexplicatopo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.condexplicadetalhe {
+  color: var(--muted);
+  font-size: 12px;
+}
+.condexplicatopo .rm {
+  margin-left: auto;
+}
+.condativas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.condguia {
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+.condguia summary {
+  cursor: pointer;
+  color: var(--muted);
+  padding: 6px 0;
+}
+.condguia .condexplica {
+  margin-top: 6px;
+}
+
 /* ---------- desfazer a última ação (BarraDesfazer) ---------- */
 .desfazerbarra {
   position: sticky;
@@ -1575,6 +1647,9 @@ button:focus-visible {
   }
   .initrow .who .nm {
     max-width: 100%;
+  }
+  .initconds {
+    padding-left: 58px;
   }
 }
 

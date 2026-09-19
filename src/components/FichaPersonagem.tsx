@@ -34,6 +34,7 @@ import { BotaoRemover } from "@/components/BotaoRemover";
 import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
+import { CondicoesDaFicha } from "@/components/ExplicacaoCondicao";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
@@ -495,6 +496,7 @@ export function FichaPersonagem({
               ))}
             </div>
           )}
+          <CondicoesDaFicha personagem={p} />
         </div>
 
         {p.is_npc ? null : (

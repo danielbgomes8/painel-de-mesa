@@ -43,7 +43,9 @@ pra resistência ou teste que passou, ou cura — o Mestre em qualquer linha, o
 jogador na do próprio personagem), **desfazer a última ação** (barra presa no
 rodapé das abas Combate e Fichas; volta dano, cura, condição, turno, quem
 entrou ou saiu da ordem, encontro começado e combate reiniciado — só se nada
-do que a ação mexeu mudou depois), **ações em
+do que a ação mexeu mudou depois), **condições na ordem de iniciativa**
+(etiqueta embaixo do nome, com as rodadas que faltam; tocar mostra o que ela
+faz pelas regras de 2024 — a exaustão também), **ações em
 massa** (só Mestre: selecionar vários e aplicar dano/cura ou uma condição de
 uma vez), log de combate visível pra todos. NPC não revelado aparece como
 "Inimigo N"; **o PV de NPC nunca aparece pro jogador, nem depois do nome

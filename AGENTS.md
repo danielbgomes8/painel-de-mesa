@@ -288,6 +288,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   quem pega o celular depois não desfaz o que o Mestre fez. Na virada de
   rodada, "Rodada N começou" é gravada antes e sozinha: linhas da mesma
   escrita saem com o mesmo horário e o log trocava a ordem delas.
+- **Condições explicadas** (19/09/2026, sem migration, roadmap item 7): o
+  texto de cada uma mora em `EFEITOS_CONDICAO` (`lib/condicoes.ts`) — resumo
+  em português do Rules Glossary 2024 / SRD 5.2, **conferido no texto da
+  página** (não de memória) e com distância em metros. Na ordem de
+  iniciativa, as condições ativas viram etiquetas embaixo do nome ("Atordoado
+  · 2 rodadas", "Exaustão 2"); tocar abre a explicação ali mesmo
+  (`ExplicacaoCondicao.tsx`). Aparecem pra todo mundo, NPC oculto inclusive
+  (como "Inimigo 1"): o log já anuncia "Um inimigo ficou Atordoado", e o
+  jogador precisa saber que o ataque dele tem vantagem. Na ficha, o chip
+  continua ligando/desligando; embaixo, cada condição ativa mostra o que faz,
+  e um guia recolhido traz as 14. Condição que inclui Incapacitado escreve o
+  que ele faz junto; o teste de `condicoes.test.ts` confere que essa lista
+  bate com `CONDICOES_QUE_QUEBRAM_CONCENTRACAO`.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
@@ -357,7 +370,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
-feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 7.
+feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 8.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
@@ -372,13 +385,13 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 7.
    (sem migration; ver "Dano direto na iniciativa" em Estado).
 6. ~~Desfazer a última ação~~ — feito em 19/09/2026 (sem migration; ver
    "Desfazer" em Estado).
-7. **Explicar a condição na hora**: tocar em "Atordoado" e ver o que ela faz
-   pelas regras de 2024.
+7. ~~Explicar a condição na hora~~ — feito em 19/09/2026 (sem migration; ver
+   "Condições explicadas" em Estado).
 8. **Funcionar sem internet** por alguns minutos (app instalável de verdade),
    pra queda de wi-fi no meio da luta.
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 176 que existem são todos de funções
+componentes não têm teste nenhum (os 182 que existem são todos de funções
 puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
