@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { VERSAO_BACKUP, lerBackup, linhasParaInserir, montarBackup, nomeArquivoBackup } from "./backup";
-import type { Bastiao, EntradaDiario, InstalacaoBastiao, LinhaLog, LinhaLogBastiao, ModeloNpc, Personagem } from "./tipos";
+import type {
+  Bastiao,
+  Encontro,
+  EntradaDiario,
+  InstalacaoBastiao,
+  LinhaLog,
+  LinhaLogBastiao,
+  ModeloNpc,
+  Personagem,
+} from "./tipos";
 
 const personagem = (extra: Partial<Personagem>): Personagem =>
   ({
@@ -28,10 +37,19 @@ const salaCheia = {
   bastiao,
   instalacoesBastiao: [{ id: "i-1", room_code: "sala", name: "Forja" } as InstalacaoBastiao],
   logBastiao: [{ id: "b-1", room_code: "sala", text: "turno 4", created_at: "2026-09-01T00:00:00Z" } as LinhaLogBastiao],
+  encontros: [
+    {
+      id: "e-1",
+      room_code: "sala",
+      name: "Emboscada na ponte",
+      grupos: [{ name: "Goblin", quantidade: 3 }],
+      created_at: "2026-09-01T00:00:00Z",
+    } as Encontro,
+  ],
 };
 
 describe("montarBackup", () => {
-  it("leva a sala inteira, inclusive o Bastião", () => {
+  it("leva a sala inteira, inclusive o Bastião e os encontros preparados", () => {
     const b = montarBackup(salaCheia);
     expect(b.versao).toBe(VERSAO_BACKUP);
     expect(b.sala_codigo).toBe("setimo-raio");
@@ -41,6 +59,7 @@ describe("montarBackup", () => {
     expect(b.bastiao_log).toHaveLength(1);
     expect(b.log).toHaveLength(1);
     expect(b.diario).toHaveLength(1);
+    expect(b.encontros).toHaveLength(1);
   });
 });
 
@@ -74,7 +93,28 @@ describe("lerBackup", () => {
       instalacoes: 1,
       temBastiao: true,
       turnoBastiao: 4,
+      encontros: 1,
     });
+    expect(r.backup.encontros?.[0].grupos).toEqual([{ name: "Goblin", quantidade: 3 }]);
+    expect(r.avisos).toEqual([]);
+  });
+
+  it("aceita backup de antes dos encontros sem apagar os da sala (null, não lista vazia)", () => {
+    const versao2: Record<string, unknown> = { ...montarBackup(salaCheia), versao: 2 };
+    delete versao2.encontros;
+    const r = lerBackup(texto(versao2), "setimo-raio");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.backup.encontros).toBeNull();
+    expect(r.resumo.encontros).toBeNull();
+    expect(r.avisos.join(" ")).toMatch(/encontros/);
+  });
+
+  it("backup com lista de encontros vazia é diferente de backup sem encontros", () => {
+    const r = lerBackup(texto(montarBackup({ ...salaCheia, encontros: [] })), "setimo-raio");
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.backup.encontros).toEqual([]);
     expect(r.avisos).toEqual([]);
   });
 

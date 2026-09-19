@@ -49,8 +49,15 @@ import {
   nivelTotal,
   percepcaoPassiva,
   somaModificadores,
+  adicionarAoEncontro,
+  limitarQuantidade,
+  nomesDoGrupo,
+  npcsDoEncontro,
+  QUANTIDADE_MAX_GRUPO,
+  resumoEncontro,
+  totalDoEncontro,
 } from "./regras";
-import type { Proficiencias } from "./tipos";
+import type { FichaMonstro, GrupoEncontro, Proficiencias } from "./tipos";
 
 describe("PV", () => {
   it("trava entre 0 e o máximo", () => {
@@ -659,5 +666,80 @@ describe("proximosDaOrdem", () => {
   it("ordem com uma pessoa só (ou vazia) não tem próximo", () => {
     expect(proximosDaOrdem(1, 0, 3)).toEqual([]);
     expect(proximosDaOrdem(0, 0, 3)).toEqual([]);
+  });
+});
+
+describe("encontros preparados", () => {
+  const goblin: FichaMonstro = {
+    name: "Goblin",
+    cls: "Fada pequena",
+    ac: 15,
+    hp_max: 10,
+    speed: 9,
+    init_mod: 2,
+    ataque: "Cimitarra +4",
+    notes: "",
+  };
+  const chefe: FichaMonstro = { ...goblin, name: "Chefe goblin", ac: 17, hp_max: 21, notes: "foge com 5 PV" };
+
+  it("adicionar o mesmo monstro de novo soma no grupo em vez de abrir outro", () => {
+    let grupos = adicionarAoEncontro([], goblin);
+    grupos = adicionarAoEncontro(grupos, { ...goblin, name: " goblin " });
+    grupos = adicionarAoEncontro(grupos, chefe);
+    expect(grupos.map((g) => [g.name, g.quantidade])).toEqual([
+      ["Goblin", 2],
+      ["Chefe goblin", 1],
+    ]);
+    expect(totalDoEncontro(grupos)).toBe(3);
+    expect(resumoEncontro(grupos)).toBe("2× Goblin · 1× Chefe goblin");
+  });
+
+  it("guarda só a ficha — id, sala e data do modelo da biblioteca ficam de fora", () => {
+    const modelo = { ...goblin, id: "m-1", room_code: "sala", created_at: "2026-09-01" };
+    const [grupo] = adicionarAoEncontro([], modelo);
+    expect(Object.keys(grupo).sort()).toEqual(
+      ["ac", "ataque", "cls", "hp_max", "init_mod", "name", "notes", "quantidade", "speed"],
+    );
+  });
+
+  it("quantidade fica entre 1 e o teto, mesmo com lixo", () => {
+    expect(limitarQuantidade(0)).toBe(1);
+    expect(limitarQuantidade(-3)).toBe(1);
+    expect(limitarQuantidade(999)).toBe(QUANTIDADE_MAX_GRUPO);
+    expect(limitarQuantidade(Number.NaN)).toBe(1);
+    expect(limitarQuantidade(2.6)).toBe(3);
+  });
+
+  it("um monstro sozinho fica com o nome puro; vários ganham número", () => {
+    expect(nomesDoGrupo("Chefe goblin", 1, [])).toEqual(["Chefe goblin"]);
+    expect(nomesDoGrupo("Goblin", 3, [])).toEqual(["Goblin 1", "Goblin 2", "Goblin 3"]);
+  });
+
+  it("rodar o mesmo encontro de novo continua a numeração, sem repetir nome", () => {
+    expect(nomesDoGrupo("Goblin", 2, ["Goblin 1", "goblin 2", "Goblin 3"])).toEqual(["Goblin 4", "Goblin 5"]);
+    // O xará sem número conta como o 1º da série.
+    expect(nomesDoGrupo("Chefe goblin", 1, ["Chefe goblin"])).toEqual(["Chefe goblin 2"]);
+  });
+
+  it("um avulso entra na série que já existe, não fica 'Goblin' solto do lado de 'Goblin 1'", () => {
+    expect(nomesDoGrupo("Goblin", 1, ["Goblin 1", "Goblin 2"])).toEqual(["Goblin 3"]);
+    // "Goblin Chefe" não é série de "Goblin" — só número depois do espaço conta.
+    expect(nomesDoGrupo("Goblin", 1, ["Goblin Chefe"])).toEqual(["Goblin"]);
+  });
+
+  it("cria uma ficha de NPC por monstro, com PV cheio e nomes que não colidem entre grupos", () => {
+    const grupos: GrupoEncontro[] = [
+      { ...goblin, quantidade: 2 },
+      { ...goblin, quantidade: 1 },
+      { ...chefe, quantidade: 1 },
+    ];
+    const npcs = npcsDoEncontro(grupos, ["Tibério Vaz"]);
+    expect(npcs.map((n) => n.name)).toEqual(["Goblin 1", "Goblin 2", "Goblin 3", "Chefe goblin"]);
+    expect(npcs.every((n) => n.is_npc)).toBe(true);
+    expect(npcs[3]).toMatchObject({ hp: 21, hp_max: 21, ac: 17, notes: "foge com 5 PV" });
+  });
+
+  it("quantidade estragada no banco não vira dezenas de fichas", () => {
+    expect(npcsDoEncontro([{ ...goblin, quantidade: 500 }], [])).toHaveLength(QUANTIDADE_MAX_GRUPO);
   });
 });

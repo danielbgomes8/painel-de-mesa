@@ -253,6 +253,32 @@ export type NovoModeloNpc = {
   ataque?: string;
 };
 
+/** A ficha de um monstro como ela entra num encontro: cópia, não link (ver
+ *  migration 0016) — mexer na biblioteca depois não muda o encontro. */
+export type FichaMonstro = {
+  name: string;
+  cls: string;
+  ac: number;
+  hp_max: number;
+  speed: number;
+  init_mod: number;
+  ataque: string;
+  notes: string;
+};
+
+/** Monstros iguais dentro de um encontro: a ficha e quantos entram. */
+export type GrupoEncontro = FichaMonstro & { quantidade: number };
+
+/** Grupo inimigo preparado antes da sessão, pronto pra jogar na iniciativa
+ *  de uma vez. */
+export type Encontro = {
+  id: string;
+  room_code: string;
+  name: string;
+  grupos: GrupoEncontro[];
+  created_at: string;
+};
+
 /** Uma linha do log curto de combate (dano/cura, rodadas, entradas na ordem). */
 export type LinhaLog = {
   id: string;

@@ -8,6 +8,7 @@ import { linhasParaInserir, type Backup } from "@/lib/backup";
 import {
   COMBATE_VAZIO,
   type Bastiao,
+  type Encontro,
   type EntradaDiario,
   type EstadoCombate,
   type InstalacaoBastiao,
@@ -66,6 +67,7 @@ export type SalaInteira = {
   bastiao: Bastiao;
   instalacoesBastiao: InstalacaoBastiao[];
   logBastiao: LinhaLogBastiao[];
+  encontros: Encontro[];
 };
 
 export type Sala = {
@@ -86,7 +88,13 @@ export type Sala = {
   bastiao: Bastiao;
   instalacoesBastiao: InstalacaoBastiao[];
   logBastiao: LinhaLogBastiao[];
+  encontros: Encontro[];
   criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
+  /** Cria várias fichas numa escrita só — ou todas, ou nenhuma. É o que o
+   *  "começar encontro" usa: metade dos goblins criada e a outra metade não
+   *  deixaria o Mestre caçando quem faltou no meio da luta. null quando falha
+   *  (já avisa na tela). */
+  criarVariosPersonagens: (dados: NovoPersonagem[]) => Promise<Personagem[] | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
   /** Igual a atualizarPersonagem, só que pra vários de uma vez em uma única
    *  escrita (Ações em Massa) — usado quando o patch de cada um pode ter um
@@ -120,6 +128,10 @@ export type Sala = {
   atualizarInstalacaoBastiao: (id: string, patch: Partial<InstalacaoBastiao>) => Promise<void>;
   removerInstalacaoBastiao: (id: string) => Promise<void>;
   registrarLogBastiao: (texto: string) => Promise<void>;
+  /** Devolve o encontro criado, ou null quando a escrita falha. */
+  criarEncontro: (nome: string) => Promise<Encontro | null>;
+  atualizarEncontro: (id: string, patch: Partial<Pick<Encontro, "name" | "grupos">>) => Promise<void>;
+  removerEncontro: (id: string) => Promise<void>;
   /** Relê a sala inteira do banco agora (o mesmo que acontece quando o app
    *  volta pra tela). Serve pra quem precisa comparar com o banco de verdade
    *  e não com o que sobrou na memória — o tempo real, por exemplo, não
@@ -194,6 +206,25 @@ async function gravarSeVersaoBater<L extends { version: number }>(
   return { tipo: "conflito", linha: releitura.data as L };
 }
 
+/** A linha de `characters` pra um personagem novo — um lugar só pros padrões,
+ *  usado por quem cria um e por quem cria vários de uma vez. */
+function linhaDePersonagem(codigo: string, slug: string, dados: NovoPersonagem) {
+  return {
+    room_code: codigo,
+    slug,
+    name: dados.name,
+    cls: dados.cls ?? "",
+    ac: dados.ac ?? 12,
+    init_mod: dados.init_mod ?? 0,
+    speed: dados.speed ?? 9,
+    hp: dados.hp ?? 10,
+    hp_max: dados.hp_max ?? 10,
+    ataque: dados.ataque ?? "",
+    is_npc: dados.is_npc ?? false,
+    notes: dados.notes ?? "",
+  };
+}
+
 /** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
 function ordenar(lista: Personagem[]): Personagem[] {
   return [...lista].sort((a, b) => {
@@ -238,6 +269,7 @@ export function useSala(codigo: string): Sala {
   const [bastiaoVersao, setBastiaoVersao] = useState(0);
   const [instalacoesBastiao, setInstalacoesBastiao] = useState<InstalacaoBastiao[]>([]);
   const [logBastiao, setLogBastiao] = useState<LinhaLogBastiao[]>([]);
+  const [encontros, setEncontros] = useState<Encontro[]>([]);
 
   // Espelho síncrono do estado, pra montar patches e reverter uma escrita que
   // falhou sem depender do closure. Atualizado depois do commit (não durante
@@ -252,6 +284,7 @@ export function useSala(codigo: string): Sala {
     modelosNpc,
     diario,
     instalacoesBastiao,
+    encontros,
   });
   useEffect(() => {
     ref.current = {
@@ -264,6 +297,7 @@ export function useSala(codigo: string): Sala {
       modelosNpc,
       diario,
       instalacoesBastiao,
+      encontros,
     };
   });
 
@@ -363,6 +397,7 @@ export function useSala(codigo: string): Sala {
           .eq("room_code", codigo)
           .order("created_at", { ascending: false })
           .limit(TAMANHO_LOG),
+        supabase.from("encontros").select("*").eq("room_code", codigo).order("created_at", { ascending: true }),
       ]);
 
       if (!vivo || estaCarga !== ultimaCarga) return;
@@ -370,7 +405,7 @@ export function useSala(codigo: string): Sala {
         return carregar(inicial, tentativa + 1);
       }
 
-      const [pc, cs, dn, lg, mn, di, ba, bi, bl] = resultados;
+      const [pc, cs, dn, lg, mn, di, ba, bi, bl, en] = resultados;
 
       if (inicial) {
         if (pc.error) {
@@ -400,6 +435,7 @@ export function useSala(codigo: string): Sala {
       setBastiaoVersao((ba.data as LinhaBastiao | null)?.version ?? 0);
       setInstalacoesBastiao((bi.data ?? []) as InstalacaoBastiao[]);
       setLogBastiao((bl.data ?? []) as LinhaLogBastiao[]);
+      setEncontros((en.data ?? []) as Encontro[]);
       setCarregando(false);
 
       carregada = true;
@@ -543,6 +579,25 @@ export function useSala(codigo: string): Sala {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "encontros", filter: filtro },
+        (msg) => {
+          eventosRecebidos++;
+          setEncontros((atual) => {
+            if (msg.eventType === "DELETE") {
+              const id = (msg.old as { id?: string }).id;
+              return atual.filter((e) => e.id !== id);
+            }
+            const novo = msg.new as Encontro;
+            // Mantém a posição de quem já estava: um encontro editado não pode
+            // pular pro fim da lista a cada toque no "+".
+            return atual.some((e) => e.id === novo.id)
+              ? atual.map((e) => (e.id === novo.id ? novo : e))
+              : [...atual, novo];
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
         { event: "INSERT", schema: "public", table: "bastiao_log", filter: filtro },
         (msg) => {
           eventosRecebidos++;
@@ -622,20 +677,7 @@ export function useSala(codigo: string): Sala {
   const criarPersonagem = useCallback(
     async (dados: NovoPersonagem): Promise<Personagem | null> => {
       const existentes = ref.current.personagens.map((p) => p.slug);
-      const linha = {
-        room_code: codigo,
-        slug: slugUnico(dados.name, existentes),
-        name: dados.name,
-        cls: dados.cls ?? "",
-        ac: dados.ac ?? 12,
-        init_mod: dados.init_mod ?? 0,
-        speed: dados.speed ?? 9,
-        hp: dados.hp ?? 10,
-        hp_max: dados.hp_max ?? 10,
-        ataque: dados.ataque ?? "",
-        is_npc: dados.is_npc ?? false,
-        notes: dados.notes ?? "",
-      };
+      const linha = linhaDePersonagem(codigo, slugUnico(dados.name, existentes), dados);
 
       let resp = await supabase.from("characters").insert(linha).select().single();
 
@@ -664,6 +706,51 @@ export function useSala(codigo: string): Sala {
         atual.some((p) => p.id === criado.id) ? atual : ordenar([...atual, criado]),
       );
       return criado;
+    },
+    [codigo],
+  );
+
+  const criarVariosPersonagens = useCallback(
+    async (dados: NovoPersonagem[]): Promise<Personagem[] | null> => {
+      if (dados.length === 0) return [];
+      // Slug único dentro do lote também: sem somar os do próprio lote,
+      // "Goblin 1" e "goblin 1" do mesmo encontro dariam o mesmo slug.
+      const montar = (existentes: string[]) => {
+        const usados = [...existentes];
+        return dados.map((d) => {
+          const slug = slugUnico(d.name, usados);
+          usados.push(slug);
+          return linhaDePersonagem(codigo, slug, d);
+        });
+      };
+
+      // Um insert só com todas as linhas: o Postgres grava tudo ou nada.
+      let resp = await supabase
+        .from("characters")
+        .insert(montar(ref.current.personagens.map((p) => p.slug)))
+        .select();
+
+      // Slug repetido = outro aparelho criou alguém com o mesmo nome entre a
+      // leitura e esta escrita. Relê os slugs de verdade e tenta mais uma vez.
+      if (resp.error?.code === "23505") {
+        const { data } = await supabase.from("characters").select("slug").eq("room_code", codigo);
+        resp = await supabase
+          .from("characters")
+          .insert(montar((data ?? []).map((p) => p.slug as string)))
+          .select();
+      }
+
+      if (resp.error) {
+        console.error("criarVariosPersonagens", resp.error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return null;
+      }
+
+      const criados = (resp.data ?? []) as Personagem[];
+      setPersonagens((atual) =>
+        ordenar([...atual.filter((p) => !criados.some((c) => c.id === p.id)), ...criados]),
+      );
+      return criados;
     },
     [codigo],
   );
@@ -1002,16 +1089,61 @@ export function useSala(codigo: string): Sala {
     [codigo],
   );
 
+  const criarEncontro = useCallback(
+    async (nome: string): Promise<Encontro | null> => {
+      const { data, error } = await supabase
+        .from("encontros")
+        .insert({ room_code: codigo, name: nome, grupos: [] })
+        .select()
+        .single();
+      if (error) {
+        console.error("criarEncontro", error);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+        return null;
+      }
+      const criado = data as Encontro;
+      setEncontros((atual) => (atual.some((e) => e.id === criado.id) ? atual : [...atual, criado]));
+      return criado;
+    },
+    [codigo],
+  );
+
+  const atualizarEncontro = useCallback(
+    async (id: string, patch: Partial<Pick<Encontro, "name" | "grupos">>) => {
+      const anterior = ref.current.encontros;
+      setEncontros((atual) => atual.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+      const { error } = await supabase.from("encontros").update(patch).eq("id", id);
+      if (error) {
+        console.error("atualizarEncontro", error);
+        setEncontros(anterior);
+        setAvisoFalha(AVISO_FALHA_ESCRITA);
+      }
+    },
+    [],
+  );
+
+  const removerEncontro = useCallback(async (id: string) => {
+    const anterior = ref.current.encontros;
+    setEncontros((atual) => atual.filter((e) => e.id !== id));
+    const { error } = await supabase.from("encontros").delete().eq("id", id);
+    if (error) {
+      console.error("removerEncontro", error);
+      setEncontros(anterior);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+    }
+  }, []);
+
   const recarregarSala = useCallback(() => recarregarRef.current(), []);
 
   const exportarSala = useCallback(async (): Promise<SalaInteira | null> => {
-    const [pc, mn, lg, di, bi, bl] = await Promise.all([
+    const [pc, mn, lg, di, bi, bl, en] = await Promise.all([
       lerTudoDaTabela("characters", codigo),
       lerTudoDaTabela("npc_templates", codigo),
       lerTudoDaTabela("combat_log", codigo),
       lerTudoDaTabela("diario", codigo),
       lerTudoDaTabela("bastiao_instalacoes", codigo),
       lerTudoDaTabela("bastiao_log", codigo),
+      lerTudoDaTabela("encontros", codigo),
     ]);
     const [cs, dn, ba] = await Promise.all([
       supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle(),
@@ -1020,7 +1152,7 @@ export function useSala(codigo: string): Sala {
     ]);
 
     const falha =
-      [pc, mn, lg, di, bi, bl].find((r) => r.erro)?.erro ??
+      [pc, mn, lg, di, bi, bl, en].find((r) => r.erro)?.erro ??
       [cs, dn, ba].find((r) => r.error)?.error?.message ??
       null;
     if (falha) {
@@ -1041,6 +1173,7 @@ export function useSala(codigo: string): Sala {
       bastiao: (ba.data ?? { ...BASTIAO_VAZIO, room_code: codigo }) as Bastiao,
       instalacoesBastiao: bi.dados as unknown as InstalacaoBastiao[],
       logBastiao: bl.dados as unknown as LinhaLogBastiao[],
+      encontros: en.dados as unknown as Encontro[],
     };
   }, [codigo]);
 
@@ -1063,6 +1196,9 @@ export function useSala(codigo: string): Sala {
         tabelas.push(["bastiao_instalacoes", backup.bastiao_instalacoes]);
         tabelas.push(["bastiao_log", backup.bastiao_log]);
       }
+      // Mesma lógica pros encontros: arquivo de antes deles existirem não
+      // apaga os encontros que a sala tem hoje.
+      if (backup.encontros) tabelas.push(["encontros", backup.encontros]);
 
       for (const [tabela] of tabelas) {
         const { error } = await supabase.from(tabela).delete().eq("room_code", codigo);
@@ -1122,7 +1258,9 @@ export function useSala(codigo: string): Sala {
     bastiao,
     instalacoesBastiao,
     logBastiao,
+    encontros,
     criarPersonagem,
+    criarVariosPersonagens,
     atualizarPersonagem,
     atualizarVariosPersonagens,
     removerPersonagem,
@@ -1141,6 +1279,9 @@ export function useSala(codigo: string): Sala {
     atualizarInstalacaoBastiao,
     removerInstalacaoBastiao,
     registrarLogBastiao,
+    criarEncontro,
+    atualizarEncontro,
+    removerEncontro,
     recarregarSala,
     exportarSala,
     restaurarBackup,

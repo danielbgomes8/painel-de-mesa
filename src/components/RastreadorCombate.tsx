@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
+import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import {
   entrarNaOrdem,
   estaCaido,
@@ -309,6 +310,8 @@ export function RastreadorCombate({
               🎲 Pôr {jogadoresDeFora.length === 1 ? "1 jogador" : `os ${jogadoresDeFora.length} jogadores`} na ordem
             </button>
           )}
+
+          <ComecarEncontro sala={sala} />
 
           <div className="addcombatant">
             <select value={quem} onChange={(e) => setQuem(e.target.value)}>

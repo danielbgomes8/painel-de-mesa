@@ -3,7 +3,20 @@
  * Cada função é pura pra poder testar sozinha (ver regras.test.ts).
  */
 
-import type { Atributo, Atributos, CampoModificavel, ItemIniciativa, Modificador, Pericia, Proficiencias, Recurso, TipoConjurador } from "./tipos";
+import type {
+  Atributo,
+  Atributos,
+  CampoModificavel,
+  FichaMonstro,
+  GrupoEncontro,
+  ItemIniciativa,
+  Modificador,
+  NovoPersonagem,
+  Pericia,
+  Proficiencias,
+  Recurso,
+  TipoConjurador,
+} from "./tipos";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pontos de vida
@@ -447,6 +460,109 @@ export function turnoAposTrocar(turnoAtual: number, i: number, j: number): numbe
   if (turnoAtual === i) return j;
   if (turnoAtual === j) return i;
   return turnoAtual;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Encontros preparados (grupo inimigo montado antes da sessão)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Teto de monstros iguais num grupo: um dedo escorregando no "+" (ou 50
+ *  digitado no lugar de 5) não pode criar dezenas de fichas de uma vez. */
+export const QUANTIDADE_MAX_GRUPO = 20;
+
+export function limitarQuantidade(n: number): number {
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(QUANTIDADE_MAX_GRUPO, Math.max(1, Math.round(n)));
+}
+
+/** Só a ficha de um modelo da biblioteca ou do catálogo — sem id, sala nem
+ *  data, que não fazem sentido dentro de um encontro. */
+export function fichaDeMonstro(m: FichaMonstro): FichaMonstro {
+  return {
+    name: m.name,
+    cls: m.cls,
+    ac: m.ac,
+    hp_max: m.hp_max,
+    speed: m.speed,
+    init_mod: m.init_mod,
+    ataque: m.ataque,
+    notes: m.notes,
+  };
+}
+
+/** Põe um monstro no encontro: se já tem um grupo com o mesmo nome, soma 1
+ *  nele em vez de abrir outro — tocar "Goblin" três vezes vira "3× Goblin". */
+export function adicionarAoEncontro(grupos: GrupoEncontro[], ficha: FichaMonstro): GrupoEncontro[] {
+  const chave = ficha.name.trim().toLowerCase();
+  const i = grupos.findIndex((g) => g.name.trim().toLowerCase() === chave);
+  if (i === -1) return [...grupos, { ...fichaDeMonstro(ficha), quantidade: 1 }];
+  return grupos.map((g, idx) => (idx === i ? { ...g, quantidade: limitarQuantidade(g.quantidade + 1) } : g));
+}
+
+export function totalDoEncontro(grupos: GrupoEncontro[]): number {
+  return grupos.reduce((soma, g) => soma + limitarQuantidade(g.quantidade), 0);
+}
+
+/** "3× Goblin · 1× Chefe goblin" — sem plural, que em português não dá pra
+ *  acertar automático ("Chefe goblins"?). */
+export function resumoEncontro(grupos: GrupoEncontro[]): string {
+  return grupos.map((g) => `${limitarQuantidade(g.quantidade)}× ${g.name}`).join(" · ");
+}
+
+/**
+ * Nomes pros monstros de um grupo, sem repetir nome de quem já está na sala.
+ * Um sozinho fica com o nome puro ("Chefe goblin"); vários — ou um que já tem
+ * xará na sala — ganham número, e o número continua de onde parou: rodar o
+ * mesmo encontro duas vezes dá Goblin 4, 5, 6, em vez de um segundo "Goblin 1"
+ * que o Mestre não consegue distinguir do primeiro.
+ */
+export function nomesDoGrupo(base: string, quantidade: number, nomesUsados: Iterable<string>): string[] {
+  const usados = new Set([...nomesUsados].map((n) => n.trim().toLowerCase()));
+  const nome = base.trim() || "Monstro";
+  const chave = nome.toLowerCase();
+  // Um avulso só fica com o nome puro se não houver série daquele monstro na
+  // sala — senão aparecia um "Goblin" solto do lado de "Goblin 1" e "Goblin 2".
+  const temSerie = [...usados].some(
+    (u) => u.startsWith(`${chave} `) && /^\d+$/.test(u.slice(chave.length + 1)),
+  );
+  if (quantidade === 1 && !usados.has(chave) && !temSerie) return [nome];
+  const saida: string[] = [];
+  // O nome puro que já está na sala conta como o 1º da série.
+  let k = usados.has(chave) ? 2 : 1;
+  while (saida.length < quantidade) {
+    const candidato = `${nome} ${k}`;
+    if (!usados.has(candidato.toLowerCase())) saida.push(candidato);
+    k++;
+  }
+  return saida;
+}
+
+/**
+ * As fichas de NPC que um encontro cria: cada monstro de cada grupo, com nome
+ * único na sala e PV cheio. Os nomes de um grupo entram na conta do seguinte,
+ * então dois grupos com o mesmo monstro também não colidem entre si.
+ */
+export function npcsDoEncontro(grupos: GrupoEncontro[], nomesUsados: Iterable<string>): NovoPersonagem[] {
+  const usados = [...nomesUsados];
+  const saida: NovoPersonagem[] = [];
+  for (const g of grupos) {
+    for (const name of nomesDoGrupo(g.name, limitarQuantidade(g.quantidade), usados)) {
+      usados.push(name);
+      saida.push({
+        name,
+        cls: g.cls,
+        ac: g.ac,
+        hp: g.hp_max,
+        hp_max: g.hp_max,
+        speed: g.speed,
+        init_mod: g.init_mod,
+        ataque: g.ataque,
+        notes: g.notes,
+        is_npc: true,
+      });
+    }
+  }
+  return saida;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

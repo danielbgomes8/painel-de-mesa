@@ -20,6 +20,7 @@ import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
 import { LogCombate } from "@/components/LogCombate";
 import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
+import { EncontrosPreparados } from "@/components/EncontrosPreparados";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { Telao } from "@/components/Telao";
@@ -158,6 +159,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       {abaEfetiva === "mestre" && souMestre && (
         <>
+          <EncontrosPreparados sala={sala} />
           <BibliotecaNpcs sala={sala} />
           <NotasDoMestre valor={sala.notasMestre} onSalvar={sala.definirNotasMestre} />
           <BackupSala sala={sala} codigo={codigo} rotulo={rotulo} />

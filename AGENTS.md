@@ -162,13 +162,36 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Montar a iniciativa** (`entrarNaOrdem` em `regras.ts`): o Mestre tem um
   botão "🎲 Pôr os N jogadores na ordem" que rola d20 + modificador da ficha
   de cada jogador que ainda não está na ordem, numa escrita só — era o
-  gargalo do começo do combate, feito um por um no celular. NPC continua
-  entrando na mão (monstro em grupo costuma usar uma iniciativa só). Os três
-  caminhos de entrada (botão, formulário do Mestre, "sua iniciativa" do
-  jogador) passam pela mesma função, que **ignora quem já está na ordem** e
+  gargalo do começo do combate, feito um por um no celular. Os monstros
+  entram pelos encontros preparados (abaixo) ou um por um no formulário. Os
+  caminhos de entrada (botão, encontro, formulário do Mestre, "sua
+  iniciativa" do jogador) passam pela mesma função, que **ignora quem já está na ordem** e
   devolve `entraram` — sem isso, toque duplo no celular punha a pessoa duas
   vezes na ordem (dois turnos) e, depois de corrigido, ainda logava duas
   vezes que ela entrou. Achado testando com dois toques de propósito.
+- **Encontros preparados** (tabela `encontros`, migration `0016`,
+  `EncontrosPreparados.tsx`): o Mestre monta o grupo inimigo antes da sessão
+  na aba Mestre ("Emboscada na ponte: 3× Goblin + 1× Chefe goblin"),
+  puxando da biblioteca da sala ou do catálogo do SRD; na aba Combate, um
+  toque cria todas as fichas e põe cada monstro na ordem. Decisões que não
+  estão no código à primeira vista:
+  - cada grupo guarda uma **cópia** da ficha, não um link pro modelo —
+    mexer/apagar a biblioteca depois não muda nem quebra o encontro;
+  - **uma rolagem por monstro** (d20 + modificador), não uma por tipo —
+    escolha do Daniel em 19/09/2026, mesmo o DMG sugerindo uma por grupo;
+  - as fichas nascem num insert só (`criarVariosPersonagens`: todas ou
+    nenhuma) e **só então** entram na ordem;
+  - nomes não repetem nome da sala e continuam a série (`nomesDoGrupo`):
+    rodar o mesmo encontro de novo dá Goblin 4, 5, 6 e "Chefe goblin 2", e
+    um goblin avulso entra como "Goblin 3" se já houver 1 e 2 — nunca um
+    "Goblin" solto do lado deles;
+  - o log diz só "N inimigos entraram no combate", **sem nome do encontro
+    nem dos monstros**: o log é público e "Emboscada do Dragão Vermelho"
+    entregaria o chefão. Os monstros nascem ocultos, como qualquer NPC.
+  A tabela nasceu numa sessão da outra máquina que não subiu o código; a
+  `0016` foi escrita pra rodar por cima dela (tudo "se ainda não existir") e
+  ligou o tempo real, que faltava — encontro montado no notebook não aparecia
+  no celular sem recarregar.
 - **Telão** (`?telao=1`, `Telao.tsx`): mostra de quem é a vez e, abaixo, os 3
   próximos da ordem (`proximosDaOrdem` em `regras.ts`, que dá a volta na
   virada de rodada). Só **nomes** na lista do "a seguir" — PV de NPC é
@@ -203,7 +226,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   Mestre, e um campo de texto rolando por dentro não dá pra ler no turno.
   Antes os ataques do jogador ficavam escondidos em "+ ver ficha completa".
 - **Backup e restauração** (`backup.ts` + `BackupSala.tsx`, aba do Mestre, sem
-  migration): o arquivo leva a sala inteira — as nove tabelas, com o log
+  migration): o arquivo leva a sala inteira — as dez tabelas (os encontros
+  entraram na versão 3 do arquivo; arquivo antigo sem eles deixa os da sala
+  em paz, mesma regra do Bastião abaixo), com o log
   **completo** (lido do banco na hora por `exportarSala`, em páginas de 1000;
   o que está na tela são só as últimas 40 linhas) e o Bastião. Antes o backup
   não levava nada de Bastião e cortava o log — parecia seguro e não era.
@@ -223,8 +248,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0015` e o `seed.sql`
-  já rodadas — o banco tem as dez tabelas (`rooms` mais nove filhas, todas
+  Paulo), separado do gb-reserva. Migrations `0001` a `0016` e o `seed.sql`
+  já rodadas — o banco tem onze tabelas (`rooms` mais dez filhas, todas
   com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
   uma vez**: se criar tabela nova
   sem "Automatically expose new tables", ela não pega GRANT pro `anon`
@@ -242,7 +267,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
-feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 4.
+feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 5.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
@@ -251,9 +276,8 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 4.
 3. ~~CI no GitHub~~ — feito em 18/09/2026: `npm run verificar`, trava no
    `vercel.json` e workflow no GitHub (ver "Verificação antes de publicar"
    lá em cima).
-4. **Preparar encontro**: escolher monstros do catálogo, montar o grupo
-   inimigo e pôr todos na iniciativa de uma vez. Hoje é um por um, no meio
-   da sessão; isso vira preparo de antes.
+4. ~~Preparar encontro~~ — feito em 19/09/2026 (migration `0016`; ver
+   "Encontros preparados" em Estado).
 5. **Aplicar dano na própria linha da iniciativa**, sem ir até a aba Fichas
    — é o gesto mais repetido do combate.
 6. **Desfazer a última ação** — o log já registra tudo, falta o botão.

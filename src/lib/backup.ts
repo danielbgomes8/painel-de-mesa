@@ -1,6 +1,7 @@
 import { COMBATE_VAZIO } from "./tipos";
 import type {
   Bastiao,
+  Encontro,
   EntradaDiario,
   EstadoCombate,
   InstalacaoBastiao,
@@ -12,9 +13,10 @@ import type {
 } from "./tipos";
 
 /** Formato do arquivo. 1 = o primeiro backup (sem Bastião, com só as últimas
- *  linhas do log); 2 = a sala inteira. Arquivo antigo continua sendo aceito
- *  na restauração — o que ele não tem fica como está (ver `lerBackup`). */
-export const VERSAO_BACKUP = 2;
+ *  linhas do log); 2 = a sala inteira; 3 = mais os encontros preparados.
+ *  Arquivo antigo continua sendo aceito na restauração — o que ele não tem
+ *  fica como está (ver `lerBackup`). */
+export const VERSAO_BACKUP = 3;
 
 /** A sala inteira num objeto simples: é isto que vira arquivo. */
 export type Backup = {
@@ -33,6 +35,9 @@ export type Backup = {
   bastiao: Bastiao | null;
   bastiao_instalacoes: InstalacaoBastiao[];
   bastiao_log: LinhaLogBastiao[];
+  /** null = arquivo de antes dos encontros existirem (não é o mesmo que uma
+   *  lista vazia: nesse caso a restauração deixa os da sala em paz). */
+  encontros: Encontro[] | null;
 };
 
 /** Junta tudo da sala num objeto simples — puro, testável. */
@@ -48,6 +53,7 @@ export function montarBackup(dados: {
   bastiao: Bastiao | null;
   instalacoesBastiao: InstalacaoBastiao[];
   logBastiao: LinhaLogBastiao[];
+  encontros: Encontro[];
 }): Backup {
   return {
     versao: VERSAO_BACKUP,
@@ -63,6 +69,7 @@ export function montarBackup(dados: {
     bastiao: dados.bastiao,
     bastiao_instalacoes: dados.instalacoesBastiao,
     bastiao_log: dados.logBastiao,
+    encontros: dados.encontros,
   };
 }
 
@@ -79,10 +86,13 @@ export type ResumoBackup = {
   instalacoes: number;
   temBastiao: boolean;
   turnoBastiao: number | null;
+  /** null quando o arquivo é de antes dos encontros (ver `Backup.encontros`). */
+  encontros: number | null;
 };
 
 export function resumirBackup(b: Backup): ResumoBackup {
   return {
+    encontros: b.encontros === null ? null : b.encontros.length,
     jogadores: b.personagens.filter((p) => !p.is_npc).length,
     npcs: b.personagens.filter((p) => p.is_npc).length,
     naOrdem: b.combate.order.length,
@@ -180,6 +190,7 @@ export function lerBackup(conteudo: string, codigoAtual: string): LeituraBackup 
     bastiao: comoBastiaoDoArquivo(o.bastiao),
     bastiao_instalacoes: lista(o.bastiao_instalacoes) as unknown as InstalacaoBastiao[],
     bastiao_log: lista(o.bastiao_log) as unknown as LinhaLogBastiao[],
+    encontros: Array.isArray(o.encontros) ? (lista(o.encontros) as unknown as Encontro[]) : null,
   };
 
   const avisos: string[] = [];
@@ -187,6 +198,9 @@ export function lerBackup(conteudo: string, codigoAtual: string): LeituraBackup 
     avisos.push(
       "Esse backup é de uma versão antiga do painel e não tem o Bastião — o Bastião da sala vai ficar como está.",
     );
+  }
+  if (backup.encontros === null) {
+    avisos.push("Esse backup é de antes dos encontros preparados — os encontros da sala vão ficar como estão.");
   }
   if (versao > VERSAO_BACKUP) {
     avisos.push("Esse arquivo foi feito por uma versão mais nova do painel; pode ter coisa que eu ainda não entendo.");

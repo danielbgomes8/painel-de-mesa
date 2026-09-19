@@ -40,6 +40,7 @@ function descrever(r: ResumoBackup): string {
     contar(r.log, "linha de log", "linhas de log"),
     contar(r.modelosNpc, "modelo na biblioteca", "modelos na biblioteca"),
   ];
+  if (r.encontros !== null) partes.push(contar(r.encontros, "encontro preparado", "encontros preparados"));
   if (r.temBastiao) {
     partes.push(`Bastião no turno ${r.turnoBastiao} com ${contar(r.instalacoes, "instalação", "instalações")}`);
   }
@@ -80,6 +81,7 @@ export function BackupSala({ sala, codigo, rotulo }: { sala: Sala; codigo: strin
     instalacoes: sala.instalacoesBastiao.length,
     temBastiao: true,
     turnoBastiao: sala.bastiao.turno,
+    encontros: sala.encontros.length,
   };
 
   async function baixar() {
