@@ -198,6 +198,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   informação do Mestre e o telão é visto pela mesa inteira, então continua
   passando por `nomeExibidoIniciativa`/`pvExibidoIniciativa` com
   `souMestre=false` (NPC não revelado aparece como "Inimigo 2").
+- **Log de combate é público** (`nomeNoLog`/`pvNoLog`/`curaComLog` em
+  `regras.ts`): cada jogador lê o log no próprio celular, então ele segue a
+  mesma regra da ordem e do telão — NPC não revelado aparece como "Um
+  inimigo", e **PV de NPC nunca vai pro log, nem revelado**. Jogador aparece
+  inteiro, com PV. Antes o log entregava tudo: "Kobold entrou no combate" saiu
+  duas vezes na setimo-raio com os dois Kobolds ocultos, e dano em NPC vinha
+  com "(PV/máximo)". Frase fixa ("Um inimigo"), sem o número do "Inimigo N":
+  o log fica congelado e o número da ordem muda quando alguém entra ou sai.
+  **Linha de log nova sobre personagem passa por `nomeNoLog`** — nunca
+  `p.name` direto.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece

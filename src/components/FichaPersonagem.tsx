@@ -6,11 +6,11 @@ import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import {
   ajustarPV,
-  aplicarCura,
   aplicarDescansoCurto,
   aplicarDescansoLongo,
   alternarPips,
   condicaoComLog,
+  curaComLog,
   danoComLog,
   deslocamentoEfetivo,
   efeitoExaustao,
@@ -22,7 +22,6 @@ import {
   limitarExaustao,
   limitarPV,
   limitarTesteMorte,
-  mensagemAjustePV,
   podeEditarPersonagem,
   situacaoMorte,
   TESTES_MORTE_MAX,
@@ -59,16 +58,10 @@ export function FichaPersonagem({
    *  log — mesma sequência "escreve, só loga se confirmar" das Ações em
    *  Massa, reaproveitada aqui em vez de reimplementada. */
   async function mudarPV(delta: number) {
-    let resultado: Partial<Personagem>;
-    let texto: string | null = null;
-    if (delta >= 0) {
-      const r = aplicarCura(p, delta);
-      resultado = r;
-      if (r.hp !== p.hp) texto = mensagemAjustePV(p.name, r.hp - p.hp, r.hp, p.hp_max);
-    } else {
-      // danoComLog já avisa o teste de concentração (ou a perda dela a 0 PV).
-      ({ patch: resultado, texto } = danoComLog(p, -delta));
-    }
+    // As duas escondem nome de NPC oculto e PV de NPC no log (é público);
+    // danoComLog ainda avisa o teste de concentração (ou a perda dela a 0 PV).
+    const { patch: resultado, texto }: { patch: Partial<Personagem>; texto: string | null } =
+      delta >= 0 ? curaComLog(p, delta) : danoComLog(p, -delta);
     const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: resultado }]);
     if (deuCerto && texto) sala.registrarVariosLogs([texto]);
   }

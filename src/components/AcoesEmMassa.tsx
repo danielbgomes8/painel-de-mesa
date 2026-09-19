@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
-import { aplicarCura, condicaoComLog, danoComLog, mensagemAjustePV } from "@/lib/regras";
+import { condicaoComLog, curaComLog, danoComLog } from "@/lib/regras";
 
 /** Área de efeito: seleciona vários personagens/NPCs e aplica dano, cura ou
  *  uma condição em todos de uma vez. Só o Mestre vê. */
@@ -30,16 +30,10 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
     const alvos: { id: string; patch: Partial<Personagem> }[] = [];
     const textos: string[] = [];
     for (const p of selecionados) {
-      if (sinal > 0) {
-        const resultado = aplicarCura(p, n);
-        alvos.push({ id: p.id, patch: resultado });
-        if (resultado.hp !== p.hp) {
-          textos.push(mensagemAjustePV(p.name, resultado.hp - p.hp, resultado.hp, p.hp_max));
-        }
-        continue;
-      }
-      // danoComLog já avisa o teste de concentração (ou a perda dela a 0 PV).
-      const { patch, texto } = danoComLog(p, n);
+      // As duas escondem nome de NPC oculto e PV de NPC no log (é público);
+      // danoComLog ainda avisa o teste de concentração (ou a perda dela a 0 PV).
+      const { patch, texto }: { patch: Partial<Personagem>; texto: string | null } =
+        sinal > 0 ? curaComLog(p, n) : danoComLog(p, n);
       alvos.push({ id: p.id, patch });
       if (texto) textos.push(texto);
     }

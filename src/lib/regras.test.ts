@@ -9,7 +9,10 @@ import {
   cdConcentracao,
   condicaoComLog,
   CONDICOES_QUE_QUEBRAM_CONCENTRACAO,
+  curaComLog,
   danoComLog,
+  nomeNoLog,
+  pvNoLog,
   entrarNaOrdem,
   alternarPips,
   descansoLongo,
@@ -522,6 +525,8 @@ describe("separarAtaques", () => {
 describe("concentração (D&D 2024)", () => {
   const tiberio = {
     name: "Tibério",
+    is_npc: false,
+    revealed: false,
     hp: 65,
     hp_max: 65,
     hp_temp: 0,
@@ -610,6 +615,56 @@ describe("concentração (D&D 2024)", () => {
     }
     // Petrificado inclui Incapacitado no 2024 — o resumo automático da fonte errou isso.
     expect(CONDICOES_QUE_QUEBRAM_CONCENTRACAO).toContain("Petrificado");
+  });
+});
+
+describe("log de combate é público (anti-spoiler de NPC)", () => {
+  const dragao = {
+    name: "Dragão Ancião",
+    is_npc: true,
+    revealed: false,
+    hp: 300,
+    hp_max: 367,
+    hp_temp: 0,
+    dss: 0,
+    dsf: 0,
+    concentration: false,
+    concentration_on: "",
+    cond: {},
+    cond_prazo: {},
+  };
+  const tiberio = { ...dragao, name: "Tibério", is_npc: false, hp: 40, hp_max: 65 };
+
+  it("NPC oculto não tem nome no log; revelado tem; jogador sempre tem", () => {
+    expect(nomeNoLog(dragao)).toBe("Um inimigo");
+    expect(nomeNoLog({ ...dragao, revealed: true })).toBe("Dragão Ancião");
+    expect(nomeNoLog(tiberio)).toBe("Tibério");
+  });
+
+  it("dano em NPC não entrega nome nem PV — nem depois de revelado", () => {
+    expect(danoComLog(dragao, 20).texto).toBe("Um inimigo sofreu 20 de dano");
+    expect(danoComLog({ ...dragao, revealed: true }, 20).texto).toBe("Dragão Ancião sofreu 20 de dano");
+  });
+
+  it("cura em NPC também não entrega PV; em jogador continua com o PV", () => {
+    expect(curaComLog(dragao, 10).texto).toBe("Um inimigo recuperou 10 PV");
+    expect(curaComLog(tiberio, 10).texto).toBe("Tibério recuperou 10 PV (50/65)");
+  });
+
+  it("cura em quem já está cheio não loga nada", () => {
+    expect(curaComLog({ ...tiberio, hp: 65 }, 10)).toEqual({ patch: { hp: 65 }, texto: null });
+  });
+
+  it("condição e concentração de NPC oculto saem sem o nome", () => {
+    expect(condicaoComLog(dragao, "Amedrontado", true).texto).toBe("Um inimigo ficou Amedrontado");
+    const concentrado = { ...dragao, concentration: true, concentration_on: "Voo", hp: 5 };
+    expect(danoComLog(concentrado, 50).texto).toBe("Um inimigo sofreu 5 de dano · 🔮 perdeu a concentração em Voo");
+  });
+
+  it("jogador continua exatamente como era", () => {
+    expect(danoComLog(tiberio, 5).texto).toBe("Tibério sofreu 5 de dano (35/65)");
+    expect(pvNoLog(tiberio)).toBe(true);
+    expect(pvNoLog(dragao)).toBe(false);
   });
 });
 

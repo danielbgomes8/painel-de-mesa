@@ -8,7 +8,9 @@ import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import {
   entrarNaOrdem,
   estaCaido,
+  mensagemCondicao,
   nomeExibidoIniciativa,
+  nomeNoLog,
   numerarNpcsNaOrdem,
   proximoTurno,
   pvExibidoIniciativa,
@@ -36,7 +38,7 @@ export async function avancarTurno(sala: Sala): Promise<EstadoCombate | null> {
       const resultado = reduzirPrazosCondicao(p.cond, p.cond_prazo);
       sala.atualizarPersonagem(p.id, { cond: resultado.cond, cond_prazo: resultado.cond_prazo });
       for (const nome of resultado.expiraram) {
-        sala.registrarLog(`${p.name} não está mais ${nome} (prazo esgotado)`);
+        sala.registrarLog(`${mensagemCondicao(nomeNoLog(p), nome, false)} (prazo esgotado)`);
       }
     }
   }
@@ -98,6 +100,7 @@ export function RastreadorCombate({
     const iniciativa = Number.isNaN(init) ? 0 : init;
 
     let item: ItemIniciativa | null = null;
+    let entrando: Personagem | null = null;
 
     if (quem === NOVO_NPC) {
       const nome = nomeNpc.trim();
@@ -115,6 +118,7 @@ export function RastreadorCombate({
       });
       setOcupado(false);
       if (!criado) return;
+      entrando = criado;
       item = { slug: criado.slug, name: criado.name, init: iniciativa };
       setNomeNpc("");
       setPvNpc("");
@@ -123,6 +127,7 @@ export function RastreadorCombate({
     } else {
       const p = personagens.find((x) => x.slug === quem);
       if (!p) return;
+      entrando = p;
       item = { slug: p.slug, name: p.name, init: iniciativa };
     }
 
@@ -135,7 +140,8 @@ export function RastreadorCombate({
       entrou = r.entraram.length > 0;
       return { order: r.ordem };
     });
-    if (feito && entrou) sala.registrarLog(`${item.name} entrou no combate (iniciativa ${item.init})`);
+    // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
+    if (feito && entrou) sala.registrarLog(`${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init})`);
     setIni("");
   }
 

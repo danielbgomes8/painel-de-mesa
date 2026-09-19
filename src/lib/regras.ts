@@ -87,11 +87,52 @@ export function aplicarCura(alvo: EstadoVida, cura: number): PatchVida {
   return ajustarPV(alvo, alvo.hp + Math.max(0, Math.round(cura)));
 }
 
-/** Frase pro log de combate a partir da variação real de PV já aplicada. */
-export function mensagemAjustePV(nome: string, delta: number, hpDepois: number, hpMax: number): string {
+/** Frase pro log de combate a partir da variação real de PV já aplicada.
+ *  `mostrarPV` false tira o "(PV atual/máximo)" — ver `pvNoLog`. */
+export function mensagemAjustePV(
+  nome: string,
+  delta: number,
+  hpDepois: number,
+  hpMax: number,
+  mostrarPV = true,
+): string {
   const verbo = delta >= 0 ? "recuperou" : "sofreu";
   const rotulo = delta >= 0 ? "PV" : "de dano";
-  return `${nome} ${verbo} ${Math.abs(delta)} ${rotulo} (${hpDepois}/${hpMax})`;
+  const pv = mostrarPV ? ` (${hpDepois}/${hpMax})` : "";
+  return `${nome} ${verbo} ${Math.abs(delta)} ${rotulo}${pv}`;
+}
+
+/** Quem aparece numa linha do log de combate. */
+export type QuemNoLog = { name: string; is_npc: boolean; revealed: boolean };
+
+/**
+ * Nome de alguém no log de combate. O log é **público** — cada jogador lê no
+ * próprio celular —, então segue a mesma regra da ordem de iniciativa e do
+ * telão: NPC ainda não revelado não tem nome. Sem isso, "Dragão Ancião entrou
+ * no combate" entregava o chefão que a ordem esconde como "Inimigo 1"
+ * (aconteceu de verdade na sala setimo-raio, com dois Kobolds ocultos).
+ * Frase fixa, sem número: "Inimigo 2" no log deixaria de bater com a ordem
+ * assim que alguém entrasse ou saísse dela.
+ */
+export function nomeNoLog(p: QuemNoLog): string {
+  return p.is_npc && !p.revealed ? "Um inimigo" : p.name;
+}
+
+/** PV de NPC nunca vai pro log, nem depois de revelado — mesma regra de
+ *  `pvExibidoIniciativa`: revelar mostra quem é, não o quanto falta pra cair. */
+export function pvNoLog(p: { is_npc: boolean }): boolean {
+  return !p.is_npc;
+}
+
+/** Cura e a linha pro log (null = PV já estava cheio, nada a logar). */
+export function curaComLog(
+  alvo: EstadoVida & QuemNoLog,
+  cura: number,
+): { patch: PatchVida; texto: string | null } {
+  const patch = aplicarCura(alvo, cura);
+  const delta = patch.hp - alvo.hp;
+  if (delta === 0) return { patch, texto: null };
+  return { patch, texto: mensagemAjustePV(nomeNoLog(alvo), delta, patch.hp, alvo.hp_max, pvNoLog(alvo)) };
 }
 
 /** Log pro caso em que o dano some inteiro no PV temporário (PV real não muda). */
@@ -134,12 +175,12 @@ function emQue(concentracaoEm: string): string {
   return alvo ? ` em ${alvo}` : "";
 }
 
-type AlvoDano = EstadoVida & {
-  name: string;
-  hp_temp: number;
-  concentration: boolean;
-  concentration_on: string;
-};
+type AlvoDano = EstadoVida &
+  QuemNoLog & {
+    hp_temp: number;
+    concentration: boolean;
+    concentration_on: string;
+  };
 
 /**
  * Dano "de verdade" num alvo (desconta do PV temporário primeiro) e a linha
@@ -152,17 +193,18 @@ export function danoComLog(alvo: AlvoDano, dano: number): { patch: PatchVidaTemp
   const d = Math.max(0, Math.round(dano));
   const patch = aplicarDano(alvo, d);
   const deltaReal = patch.hp - alvo.hp;
+  const nome = nomeNoLog(alvo);
   let texto: string | null = null;
   if (deltaReal !== 0) {
-    texto = mensagemAjustePV(alvo.name, deltaReal, patch.hp, alvo.hp_max);
+    texto = mensagemAjustePV(nome, deltaReal, patch.hp, alvo.hp_max, pvNoLog(alvo));
   } else if (patch.hp_temp < alvo.hp_temp) {
-    texto = mensagemDanoAbsorvido(alvo.name, alvo.hp_temp - patch.hp_temp);
+    texto = mensagemDanoAbsorvido(nome, alvo.hp_temp - patch.hp_temp);
   }
   if (!alvo.concentration) return { patch, texto };
 
   if (patch.concentration === false) {
     const aviso = `perdeu a concentração${emQue(alvo.concentration_on)}`;
-    return { patch, texto: texto ? `${texto} · 🔮 ${aviso}` : `${alvo.name} ${aviso}` };
+    return { patch, texto: texto ? `${texto} · 🔮 ${aviso}` : `${nome} ${aviso}` };
   }
   if (texto === null) return { patch, texto };
   return {
@@ -171,8 +213,7 @@ export function danoComLog(alvo: AlvoDano, dano: number): { patch: PatchVidaTemp
   };
 }
 
-type AlvoCondicao = {
-  name: string;
+type AlvoCondicao = QuemNoLog & {
   cond: Record<string, boolean>;
   cond_prazo: Record<string, number>;
   concentration: boolean;
@@ -196,7 +237,7 @@ export function condicaoComLog(
   const cond_prazo = { ...alvo.cond_prazo };
   if (!ligar) delete cond_prazo[condicao];
   const patch: ReturnType<typeof condicaoComLog>["patch"] = { cond: { ...alvo.cond, [condicao]: ligar }, cond_prazo };
-  const texto = mensagemCondicao(alvo.name, condicao, ligar);
+  const texto = mensagemCondicao(nomeNoLog(alvo), condicao, ligar);
   if (ligar && alvo.concentration && CONDICOES_QUE_QUEBRAM_CONCENTRACAO.includes(condicao)) {
     patch.concentration = false;
     patch.concentration_on = "";
