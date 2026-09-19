@@ -8,3 +8,9 @@ export function d20(): number {
 export function d100(): number {
   return 1 + Math.floor(Math.random() * 100);
 }
+
+/** Um dado de N faces — o que o ataque rolado na iniciativa usa (ver
+ *  `resolverAtaque` em regras.ts). */
+export function rolarDado(faces: number): number {
+  return 1 + Math.floor(Math.random() * faces);
+}

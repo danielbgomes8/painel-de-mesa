@@ -8,11 +8,13 @@ import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
 import { ExplicacaoCondicao, ExplicacaoExaustao } from "@/components/ExplicacaoCondicao";
 import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
+import { RolarAtaques } from "@/components/RolarAtaques";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 import {
   entrarNaOrdem,
   estaCaido,
+  lerAtaquesRolaveis,
   lerValorPV,
   mensagemCondicao,
   metadeDoDano,
@@ -463,6 +465,7 @@ export function RastreadorCombate({
                 <AcoesNaLinha
                   sala={sala}
                   personagem={pv}
+                  naVez={i === combate.turn}
                   onAplicar={(delta) => aplicarAjuste(pv, delta)}
                   onFechar={() => setAjustando(null)}
                 />
@@ -598,14 +601,21 @@ export function RastreadorCombate({
 function AcoesNaLinha({
   sala,
   personagem: p,
+  naVez,
   onAplicar,
   onFechar,
 }: {
   sala: Sala;
   personagem: Personagem;
+  /** É a vez de quem está nesta linha. */
+  naVez: boolean;
   onAplicar: (delta: number) => Promise<void>;
   onFechar: () => void;
 }) {
+  // Na vez de quem tem ataque pra rolar, abrir a linha é pra atacar, não pra
+  // tomar dano: sem o cursor no campo de PV, o teclado do celular não sobe
+  // por cima dos botões de ataque.
+  const focarDano = !(naVez && lerAtaquesRolaveis(p.ataque ?? "").ataques.length > 0);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const n = lerValorPV(texto);
@@ -637,7 +647,7 @@ function AcoesNaLinha({
         inputMode="numeric"
         min={1}
         max={999}
-        autoFocus
+        autoFocus={focarDano}
         enterKeyHint="done"
         placeholder="quanto?"
         aria-label={`Quanto de dano ou cura em ${p.name}`}
@@ -671,6 +681,7 @@ function AcoesNaLinha({
         ✕
       </button>
       {notas.length > 0 && <p className="initajustenota">{notas.join(" · ")}</p>}
+      <RolarAtaques texto={p.ataque ?? ""} />
       <div className="initajustecond">
         <span className="sectitle">Condições</span>
         <ChipsCondicao sala={sala} personagem={p} editavel />

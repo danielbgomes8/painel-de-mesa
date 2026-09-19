@@ -345,6 +345,20 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     pra um endereço que não responde.
 - **Faixa de 0 PV diz "Inconsciente"**, não "Caído" (19/09/2026): Caído é a
   condição de estar no chão (Prone), que agora tem explicação própria.
+- **Ataques rolados** (19/09/2026, sem migration, segunda lista item 2): no
+  painel da linha da iniciativa, os ataques do campo `ataque` viram botões
+  "🎲 Cimitarra +4" (`RolarAtaques.tsx`). `lerAtaquesRolaveis` (regras.ts)
+  entende o texto livre nos dois formatos que existem — o do catálogo
+  ("Cimitarra +4, 1d6+2 cortante · Arco…", "2x Dilacerar…", "2 ataques:
+  A · B", dano extra "+ 1d6 elétrico", observação entre parênteses ignorada)
+  e o da ficha do jogador ("Malho +1: +7, 2d6+9", uma linha por ataque); o
+  teste passa todos os monstros do catálogo por ele. `resolverAtaque` rola
+  com o dado injetado (testado com dado viciado): vantagem/desvantagem com
+  dois d20, 20 natural rola os DADOS de dano em dobro (modificador uma vez),
+  1 natural erra, dano não fica negativo. **Não vai pro log**: fica só na
+  tela de quem rolou, como o Mestre rolando atrás do escudo. Na vez de quem
+  tem ataque, o painel abre sem o cursor no campo de PV (o teclado do
+  celular cobriria os botões de ataque).
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
@@ -438,20 +452,19 @@ a lista seguinte está logo abaixo.
 ### Segunda lista (sugerida em 19/09/2026 — o Daniel respondeu "vamos seguir")
 
 Tudo gira em torno da linha da iniciativa, que virou o centro do combate. O
-próximo é o 2.
+próximo é o 3.
 
 1. ~~Condição direto na linha da iniciativa~~ — feito em 19/09/2026 (sem
    migration): o painel que abre ao tocar no nome ganhou os 14 chips e os
    prazos, os mesmos da ficha (`CondicoesEditaveis.tsx`).
-2. **Ataque do monstro rolado na iniciativa**: a ficha do NPC tem a linha
-   de ataque em texto ("Cimitarra +4, 1d6+2") — um toque rolaria acerto e
-   dano.
+2. ~~Ataque rolado na iniciativa~~ — feito em 19/09/2026 (sem migration;
+   ver "Ataques rolados" em Estado).
 3. **Jogador caído na iniciativa**: a 0 PV, a linha mostra Inconsciente e os
    testes de morte, com os botões de sucesso/falha ali mesmo.
 4. **Telão com as condições** de quem está na vez.
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 197 que existem são todos de funções
+componentes não têm teste nenhum (os 214 que existem são todos de funções
 puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava

@@ -946,3 +946,168 @@ export function separarAtaques(texto: string): LinhaAtaque[] {
       return { nome: linha.slice(0, i).trim(), detalhe: linha.slice(i + 1).trim() };
     });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ataques rolados na linha da iniciativa
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Um pedaço do dano: "1d6+2 cortante" ou o extra "+ 1d6 elétrico". */
+export type ParteDano = { qtd: number; faces: number; mod: number; tipo: string };
+
+/** Ataque que deu pra entender no texto livre do campo `ataque`. `bonus`
+ *  null = só dano (ex.: "Sopro: CD 13, 4d6 fogo" — quem rola é o alvo). */
+export type AtaqueRolavel = {
+  nome: string;
+  bonus: number | null;
+  /** "2x Dilacerar": quantos ataques iguais saem de um toque. */
+  vezes: number;
+  partes: ParteDano[];
+};
+
+export type LeituraAtaques = {
+  ataques: AtaqueRolavel[];
+  /** "2 ataques: A · B" — quantos ataques por turno, escolhendo entre eles. */
+  multiataque: number | null;
+};
+
+// Tipo de dano só é aceito se for um destes — palavra solta depois do dado
+// ("mais uma mordida") não vira tipo.
+const TIPOS_DANO = new Set([
+  "ácido", "acido", "contundente", "cortante", "elétrico", "eletrico", "energia", "fogo", "força", "forca",
+  "frio", "necrótico", "necrotico", "perfurante", "psíquico", "psiquico", "radiante", "trovão", "trovao",
+  "trovejante", "veneno",
+]);
+
+// "2d6+9", "1d6 elétrico", "2d8+5 de trovão". O modificador não pode ser o
+// começo do próximo dado ("1d6 + 2d4").
+const DADO = /(\d+)\s*d\s*(\d+)(?:\s*([+-])\s*(\d+)(?!\s*d\s*\d))?(?:\s+(?:de\s+)?([a-zà-ÿ]+))?/gi;
+
+function lerSegmentoAtaque(bruto: string): AtaqueRolavel | null {
+  // Observação entre parênteses ("(troca 1 por Mordida +5, 2d8+3)") não é
+  // dano deste ataque.
+  let s = bruto.replace(/\([^)]*\)/g, " ").trim();
+  let vezes = 1;
+  const mVezes = s.match(/^(\d+)\s*[x×]\s+/i);
+  if (mVezes) {
+    vezes = Math.max(1, Number(mVezes[1]));
+    s = s.slice(mVezes[0].length);
+  }
+  const inicioDano = s.search(/\d+\s*d\s*\d+/i);
+  if (inicioDano < 0) return null;
+
+  const cabeca = s.slice(0, inicioDano);
+  // Jogador escreve "Malho +1: +7, 2d6+9" (nome antes do ":"); o catálogo
+  // escreve "Cimitarra +4, 1d6+2".
+  const doisPontos = cabeca.indexOf(":");
+  let nome = doisPontos >= 0 ? cabeca.slice(0, doisPontos) : cabeca;
+  const resto = doisPontos >= 0 ? cabeca.slice(doisPontos + 1) : cabeca;
+  const mBonus = resto.match(/([+-]\d+)\s*,?\s*$/);
+  const bonus = mBonus ? Number(mBonus[1]) : null;
+  if (mBonus && doisPontos < 0) nome = resto.slice(0, mBonus.index);
+
+  const partes: ParteDano[] = [];
+  for (const m of s.slice(inicioDano).matchAll(DADO)) {
+    const tipo = (m[5] ?? "").toLowerCase();
+    partes.push({
+      qtd: Number(m[1]),
+      faces: Number(m[2]),
+      mod: m[4] ? Number(m[4]) * (m[3] === "-" ? -1 : 1) : 0,
+      tipo: TIPOS_DANO.has(tipo) ? tipo : "",
+    });
+  }
+  if (partes.length === 0) return null;
+  return { nome: nome.replace(/[\s,:]+$/, "").trim() || "Ataque", bonus, vezes, partes };
+}
+
+/**
+ * Lê o campo `ataque` (texto livre) atrás do que dá pra rolar: nome, bônus
+ * de acerto e dano. Entende o formato do catálogo ("Cimitarra +4, 1d6+2
+ * cortante · Arco curto +4, 1d6+2 perfurante", "2x Dilacerar…", "2 ataques:
+ * A · B", dano extra "+ 1d6 elétrico") e o da ficha do jogador (uma linha
+ * por ataque, "Malho +1: +7, 2d6+9 contundente"). O que não tiver dado fica
+ * de fora — o texto inteiro continua na ficha.
+ */
+export function lerAtaquesRolaveis(texto: string): LeituraAtaques {
+  const ataques: AtaqueRolavel[] = [];
+  let multiataque: number | null = null;
+  for (const linhaBruta of (texto ?? "").split("\n")) {
+    let linha = linhaBruta.trim();
+    if (!linha) continue;
+    const mMulti = linha.match(/^(\d+)\s+ataques?\s*:\s*/i);
+    if (mMulti) {
+      multiataque ??= Number(mMulti[1]);
+      linha = linha.slice(mMulti[0].length);
+    }
+    for (const segmento of linha.split(/\s+·\s+|\s*;\s*|\s+e\s+(?=[A-ZÀ-Ý])/)) {
+      const ataque = lerSegmentoAtaque(segmento);
+      if (ataque) ataques.push(ataque);
+    }
+  }
+  return { ataques, multiataque };
+}
+
+export type ModoRolagem = "normal" | "vantagem" | "desvantagem";
+
+export type ResultadoAtaque = {
+  nome: string;
+  /** Os d20 que saíram (dois com vantagem/desvantagem); vazio = só dano. */
+  d20s: number[];
+  d20: number | null;
+  acerto: number | null;
+  critico: boolean;
+  /** 1 natural: erra, não importa o bônus. */
+  erroCritico: boolean;
+  partes: { dados: number[]; mod: number; tipo: string; total: number }[];
+  dano: number;
+};
+
+/**
+ * Rola um ataque. `rolar(faces)` vem de fora (dados.ts) pra dar pra testar
+ * com dado viciado. Regras 2024: vantagem/desvantagem rola dois d20 e fica
+ * com o maior/menor; 20 natural é crítico e rola os DADOS de dano duas vezes
+ * (o modificador entra uma vez só); dano não fica negativo.
+ */
+export function resolverAtaque(
+  ataque: AtaqueRolavel,
+  modo: ModoRolagem,
+  rolar: (faces: number) => number,
+): ResultadoAtaque {
+  const d20s = ataque.bonus === null ? [] : modo === "normal" ? [rolar(20)] : [rolar(20), rolar(20)];
+  const d20 =
+    d20s.length === 0 ? null : modo === "vantagem" ? Math.max(...d20s) : modo === "desvantagem" ? Math.min(...d20s) : d20s[0];
+  const critico = d20 === 20;
+  const partes = ataque.partes.map((p) => {
+    const dados = Array.from({ length: critico ? p.qtd * 2 : p.qtd }, () => rolar(p.faces));
+    const total = Math.max(0, dados.reduce((soma, x) => soma + x, 0) + p.mod);
+    return { dados, mod: p.mod, tipo: p.tipo, total };
+  });
+  return {
+    nome: ataque.nome,
+    d20s,
+    d20,
+    acerto: d20 === null ? null : d20 + (ataque.bonus ?? 0),
+    critico,
+    erroCritico: d20 === 1,
+    partes,
+    dano: partes.reduce((soma, p) => soma + p.total, 0),
+  };
+}
+
+function comSinal(n: number): string {
+  return n >= 0 ? `+${n}` : `−${Math.abs(n)}`;
+}
+
+/** O resultado em duas frases curtas, pro painel da linha. */
+export function descreverAtaque(r: ResultadoAtaque, bonus: number | null): { acerto: string | null; dano: string } {
+  let acerto: string | null = null;
+  if (r.d20 !== null) {
+    const outro = r.d20s.length > 1 ? ` (e ${r.d20s.find((x, i) => i !== r.d20s.indexOf(r.d20 as number))})` : "";
+    const conta = `🎲 ${r.d20}${outro} ${comSinal(bonus ?? 0)} = ${r.acerto}`;
+    acerto = r.critico ? `${conta} — 20 natural, CRÍTICO` : r.erroCritico ? `${conta} — 1 natural, erra` : conta;
+  }
+  const detalhe = (p: ResultadoAtaque["partes"][number]) =>
+    `${p.dados.join("+")}${p.mod ? ` ${comSinal(p.mod)}` : ""}`;
+  const partes = r.partes.map((p) => `${p.total}${p.tipo ? ` ${p.tipo}` : ""} (${detalhe(p)})`);
+  const dano = partes.length === 1 ? `${partes[0].replace(/^(\d+)/, "$1 de dano")}` : `${r.dano} de dano: ${partes.join(" + ")}`;
+  return { acerto, dano };
+}
