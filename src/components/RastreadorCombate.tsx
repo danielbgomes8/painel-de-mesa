@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
+import { mudarPVComLog } from "@/components/FichaPersonagem";
 import {
   entrarNaOrdem,
   estaCaido,
+  lerValorPV,
   mensagemCondicao,
+  metadeDoDano,
   nomeExibidoIniciativa,
   nomeNoLog,
   numerarNpcsNaOrdem,
+  podeEditarPersonagem,
   proximoTurno,
   pvExibidoIniciativa,
   reduzirPrazosCondicao,
@@ -69,6 +73,11 @@ export function RastreadorCombate({
   }>({});
   const [ini, setIni] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  // Dano/cura direto na linha: qual linha está com o campo aberto (por slug —
+  // índice mudaria de dono quando alguém entra na ordem) e o retorno do
+  // último ajuste, que fica embaixo da linha até a próxima ação.
+  const [ajustando, setAjustando] = useState<string | null>(null);
+  const [retorno, setRetorno] = useState<{ slug: string; texto: string } | null>(null);
 
   const naOrdem = new Set(combate.order.map((o) => o.slug));
   const disponiveis = personagens.filter((p) => !naOrdem.has(p.slug));
@@ -171,8 +180,20 @@ export function RastreadorCombate({
     );
   }
 
+  function abrirAjuste(slug: string) {
+    setRetorno(null);
+    setAjustando((atual) => (atual === slug ? null : slug));
+  }
+
+  async function aplicarAjuste(alvo: Personagem, delta: number) {
+    const texto = await mudarPVComLog(sala, alvo, delta);
+    setAjustando(null);
+    if (texto) setRetorno({ slug: alvo.slug, texto });
+  }
+
   async function aoClicarProximoTurno() {
     if (ocupado) return;
+    setRetorno(null);
     setOcupado(true);
     await avancarTurno(sala);
     setOcupado(false);
@@ -184,6 +205,7 @@ export function RastreadorCombate({
   }
 
   function remover(i: number) {
+    if (combate.order[i]?.slug === ajustando) setAjustando(null);
     sala.definirCombate((atual) => {
       const ordem = atual.order.filter((_, idx) => idx !== i);
       return { order: ordem, turn: turnoAposRemover(atual.turn, i, ordem.length) };
@@ -224,63 +246,109 @@ export function RastreadorCombate({
             const nomeExibido = pv
               ? nomeExibidoIniciativa(pv, contagensNpc[i], souMestre)
               : c.name;
-          return (
-            <div key={`${c.slug}-${i}`} className={`initrow${i === combate.turn ? " turn" : ""}`}>
-              <div className="n">{c.init}</div>
-              <div className="who">
+            // Mesma permissão da ficha: o Mestre em qualquer linha, o jogador
+            // só na do próprio personagem.
+            const podeAjustar = pv !== null && podeEditarPersonagem(souMestre, pv.slug === meuPersonagem?.slug);
+            const aberto = podeAjustar && ajustando === c.slug;
+            const quem = (
+              <>
                 <span className="nm">{nomeExibido}</span>
                 {pvVisivel && (
-                  <span className={`hpmini${critico ? " crit" : ""}`}>
-                    {pvVisivel.hp}/{pvVisivel.hp_max} PV
+                  <span className="pvlinha">
+                    <span className={`hpmini${critico ? " crit" : ""}`}>
+                      {pvVisivel.hp}/{pvVisivel.hp_max} PV
+                    </span>
+                    {pv && pv.hp_temp > 0 && <span className="hptemp">+{pv.hp_temp}</span>}
+                    {podeAjustar && (
+                      <span className="pvtoque" aria-hidden="true">
+                        ±
+                      </span>
+                    )}
                   </span>
                 )}
-              </div>
-              {souMestre && pv?.is_npc ? (
-                <button
-                  type="button"
-                  className="minilink"
-                  onClick={() => sala.atualizarPersonagem(pv.id, { revealed: !pv.revealed })}
-                >
-                  {pv.revealed ? "revelado" : "revelar"}
-                </button>
-              ) : (
-                <span />
-              )}
-              {souMestre ? (
-                <div className="reorder">
+              </>
+            );
+          return (
+            <Fragment key={`${c.slug}-${i}`}>
+              <div className={`initrow${i === combate.turn ? " turn" : ""}`}>
+                <div className="n">{c.init}</div>
+                {podeAjustar ? (
+                  // A linha toda (nome + PV) é o alvo do toque: é o gesto mais
+                  // repetido do combate, feito no celular com a mesa esperando.
                   <button
                     type="button"
-                    aria-label="Subir na ordem"
-                    disabled={i === 0}
-                    onClick={() => trocar(i, i - 1)}
+                    className="who whobtn"
+                    aria-expanded={aberto}
+                    title="Aplicar dano ou cura"
+                    onClick={() => abrirAjuste(c.slug)}
                   >
-                    ▲
+                    {quem}
                   </button>
+                ) : (
+                  <div className="who">{quem}</div>
+                )}
+                {souMestre && pv?.is_npc ? (
                   <button
                     type="button"
-                    aria-label="Descer na ordem"
-                    disabled={i === combate.order.length - 1}
-                    onClick={() => trocar(i, i + 1)}
+                    className="minilink"
+                    onClick={() => sala.atualizarPersonagem(pv.id, { revealed: !pv.revealed })}
                   >
-                    ▼
+                    {pv.revealed ? "revelado" : "revelar"}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                {souMestre ? (
+                  <div className="reorder">
+                    <button
+                      type="button"
+                      aria-label="Subir na ordem"
+                      disabled={i === 0}
+                      onClick={() => trocar(i, i - 1)}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Descer na ordem"
+                      disabled={i === combate.order.length - 1}
+                      onClick={() => trocar(i, i + 1)}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                ) : (
+                  <div />
+                )}
+                {souMestre ? (
+                  <button
+                    type="button"
+                    className="rm"
+                    aria-label="Remover da ordem"
+                    onClick={() => remover(i)}
+                  >
+                    ✕
+                  </button>
+                ) : (
+                  <span />
+                )}
+              </div>
+              {aberto && pv && (
+                <AjustePVNaLinha
+                  personagem={pv}
+                  onAplicar={(delta) => aplicarAjuste(pv, delta)}
+                  onFechar={() => setAjustando(null)}
+                />
+              )}
+              {!aberto && retorno?.slug === c.slug && (
+                <div className="initretorno" role="status">
+                  <span>{retorno.texto}</span>
+                  <button type="button" className="rm" aria-label="Dispensar" onClick={() => setRetorno(null)}>
+                    ✕
                   </button>
                 </div>
-              ) : (
-                <div />
               )}
-              {souMestre ? (
-                <button
-                  type="button"
-                  className="rm"
-                  aria-label="Remover da ordem"
-                  onClick={() => remover(i)}
-                >
-                  ✕
-                </button>
-              ) : (
-                <span />
-              )}
-            </div>
+            </Fragment>
           );
         })}
       </div>
@@ -391,6 +459,87 @@ export function RastreadorCombate({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** Campo de dano/cura que abre embaixo da linha da iniciativa: digita o
+ *  número e escolhe dano, metade (resistência / passou no teste) ou cura.
+ *  Enter = dano, que é o caso mais comum; Esc fecha. */
+function AjustePVNaLinha({
+  personagem: p,
+  onAplicar,
+  onFechar,
+}: {
+  personagem: Personagem;
+  onAplicar: (delta: number) => Promise<void>;
+  onFechar: () => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const n = lerValorPV(texto);
+  const metade = n === null ? 0 : metadeDoDano(n);
+
+  function aplicar(delta: number) {
+    if (enviando || delta === 0) return;
+    // Sem voltar pra false: quem chama fecha este campo quando termina.
+    setEnviando(true);
+    onAplicar(delta);
+  }
+
+  // Lembretes que mudam a conta, só quando existem: o PV temporário segura o
+  // dano antes, a resistência pede a metade, e concentrado pede teste de CON
+  // (o retorno e o log já trazem a CD depois de aplicar).
+  const notas: string[] = [];
+  if (p.hp_temp > 0) notas.push(`${p.hp_temp} de PV temporário sai primeiro`);
+  if (p.vantagens_resistencias.trim()) notas.push(p.vantagens_resistencias.trim());
+  if (p.concentration) {
+    const em = p.concentration_on.trim();
+    notas.push(em ? `concentrado em ${em}` : "concentrado");
+  }
+
+  return (
+    <div className="initajuste">
+      <input
+        className="num"
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={999}
+        autoFocus
+        enterKeyHint="done"
+        placeholder="quanto?"
+        aria-label={`Quanto de dano ou cura em ${p.name}`}
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (n) aplicar(-n);
+          } else if (e.key === "Escape") {
+            onFechar();
+          }
+        }}
+      />
+      <button type="button" className="btn primary" disabled={!n || enviando} onClick={() => n && aplicar(-n)}>
+        {n ? `Dano ${n}` : "Dano"}
+      </button>
+      <button
+        type="button"
+        className="btn"
+        disabled={!metade || enviando}
+        title="Resistência, ou passou no teste: metade do dano, arredondando pra baixo"
+        onClick={() => aplicar(-metade)}
+      >
+        {metade ? `Metade ${metade}` : "Metade"}
+      </button>
+      <button type="button" className="btn cura" disabled={!n || enviando} onClick={() => n && aplicar(n)}>
+        {n ? `Cura ${n}` : "Cura"}
+      </button>
+      <button type="button" className="rm" aria-label="Fechar" onClick={onFechar}>
+        ✕
+      </button>
+      {notas.length > 0 && <p className="initajustenota">{notas.join(" · ")}</p>}
     </div>
   );
 }

@@ -383,6 +383,58 @@ export function alternarPips(indiceClicado: number, preenchidosAgora: number): n
 // Iniciativa / combate
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Dano e cura direto na linha da iniciativa
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Teto do campo de dano/cura: nenhum golpe do jogo chega perto, e um zero a
+ *  mais digitado sem querer não apaga o dragão. */
+export const PV_DIGITADO_MAX = 999;
+
+/** Valor do campo de dano/cura: inteiro positivo, ou null (vazio, zero,
+ *  negativo, lixo) — null deixa os botões desligados. */
+export function lerValorPV(texto: string): number | null {
+  const n = Number.parseInt(texto, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(n, PV_DIGITADO_MAX);
+}
+
+/** Metade do dano, arredondada pra baixo: é a regra da Resistência e do
+ *  "metade do dano se passar no teste" (Regras 2024, Rules Glossary —
+ *  verbetes Resistance e Round Down). */
+export function metadeDoDano(dano: number): number {
+  return Math.floor(Math.max(0, dano) / 2);
+}
+
+/**
+ * Dano (`delta` < 0) ou cura (`delta` > 0), com a linha pro log e o
+ * `retorno`: o que aparece na hora, embaixo da linha da iniciativa, pra quem
+ * aplicou. O log é público e esconde nome e PV de NPC (`nomeNoLog`/`pvNoLog`);
+ * o retorno não precisa — quem aplica é o Mestre ou o dono da ficha, que já
+ * veem os dois — e com "Um inimigo" o Mestre não saberia em qual dos três
+ * goblins acertou. `texto` null = nada mudou, não loga.
+ */
+export function ajustePVComLog(
+  alvo: AlvoDano,
+  delta: number,
+): { patch: PatchVida | PatchVidaTemp; texto: string | null; retorno: string } {
+  const semSegredo = { ...alvo, is_npc: false, revealed: true };
+  if (delta >= 0) {
+    const r = curaComLog(alvo, delta);
+    return { ...r, retorno: curaComLog(semSegredo, delta).texto ?? `${alvo.name} já está com o PV cheio` };
+  }
+  const r = danoComLog(alvo, -delta);
+  const retorno =
+    danoComLog(semSegredo, -delta).texto ??
+    // Só chega aqui quem já estava a 0 PV e sem PV temporário. Jogador a 0 PV
+    // que leva dano falha um teste de morte (dois se for crítico) — fica o
+    // lembrete, sem marcar sozinho: daqui não dá pra saber se foi crítico.
+    (alvo.is_npc
+      ? `${alvo.name} já está a 0 PV`
+      : `${alvo.name} já está a 0 PV: dano agora é 1 falha no teste de morte (2 se for crítico)`);
+  return { ...r, retorno };
+}
+
 /**
  * Nome exibido na ordem de iniciativa: o Mestre e o próprio nome de
  * personagem de jogador sempre veem o nome real. NPC ainda não revelado

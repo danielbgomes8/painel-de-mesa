@@ -509,6 +509,93 @@ button:focus-visible {
 .initrow .who .hpmini.crit {
   color: var(--danger);
 }
+/* PV, PV temporário e o "±" andam juntos: no celular descem pra baixo do nome
+   (ver o @media de 520px), senão o nome virava "Go…". */
+.initrow .who .pvlinha {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+/* Dano/cura direto na linha da iniciativa: nome + PV viram um botão sem cara
+   de botão (a linha continua lendo como antes); o "±" avisa que dá pra tocar. */
+.initrow .whobtn {
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 4px 0;
+  min-height: 36px;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.initrow .whobtn .pvtoque {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.initrow .whobtn:hover .pvtoque,
+.initrow .whobtn[aria-expanded="true"] .pvtoque {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.initajuste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--surface);
+}
+.initajuste input.num {
+  width: 84px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 15px;
+}
+.initajuste input.num:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.initajuste .btn.cura {
+  color: var(--ok);
+}
+.initajuste .rm {
+  margin-left: auto;
+}
+.initajustenota {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.initretorno {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 2px 12px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
 /* ✕ de remover (BotaoRemover: recursos, itens, seções da ficha, classes...).
    Sem esta regra base ele caía no botão PADRÃO do navegador — fundo cinza e
    borda branca dentro do tema escuro — e com 26px de alvo. Só a linha da
@@ -1445,6 +1532,14 @@ button:focus-visible {
   }
   .initrow {
     grid-template-columns: 36px 1fr auto auto auto;
+  }
+  .initrow .who {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+  .initrow .who .nm {
+    max-width: 100%;
   }
 }
 

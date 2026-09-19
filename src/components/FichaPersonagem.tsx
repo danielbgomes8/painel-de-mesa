@@ -6,12 +6,11 @@ import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import {
   ajustarPV,
+  ajustePVComLog,
   aplicarDescansoCurto,
   aplicarDescansoLongo,
   alternarPips,
   condicaoComLog,
-  curaComLog,
-  danoComLog,
   deslocamentoEfetivo,
   efeitoExaustao,
   estaCaido,
@@ -36,6 +35,22 @@ import { FichaClasse } from "@/components/FichaClasse";
 
 const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
 
+/**
+ * Dano (`delta` < 0) ou cura "de verdade" num personagem (dano desconta do PV
+ * temporário primeiro) + linha no log — só loga depois que a escrita da ficha
+ * confirmar, senão o log jura um dano que não aconteceu. Mesma sequência das
+ * Ações em Massa. Devolve o retorno pra quem aplicou (ver `ajustePVComLog`),
+ * ou null se a escrita falhou (o aviso de falha já aparece no topo). Serve o
+ * −/+ da ficha e o dano direto na linha da iniciativa.
+ */
+export async function mudarPVComLog(sala: Sala, p: Personagem, delta: number): Promise<string | null> {
+  const { patch, texto, retorno } = ajustePVComLog(p, delta);
+  const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch }]);
+  if (!deuCerto) return null;
+  if (texto) sala.registrarVariosLogs([texto]);
+  return retorno;
+}
+
 export function FichaPersonagem({
   personagem: p,
   souMestre,
@@ -54,16 +69,8 @@ export function FichaPersonagem({
   const [mostrarExtras, setMostrarExtras] = useState(false);
   const [mostrarFichaCompleta, setMostrarFichaCompleta] = useState(false);
 
-  /** Dano/cura "de verdade" (descontam do PV temporário primeiro) + linha no
-   *  log — mesma sequência "escreve, só loga se confirmar" das Ações em
-   *  Massa, reaproveitada aqui em vez de reimplementada. */
-  async function mudarPV(delta: number) {
-    // As duas escondem nome de NPC oculto e PV de NPC no log (é público);
-    // danoComLog ainda avisa o teste de concentração (ou a perda dela a 0 PV).
-    const { patch: resultado, texto }: { patch: Partial<Personagem>; texto: string | null } =
-      delta >= 0 ? curaComLog(p, delta) : danoComLog(p, -delta);
-    const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: resultado }]);
-    if (deuCerto && texto) sala.registrarVariosLogs([texto]);
+  function mudarPV(delta: number) {
+    mudarPVComLog(sala, p, delta);
   }
 
   function descansoLongoCompleto() {

@@ -37,7 +37,10 @@ e Mestre editam igual — não é ferramenta só do Mestre.
 
 **Combate** — rastreador de iniciativa (adicionar personagem cadastrado ou
 NPC/monstro avulso do catálogo, **rolar iniciativa** d20+mod, ordenar,
-reordenar na mão, marcar o turno, avançar rodada, reiniciar), **ações em
+reordenar na mão, marcar o turno, avançar rodada, reiniciar), **dano e cura
+direto na linha da iniciativa** (toca no nome, digita o número: dano, metade
+pra resistência ou teste que passou, ou cura — o Mestre em qualquer linha, o
+jogador na do próprio personagem), **ações em
 massa** (só Mestre: selecionar vários e aplicar dano/cura ou uma condição de
 uma vez), log de combate visível pra todos. NPC não revelado aparece como
 "Inimigo N"; **o PV de NPC nunca aparece pro jogador, nem depois do nome

@@ -245,6 +245,23 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   o log fica congelado e o número da ordem muda quando alguém entra ou sai.
   **Linha de log nova sobre personagem passa por `nomeNoLog`** — nunca
   `p.name` direto.
+- **Dano direto na iniciativa** (19/09/2026, sem migration, roadmap item 5):
+  tocar no nome/PV de uma linha abre embaixo dela um campo com **Dano N**,
+  **Metade** (resistência ou passou no teste: `metadeDoDano`, arredonda pra
+  baixo) e **Cura N**; Enter = dano, Esc fecha. Mesma permissão da ficha
+  (`podeEditarPersonagem`: Mestre em qualquer linha, jogador só na dele). O
+  campo lembra o que muda a conta antes de aplicar (PV temporário,
+  "Vantagens & resistências" da ficha, concentração). Tudo passa por
+  `mudarPVComLog` (exportada de `FichaPersonagem.tsx`, a mesma do −/+ da
+  ficha) → `ajustePVComLog` em `regras.ts`, que devolve o patch, a linha do
+  log **público** (NPC oculto = "Um inimigo", sem PV) e o **retorno** que
+  aparece embaixo da linha pra quem aplicou — esse com nome e PV de verdade,
+  senão o Mestre não sabe em qual dos três goblins acertou, e com o aviso de
+  concentração (teste de CON com a CD) ali mesmo, sem descer até o log.
+  Jogador a 0 PV que leva dano não gera log; o retorno lembra que é falha no
+  teste de morte (não marca sozinho: não dá pra saber se foi crítico). No
+  celular o PV desce pra baixo do nome (`.pvlinha`, @media 520px) — com o
+  "±" a mais o nome virava "Go…" (achado testando).
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
@@ -314,7 +331,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
-feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 5.
+feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 6.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
@@ -325,8 +342,8 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 5.
    lá em cima).
 4. ~~Preparar encontro~~ — feito em 19/09/2026 (migration `0016`; ver
    "Encontros preparados" em Estado).
-5. **Aplicar dano na própria linha da iniciativa**, sem ir até a aba Fichas
-   — é o gesto mais repetido do combate.
+5. ~~Aplicar dano na própria linha da iniciativa~~ — feito em 19/09/2026
+   (sem migration; ver "Dano direto na iniciativa" em Estado).
 6. **Desfazer a última ação** — o log já registra tudo, falta o botão.
 7. **Explicar a condição na hora**: tocar em "Atordoado" e ver o que ela faz
    pelas regras de 2024.
@@ -334,7 +351,8 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 5.
    pra queda de wi-fi no meio da luta.
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (as 126 que existem são das regras puras);
+componentes não têm teste nenhum (os 160 que existem são todos de funções
+puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
 de versão do combate, os dois agora passam por `gravarSeVersaoBater` em

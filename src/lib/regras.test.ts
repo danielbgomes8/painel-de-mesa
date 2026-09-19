@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { CONDICOES } from "./condicoes";
 import {
   ajustarPV,
+  ajustePVComLog,
+  lerValorPV,
+  metadeDoDano,
+  PV_DIGITADO_MAX,
   aplicarCura,
   aplicarDano,
   aplicarDescansoCurto,
@@ -665,6 +669,64 @@ describe("log de combate é público (anti-spoiler de NPC)", () => {
     expect(danoComLog(tiberio, 5).texto).toBe("Tibério sofreu 5 de dano (35/65)");
     expect(pvNoLog(tiberio)).toBe(true);
     expect(pvNoLog(dragao)).toBe(false);
+  });
+});
+
+describe("dano e cura na linha da iniciativa", () => {
+  const kobold = {
+    name: "Kobold",
+    is_npc: true,
+    revealed: false,
+    hp: 10,
+    hp_max: 12,
+    hp_temp: 0,
+    dss: 0,
+    dsf: 0,
+    concentration: false,
+    concentration_on: "",
+  };
+  const tiberio = { ...kobold, name: "Tibério", is_npc: false, hp: 40, hp_max: 65 };
+
+  it("campo aceita só inteiro positivo, com teto", () => {
+    expect(lerValorPV("8")).toBe(8);
+    expect(lerValorPV(" 12 ")).toBe(12);
+    expect(lerValorPV("")).toBeNull();
+    expect(lerValorPV("0")).toBeNull();
+    expect(lerValorPV("-5")).toBeNull();
+    expect(lerValorPV("abc")).toBeNull();
+    expect(lerValorPV("50000")).toBe(PV_DIGITADO_MAX);
+  });
+
+  it("metade arredonda pra baixo (resistência, passou no teste)", () => {
+    expect(metadeDoDano(9)).toBe(4);
+    expect(metadeDoDano(8)).toBe(4);
+    expect(metadeDoDano(1)).toBe(0);
+  });
+
+  it("o log continua escondendo o NPC; o retorno mostra ao Mestre qual e quanto sobrou", () => {
+    const r = ajustePVComLog(kobold, -7);
+    expect(r.patch).toEqual({ hp: 3, hp_temp: 0 });
+    expect(r.texto).toBe("Um inimigo sofreu 7 de dano");
+    expect(r.retorno).toBe("Kobold sofreu 7 de dano (3/12)");
+  });
+
+  it("cura: mesmo esquema, e cheio não loga mas avisa", () => {
+    expect(ajustePVComLog(kobold, 2).retorno).toBe("Kobold recuperou 2 PV (12/12)");
+    const cheio = ajustePVComLog({ ...tiberio, hp: 65 }, 5);
+    expect(cheio.texto).toBeNull();
+    expect(cheio.retorno).toBe("Tibério já está com o PV cheio");
+  });
+
+  it("o aviso de concentração aparece no retorno também", () => {
+    const r = ajustePVComLog({ ...tiberio, concentration: true, concentration_on: "Voo" }, -30);
+    expect(r.retorno).toBe("Tibério sofreu 30 de dano (10/65) · 🔮 concentrado em Voo: teste de CON, CD 15");
+  });
+
+  it("jogador já caído: não loga nada, lembra do teste de morte", () => {
+    const r = ajustePVComLog({ ...tiberio, hp: 0 }, -5);
+    expect(r.texto).toBeNull();
+    expect(r.retorno).toBe("Tibério já está a 0 PV: dano agora é 1 falha no teste de morte (2 se for crítico)");
+    expect(ajustePVComLog({ ...kobold, hp: 0 }, -5).retorno).toBe("Kobold já está a 0 PV");
   });
 });
 
