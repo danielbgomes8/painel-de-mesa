@@ -6,8 +6,10 @@
 
 export type Identidade = { tipo: "mestre" } | { tipo: "jogador"; slug: string };
 
+const PREFIXO = "mesa-identidade:";
+
 function chave(sala: string): string {
-  return `mesa-identidade:${sala}`;
+  return `${PREFIXO}${sala}`;
 }
 
 function ler(sala: string): Identidade | null {
@@ -81,6 +83,23 @@ export function salvarIdentidade(sala: string, identidade: Identidade): void {
     /* aba privada / storage bloqueado — segue sem lembrar */
   }
   avisar();
+}
+
+/** Salas em que este aparelho já entrou (tem identidade salva), separadas por
+ *  vírgula — string e não lista pra servir de snapshot estável no
+ *  useSyncExternalStore. Serve pra trocar de mesa no app instalado, que não
+ *  tem barra de endereço. */
+export function salasComIdentidade(): string {
+  try {
+    const salas: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(PREFIXO)) salas.push(k.slice(PREFIXO.length));
+    }
+    return salas.sort().join(",");
+  } catch {
+    return "";
+  }
 }
 
 export function limparIdentidade(sala: string): void {

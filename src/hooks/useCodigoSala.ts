@@ -11,3 +11,13 @@ const semAssinatura = () => () => {};
 export function useCodigoSala(): string {
   return useSyncExternalStore(semAssinatura, codigoDaSala, () => SALA_PADRAO);
 }
+
+/** false no servidor e durante a hidratação, true depois — antes disso a sala
+ *  de verdade (URL ou última sala do aparelho) ainda não foi lida. */
+export function useNoNavegador(): boolean {
+  return useSyncExternalStore(
+    semAssinatura,
+    () => true,
+    () => false,
+  );
+}

@@ -13,7 +13,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Português em tudo**: nomes de arquivo, variáveis, comentários, textos de tela.
   Quem conduz o projeto não é dev — explicar sem jargão.
 - **Sem login.** Identidade é `localStorage` (`src/lib/identidade.ts`) + código de
-  sala na URL (`?sala=...`, padrão `setimo-raio` em `src/lib/sala.ts`).
+  sala na URL (`?sala=...`). Sem `?sala=`, abre a última sala em que o
+  aparelho entrou, e só então o padrão `setimo-raio` (`escolherSala` em
+  `src/lib/sala.ts`) — é o que faz o app instalado na tela de início abrir a
+  campanha de cada um.
 - **Regras de negócio fechadas** ficam em `src/lib/regras.ts`, cada uma pura e
   testada em `src/lib/regras.test.ts` (`npm run teste`). Não reimplementar em
   componente — importar de lá. O mesmo vale pro catálogo de monstros:
@@ -198,6 +201,20 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   informação do Mestre e o telão é visto pela mesa inteira, então continua
   passando por `nomeExibidoIniciativa`/`pvExibidoIniciativa` com
   `souMestre=false` (NPC não revelado aparece como "Inimigo 2").
+- **Várias campanhas no mesmo deploy** (19/09/2026, sem migration): cada
+  campanha é uma sala (`?sala=codigo`), criada sozinha no primeiro acesso,
+  com dados totalmente separados. O que prendia tudo à Sétimo Raio foi solto:
+  o título da aba vem do `<title>` que o `Painel` renderiza com o nome da sala
+  (não do metadata do layout — o Next aplica aquele por último e passava por
+  cima), o manifest ficou genérico, e o app instalado abre a **última sala em
+  que o aparelho entrou** (só grava depois de entrar, não num link espiado).
+  Quem está em mais de uma campanha ganha "↔ outra mesa" no topo — o app
+  instalado não tem barra de endereço, sem isso não havia como trocar. A
+  sala só é montada **depois da hidratação** (`useNoNavegador`): montando
+  antes, o efeito que grava `?sala=` no endereço prendia a pessoa na sala
+  padrão e ainda abria uma conexão à toa com ela — achado testando. O código
+  da sala é a única "senha" (modelo aberto, ver "Segurança" no README):
+  campanha nova deve usar um código difícil de chutar.
 - **Log de combate é público** (`nomeNoLog`/`pvNoLog`/`curaComLog` em
   `regras.ts`): cada jogador lê o log no próprio celular, então ele segue a
   mesma regra da ordem e do telão — NPC não revelado aparece como "Um

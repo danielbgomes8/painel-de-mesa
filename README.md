@@ -154,7 +154,11 @@ também roda a mesma verificação a cada push (`.github/workflows/verificar.yml
 e marca o commit com ✓ ou ✗.
 
 Para abrir outra mesa no mesmo deploy, use `?sala=<codigo>` na URL
-(ex.: `/?sala=nova-campanha`). A sala é criada sozinha no primeiro acesso.
+(ex.: `/?sala=cripta-de-ferro-7k2`). A sala é criada sozinha no primeiro
+acesso. Como o código da sala é o que protege a mesa (quem tem o link entra),
+use um código difícil de chutar. O app instalado na tela de início abre a
+última mesa em que o aparelho entrou, e quem joga em mais de uma troca pelo
+atalho "↔" no topo.
 
 ---
 

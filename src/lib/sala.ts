@@ -20,20 +20,59 @@ export function normalizarCodigoSala(bruto: string): string {
   return aSlug(bruto) || SALA_PADRAO;
 }
 
-/** Código da sala desta aba: `?sala=...` na URL, ou o padrão. Só no navegador. */
-export function codigoDaSala(): string {
-  if (typeof window === "undefined") return SALA_PADRAO;
-  const bruto = new URLSearchParams(window.location.search).get("sala");
-  return bruto ? normalizarCodigoSala(bruto) : SALA_PADRAO;
+/**
+ * Qual sala abrir: o `?sala=` do link manda; sem ele, a última sala em que
+ * este aparelho entrou; sem nenhuma das duas, o padrão.
+ *
+ * A "última sala" existe por causa do app instalado na tela de início: ele
+ * abre sempre em `/` (o endereço fica gravado na instalação) e não tem barra
+ * de endereço pra trocar. Sem isso, quem joga em outra campanha e instalou o
+ * app caía na Sétimo Raio toda vez.
+ */
+export function escolherSala(daUrl: string | null, ultima: string | null): string {
+  if (daUrl) return normalizarCodigoSala(daUrl);
+  const lembrada = ultima ? aSlug(ultima) : "";
+  return lembrada || SALA_PADRAO;
 }
 
-/** Rótulo curto pra mostrar no topo. */
+const CHAVE_ULTIMA_SALA = "mesa-ultima-sala";
+
+function lerUltimaSala(): string | null {
+  try {
+    return localStorage.getItem(CHAVE_ULTIMA_SALA);
+  } catch {
+    return null;
+  }
+}
+
+/** Grava a sala em que a pessoa entrou, pra próxima abertura sem `?sala=`. */
+export function lembrarSala(codigo: string): void {
+  try {
+    localStorage.setItem(CHAVE_ULTIMA_SALA, codigo);
+  } catch {
+    /* aba privada / storage bloqueado — segue sem lembrar */
+  }
+}
+
+/** Código da sala desta aba (ver `escolherSala`). Só no navegador. */
+export function codigoDaSala(): string {
+  if (typeof window === "undefined") return SALA_PADRAO;
+  return escolherSala(new URLSearchParams(window.location.search).get("sala"), lerUltimaSala());
+}
+
+/** Nome com acento das salas que já existem — o código não guarda acento. */
+const NOMES_DAS_SALAS: Record<string, string> = { "setimo-raio": "Sétimo Raio" };
+
+/** Rótulo curto pra mostrar no topo e na aba do navegador. */
 export function rotuloDaSala(codigo: string): string {
-  return codigo
-    .split("-")
-    .filter(Boolean)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ");
+  return (
+    NOMES_DAS_SALAS[codigo] ??
+    codigo
+      .split("-")
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(" ")
+  );
 }
 
 /** slug a partir de um nome; garante que não colide com os `existentes`. */

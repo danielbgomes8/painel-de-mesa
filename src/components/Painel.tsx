@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
-import { useCodigoSala } from "@/hooks/useCodigoSala";
-import { useIdentidade } from "@/hooks/useIdentidade";
+import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
+import { useIdentidade, useOutrasSalas } from "@/hooks/useIdentidade";
 import { useModoTelao } from "@/hooks/useModoTelao";
 import {
   limparIdentidade,
   salvarIdentidade,
   type Identidade,
 } from "@/lib/identidade";
-import { rotuloDaSala } from "@/lib/sala";
+import { lembrarSala, rotuloDaSala } from "@/lib/sala";
 import { BackupSala, baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
@@ -28,9 +28,37 @@ import { BarraAbas, type Aba } from "@/components/BarraAbas";
 
 export function Painel() {
   const codigo = useCodigoSala();
-  // key=codigo: se a sala mudar (só acontece na resolução inicial de
-  // `?sala=`), remonta do zero em vez de o hook ter que se resetar sozinho.
-  return <PainelSala key={codigo} codigo={codigo} />;
+  const noNavegador = useNoNavegador();
+
+  // No servidor e na hidratação a sala ainda não é conhecida: a página é
+  // estática, e o código vem da URL ou da última sala deste aparelho (ver
+  // escolherSala). Montar a sala antes disso abria a conexão da sala padrão
+  // à toa — e o efeito que grava `?sala=` no endereço prendia a pessoa nela:
+  // o app instalado caía na Sétimo Raio em vez da última campanha (achado
+  // testando). O título neutro também é o que um preview de link (WhatsApp)
+  // enxerga, em vez do nome de outra campanha.
+  if (!noNavegador) {
+    return (
+      <>
+        <title>Painel de Mesa</title>
+        <div className="tela-centro">
+          <h1>Painel de Mesa</h1>
+          <p>Conectando à sala…</p>
+        </div>
+      </>
+    );
+  }
+
+  // Aba do navegador com o nome da campanha aberta: o React 19 leva o <title>
+  // pro <head>. Não fica no metadata do layout — lá é fixo e o Next o aplica
+  // depois da montagem, por cima de um document.title (achado testando).
+  // key=codigo: trocar de sala remonta do zero.
+  return (
+    <>
+      <title>{`Painel de Mesa — ${rotuloDaSala(codigo)}`}</title>
+      <PainelSala key={codigo} codigo={codigo} />
+    </>
+  );
 }
 
 function PainelSala({ codigo }: { codigo: string }) {
@@ -67,6 +95,24 @@ function PainelSala({ codigo }: { codigo: string }) {
     if (identidade?.tipo !== "jogador") return null;
     return sala.personagens.find((p) => p.slug === identidade.slug) ?? null;
   }, [identidade, sala.personagens]);
+
+  const outrasSalas = useOutrasSalas(codigo);
+
+  // A sala vai pro endereço mesmo quando veio da "última sala" (ver
+  // escolherSala): recarregar fica na mesma, e o link copiado dali leva
+  // quem recebe pra campanha certa em vez de pra última sala DELE.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("sala")) return;
+    url.searchParams.set("sala", codigo);
+    window.history.replaceState(null, "", url);
+  }, [codigo]);
+
+  // Só lembra depois de entrar de verdade — um link com erro de digitação que
+  // só foi espiado não vira a sala que o app instalado abre amanhã.
+  useEffect(() => {
+    if (identidade) lembrarSala(codigo);
+  }, [codigo, identidade]);
 
   if (sala.erro) {
     return (
@@ -127,6 +173,11 @@ function PainelSala({ codigo }: { codigo: string }) {
           <button className="linkbtn" type="button" onClick={trocar}>
             trocar
           </button>
+          {outrasSalas.map((s) => (
+            <a key={s} className="linkbtn" href={`?sala=${encodeURIComponent(s)}`}>
+              ↔ {rotuloDaSala(s)}
+            </a>
+          ))}
         </div>
       </div>
 

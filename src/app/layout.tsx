@@ -21,10 +21,12 @@ const mono = IBM_Plex_Mono({
   variable: "--fonte-mono",
 });
 
+// Sem `title` aqui de propósito: o mesmo deploy serve várias mesas, e o
+// título com o nome da campanha aberta vem do <title> que o Painel renderiza.
+// Um title neste metadata é aplicado pelo Next depois e passa por cima dele.
 export const metadata: Metadata = {
-  title: "Painel de Mesa — Sétimo Raio",
   description:
-    "Painel de combate e fichas da mesa de D&D 5.5 Sétimo Raio. Sincroniza entre celular, tablet e notebook.",
+    "Painel de combate e fichas pra mesa de D&D 5.5. Sincroniza entre celular, tablet e notebook.",
 };
 
 export const viewport: Viewport = {

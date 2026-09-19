@@ -190,6 +190,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
   font-size: 13px;
   color: var(--muted);
 }
@@ -209,6 +210,11 @@ button:focus-visible {
 .linkbtn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+/* O "↔ outra mesa" é link de verdade (troca de sala recarregando a página). */
+a.linkbtn {
+  display: inline-block;
+  text-decoration: none;
 }
 .synctag {
   font-size: 11px;
