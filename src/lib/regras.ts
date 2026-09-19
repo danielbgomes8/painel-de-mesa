@@ -66,7 +66,8 @@ export function faixaPV(hp: number, hpMax: number): FaixaPV {
   return "cheio";
 }
 
-/** PV a 0 = Caído: inconsciente, faz os testes de morte. */
+/** PV a 0: jogador fica Inconsciente e faz os testes de morte (o nome da
+ *  função é antigo — "Caído" nas condições é outra coisa, estar no chão). */
 export function estaCaido(hp: number): boolean {
   return hp <= 0;
 }

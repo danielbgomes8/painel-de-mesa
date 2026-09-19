@@ -11,6 +11,12 @@ Não é ficha completa de personagem: é o punhado de coisas que muda o tempo to
 durante a sessão — PV, exaustão, condições, testes de morte, iniciativa — com
 tudo sincronizando na hora entre celular, tablet e notebook.
 
+**Funciona sem internet por um tempo.** Se o wi-fi cair no meio da luta, o
+combate continua: dano, cura, condições, turnos e log ficam guardados no
+aparelho e vão pro banco quando a conexão volta (o que outro celular mexeu
+no meio tempo não é atropelado — a tela avisa). O app instalado também abre
+sem internet, mostrando a última foto da sala que aquele aparelho viu.
+
 **Sem login.** Cada pessoa abre o link, escolhe a campanha e diz quem é
 (Mestre, um personagem da lista, ou digita um nome novo). Essa escolha fica
 salva só no navegador dela, uma por campanha.

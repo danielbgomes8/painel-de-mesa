@@ -228,6 +228,12 @@ button:focus-visible {
 .synctag.on::before {
   background: var(--ok);
 }
+.synctag.semrede {
+  color: var(--warn);
+}
+.synctag.semrede::before {
+  background: var(--warn);
+}
 
 /* ---------- gate ---------- */
 .gate {
@@ -1472,6 +1478,18 @@ button:focus-visible {
 .avisofalha button:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
+}
+/* Sem internet: não é erro (o combate continua), então não é vermelho. */
+.avisosemrede {
+  border: 1px solid var(--warn);
+  border-left-width: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 14px;
+  margin: 0 0 10px;
+  border-radius: 9px;
 }
 .turnbanner {
   background: var(--accent);

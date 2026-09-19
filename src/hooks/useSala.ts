@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { slugUnico } from "@/lib/sala";
 import { turnoAposRemover } from "@/lib/regras";
@@ -8,6 +8,7 @@ import { linhasParaInserir, type Backup } from "@/lib/backup";
 import {
   camposConferiveis,
   empilhar,
+  mudancaDe,
   lerPilhaGuardada,
   mesmoCombate,
   mudouAlgo,
@@ -16,6 +17,18 @@ import {
   type MudancaCombate,
   type NovaAcaoDesfazivel,
 } from "@/lib/desfazer";
+import {
+  combateSemConflito,
+  conflitosDePersonagens,
+  ehFalhaDeRede,
+  enfileirar,
+  lerFilaGuardada,
+  lerFotoGuardada,
+  linhasProvisorias,
+  mudancasEsperando,
+  type FotoSala,
+  type OpOffline,
+} from "@/lib/offline";
 import {
   COMBATE_VAZIO,
   type Bastiao,
@@ -64,7 +77,7 @@ type LinhaBastiao = Bastiao & { version: number };
 type ResultadoVersao<L> =
   | { tipo: "gravou"; linha: L }
   | { tipo: "conflito"; linha: L }
-  | { tipo: "erro"; mensagem: string };
+  | { tipo: "erro"; mensagem: string; rede: boolean };
 
 /** A sala inteira lida do banco na hora (não o que está na tela): o log vai
  *  completo, não só as últimas linhas. É o que vira arquivo de backup. */
@@ -90,6 +103,14 @@ export type Sala = {
    *  tela inteira. Fica até a próxima falha ou até `limparAvisoFalha()`. */
   avisoFalha: string | null;
   limparAvisoFalha: () => void;
+  /** Sem internet: o combate continua e as mudanças esperam numa fila neste
+   *  aparelho (ver lib/offline.ts). */
+  semInternet: boolean;
+  /** Quantas mudanças esperam conexão pra ir pro banco. */
+  esperando: number;
+  /** Abriu sem internet: hora da foto guardada que está na tela. null = a
+   *  tela veio do banco. */
+  fotoDe: string | null;
   personagens: Personagem[];
   combate: EstadoCombate;
   notasMestre: string;
@@ -221,12 +242,12 @@ async function gravarSeVersaoBater<L extends { version: number }>(
     .eq("version", versao)
     .select()
     .maybeSingle();
-  if (error) return { tipo: "erro", mensagem: error.message };
+  if (error) return { tipo: "erro", mensagem: error.message, rede: ehFalhaDeRede(error) };
   if (data) return { tipo: "gravou", linha: data as L };
 
   const releitura = await supabase.from(tabela).select("*").eq("room_code", codigo).maybeSingle();
-  if (releitura.error) return { tipo: "erro", mensagem: releitura.error.message };
-  if (!releitura.data) return { tipo: "erro", mensagem: `${tabela}: linha da sala sumiu` };
+  if (releitura.error) return { tipo: "erro", mensagem: releitura.error.message, rede: ehFalhaDeRede(releitura.error) };
+  if (!releitura.data) return { tipo: "erro", mensagem: `${tabela}: linha da sala sumiu`, rede: false };
   return { tipo: "conflito", linha: releitura.data as L };
 }
 
@@ -273,6 +294,19 @@ const AVISO_FALHA_ESCRITA = "Não salvou — confira a conexão e tente de novo.
 
 /** Chave da pilha de desfazer no sessionStorage (+ código da sala). */
 const PREFIXO_PILHA_DESFAZER = "mesa-desfazer:";
+
+/** Sem internet (ver lib/offline.ts): fila de mudanças e foto da sala, no
+ *  localStorage (+ código da sala) — sobrevivem ao app fechar. */
+const PREFIXO_FILA_OFFLINE = "mesa-fila:";
+const PREFIXO_FOTO_SALA = "mesa-foto:";
+
+/** De quanto em quanto tempo, sem internet, tenta mandar a fila de novo
+ *  (além de quando o aparelho avisa que a conexão voltou). */
+const INTERVALO_TENTATIVA_MS = 10_000;
+
+function novoId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export type ResultadoDesfazer =
   | { ok: true; rotulo: string }
@@ -322,6 +356,60 @@ export function useSala(codigo: string): Sala {
     }
   }, [chavePilha, pilhaDesfazer]);
 
+  // Sem internet (ver lib/offline.ts). A fila tem espelho em ref porque a
+  // sincronização anda por ela uma operação por vez, sem esperar render.
+  const chaveFila = `${PREFIXO_FILA_OFFLINE}${codigo}`;
+  const [fila, setFila] = useState<OpOffline[]>(() => {
+    try {
+      return lerFilaGuardada(localStorage.getItem(chaveFila));
+    } catch {
+      return [];
+    }
+  });
+  const filaRef = useRef(fila);
+  const [semInternet, setSemInternet] = useState(false);
+  const semInternetRef = useRef(false);
+  const [fotoDe, setFotoDe] = useState<string | null>(null);
+  // Última vez que a tela bateu com o banco — é a hora que vai na foto.
+  const ultimaSincroniaRef = useRef<string | null>(null);
+
+  const mudarFila = useCallback(
+    (mudar: (atual: OpOffline[]) => OpOffline[]) => {
+      const nova = mudar(filaRef.current);
+      filaRef.current = nova;
+      setFila(nova);
+      try {
+        localStorage.setItem(chaveFila, JSON.stringify(nova));
+      } catch {
+        /* storage cheio / bloqueado — a fila segue só na memória */
+      }
+    },
+    [chaveFila],
+  );
+
+  const marcarSemInternet = useCallback((sem: boolean) => {
+    semInternetRef.current = sem;
+    setSemInternet(sem);
+  }, []);
+
+  // Ordem em que cada escrita foi FEITA (ver `seq` em lib/offline.ts):
+  // pega na hora do toque, antes de esperar a rede.
+  const ultimaSeqRef = useRef(0);
+  const proximaSeq = useCallback(() => {
+    const seq = Math.max(Date.now(), ultimaSeqRef.current + 1);
+    ultimaSeqRef.current = seq;
+    return seq;
+  }, []);
+
+  /** Escrita que não pôde ir pro banco agora: fica na tela e vai pra fila. */
+  const guardarNaFila = useCallback(
+    (op: Parameters<typeof enfileirar>[1], seq: number) => {
+      marcarSemInternet(true);
+      mudarFila((atual) => enfileirar(atual, op, novoId(), seq));
+    },
+    [marcarSemInternet, mudarFila],
+  );
+
   // Espelho síncrono do estado, pra montar patches e reverter uma escrita que
   // falhou sem depender do closure. Atualizado depois do commit (não durante
   // o render).
@@ -356,6 +444,140 @@ export function useSala(codigo: string): Sala {
   // precisa reler a sala inteira depois de trocar o banco.
   const recarregarRef = useRef<() => void>(() => {});
 
+  const sincronizandoRef = useRef<Promise<boolean> | null>(null);
+  // Ponte pra `sincronizar` (definida logo abaixo, e que também chama a si
+  // mesma por aqui); preenchida por efeito.
+  const sincronizarRef = useRef<() => Promise<boolean>>(async () => false);
+
+  /**
+   * Manda a fila pro banco, na ordem, uma operação por vez. Cada uma só grava
+   * se o banco ainda estiver como ela encontrou (ver lib/offline.ts); a que
+   * não puder é deixada de fora, junto com as linhas de log dela, e o aviso
+   * diz quem mudou. true = a fila acabou; false = a conexão caiu de novo no
+   * meio e o resto espera a próxima tentativa.
+   *
+   * Não mexe na tela enquanto anda: ela já mostra o resultado da fila
+   * inteira, e um estado do meio do caminho confundiria quem continua
+   * jogando. Quem chama relê a sala quando acaba.
+   */
+  const sincronizar = useCallback((): Promise<boolean> => {
+    // Já tem uma tentativa andando: espera ela. Se ela falhar, tenta de novo
+    // uma vez — ela pode ter começado ainda sem internet (pelo relógio) e
+    // quem chama agora sabe que a conexão acabou de voltar.
+    const andando = sincronizandoRef.current;
+    if (andando) return andando.then((acabou) => acabou || sincronizarRef.current());
+
+    type Resultado = "ok" | "sem-internet" | { naoForam: string[] };
+
+    async function gravar(op: OpOffline): Promise<Resultado> {
+      if (op.tipo === "personagens") {
+        if (op.mudancas.length === 0) return "ok";
+        const lidos = await supabase
+          .from("characters")
+          .select("*")
+          .in(
+            "id",
+            op.mudancas.map((m) => m.id),
+          );
+        if (lidos.error) return ehFalhaDeRede(lidos.error) ? "sem-internet" : { naoForam: op.mudancas.map((m) => m.nome) };
+        const conflitos = conflitosDePersonagens(op.mudancas, (lidos.data ?? []) as Personagem[]);
+        if (conflitos.length > 0) return { naoForam: conflitos };
+        for (const m of op.mudancas) {
+          let consulta = supabase.from("characters").update(m.depois).eq("id", m.id);
+          for (const [coluna, valor] of camposConferiveis(m.antes)) consulta = consulta.eq(coluna, valor);
+          const { data, error } = await consulta.select("id");
+          if (error) return ehFalhaDeRede(error) ? "sem-internet" : { naoForam: [m.nome] };
+          if (!data || data.length === 0) return { naoForam: [m.nome] };
+          // Já foi: sai da operação, pra uma queda logo depois não fazer ela
+          // parecer conflito na próxima tentativa.
+          mudarFila((atual) =>
+            atual.map((o) =>
+              o.id === op.id && o.tipo === "personagens"
+                ? { ...o, mudancas: o.mudancas.filter((x) => x.id !== m.id) }
+                : o,
+            ),
+          );
+        }
+        return "ok";
+      }
+
+      if (op.tipo === "combate") {
+        const ordem = "a ordem de iniciativa";
+        for (let tentativa = 0; tentativa < MAX_TENTATIVAS_VERSAO; tentativa++) {
+          const lida = await supabase.from("combat_state").select("*").eq("room_code", codigo).maybeSingle();
+          if (lida.error) return ehFalhaDeRede(lida.error) ? "sem-internet" : { naoForam: [ordem] };
+          const linha = lida.data as LinhaCombate | null;
+          if (!linha || !combateSemConflito(op, comoCombate(linha))) return { naoForam: [ordem] };
+          const r = await gravarSeVersaoBater<LinhaCombate>("combat_state", codigo, linha.version, {
+            round: op.depois.round,
+            turn: op.depois.turn,
+            order_json: op.depois.order,
+          });
+          if (r.tipo === "gravou") return "ok";
+          if (r.tipo === "erro") return r.rede ? "sem-internet" : { naoForam: [ordem] };
+          // conflito: alguém gravou entre a leitura e a escrita — confere de novo
+        }
+        return { naoForam: [ordem] };
+      }
+
+      // Log: uma linha por vez, na ordem — linhas da mesma escrita sairiam
+      // com o mesmo horário e o log não saberia qual veio antes.
+      for (const text of op.textos) {
+        const { error } = await supabase.from("combat_log").insert({ room_code: codigo, text });
+        if (error) return ehFalhaDeRede(error) ? "sem-internet" : "ok"; // log recusado: segue sem ele
+        mudarFila((atual) =>
+          atual.map((o) => (o.id === op.id && o.tipo === "log" ? { ...o, textos: o.textos.slice(1) } : o)),
+        );
+      }
+      return "ok";
+    }
+
+    const tarefa = (async (): Promise<boolean> => {
+      const naoForam: string[] = [];
+      try {
+        while (filaRef.current.length > 0) {
+          const op = filaRef.current[0];
+          const r = await gravar(op);
+          if (r === "sem-internet") return false;
+          if (r === "ok") {
+            mudarFila((atual) =>
+              atual
+                .filter((o) => o.id !== op.id)
+                .map((o) => (o.tipo === "log" && o.dependeDe === op.id ? { ...o, dependeDe: null } : o)),
+            );
+          } else {
+            naoForam.push(...r.naoForam);
+            // A linha de log que contava essa mudança também fica de fora.
+            mudarFila((atual) => atual.filter((o) => o.id !== op.id && !(o.tipo === "log" && o.dependeDe === op.id)));
+          }
+        }
+      } catch (e) {
+        console.error("sincronizar fila", e);
+        return false;
+      }
+      marcarSemInternet(false);
+      setFotoDe(null);
+      if (naoForam.length > 0) {
+        setAvisoFalha(
+          `A internet voltou, mas isto ficou de fora porque mudou em outro aparelho enquanto este estava sem conexão: ${[
+            ...new Set(naoForam),
+          ].join(", ")}. Confira e refaça se precisar.`,
+        );
+      }
+      return true;
+    })();
+    sincronizandoRef.current = tarefa;
+    tarefa.finally(() => {
+      sincronizandoRef.current = null;
+    });
+    return tarefa;
+  }, [codigo, marcarSemInternet, mudarFila]);
+
+  // O efeito principal chama por aqui (ele não depende de `sincronizar`).
+  useEffect(() => {
+    sincronizarRef.current = sincronizar;
+  }, [sincronizar]);
+
   useEffect(() => {
     if (!supabaseConfigurado) return;
 
@@ -368,6 +590,40 @@ export function useSala(codigo: string): Sala {
     let ultimaCarga = 0;
     let eventosRecebidos = 0;
 
+    /** Abriu sem internet: mostra a última foto da sala guardada neste
+     *  aparelho. Sem foto, não há o que mostrar. */
+    function usarFoto() {
+      let foto: FotoSala | null = null;
+      try {
+        foto = lerFotoGuardada(localStorage.getItem(`${PREFIXO_FOTO_SALA}${codigo}`));
+      } catch {
+        foto = null;
+      }
+      if (!foto) {
+        setErro("Sem internet, e este aparelho ainda não tinha aberto esta sala. Tente de novo quando a conexão voltar.");
+        setCarregando(false);
+        return;
+      }
+      const lista = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+      setPersonagens(ordenar(foto.personagens));
+      setCombate(foto.combate);
+      setCombateVersao(foto.combateVersao);
+      setNotasMestre(typeof foto.notasMestre === "string" ? foto.notasMestre : "");
+      setLog(lista<LinhaLog>(foto.log));
+      setModelosNpc(lista<ModeloNpc>(foto.modelosNpc));
+      setDiario(lista<EntradaDiario>(foto.diario));
+      if (foto.bastiao && typeof foto.bastiao === "object") setBastiao(foto.bastiao as Bastiao);
+      setBastiaoVersao(Number(foto.bastiaoVersao) || 0);
+      setInstalacoesBastiao(lista<InstalacaoBastiao>(foto.instalacoesBastiao));
+      setLogBastiao(lista<LinhaLogBastiao>(foto.logBastiao));
+      setEncontros(lista<Encontro>(foto.encontros));
+      ultimaSincroniaRef.current = foto.quando;
+      setFotoDe(foto.quando);
+      marcarSemInternet(true);
+      setCarregando(false);
+      carregada = true;
+    }
+
     async function iniciar() {
       // Garante que a sala existe (deixa qualquer ?sala=novo-codigo funcionar).
       // Sem checar erro aqui, uma falha passava batido e todo update/insert
@@ -377,6 +633,7 @@ export function useSala(codigo: string): Sala {
         .from("rooms")
         .upsert({ code: codigo }, { onConflict: "code", ignoreDuplicates: true });
       if (!vivo) return;
+      if (preparo.error && ehFalhaDeRede(preparo.error)) return usarFoto();
       if (preparo.error) {
         setErro(`Não consegui preparar a sala: ${preparo.error.message}`);
         setCarregando(false);
@@ -396,12 +653,21 @@ export function useSala(codigo: string): Sala {
       ]);
       if (!vivo) return;
       const falhaDependente = dependentes.find((r) => r.error);
+      if (falhaDependente?.error && ehFalhaDeRede(falhaDependente.error)) return usarFoto();
       if (falhaDependente?.error) {
         setErro(`Não consegui preparar a sala: ${falhaDependente.error.message}`);
         setCarregando(false);
         return;
       }
 
+      // Sobrou fila de uma sessão sem internet (o app fechou antes de a
+      // conexão voltar): vai pro banco antes de ler, senão a leitura apagaria
+      // da tela o que ainda não foi. Se cair de novo, fica na foto.
+      if (filaRef.current.length > 0 && !(await sincronizarRef.current())) {
+        if (vivo) usarFoto();
+        return;
+      }
+      if (!vivo) return;
       await carregar(true);
     }
 
@@ -459,6 +725,7 @@ export function useSala(codigo: string): Sala {
       const [pc, cs, dn, lg, mn, di, ba, bi, bl, en] = resultados;
 
       if (inicial) {
+        if (pc.error && ehFalhaDeRede(pc.error)) return usarFoto();
         if (pc.error) {
           setErro(`Não consegui carregar a sala: ${pc.error.message}`);
           setCarregando(false);
@@ -471,6 +738,7 @@ export function useSala(codigo: string): Sala {
         const falha = resultados.find((r) => r.error);
         if (falha?.error) {
           console.error("recarregar sala", falha.error);
+          if (ehFalhaDeRede(falha.error)) marcarSemInternet(true);
           return;
         }
       }
@@ -488,6 +756,12 @@ export function useSala(codigo: string): Sala {
       setLogBastiao((bl.data ?? []) as LinhaLogBastiao[]);
       setEncontros((en.data ?? []) as Encontro[]);
       setCarregando(false);
+      ultimaSincroniaRef.current = new Date().toISOString();
+      // Releu o banco e não tem nada esperando: a conexão voltou.
+      if (semInternetRef.current && filaRef.current.length === 0) {
+        marcarSemInternet(false);
+        setFotoDe(null);
+      }
 
       carregada = true;
       if (recarregarQuandoCarregar) {
@@ -503,6 +777,17 @@ export function useSala(codigo: string): Sala {
         recarregarQuandoCarregar = true;
         return;
       }
+      // Mudanças feitas sem internet vão pro banco antes de reler — senão a
+      // releitura apagaria da tela o que ainda não foi.
+      if (filaRef.current.length > 0) {
+        sincronizarRef
+          .current()
+          .then((acabou) => {
+            if (acabou && vivo) return carregar(false);
+          })
+          .catch((e) => console.error("recarregar sala", e));
+        return;
+      }
       carregar(false).catch((e) => console.error("recarregar sala", e));
     }
 
@@ -512,6 +797,17 @@ export function useSala(codigo: string): Sala {
       if (document.visibilityState === "visible") recarregar();
     }
     document.addEventListener("visibilitychange", aoVoltarPraTela);
+
+    // Sem internet: tenta de novo quando o aparelho avisa que a conexão
+    // voltou e, por garantia, a cada 10 segundos (wi-fi "conectado" mas sem
+    // internet não dispara o aviso).
+    function aoVoltarInternet() {
+      if (semInternetRef.current) recarregar();
+    }
+    window.addEventListener("online", aoVoltarInternet);
+    const relogio = window.setInterval(() => {
+      if (semInternetRef.current && navigator.onLine !== false) recarregar();
+    }, INTERVALO_TENTATIVA_MS);
 
     iniciar().catch((e) => {
       if (!vivo) return;
@@ -671,28 +967,102 @@ export function useSala(codigo: string): Sala {
       vivo = false;
       recarregarRef.current = () => {};
       document.removeEventListener("visibilitychange", aoVoltarPraTela);
+      window.removeEventListener("online", aoVoltarInternet);
+      window.clearInterval(relogio);
       supabase.removeChannel(canal);
     };
-  }, [codigo]);
+  }, [codigo, marcarSemInternet]);
+
+  // Foto da sala no aparelho, pra abrir sem internet. Espera a tela assentar
+  // (1 s) em vez de gravar a cada toque.
+  useEffect(() => {
+    if (!supabaseConfigurado || carregando || erro) return;
+    const t = window.setTimeout(() => {
+      const foto = {
+        quando: ultimaSincroniaRef.current ?? new Date().toISOString(),
+        personagens,
+        combate,
+        combateVersao,
+        notasMestre,
+        log,
+        modelosNpc,
+        diario,
+        bastiao,
+        bastiaoVersao,
+        instalacoesBastiao,
+        logBastiao,
+        encontros,
+      };
+      try {
+        localStorage.setItem(`${PREFIXO_FOTO_SALA}${codigo}`, JSON.stringify(foto));
+      } catch {
+        /* storage cheio / bloqueado — segue sem foto */
+      }
+    }, 1000);
+    return () => window.clearTimeout(t);
+  }, [
+    codigo,
+    carregando,
+    erro,
+    personagens,
+    combate,
+    combateVersao,
+    notasMestre,
+    log,
+    modelosNpc,
+    diario,
+    bastiao,
+    bastiaoVersao,
+    instalacoesBastiao,
+    logBastiao,
+    encontros,
+  ]);
 
   const atualizarPersonagem = useCallback(
     async (id: string, patch: Partial<Personagem>) => {
+      const seq = proximaSeq();
       const anterior = ref.current.personagens;
+      const alvo = anterior.find((p) => p.id === id);
+      // Espelho já com a mudança: duas escritas seguidas sem internet (antes
+      // do próximo render) precisam partir uma da outra.
+      ref.current = { ...ref.current, personagens: anterior.map((p) => (p.id === id ? { ...p, ...patch } : p)) };
       setPersonagens((atual) => atual.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+      if (semInternetRef.current) {
+        if (alvo) guardarNaFila({ tipo: "personagens", mudancas: [mudancaDe(alvo, patch)] }, seq);
+        return;
+      }
       const { error } = await supabase.from("characters").update(patch).eq("id", id);
+      if (error && ehFalhaDeRede(error) && alvo) {
+        guardarNaFila({ tipo: "personagens", mudancas: [mudancaDe(alvo, patch)] }, seq);
+        return;
+      }
       if (error) {
         console.error("atualizarPersonagem", error);
         setPersonagens(anterior);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
       }
     },
-    [],
+    [guardarNaFila, proximaSeq],
   );
 
   const atualizarVariosPersonagens = useCallback(
     async (alvos: { id: string; patch: Partial<Personagem> }[]): Promise<boolean> => {
       if (alvos.length === 0) return true;
+      const seq = proximaSeq();
       const anterior = ref.current.personagens;
+      // Uma mudança por alvo, na mesma ordem de `alvos` (null = ficha que
+      // não está na tela) — é o que vai pra fila se faltar internet.
+      const mudancas = alvos.map(({ id, patch }) => {
+        const p = anterior.find((x) => x.id === id);
+        return p ? mudancaDe(p, patch) : null;
+      });
+      ref.current = {
+        ...ref.current,
+        personagens: anterior.map((p) => {
+          const alvo = alvos.find((a) => a.id === p.id);
+          return alvo ? { ...p, ...alvo.patch } : p;
+        }),
+      };
       setPersonagens((atual) =>
         atual.map((p) => {
           const alvo = alvos.find((a) => a.id === p.id);
@@ -708,10 +1078,22 @@ export function useSala(codigo: string): Sala {
       // condições da ficha, era o caminho da maioria das escritas do app.
       // (Upsert parcial não resolve: o Postgres cobra as colunas "not null"
       // — room_code, name... — mesmo em quem já existe.)
+      const naFila = (lista: (typeof mudancas)[number][]) =>
+        guardarNaFila({ tipo: "personagens", mudancas: lista.filter((m) => m !== null) }, seq);
+      if (semInternetRef.current) {
+        naFila(mudancas);
+        return true;
+      }
       const respostas = await Promise.all(
         alvos.map(({ id, patch }) => supabase.from("characters").update(patch).eq("id", id)),
       );
-      const erro = respostas.find((r) => r.error)?.error;
+      // Sem internet no meio: o que não foi fica na tela e vai pra fila.
+      const erros = respostas.map((r) => r.error);
+      if (erros.some((e) => e) && erros.every((e) => !e || ehFalhaDeRede(e))) {
+        naFila(mudancas.filter((_, i) => erros[i]));
+        return true;
+      }
+      const erro = erros.find((e) => e);
       if (erro) {
         console.error("atualizarVariosPersonagens", erro);
         // Volta ao estado de antes; quem gravou de verdade no meio do lote é
@@ -722,7 +1104,7 @@ export function useSala(codigo: string): Sala {
       }
       return true;
     },
-    [],
+    [guardarNaFila, proximaSeq],
   );
 
   const criarPersonagem = useCallback(
@@ -810,10 +1192,20 @@ export function useSala(codigo: string): Sala {
     async (
       patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>),
     ): Promise<MudancaCombate | null> => {
+      const seq = proximaSeq();
       const original = ref.current.combate;
       const versaoOriginal = ref.current.combateVersao;
       let anterior = original;
       let versao = versaoOriginal;
+
+      if (semInternetRef.current) {
+        const parcial = typeof patch === "function" ? patch(original) : patch;
+        const depois = { ...original, ...parcial };
+        ref.current = { ...ref.current, combate: depois };
+        setCombate(depois);
+        guardarNaFila({ tipo: "combate", antes: original, depois }, seq);
+        return { antes: original, depois };
+      }
 
       // Resolver contra ref.current (em vez do `combate` de closure, que pode
       // já estar velho depois de um await) encurta a janela da corrida, mas
@@ -832,6 +1224,13 @@ export function useSala(codigo: string): Sala {
           turn: proximo.turn,
           order_json: proximo.order,
         });
+
+        if (r.tipo === "erro" && r.rede) {
+          // Sem internet no meio: a mudança fica na tela e vai pra fila.
+          ref.current = { ...ref.current, combate: proximo };
+          guardarNaFila({ tipo: "combate", antes: anterior, depois: proximo }, seq);
+          return { antes: anterior, depois: proximo };
+        }
 
         if (r.tipo === "erro") {
           console.error("definirCombate", r.mensagem);
@@ -858,7 +1257,7 @@ export function useSala(codigo: string): Sala {
       setAvisoFalha(AVISO_FALHA_ESCRITA);
       return null;
     },
-    [codigo],
+    [codigo, guardarNaFila, proximaSeq],
   );
 
   const removerPersonagem = useCallback(
@@ -908,11 +1307,15 @@ export function useSala(codigo: string): Sala {
 
   const registrarLog = useCallback(
     async (texto: string) => {
+      const seq = proximaSeq();
+      const naFila = () => guardarNaFila({ tipo: "log", textos: [texto], quando: new Date().toISOString() }, seq);
+      if (semInternetRef.current) return naFila();
       const { data, error } = await supabase
         .from("combat_log")
         .insert({ room_code: codigo, text: texto })
         .select()
         .single();
+      if (error && ehFalhaDeRede(error)) return naFila();
       if (error) {
         console.error("registrarLog", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
@@ -921,16 +1324,20 @@ export function useSala(codigo: string): Sala {
       const nova = data as LinhaLog;
       setLog((atual) => (atual.some((l) => l.id === nova.id) ? atual : [nova, ...atual].slice(0, TAMANHO_LOG)));
     },
-    [codigo],
+    [codigo, guardarNaFila, proximaSeq],
   );
 
   const registrarVariosLogs = useCallback(
     async (textos: string[]) => {
       if (textos.length === 0) return;
+      const seq = proximaSeq();
+      const naFila = () => guardarNaFila({ tipo: "log", textos, quando: new Date().toISOString() }, seq);
+      if (semInternetRef.current) return naFila();
       const { data, error } = await supabase
         .from("combat_log")
         .insert(textos.map((text) => ({ room_code: codigo, text })))
         .select();
+      if (error && ehFalhaDeRede(error)) return naFila();
       if (error) {
         console.error("registrarVariosLogs", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
@@ -944,7 +1351,7 @@ export function useSala(codigo: string): Sala {
         return [...novas].reverse().concat(semElas).slice(0, TAMANHO_LOG);
       });
     },
-    [codigo],
+    [codigo, guardarNaFila, proximaSeq],
   );
 
   const criarModeloNpc = useCallback(
@@ -1230,8 +1637,7 @@ export function useSala(codigo: string): Sala {
 
   const lembrarDesfazer = useCallback((acao: NovaAcaoDesfazivel) => {
     if (!mudouAlgo(acao)) return;
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setPilhaDesfazer((pilha) => empilhar(pilha, { ...acao, id }));
+    setPilhaDesfazer((pilha) => empilhar(pilha, { ...acao, id: novoId() }));
   }, []);
 
   const esquecerDesfazer = useCallback(() => setPilhaDesfazer([]), []);
@@ -1239,6 +1645,9 @@ export function useSala(codigo: string): Sala {
   const desfazer = useCallback(async (): Promise<ResultadoDesfazer> => {
     const acao = pilhaRef.current[0];
     if (!acao) return { ok: false, motivo: "não há nada pra desfazer" };
+    // Desfazer confere o banco antes de mexer: sem internet não dá pra
+    // conferir. A pilha fica pra quando a conexão voltar.
+    if (semInternetRef.current) return { ok: false, motivo: "sem internet — desfaça quando a conexão voltar" };
     // Desistir limpa a pilha inteira: se a ação mais nova não volta, as de
     // antes dela ficariam desfeitas fora de ordem.
     const desistir = (motivo: string): ResultadoDesfazer => {
@@ -1386,16 +1795,25 @@ export function useSala(codigo: string): Sala {
     [codigo, definirCombate, definirNotasMestre, definirBastiao],
   );
 
+  // Log da tela: as linhas que ainda esperam conexão aparecem no topo.
+  const logComFila = useMemo(() => {
+    const provisorias = linhasProvisorias(fila).map((l) => ({ ...l, room_code: codigo }));
+    return provisorias.length === 0 ? log : [...provisorias, ...log].slice(0, TAMANHO_LOG);
+  }, [fila, log, codigo]);
+
   return {
     carregando: supabaseConfigurado && carregando,
     conectado,
     erro: supabaseConfigurado ? erro : MSG_SEM_CONFIG,
     avisoFalha,
     limparAvisoFalha,
+    semInternet,
+    esperando: mudancasEsperando(fila),
+    fotoDe,
     personagens,
     combate,
     notasMestre,
-    log,
+    log: logComFila,
     modelosNpc,
     diario,
     bastiao,

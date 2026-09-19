@@ -301,6 +301,45 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   e um guia recolhido traz as 14. Condição que inclui Incapacitado escreve o
   que ele faz junto; o teste de `condicoes.test.ts` confere que essa lista
   bate com `CONDICOES_QUE_QUEBRAM_CONCENTRACAO`.
+- **Sem internet** (19/09/2026, sem migration, roadmap item 8). Duas partes:
+  - **App abre sem internet**: service worker em `public/sw.js`, registrado
+    pelo `Painel` só no build de produção. Guarda só o próprio app (página
+    por rede primeiro com 4 s de prazo; `/_next/static/` guardado primeiro,
+    porque o nome muda a cada versão; na instalação já guarda a página e os
+    arquivos que ela cita). Chamada pro Supabase nunca passa por ele. **O
+    navegador embutido do Claude Code não registra service worker em
+    `http://localhost`** ("unknown error when fetching the script" — em
+    HTTPS funciona), então ele só foi testado no site publicado.
+  - **Combate continua sem internet** (regras em `lib/offline.ts`, fila no
+    `useSala`): escrita que falha por queda de rede (erro sem `code` — ver
+    `ehFalhaDeRede`; recusa do banco continua sendo erro) fica na tela e vai
+    pra uma **fila no localStorage** (`mesa-fila:<sala>`), junto com o
+    antes/depois de cada campo. Vale pra `atualizarPersonagem`,
+    `atualizarVariosPersonagens`, `definirCombate` e os dois `registrarLog`
+    — o resto (criar ficha, diário, Bastião…) continua precisando de
+    conexão. Todo pedido ao Supabase tem **prazo de 10 s**
+    (`fetchComPrazo` em `lib/supabase.ts`): wi-fi "conectado" mas sem
+    internet deixava o pedido pendurado por dezenas de segundos. E cada
+    operação leva `seq` = a hora do toque, não a da falha — escritas
+    penduradas falham fora de ordem, e a fila precisa da ordem em que a
+    pessoa jogou (achado testando: dois danos seguidos no mesmo goblin). Na volta (evento `online`, reconexão do tempo real, volta pro
+    app, ou a cada 10 s), `sincronizar` manda a fila na ordem, uma operação
+    por vez, e **só grava o que o banco ainda tem como a mudança
+    encontrou**: se outro celular mexeu no meio tempo, pula (e as linhas de
+    log amarradas a ela, `dependeDe`) e o aviso diz quem. Só depois relê a
+    sala — reler antes apagaria da tela o que ainda não foi. Enquanto houver
+    fila, o desfazer espera a conexão. A **foto da sala** (`mesa-foto:<sala>`,
+    gravada 1 s depois de cada mudança) é o que a tela mostra se o app abrir
+    sem internet; sem foto, a mensagem diz que o aparelho nunca abriu a
+    sala. **Pra testar a queda no meio da sessão**: o cliente do Supabase
+    resolve `fetch` a cada chamada (`lib/supabase.ts`), então no console dá
+    pra trocar `window.fetch` por um que rejeita URLs de
+    `supabase.co/rest` com `TypeError` e depois voltar o original e
+    disparar `window.dispatchEvent(new Event("online"))`. Pra testar abrir
+    sem internet: subir o `next dev` com `NEXT_PUBLIC_SUPABASE_URL` apontando
+    pra um endereço que não responde.
+- **Faixa de 0 PV diz "Inconsciente"**, não "Caído" (19/09/2026): Caído é a
+  condição de estar no chão (Prone), que agora tem explicação própria.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
@@ -370,7 +409,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
-feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 8.
+feitos — ficam aqui pra deixar claro de onde a ordem veio. Os 8 foram feitos;
+a próxima lista sai de conversa nova com o Daniel.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
@@ -387,11 +427,11 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 8.
    "Desfazer" em Estado).
 7. ~~Explicar a condição na hora~~ — feito em 19/09/2026 (sem migration; ver
    "Condições explicadas" em Estado).
-8. **Funcionar sem internet** por alguns minutos (app instalável de verdade),
-   pra queda de wi-fi no meio da luta.
+8. ~~Funcionar sem internet~~ — feito em 19/09/2026 (sem migration; ver
+   "Sem internet" em Estado).
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 182 que existem são todos de funções
+componentes não têm teste nenhum (os 196 que existem são todos de funções
 puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava

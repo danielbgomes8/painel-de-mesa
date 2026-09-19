@@ -235,8 +235,10 @@ export function RastreadorCombate({
   }
 
   async function aplicarAjuste(alvo: Personagem, delta: number) {
-    const texto = await mudarPVComLog(sala, alvo, delta);
+    // Fecha no toque: a linha já mostra o PV novo, e com a internet
+    // pendurada a escrita pode levar até o prazo da rede pra responder.
     setAjustando(null);
+    const texto = await mudarPVComLog(sala, alvo, delta);
     if (texto) setRetorno({ slug: alvo.slug, texto });
   }
 

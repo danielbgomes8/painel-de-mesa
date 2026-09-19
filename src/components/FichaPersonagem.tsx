@@ -132,7 +132,9 @@ export function FichaPersonagem({
             {/* NPC não tem a seção de testes de morte abaixo (monstro não
              *  rola morte no 2024) — banner não pode mandar fazer um teste
              *  que não existe na própria ficha. */}
-            {p.is_npc ? "⚠ Caído — a 0 PV" : "⚠ Caído — inconsciente, faça os testes de morte"}
+            {/* "Inconsciente", não "Caído": Caído é a condição de estar
+             *  derrubado no chão (Prone), com explicação própria na ficha. */}
+            {p.is_npc ? "⚠ A 0 PV — fora de combate" : "⚠ Inconsciente — a 0 PV, faça os testes de morte"}
           </div>
         )}
 

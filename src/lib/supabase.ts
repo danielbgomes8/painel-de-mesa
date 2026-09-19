@@ -14,7 +14,31 @@ const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const supabaseConfigurado = Boolean(url && anon);
 
+/** Pedido que não responde nisso é dado como sem internet (ver
+ *  lib/offline.ts): wi-fi "conectado" mas sem internet deixa o pedido
+ *  pendurado por dezenas de segundos, e até lá o app nem sabia que devia
+ *  guardar as mudanças na fila. */
+const PRAZO_REDE_MS = 10_000;
+
+function fetchComPrazo(entrada: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const prazo = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(PRAZO_REDE_MS) : null;
+  // Quem chamou pode ter mandado o próprio sinal de cancelar: vale o que vier
+  // primeiro. Navegador sem AbortSignal.any fica só com o de quem chamou.
+  const sinal =
+    prazo && init.signal
+      ? typeof AbortSignal.any === "function"
+        ? AbortSignal.any([init.signal, prazo])
+        : init.signal
+      : (init.signal ?? prazo ?? undefined);
+  // `fetch` resolvido a cada chamada (a biblioteca guardaria o da hora em que
+  // o cliente nasce): é o que deixa simular queda de internet no teste
+  // manual trocando `window.fetch` no console — ver "Sem internet" no
+  // AGENTS.md.
+  return fetch(entrada, { ...init, signal: sinal });
+}
+
 export const supabase = createClient(url ?? "https://sem-config.supabase.co", anon ?? "sem-config", {
   auth: { persistSession: false },
   realtime: { params: { eventsPerSecond: 10 } },
+  global: { fetch: fetchComPrazo },
 });

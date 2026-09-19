@@ -11,6 +11,7 @@ import {
   type Identidade,
 } from "@/lib/identidade";
 import { lembrarSala, rotuloDaSala } from "@/lib/sala";
+import { horaCurta } from "@/lib/offline";
 import { BackupSala, baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
@@ -31,6 +32,14 @@ import { BarraDesfazer } from "@/components/BarraDesfazer";
 export function Painel() {
   const codigo = useCodigoSala();
   const noNavegador = useNoNavegador();
+
+  // Service worker (public/sw.js): guarda o app no aparelho pra ele abrir
+  // sem internet. Só no site publicado — no `npm run dev` ele guardaria
+  // versões de desenvolvimento e atrapalharia.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch((e) => console.error("service worker", e));
+  }, []);
 
   // No servidor e na hidratação a sala ainda não é conhecida: a página é
   // estática, e o código vem da URL ou da última sala deste aparelho (ver
@@ -161,8 +170,12 @@ function PainelSala({ codigo }: { codigo: string }) {
           <span className="tag">{rotulo}</span>
         </div>
         <div className="whoami">
-          <span className={`synctag${sala.conectado ? " on" : ""}`}>
-            {sala.conectado ? "sincronizado" : "offline"}
+          <span className={`synctag${sala.semInternet ? " semrede" : sala.conectado ? " on" : ""}`}>
+            {sala.semInternet
+              ? `sem internet${sala.esperando > 0 ? ` · ${sala.esperando} esperando` : ""}`
+              : sala.conectado
+                ? "sincronizado"
+                : "offline"}
           </span>
           <span>
             Entrou como <b>{quem}</b>
@@ -213,6 +226,14 @@ function PainelSala({ codigo }: { codigo: string }) {
           <button type="button" onClick={sala.limparAvisoFalha} aria-label="Dispensar aviso">
             ✕
           </button>
+        </div>
+      )}
+
+      {sala.semInternet && (
+        <div className="avisosemrede" role="status">
+          <b>Sem internet.</b> O combate continua: o que você fizer fica guardado neste aparelho e vai
+          pro banco quando a conexão voltar — os outros celulares só veem depois.
+          {sala.fotoDe && ` Abriu sem conexão: mostrando o que este aparelho tinha às ${horaCurta(sala.fotoDe)}.`}
         </div>
       )}
 
