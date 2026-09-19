@@ -45,7 +45,8 @@ describe("campanhas pra escolher", () => {
     expect(codigos([], "setimo-raio")).toEqual(["setimo-raio", "forgotten-realms"]);
   });
 
-  it("a Forgotten Realms é do Diogo, com nome bonito", () => {
+  it("cada campanha do grupo sabe quem mestra", () => {
+    expect(mestreDaSala("setimo-raio")).toBe("Maeta");
     expect(rotuloDaSala("forgotten-realms")).toBe("Forgotten Realms");
     expect(mestreDaSala("forgotten-realms")).toBe("Diogo");
     expect(mestreDaSala("cripta-de-ferro")).toBeUndefined();

@@ -216,7 +216,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `EscolherCampanha.tsx`): na tela de entrada (antes de escolher quem é — quem
   abre o link puro cai na Sétimo Raio e precisa sair dela) e no botão
   "⇄ trocar campanha" do topo. Lista as campanhas do grupo (`CAMPANHAS` em
-  `sala.ts`, hoje Sétimo Raio e Forgotten Realms do Diogo), depois as salas
+  `sala.ts`, hoje Sétimo Raio do Maeta e Forgotten Realms do Diogo), depois as salas
   que o aparelho já abriu por código e a sala aberta agora
   (`campanhasParaEscolher`), mais um campo pra digitar o código de outra
   (`codigoDigitado`, que devolve `null` em vez de cair no padrão). A troca é

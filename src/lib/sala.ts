@@ -111,7 +111,7 @@ export type Campanha = {
  * "Segurança" no README).
  */
 export const CAMPANHAS: readonly Campanha[] = [
-  { codigo: "setimo-raio", nome: "Sétimo Raio" },
+  { codigo: "setimo-raio", nome: "Sétimo Raio", mestre: "Maeta" },
   { codigo: "forgotten-realms", nome: "Forgotten Realms", mestre: "Diogo" },
 ];
 

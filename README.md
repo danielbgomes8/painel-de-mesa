@@ -1,8 +1,8 @@
 # Painel de Mesa
 
 Painel de combate e fichas pra mesa de **D&D 5.5** (regras 2024, SRD 5.2) do
-Daniel — campanha **"Sétimo Raio"**, jogada presencialmente com cada pessoa no
-seu aparelho. O mesmo app serve outras campanhas do grupo, cada uma com os
+Daniel — campanha **"Sétimo Raio"** (mestrada pelo Maeta), jogada
+presencialmente com cada pessoa no seu aparelho. O mesmo app serve outras campanhas do grupo, cada uma com os
 dados separados (hoje também a **"Forgotten Realms"**, mestrada pelo Diogo).
 
 Não é ficha completa de personagem: é o punhado de coisas que muda o tempo todo
