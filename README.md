@@ -88,8 +88,9 @@ antecedência (ficha completa + notas de tática, reaproveitável entre
 combates e sessões), busca no catálogo de monstros do SRD 2024 (CA, PV,
 iniciativa, linha de ataque), notas privadas que só o Mestre enxerga,
 revelar/ocultar NPC, remover personagens e NPCs, **modo telão** (tela cheia
-pra projetar ou compartilhar, sem os controles de edição, com o mesmo
-segredo de PV de NPC) e **backup** (baixa tudo da sala num `.json`).
+pra projetar ou compartilhar, sem os controles de edição, mostrando de quem
+é a vez, as condições dela e quem vem a seguir, com o mesmo segredo de PV
+de NPC) e **backup** (baixa tudo da sala num `.json`).
 
 ---
 

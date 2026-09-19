@@ -205,7 +205,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   virada de rodada). Só **nomes** na lista do "a seguir" — PV de NPC é
   informação do Mestre e o telão é visto pela mesa inteira, então continua
   passando por `nomeExibidoIniciativa`/`pvExibidoIniciativa` com
-  `souMestre=false` (NPC não revelado aparece como "Inimigo 2").
+  `souMestre=false` (NPC não revelado aparece como "Inimigo 2"). Desde
+  19/09/2026 mostra também **as condições de quem está na vez** (com o prazo,
+  a exaustão e o "Inconsciente" de jogador a 0 PV) — elas valem pra mesa
+  inteira ver, como já valiam na ordem e no log; NPC a 0 PV não entra nisso,
+  que é PV dele disfarçado. A folga do corpo da página some no telão
+  (`body:has(.telao)`): ela empurrava o conteúdo pra fora da tela da TV e
+  deixava a página rolando 84px à toa (achado medindo).
 - **Várias campanhas no mesmo deploy** (19/09/2026, sem migration): cada
   campanha é uma sala (`?sala=codigo`), criada sozinha no primeiro acesso,
   com dados totalmente separados. O que prendia tudo à sala padrão foi solto:
@@ -462,8 +468,8 @@ a lista seguinte está logo abaixo.
 
 ### Segunda lista (sugerida em 19/09/2026 — o Daniel respondeu "vamos seguir")
 
-Tudo gira em torno da linha da iniciativa, que virou o centro do combate. O
-próximo é o 4.
+Tudo gira em torno da linha da iniciativa, que virou o centro do combate.
+Os quatro foram feitos; a próxima lista sai de conversa nova com o Daniel.
 
 1. ~~Condição direto na linha da iniciativa~~ — feito em 19/09/2026 (sem
    migration): o painel que abre ao tocar no nome ganhou os 14 chips e os
@@ -472,7 +478,8 @@ próximo é o 4.
    ver "Ataques rolados" em Estado).
 3. ~~Jogador caído na iniciativa~~ — feito em 19/09/2026 (sem migration;
    ver "Testes de morte" em Estado).
-4. **Telão com as condições** de quem está na vez.
+4. ~~Telão com as condições~~ — feito em 19/09/2026 (sem migration; ver
+   "Telão" em Estado).
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
 componentes não têm teste nenhum (os 219 que existem são todos de funções

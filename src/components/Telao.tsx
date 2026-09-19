@@ -1,7 +1,9 @@
 "use client";
 
 import type { Sala } from "@/hooks/useSala";
+import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import {
+  estaCaido,
   nomeExibidoIniciativa,
   numerarNpcsNaOrdem,
   proximosDaOrdem,
@@ -28,6 +30,18 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
       : atual.name
     : null;
   const pvVisivel = pv ? pvExibidoIniciativa(pv, false) : null;
+  // As condições de quem está na vez, do tamanho de serem lidas do outro
+  // lado da mesa. Valem pra todo mundo ver, NPC oculto inclusive (o log já
+  // anuncia, e é o que decide se o ataque tem vantagem). Jogador a 0 PV
+  // aparece como Inconsciente, que é a condição que ele tem pelas regras;
+  // NPC a 0 PV não entra nisso — o PV dele é informação do Mestre.
+  const etiquetas: string[] = [];
+  if (pv && !pv.is_npc && estaCaido(pv.hp)) etiquetas.push("Inconsciente");
+  for (const nome of pv ? condicoesAtivas(pv.cond) : []) {
+    const prazo = pv?.cond_prazo[nome];
+    etiquetas.push(prazo ? `${nome} · ${textoPrazo(prazo)}` : nome);
+  }
+  if (pv && pv.exh > 0) etiquetas.push(`Exaustão ${pv.exh}`);
   // Só os nomes: PV de NPC é informação do Mestre, e no telão a mesa inteira
   // está vendo (ver pvExibidoIniciativa).
   const proximos = proximosDaOrdem(combate.order.length, combate.turn, QUANTOS_PROXIMOS).map((i) => {
@@ -51,6 +65,13 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
           {pvVisivel && (
             <div className="telao-pv">
               {pvVisivel.hp} / {pvVisivel.hp_max} PV
+            </div>
+          )}
+          {etiquetas.length > 0 && (
+            <div className="telao-cond">
+              {etiquetas.map((e) => (
+                <span key={e}>{e}</span>
+              ))}
             </div>
           )}
           {proximos.length > 0 && (

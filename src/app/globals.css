@@ -1628,6 +1628,11 @@ button:focus-visible {
 }
 
 /* ---------- modo telão ---------- */
+/* No telão a folga do corpo da página não serve: ela empurrava o conteúdo
+   pra fora da tela cheia da TV e deixava a página rolando 84px à toa. */
+body:has(.telao) {
+  padding: 0;
+}
 .telao {
   min-height: 100vh;
   display: flex;
@@ -1660,6 +1665,23 @@ button:focus-visible {
   font-size: 32px;
   color: var(--ink);
 }
+/* Condições de quem está na vez: grandes o bastante pra ler de longe, mas
+   menores que o nome. */
+.telao-cond {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 14px;
+}
+.telao-cond span {
+  border: 2px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-family: var(--f-display);
+  font-size: clamp(18px, 2.6vw, 30px);
+  padding: 4px 18px;
+}
+
 /* "A seguir" no telão: bem menor que o nome de quem está jogando, pra a mesa
    se preparar sem tirar o olho de quem é a vez. Só nomes — PV de NPC é
    informação do Mestre (ver pvExibidoIniciativa). */
