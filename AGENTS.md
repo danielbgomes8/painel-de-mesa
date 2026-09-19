@@ -17,7 +17,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   aparelho entrou, e só então o padrão `setimo-raio` (`escolherSala` em
   `src/lib/sala.ts`) — é o que faz o app instalado na tela de início abrir a
   campanha de cada um. Campanha do grupo (nome com acento, quem mestra) mora
-  em `CAMPANHAS`, no mesmo arquivo.
+  em `CAMPANHAS`, no mesmo arquivo. A campanha da sala `setimo-raio` se chama
+  **Salamina** (mestre: Maeta) — "Sétimo Raio" foi nome errado do começo,
+  vindo da ficha do Tibério. O código não muda: renomear a sala obrigaria a
+  mover os dados de todas as tabelas e cada aparelho perderia a escolha de
+  personagem salva (`mesa-identidade:setimo-raio`).
 - **Regras de negócio fechadas** ficam em `src/lib/regras.ts`, cada uma pura e
   testada em `src/lib/regras.test.ts` (`npm run teste`). Não reimplementar em
   componente — importar de lá. O mesmo vale pro catálogo de monstros:
@@ -204,7 +208,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `souMestre=false` (NPC não revelado aparece como "Inimigo 2").
 - **Várias campanhas no mesmo deploy** (19/09/2026, sem migration): cada
   campanha é uma sala (`?sala=codigo`), criada sozinha no primeiro acesso,
-  com dados totalmente separados. O que prendia tudo à Sétimo Raio foi solto:
+  com dados totalmente separados. O que prendia tudo à sala padrão foi solto:
   o título da aba vem do `<title>` que o `Painel` renderiza com o nome da sala
   (não do metadata do layout — o Next aplica aquele por último e passava por
   cima), o manifest ficou genérico, e o app instalado abre a **última sala em
@@ -214,9 +218,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   padrão e ainda abria uma conexão à toa com ela — achado testando.
 - **Trocar de campanha sem link** (19/09/2026, sem migration,
   `EscolherCampanha.tsx`): na tela de entrada (antes de escolher quem é — quem
-  abre o link puro cai na Sétimo Raio e precisa sair dela) e no botão
+  abre o link puro cai na Salamina e precisa sair dela) e no botão
   "⇄ trocar campanha" do topo. Lista as campanhas do grupo (`CAMPANHAS` em
-  `sala.ts`, hoje Sétimo Raio do Maeta e Forgotten Realms do Diogo), depois as salas
+  `sala.ts`, hoje Salamina do Maeta e Forgotten Realms do Diogo), depois as salas
   que o aparelho já abriu por código e a sala aberta agora
   (`campanhasParaEscolher`), mais um campo pra digitar o código de outra
   (`codigoDigitado`, que devolve `null` em vez de cair no padrão). A troca é

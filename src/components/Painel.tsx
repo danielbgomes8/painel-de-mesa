@@ -35,7 +35,7 @@ export function Painel() {
   // estática, e o código vem da URL ou da última sala deste aparelho (ver
   // escolherSala). Montar a sala antes disso abria a conexão da sala padrão
   // à toa — e o efeito que grava `?sala=` no endereço prendia a pessoa nela:
-  // o app instalado caía na Sétimo Raio em vez da última campanha (achado
+  // o app instalado caía na Salamina em vez da última campanha (achado
   // testando). O título neutro também é o que um preview de link (WhatsApp)
   // enxerga, em vez do nome de outra campanha.
   if (!noNavegador) {

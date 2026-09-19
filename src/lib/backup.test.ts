@@ -26,7 +26,7 @@ const personagem = (extra: Partial<Personagem>): Personagem =>
 const bastiao: Bastiao = { room_code: "sala", turno: 4, tesouro_po: 120, defensores: 3, notes: "torre" };
 
 const salaCheia = {
-  rotulo: "Sétimo Raio",
+  rotulo: "Salamina",
   codigo: "setimo-raio",
   personagens: [personagem({}), personagem({ id: "id-2", slug: "kobold", name: "Kobold", is_npc: true })],
   combate: { round: 11, turn: 2, order: [{ slug: "tiberio", name: "Tibério", init: 18 }] },
@@ -121,7 +121,7 @@ describe("lerBackup", () => {
   it("aceita backup antigo (sem Bastião) avisando que o Bastião fica como está", () => {
     const antigo = {
       exportado_em: "2026-09-01T00:00:00Z",
-      sala: "Sétimo Raio",
+      sala: "Salamina",
       personagens: [personagem({})],
       combate: { round: 2, turn: 0, order: [] },
       notas_mestre: "",

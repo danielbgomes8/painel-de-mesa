@@ -47,7 +47,7 @@ export function Portao({
       <h1>Painel de Mesa</h1>
 
       {/* Quem abre o link puro cai na última campanha do aparelho (ou na
-          Sétimo Raio): daqui dá pra ir pra outra antes de escolher quem é. */}
+          Salamina): daqui dá pra ir pra outra antes de escolher quem é. */}
       <div className="gatecampanha">
         <div className="gatecampanharotulo">Campanha</div>
         <EscolherCampanha atual={codigo} />

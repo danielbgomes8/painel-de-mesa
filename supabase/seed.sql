@@ -1,4 +1,4 @@
--- Dados da primeira sala — campanha "Sétimo Raio".
+-- Dados da primeira sala — campanha "Salamina" (código `setimo-raio`).
 -- Rode DEPOIS de 0001_inicial.sql. Idempotente: pode rodar de novo sem duplicar.
 
 insert into public.rooms (code)

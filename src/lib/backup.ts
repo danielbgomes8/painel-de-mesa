@@ -22,7 +22,7 @@ export const VERSAO_BACKUP = 3;
 export type Backup = {
   versao: number;
   exportado_em: string;
-  /** Nome bonito da sala, só pra quem lê o arquivo ("Sétimo Raio"). */
+  /** Nome bonito da sala, só pra quem lê o arquivo ("Salamina"). */
   sala: string;
   /** Código de verdade da sala ("setimo-raio") — é o que dá pra conferir. */
   sala_codigo: string;

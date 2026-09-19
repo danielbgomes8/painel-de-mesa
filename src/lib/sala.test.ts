@@ -17,7 +17,7 @@ describe("qual sala abrir", () => {
     expect(escolherSala(null, "cripta-de-ferro")).toBe("cripta-de-ferro");
   });
 
-  it("sem link e sem sala lembrada, cai no padrão — quem só joga a Sétimo Raio não sente nada", () => {
+  it("sem link e sem sala lembrada, cai no padrão — quem só joga a Salamina não sente nada", () => {
     expect(escolherSala(null, null)).toBe(SALA_PADRAO);
   });
 
@@ -28,8 +28,8 @@ describe("qual sala abrir", () => {
 });
 
 describe("rótulo da sala", () => {
-  it("a Sétimo Raio mantém o acento que o código não guarda", () => {
-    expect(rotuloDaSala("setimo-raio")).toBe("Sétimo Raio");
+  it("a Salamina mostra o nome certo, não o do código antigo", () => {
+    expect(rotuloDaSala("setimo-raio")).toBe("Salamina");
   });
 
   it("sala nova vira título a partir do código", () => {
@@ -73,7 +73,7 @@ describe("código digitado", () => {
     expect(codigoDigitado("Cripta-de-Ferro-7K2")).toBe("cripta-de-ferro-7k2");
   });
 
-  it("campo vazio não leva ninguém pra Sétimo Raio sem querer", () => {
+  it("campo vazio não leva ninguém pra Salamina sem querer", () => {
     expect(codigoDigitado("")).toBeNull();
     expect(codigoDigitado(" !! ")).toBeNull();
   });

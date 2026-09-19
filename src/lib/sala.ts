@@ -27,7 +27,7 @@ export function normalizarCodigoSala(bruto: string): string {
  * A "última sala" existe por causa do app instalado na tela de início: ele
  * abre sempre em `/` (o endereço fica gravado na instalação) e não tem barra
  * de endereço pra trocar. Sem isso, quem joga em outra campanha e instalou o
- * app caía na Sétimo Raio toda vez.
+ * app caía na sala padrão (Salamina) toda vez.
  */
 export function escolherSala(daUrl: string | null, ultima: string | null): string {
   if (daUrl) return normalizarCodigoSala(daUrl);
@@ -91,7 +91,7 @@ export function irParaSala(codigo: string): void {
 
 /** Código digitado à mão ("Forgotten Realms", "cripta-de-ferro-7k2") → código
  *  de sala, ou `null` se não sobrou nada — aqui não cai no padrão, pra um
- *  campo vazio não levar ninguém pra Sétimo Raio sem querer. */
+ *  campo vazio não levar ninguém pra Salamina sem querer. */
 export function codigoDigitado(bruto: string): string | null {
   return aSlug(bruto) || null;
 }
@@ -111,7 +111,11 @@ export type Campanha = {
  * "Segurança" no README).
  */
 export const CAMPANHAS: readonly Campanha[] = [
-  { codigo: "setimo-raio", nome: "Sétimo Raio", mestre: "Maeta" },
+  // O código ficou `setimo-raio` (nome errado que o app teve no começo, vindo
+  // da ficha do Tibério) e não muda: todos os dados da campanha e a escolha
+  // de personagem salva em cada aparelho (`mesa-identidade:setimo-raio`)
+  // estão presos a ele. Só o nome mostrado é Salamina.
+  { codigo: "setimo-raio", nome: "Salamina", mestre: "Maeta" },
   { codigo: "forgotten-realms", nome: "Forgotten Realms", mestre: "Diogo" },
 ];
 
