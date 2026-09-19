@@ -29,10 +29,11 @@ const TAMANHO_LOG = 40;
  *  metade sem paginar — e backup pela metade é pior que backup nenhum. */
 const PAGINA_EXPORTACAO = 1000;
 
-// Tentativas de definirCombate antes de desistir e avisar (ver migration
-// 0010) — mais que suficiente pra qualquer contenção real numa mesa de RPG;
-// existe só pra não tentar pra sempre num cenário patológico.
-const MAX_TENTATIVAS_COMBATE = 5;
+// Tentativas de uma escrita com versão antes de desistir e avisar (ver
+// migrations 0010 e 0015) — mais que suficiente pra qualquer contenção real
+// numa mesa de RPG; existe só pra não tentar pra sempre num cenário
+// patológico.
+const MAX_TENTATIVAS_VERSAO = 5;
 
 const BASTIAO_VAZIO: Bastiao = { room_code: "", turno: 1, tesouro_po: 0, defensores: 0, notes: "" };
 
@@ -43,6 +44,15 @@ type LinhaCombate = {
   order_json: ItemIniciativa[] | null;
   version: number;
 };
+
+/** A linha de `bastiao` no banco: o que a tela usa, mais o contador de versão
+ *  (que é detalhe de escrita e por isso fica fora do tipo `Bastiao`). */
+type LinhaBastiao = Bastiao & { version: number };
+
+type ResultadoVersao<L> =
+  | { tipo: "gravou"; linha: L }
+  | { tipo: "conflito"; linha: L }
+  | { tipo: "erro"; mensagem: string };
 
 /** A sala inteira lida do banco na hora (não o que está na tela): o log vai
  *  completo, não só as últimas linhas. É o que vira arquivo de backup. */
@@ -151,6 +161,39 @@ function pedacos<T>(lista: T[], tamanho: number): T[][] {
   return saida;
 }
 
+/**
+ * UPDATE que só pega se `version` ainda for a que este cliente leu — o
+ * controle de concorrência otimista das migrations 0010 (combate) e 0015
+ * (Bastião). Uma instrução atômica no Postgres decide quem ganha: quem chegou
+ * primeiro grava e incrementa a versão, quem chegou depois afeta zero linhas.
+ *
+ * "conflito" não é falha: vem com a linha de verdade que está no banco agora,
+ * pra quem chamou refazer o cálculo em cima dela e tentar de novo. Relê
+ * direto do banco de propósito — não dá pra confiar que o tempo real já
+ * entregou a notícia a tempo.
+ */
+async function gravarSeVersaoBater<L extends { version: number }>(
+  tabela: string,
+  codigo: string,
+  versao: number,
+  colunas: Record<string, unknown>,
+): Promise<ResultadoVersao<L>> {
+  const { data, error } = await supabase
+    .from(tabela)
+    .update({ ...colunas, version: versao + 1 })
+    .eq("room_code", codigo)
+    .eq("version", versao)
+    .select()
+    .maybeSingle();
+  if (error) return { tipo: "erro", mensagem: error.message };
+  if (data) return { tipo: "gravou", linha: data as L };
+
+  const releitura = await supabase.from(tabela).select("*").eq("room_code", codigo).maybeSingle();
+  if (releitura.error) return { tipo: "erro", mensagem: releitura.error.message };
+  if (!releitura.data) return { tipo: "erro", mensagem: `${tabela}: linha da sala sumiu` };
+  return { tipo: "conflito", linha: releitura.data as L };
+}
+
 /** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
 function ordenar(lista: Personagem[]): Personagem[] {
   return [...lista].sort((a, b) => {
@@ -191,6 +234,8 @@ export function useSala(codigo: string): Sala {
   const [modelosNpc, setModelosNpc] = useState<ModeloNpc[]>([]);
   const [diario, setDiario] = useState<EntradaDiario[]>([]);
   const [bastiao, setBastiao] = useState<Bastiao>(BASTIAO_VAZIO);
+  // Mesmo papel do combateVersao acima, pro Bastião (ver migration 0015).
+  const [bastiaoVersao, setBastiaoVersao] = useState(0);
   const [instalacoesBastiao, setInstalacoesBastiao] = useState<InstalacaoBastiao[]>([]);
   const [logBastiao, setLogBastiao] = useState<LinhaLogBastiao[]>([]);
 
@@ -202,6 +247,7 @@ export function useSala(codigo: string): Sala {
     combate,
     combateVersao,
     bastiao,
+    bastiaoVersao,
     notasMestre,
     modelosNpc,
     diario,
@@ -213,6 +259,7 @@ export function useSala(codigo: string): Sala {
       combate,
       combateVersao,
       bastiao,
+      bastiaoVersao,
       notasMestre,
       modelosNpc,
       diario,
@@ -350,6 +397,7 @@ export function useSala(codigo: string): Sala {
       setModelosNpc((mn.data ?? []) as ModeloNpc[]);
       setDiario((di.data ?? []) as EntradaDiario[]);
       setBastiao((ba.data ?? { ...BASTIAO_VAZIO, room_code: codigo }) as Bastiao);
+      setBastiaoVersao((ba.data as LinhaBastiao | null)?.version ?? 0);
       setInstalacoesBastiao((bi.data ?? []) as InstalacaoBastiao[]);
       setLogBastiao((bl.data ?? []) as LinhaLogBastiao[]);
       setCarregando(false);
@@ -472,7 +520,9 @@ export function useSala(codigo: string): Sala {
         (msg) => {
           eventosRecebidos++;
           if (msg.eventType === "DELETE") return;
-          setBastiao(msg.new as Bastiao);
+          const linha = msg.new as LinhaBastiao;
+          setBastiao(linha);
+          setBastiaoVersao(linha.version ?? 0);
         },
       )
       .on(
@@ -631,62 +681,42 @@ export function useSala(codigo: string): Sala {
       // já estar velho depois de um await) encurta a janela da corrida, mas
       // não fecha: dois clientes podem estar com o request em voo ao mesmo
       // tempo, cada um sem saber do outro. A trava de verdade é o UPDATE só
-      // pegar se `version` ainda for a que este cliente leu — controle de
-      // concorrência otimista (ver migration 0010). Quando não pega, ninguém
-      // perdeu escrita: busca o estado de verdade e tenta de novo em cima
-      // dele, até um número razoável de tentativas.
-      for (let tentativa = 0; tentativa < MAX_TENTATIVAS_COMBATE; tentativa++) {
+      // pegar se `version` ainda for a que este cliente leu — ver
+      // gravarSeVersaoBater e a migration 0010. Conflito não perde escrita:
+      // refaz o patch em cima do estado de verdade e tenta de novo.
+      for (let tentativa = 0; tentativa < MAX_TENTATIVAS_VERSAO; tentativa++) {
         const parcial = typeof patch === "function" ? patch(anterior) : patch;
         const proximo = { ...anterior, ...parcial };
         setCombate(proximo);
 
-        const { data, error } = await supabase
-          .from("combat_state")
-          .update({ round: proximo.round, turn: proximo.turn, order_json: proximo.order, version: versao + 1 })
-          .eq("room_code", codigo)
-          .eq("version", versao)
-          .select()
-          .maybeSingle();
+        const r = await gravarSeVersaoBater<LinhaCombate>("combat_state", codigo, versao, {
+          round: proximo.round,
+          turn: proximo.turn,
+          order_json: proximo.order,
+        });
 
-        if (error) {
-          console.error("definirCombate", error);
+        if (r.tipo === "erro") {
+          console.error("definirCombate", r.mensagem);
           setCombate(original);
           setCombateVersao(versaoOriginal);
           setAvisoFalha(AVISO_FALHA_ESCRITA);
           return null;
         }
 
-        if (data) {
-          const linha = data as LinhaCombate;
-          const atualizado = comoCombate(linha);
+        if (r.tipo === "gravou") {
+          const atualizado = comoCombate(r.linha);
           setCombate(atualizado);
-          setCombateVersao(linha.version);
+          setCombateVersao(r.linha.version);
           return atualizado;
         }
 
-        // Zero linhas afetadas = outro cliente escreveu entre a leitura e
-        // esta escrita. Releitura direta do banco, não confia em o realtime
-        // já ter entregue a notícia a tempo.
-        const { data: fresco, error: erroFresco } = await supabase
-          .from("combat_state")
-          .select("*")
-          .eq("room_code", codigo)
-          .maybeSingle();
-        if (erroFresco || !fresco) {
-          console.error("definirCombate (releitura)", erroFresco);
-          setCombate(original);
-          setCombateVersao(versaoOriginal);
-          setAvisoFalha(AVISO_FALHA_ESCRITA);
-          return null;
-        }
-        const linhaFresca = fresco as LinhaCombate;
-        anterior = comoCombate(linhaFresca);
-        versao = linhaFresca.version;
+        anterior = comoCombate(r.linha);
+        versao = r.linha.version;
         setCombate(anterior);
         setCombateVersao(versao);
       }
 
-      console.error("definirCombate: contenção demais, desisti depois de", MAX_TENTATIVAS_COMBATE, "tentativas");
+      console.error("definirCombate: contenção demais, desisti depois de", MAX_TENTATIVAS_VERSAO, "tentativas");
       setAvisoFalha(AVISO_FALHA_ESCRITA);
       return null;
     },
@@ -864,19 +894,48 @@ export function useSala(codigo: string): Sala {
   }, []);
 
   const definirBastiao = useCallback(
-    async (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => {
-      const anterior = ref.current.bastiao;
-      const parcial = typeof patch === "function" ? patch(anterior) : patch;
-      const proximo = { ...anterior, ...parcial };
-      setBastiao(proximo);
-      const { error } = await supabase.from("bastiao").update(parcial).eq("room_code", codigo);
-      if (error) {
-        console.error("definirBastiao", error);
+    async (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)): Promise<Bastiao | null> => {
+      const original = ref.current.bastiao;
+      const versaoOriginal = ref.current.bastiaoVersao;
+      let anterior = original;
+      let versao = versaoOriginal;
+
+      // Mesma trava do definirCombate, pelo mesmo motivo — e aqui o caso comum
+      // é justamente mais de um aparelho mexendo junto, porque o Bastião é do
+      // grupo: "próximo turno" é turno+1 calculado aqui, então sem a versão
+      // dois avanços simultâneos viravam um só (ver migration 0015).
+      for (let tentativa = 0; tentativa < MAX_TENTATIVAS_VERSAO; tentativa++) {
+        const parcial = typeof patch === "function" ? patch(anterior) : patch;
+        const proximo = { ...anterior, ...parcial };
+        setBastiao(proximo);
+
+        // Manda só as colunas do patch, não a linha inteira: quem edita o
+        // tesouro não reescreve as notas que o outro acabou de salvar.
+        const r = await gravarSeVersaoBater<LinhaBastiao>("bastiao", codigo, versao, parcial);
+
+        if (r.tipo === "erro") {
+          console.error("definirBastiao", r.mensagem);
+          setBastiao(original);
+          setBastiaoVersao(versaoOriginal);
+          setAvisoFalha(AVISO_FALHA_ESCRITA);
+          return null;
+        }
+
+        if (r.tipo === "gravou") {
+          setBastiao(r.linha);
+          setBastiaoVersao(r.linha.version);
+          return r.linha;
+        }
+
+        anterior = r.linha;
+        versao = r.linha.version;
         setBastiao(anterior);
-        setAvisoFalha(AVISO_FALHA_ESCRITA);
-        return null;
+        setBastiaoVersao(versao);
       }
-      return proximo;
+
+      console.error("definirBastiao: contenção demais, desisti depois de", MAX_TENTATIVAS_VERSAO, "tentativas");
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+      return null;
     },
     [codigo],
   );

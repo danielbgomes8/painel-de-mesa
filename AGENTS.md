@@ -223,7 +223,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0014` e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0015` e o `seed.sql`
   já rodadas — o banco tem as dez tabelas (`rooms` mais nove filhas, todas
   com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
   uma vez**: se criar tabela nova
@@ -264,9 +264,10 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 4.
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
 componentes não têm teste nenhum (as 126 que existem são das regras puras);
-`definirBastiao` não tem o controle de concorrência que `definirCombate`
-ganhou na migration `0010`, então dois aparelhos avançando o turno juntos
-podem contar errado; e `combat_log` nunca é podado.
+e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
+concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
+de versão do combate, os dois agora passam por `gravarSeVersaoBater` em
+`useSala.ts`.)
 
 **Pendente com o Daniel** (não dá pra resolver sozinho): as fichas completas
 de **Sigha**, **Mordecai** e **Massaranduba** — os três estão com atributos

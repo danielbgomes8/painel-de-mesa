@@ -125,7 +125,8 @@ src/
                   por classe/nível) · monstrosSrd (catálogo de monstros) ·
                   backup (exporta a sala num .json)
 supabase/
-  migrations/     0001 a 0014 — do esquema inicial até multiclasse; o
+  migrations/     0001 a 0015 — do esquema inicial até a trava de versão
+                  do Bastião; o
                   cabeçalho de cada arquivo diz depois de qual rodar
   seed.sql        dados da sala "setimo-raio" (Tibério Vaz)
 ```
