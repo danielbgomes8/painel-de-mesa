@@ -6,6 +6,17 @@ import { slugUnico } from "@/lib/sala";
 import { turnoAposRemover } from "@/lib/regras";
 import { linhasParaInserir, type Backup } from "@/lib/backup";
 import {
+  camposConferiveis,
+  empilhar,
+  lerPilhaGuardada,
+  mesmoCombate,
+  mudouAlgo,
+  podeDesfazer,
+  type AcaoDesfazivel,
+  type MudancaCombate,
+  type NovaAcaoDesfazivel,
+} from "@/lib/desfazer";
+import {
   COMBATE_VAZIO,
   type Bastiao,
   type Encontro,
@@ -105,11 +116,13 @@ export type Sala = {
   removerPersonagem: (id: string) => Promise<void>;
   /** Aceita um patch pronto ou uma função (atual) => patch, resolvida contra o
    *  estado mais recente conhecido — evite montar o patch a partir do
-   *  `combate` de fora depois de um `await`, pode já estar velho. Devolve
-   *  null quando a escrita falha (e já reverteu o estado local). */
+   *  `combate` de fora depois de um `await`, pode já estar velho. Devolve o
+   *  estado de antes (o que a escrita que pegou usou de base) e o de depois —
+   *  o par que o desfazer precisa. null quando a escrita falha (e já reverteu
+   *  o estado local). */
   definirCombate: (
     patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>),
-  ) => Promise<EstadoCombate | null>;
+  ) => Promise<MudancaCombate | null>;
   definirNotasMestre: (texto: string) => Promise<void>;
   registrarLog: (texto: string) => Promise<void>;
   /** Igual a registrarLog, várias linhas numa só escrita. */
@@ -137,6 +150,17 @@ export type Sala = {
    *  e não com o que sobrou na memória — o tempo real, por exemplo, não
    *  entrega apagamentos feitos em outro aparelho. */
   recarregarSala: () => void;
+  /** A ação mais nova DESTE aparelho que dá pra desfazer (null = nenhuma). */
+  desfazivel: AcaoDesfazivel | null;
+  /** Guarda uma ação feita agora pra poder desfazer (ver lib/desfazer.ts).
+   *  Chamar só depois que a escrita confirmou. Ação que não mudou nada é
+   *  ignorada. */
+  lembrarDesfazer: (acao: NovaAcaoDesfazivel) => void;
+  /** Desfaz a ação mais nova, se nada do que ela mexeu mudou depois. */
+  desfazer: () => Promise<ResultadoDesfazer>;
+  /** Esvazia a pilha — quem trocou de identidade no aparelho não desfaz o
+   *  que a pessoa anterior fez. */
+  esquecerDesfazer: () => void;
   /** Lê a sala inteira do banco pro arquivo de backup. null quando falha. */
   exportarSala: () => Promise<SalaInteira | null>;
   /** Apaga o conteúdo da sala e põe o do arquivo no lugar. Devolve a frase do
@@ -247,6 +271,13 @@ const MSG_SEM_CONFIG =
 
 const AVISO_FALHA_ESCRITA = "Não salvou — confira a conexão e tente de novo.";
 
+/** Chave da pilha de desfazer no sessionStorage (+ código da sala). */
+const PREFIXO_PILHA_DESFAZER = "mesa-desfazer:";
+
+export type ResultadoDesfazer =
+  | { ok: true; rotulo: string }
+  | { ok: false; motivo: string };
+
 export function useSala(codigo: string): Sala {
   const [carregando, setCarregando] = useState(supabaseConfigurado);
   const [conectado, setConectado] = useState(false);
@@ -270,6 +301,26 @@ export function useSala(codigo: string): Sala {
   const [instalacoesBastiao, setInstalacoesBastiao] = useState<InstalacaoBastiao[]>([]);
   const [logBastiao, setLogBastiao] = useState<LinhaLogBastiao[]>([]);
   const [encontros, setEncontros] = useState<Encontro[]>([]);
+  // Ações deste aparelho que dá pra desfazer, a mais nova primeiro. Fica no
+  // sessionStorage da aba (por sala): o celular recarrega a página quando a
+  // pessoa troca de app no meio da luta, e o desfazer não pode sumir com isso.
+  const chavePilha = `${PREFIXO_PILHA_DESFAZER}${codigo}`;
+  const [pilhaDesfazer, setPilhaDesfazer] = useState<AcaoDesfazivel[]>(() => {
+    try {
+      return lerPilhaGuardada(sessionStorage.getItem(chavePilha));
+    } catch {
+      return [];
+    }
+  });
+  const pilhaRef = useRef(pilhaDesfazer);
+  useEffect(() => {
+    pilhaRef.current = pilhaDesfazer;
+    try {
+      sessionStorage.setItem(chavePilha, JSON.stringify(pilhaDesfazer));
+    } catch {
+      /* aba privada / storage cheio — o desfazer segue só na memória */
+    }
+  }, [chavePilha, pilhaDesfazer]);
 
   // Espelho síncrono do estado, pra montar patches e reverter uma escrita que
   // falhou sem depender do closure. Atualizado depois do commit (não durante
@@ -758,7 +809,7 @@ export function useSala(codigo: string): Sala {
   const definirCombate = useCallback(
     async (
       patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>),
-    ): Promise<EstadoCombate | null> => {
+    ): Promise<MudancaCombate | null> => {
       const original = ref.current.combate;
       const versaoOriginal = ref.current.combateVersao;
       let anterior = original;
@@ -794,7 +845,7 @@ export function useSala(codigo: string): Sala {
           const atualizado = comoCombate(r.linha);
           setCombate(atualizado);
           setCombateVersao(r.linha.version);
-          return atualizado;
+          return { antes: anterior, depois: atualizado };
         }
 
         anterior = comoCombate(r.linha);
@@ -1177,6 +1228,96 @@ export function useSala(codigo: string): Sala {
     };
   }, [codigo]);
 
+  const lembrarDesfazer = useCallback((acao: NovaAcaoDesfazivel) => {
+    if (!mudouAlgo(acao)) return;
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPilhaDesfazer((pilha) => empilhar(pilha, { ...acao, id }));
+  }, []);
+
+  const esquecerDesfazer = useCallback(() => setPilhaDesfazer([]), []);
+
+  const desfazer = useCallback(async (): Promise<ResultadoDesfazer> => {
+    const acao = pilhaRef.current[0];
+    if (!acao) return { ok: false, motivo: "não há nada pra desfazer" };
+    // Desistir limpa a pilha inteira: se a ação mais nova não volta, as de
+    // antes dela ficariam desfeitas fora de ordem.
+    const desistir = (motivo: string): ResultadoDesfazer => {
+      setPilhaDesfazer([]);
+      return { ok: false, motivo };
+    };
+
+    const veredito = podeDesfazer(acao, ref.current.personagens, ref.current.combate);
+    if (!veredito.ok) return desistir(veredito.motivo);
+
+    // 1. Ordem de iniciativa: mesma trava de versão do definirCombate, mas
+    //    em vez de refazer a conta em cima do que outro celular gravou, só
+    //    volta se o que está lá ainda for exatamente o que a ação deixou.
+    if (acao.combate) {
+      let atual = ref.current.combate;
+      let versao = ref.current.combateVersao;
+      let voltou = false;
+      for (let tentativa = 0; tentativa < MAX_TENTATIVAS_VERSAO && !voltou; tentativa++) {
+        if (!mesmoCombate(atual, acao.combate.depois)) {
+          return desistir("a ordem de iniciativa mudou depois disso");
+        }
+        const { antes } = acao.combate;
+        const r = await gravarSeVersaoBater<LinhaCombate>("combat_state", codigo, versao, {
+          round: antes.round,
+          turn: antes.turn,
+          order_json: antes.order,
+        });
+        if (r.tipo === "erro") {
+          console.error("desfazer (combate)", r.mensagem);
+          setAvisoFalha(AVISO_FALHA_ESCRITA);
+          // A pilha fica: foi a conexão, dá pra tentar de novo.
+          return { ok: false, motivo: "não salvou — confira a conexão e tente de novo" };
+        }
+        atual = comoCombate(r.linha);
+        versao = r.linha.version;
+        setCombate(atual);
+        setCombateVersao(versao);
+        voltou = r.tipo === "gravou";
+      }
+      if (!voltou) return desistir("a ordem de iniciativa não parou de mudar");
+    }
+
+    // 2. Fichas: o UPDATE só pega se os números e marcações ainda forem os
+    //    que a ação gravou (texto e mapa de condições já foram conferidos em
+    //    podeDesfazer, contra o estado que o tempo real mantém em dia).
+    const naoVoltaram: string[] = [];
+    for (const m of acao.personagens) {
+      let consulta = supabase.from("characters").update(m.antes).eq("id", m.id);
+      for (const [coluna, valor] of camposConferiveis(m.depois)) consulta = consulta.eq(coluna, valor);
+      const { data, error } = await consulta.select("id");
+      if (error || !data || data.length === 0) {
+        if (error) console.error("desfazer (ficha)", error);
+        naoVoltaram.push(m.nome);
+        continue;
+      }
+      setPersonagens((lista) => lista.map((p) => (p.id === m.id ? { ...p, ...m.antes } : p)));
+    }
+
+    // 3. Fichas que a ação criou (NPC novo, encontro) — já saíram da ordem
+    //    no passo 1.
+    if (acao.criados.length > 0) {
+      const { error } = await supabase.from("characters").delete().in("id", acao.criados);
+      if (error) {
+        console.error("desfazer (criados)", error);
+        naoVoltaram.push("as fichas criadas");
+      } else {
+        setPersonagens((lista) => lista.filter((p) => !acao.criados.includes(p.id)));
+      }
+    }
+
+    setPilhaDesfazer((pilha) => pilha.filter((a) => a.id !== acao.id));
+    if (acao.textoLog) registrarLog(acao.textoLog);
+    if (naoVoltaram.length > 0) {
+      setPilhaDesfazer([]);
+      return { ok: false, motivo: `desfeito em parte — ${naoVoltaram.join(", ")} mudou no meio, ajuste na ficha` };
+    }
+    return { ok: true, rotulo: acao.rotulo };
+  }, [codigo, registrarLog]);
+
   const restaurarBackup = useCallback(
     async (backup: Backup): Promise<{ ok: boolean; erro?: string }> => {
       // Ordem: apaga tudo o que é lista, repõe do arquivo, depois arruma as
@@ -1238,6 +1379,8 @@ export function useSala(codigo: string): Sala {
       // Relê do banco: o estado da tela foi virado do avesso por deletes e
       // inserts, e o tempo real pode ter entregue só parte deles.
       recarregarRef.current();
+      // Nada do que estava na pilha se refere mais à sala que ficou.
+      setPilhaDesfazer([]);
       return { ok: true };
     },
     [codigo, definirCombate, definirNotasMestre, definirBastiao],
@@ -1283,6 +1426,10 @@ export function useSala(codigo: string): Sala {
     atualizarEncontro,
     removerEncontro,
     recarregarSala,
+    desfazivel: pilhaDesfazer[0] ?? null,
+    lembrarDesfazer,
+    desfazer,
+    esquecerDesfazer,
     exportarSala,
     restaurarBackup,
   };

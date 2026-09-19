@@ -26,6 +26,7 @@ import { PainelBastiao } from "@/components/PainelBastiao";
 import { Telao } from "@/components/Telao";
 import { BarraAbas, type Aba } from "@/components/BarraAbas";
 import { EscolherCampanha } from "@/components/EscolherCampanha";
+import { BarraDesfazer } from "@/components/BarraDesfazer";
 
 export function Painel() {
   const codigo = useCodigoSala();
@@ -75,6 +76,9 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
   function trocar() {
     limparIdentidade(codigo);
+    // A pilha de desfazer é do aparelho, não da pessoa: quem entra depois
+    // não pode desfazer o que o Mestre fez antes de passar o celular.
+    sala.esquecerDesfazer();
   }
   function abrirTelao() {
     const params = new URLSearchParams(window.location.search);
@@ -265,6 +269,10 @@ function PainelSala({ codigo }: { codigo: string }) {
                 )}
           </div>
         ))}
+
+      {/* No fim do conteúdo e presa no rodapé (sticky): sempre ao alcance do
+          polegar, sem cobrir o topo da ordem de iniciativa. */}
+      {(abaEfetiva === "combate" || abaEfetiva === "fichas") && <BarraDesfazer sala={sala} />}
     </>
   );
 }

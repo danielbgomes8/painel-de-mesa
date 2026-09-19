@@ -331,6 +331,41 @@ button:focus-visible {
   line-height: 1.7;
 }
 
+/* ---------- desfazer a última ação (BarraDesfazer) ---------- */
+.desfazerbarra {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  max-width: 640px;
+  margin: 18px auto 0;
+  padding: 8px 12px 8px 8px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.desfazertexto {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desfazerresultado {
+  flex-basis: 100%;
+  padding-left: 4px;
+  font-size: 12.5px;
+  color: var(--ok);
+}
+.desfazerresultado.falhou {
+  color: var(--danger);
+}
+
 /* ---------- escolher campanha (tela de entrada e "trocar campanha") ---------- */
 .gatecampanha {
   margin: 18px 0 20px;

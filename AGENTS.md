@@ -262,6 +262,32 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   teste de morte (não marca sozinho: não dá pra saber se foi crítico). No
   celular o PV desce pra baixo do nome (`.pvlinha`, @media 520px) — com o
   "±" a mais o nome virava "Go…" (achado testando).
+- **Desfazer** (19/09/2026, sem migration, roadmap item 6; regras puras em
+  `lib/desfazer.ts`, pilha e escrita no `useSala`, botão em
+  `BarraDesfazer.tsx`): cada aparelho desfaz o que **ele** fez — a pilha (até
+  10, mais nova primeiro) fica no `sessionStorage` da aba, por sala, porque o
+  celular recarrega a página quando a pessoa troca de app. Cada ação guarda o
+  antes e o depois de cada campo que escreveu (`mudancaDe`), a mudança da
+  ordem (`definirCombate` agora devolve `{ antes, depois }` da escrita que
+  pegou) e as fichas que criou. Só volta se o "depois" ainda for o que está
+  valendo (`podeDesfazer`); a ordem volta pela mesma trava de versão da
+  migration 0010, e as fichas com `.eq` nos campos de número/booleano no
+  próprio UPDATE. Se não der, avisa quem mudou e **esvazia a pilha** —
+  desfazer as de antes pulando a mais nova deixaria tudo fora de ordem.
+  **Toda ação nova que muda o combate chama `sala.lembrarDesfazer` depois
+  que a escrita confirmar** — hoje: dano/cura (`mudarPVComLog`, ações em
+  massa), condição (ficha e massa), `avancarTurno` (a virada de rodada volta
+  com os prazos de condição), entrar na ordem (com o NPC criado junto),
+  pôr todos os jogadores, começar encontro (apaga as fichas criadas; o
+  encontro preparado fica), tirar da ordem e reiniciar combate. ▲▼ e
+  revelar ficam de fora (o próprio botão já desfaz). O log ganha "↩ Desfeito:
+  <linha original>" (já passou pelo anti-spoiler) ou um resumo com contagem;
+  ação que não foi pro log não grava nada ao desfazer. O rótulo do botão só
+  aparece no aparelho de quem fez — no do Mestre vai com nome de verdade, no
+  do jogador nunca cita inimigo ("Próximo turno"). "trocar" esvazia a pilha:
+  quem pega o celular depois não desfaz o que o Mestre fez. Na virada de
+  rodada, "Rodada N começou" é gravada antes e sozinha: linhas da mesma
+  escrita saem com o mesmo horário e o log trocava a ordem delas.
 - **Passar a vez** (`avancarTurno` exportada de `RastreadorCombate.tsx`,
   reaproveitada no `BannerSuaVez`): o jogador vê um botão no banner "É a sua
   vez!" pra avançar o turno sozinho, sem depender do Mestre. Só aparece
@@ -331,7 +357,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram
-feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 6.
+feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 7.
 
 1. ~~Corrigir os três defeitos achados na revisão completa~~ — commit
    `0347e01` (escrita que apagava a de outro celular, descanso longo
@@ -344,14 +370,15 @@ feitos — ficam aqui pra deixar claro de onde a ordem veio. O próximo é o 6.
    "Encontros preparados" em Estado).
 5. ~~Aplicar dano na própria linha da iniciativa~~ — feito em 19/09/2026
    (sem migration; ver "Dano direto na iniciativa" em Estado).
-6. **Desfazer a última ação** — o log já registra tudo, falta o botão.
+6. ~~Desfazer a última ação~~ — feito em 19/09/2026 (sem migration; ver
+   "Desfazer" em Estado).
 7. **Explicar a condição na hora**: tocar em "Atordoado" e ver o que ela faz
    pelas regras de 2024.
 8. **Funcionar sem internet** por alguns minutos (app instalável de verdade),
    pra queda de wi-fi no meio da luta.
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 160 que existem são todos de funções
+componentes não têm teste nenhum (os 176 que existem são todos de funções
 puras em `lib/`);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava

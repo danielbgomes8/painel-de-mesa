@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
+import { mudancaDe, textoDesfeito } from "@/lib/desfazer";
 import {
   ajustarPV,
   ajustePVComLog,
@@ -21,6 +22,7 @@ import {
   limitarExaustao,
   limitarPV,
   limitarTesteMorte,
+  mensagemCondicao,
   podeEditarPersonagem,
   situacaoMorte,
   TESTES_MORTE_MAX,
@@ -41,13 +43,21 @@ const TIPOS_DADO = ["d6", "d8", "d10", "d12"];
  * confirmar, senão o log jura um dano que não aconteceu. Mesma sequência das
  * Ações em Massa. Devolve o retorno pra quem aplicou (ver `ajustePVComLog`),
  * ou null se a escrita falhou (o aviso de falha já aparece no topo). Serve o
- * −/+ da ficha e o dano direto na linha da iniciativa.
+ * −/+ da ficha e o dano direto na linha da iniciativa, e fica guardado pro
+ * botão de desfazer.
  */
 export async function mudarPVComLog(sala: Sala, p: Personagem, delta: number): Promise<string | null> {
   const { patch, texto, retorno } = ajustePVComLog(p, delta);
   const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch }]);
   if (!deuCerto) return null;
   if (texto) sala.registrarVariosLogs([texto]);
+  sala.lembrarDesfazer({
+    rotulo: retorno,
+    textoLog: textoDesfeito(texto ? [texto] : [], ""),
+    personagens: [mudancaDe(p, patch)],
+    combate: null,
+    criados: [],
+  });
   return retorno;
 }
 
@@ -449,7 +459,15 @@ export function FichaPersonagem({
                   onClick={async () => {
                     const { patch: mudanca, texto } = condicaoComLog(p, nome, !ativa);
                     const deuCerto = await sala.atualizarVariosPersonagens([{ id: p.id, patch: mudanca }]);
-                    if (deuCerto) sala.registrarVariosLogs([texto]);
+                    if (!deuCerto) return;
+                    sala.registrarVariosLogs([texto]);
+                    sala.lembrarDesfazer({
+                      rotulo: mensagemCondicao(p.name, nome, !ativa),
+                      textoLog: textoDesfeito([texto], ""),
+                      personagens: [mudancaDe(p, mudanca)],
+                      combate: null,
+                      criados: [],
+                    });
                   }}
                 >
                   {nome}

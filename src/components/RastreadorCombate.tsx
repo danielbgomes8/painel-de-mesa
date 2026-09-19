@@ -6,6 +6,7 @@ import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib
 import { d20 } from "@/lib/dados";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
+import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 import {
   entrarNaOrdem,
   estaCaido,
@@ -29,24 +30,45 @@ const NOVO_NPC = "__novo__";
  *  condições de todo mundo e loga quem parou de estar com o quê. Devolve
  *  `null` quando a escrita falha (o combate já voltou pro estado anterior) —
  *  quem chama não deve agir como se tivesse avançado de verdade. Usado tanto
- *  pelo botão do Mestre quanto pelo "passar a vez" do jogador na sua vez. */
+ *  pelo botão do Mestre quanto pelo "passar a vez" do jogador na sua vez.
+ *  Fica guardado pra desfazer — a virada de rodada volta inteira, prazos de
+ *  condição inclusive. */
 export async function avancarTurno(sala: Sala): Promise<EstadoCombate | null> {
-  const rodadaAntes = sala.combate.round;
   const personagens = sala.personagens;
-  const proximo = await sala.definirCombate((atual) => proximoTurno(atual));
-  if (!proximo) return null;
-  if (proximo.round !== rodadaAntes) {
-    sala.registrarLog(`Rodada ${proximo.round} começou`);
+  const mudanca = await sala.definirCombate((atual) => proximoTurno(atual));
+  if (!mudanca) return null;
+  const { antes, depois } = mudanca;
+  const virou = depois.round !== antes.round;
+  const linhaRodada = `Rodada ${depois.round} começou`;
+  const prazos: MudancaPersonagem[] = [];
+  if (virou) {
+    const expirados: string[] = [];
     for (const p of personagens) {
       if (Object.keys(p.cond_prazo).length === 0) continue;
       const resultado = reduzirPrazosCondicao(p.cond, p.cond_prazo);
-      sala.atualizarPersonagem(p.id, { cond: resultado.cond, cond_prazo: resultado.cond_prazo });
+      prazos.push(mudancaDe(p, { cond: resultado.cond, cond_prazo: resultado.cond_prazo }));
       for (const nome of resultado.expiraram) {
-        sala.registrarLog(`${mensagemCondicao(nomeNoLog(p), nome, false)} (prazo esgotado)`);
+        expirados.push(`${mensagemCondicao(nomeNoLog(p), nome, false)} (prazo esgotado)`);
       }
     }
+    // Uma escrita só pros prazos de todo mundo, e o log de quem perdeu a
+    // condição só depois dela confirmar.
+    const gravou = await sala.atualizarVariosPersonagens(prazos.map((m) => ({ id: m.id, patch: m.depois })));
+    if (!gravou) prazos.length = 0;
+    // A virada primeiro e sozinha: linhas da mesma escrita saem com o mesmo
+    // horário e o log não saberia qual veio antes.
+    await sala.registrarLog(linhaRodada);
+    if (gravou) sala.registrarVariosLogs(expirados);
   }
-  return proximo;
+  sala.lembrarDesfazer({
+    rotulo: virou ? `Próximo turno — começou a rodada ${depois.round}` : "Próximo turno",
+    // Passar a vez sem virar a rodada não vai pro log; desfazer também não.
+    textoLog: textoDesfeito(virou ? [linhaRodada] : [], ""),
+    personagens: prazos,
+    combate: mudanca,
+    criados: [],
+  });
+  return depois;
 }
 
 export function RastreadorCombate({
@@ -110,6 +132,7 @@ export function RastreadorCombate({
 
     let item: ItemIniciativa | null = null;
     let entrando: Personagem | null = null;
+    let criado: Personagem | null = null;
 
     if (quem === NOVO_NPC) {
       const nome = nomeNpc.trim();
@@ -117,7 +140,7 @@ export function RastreadorCombate({
       const pvMax = Number.parseInt(pvNpc, 10);
       const ca = Number.parseInt(caNpc, 10);
       setOcupado(true);
-      const criado = await sala.criarPersonagem({
+      criado = await sala.criarPersonagem({
         name: nome,
         is_npc: true,
         hp: Number.isNaN(pvMax) ? 10 : pvMax,
@@ -149,8 +172,19 @@ export function RastreadorCombate({
       entrou = r.entraram.length > 0;
       return { order: r.ordem };
     });
-    // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
-    if (feito && entrou) sala.registrarLog(`${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init})`);
+    if (feito && entrou) {
+      // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
+      const linha = `${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init})`;
+      sala.registrarLog(linha);
+      sala.lembrarDesfazer({
+        rotulo: `${entrando.name} entrou no combate (iniciativa ${item.init})`,
+        textoLog: textoDesfeito([linha], ""),
+        personagens: [],
+        combate: feito,
+        // NPC criado agora pra entrar: desfazer apaga a ficha junto.
+        criados: criado ? [criado.id] : [],
+      });
+    }
     setIni("");
   }
 
@@ -175,9 +209,16 @@ export function RastreadorCombate({
     });
     setOcupado(false);
     if (!feito) return;
-    sala.registrarVariosLogs(
-      entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init})`),
-    );
+    const linhas = entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init})`);
+    sala.registrarVariosLogs(linhas);
+    const resumo = entraram.length === 1 ? linhas[0] : `${entraram.length} jogadores entraram no combate`;
+    sala.lembrarDesfazer({
+      rotulo: resumo,
+      textoLog: textoDesfeito(linhas, resumo),
+      personagens: [],
+      combate: feito,
+      criados: [],
+    });
   }
 
   function abrirAjuste(slug: string) {
@@ -199,17 +240,41 @@ export function RastreadorCombate({
     setOcupado(false);
   }
 
-  function reiniciar() {
-    sala.definirCombate({ round: 1, turn: 0, order: [] });
+  async function reiniciar() {
+    const feito = await sala.definirCombate({ round: 1, turn: 0, order: [] });
+    if (!feito) return;
     sala.registrarLog("Combate reiniciado");
+    sala.lembrarDesfazer({
+      rotulo: "Combate reiniciado",
+      textoLog: textoDesfeito(["Combate reiniciado"], ""),
+      personagens: [],
+      combate: feito,
+      criados: [],
+    });
   }
 
-  function remover(i: number) {
-    if (combate.order[i]?.slug === ajustando) setAjustando(null);
-    sala.definirCombate((atual) => {
-      const ordem = atual.order.filter((_, idx) => idx !== i);
-      return { order: ordem, turn: turnoAposRemover(atual.turn, i, ordem.length) };
+  async function remover(i: number) {
+    const saindo = combate.order[i];
+    if (!saindo) return;
+    if (saindo.slug === ajustando) setAjustando(null);
+    // Pelo slug, não pelo índice da tela: se alguém entrou na ordem de outro
+    // celular no meio tempo, o índice já é de outra pessoa.
+    const feito = await sala.definirCombate((atual) => {
+      const idx = atual.order.findIndex((o) => o.slug === saindo.slug);
+      if (idx < 0) return {};
+      const ordem = atual.order.filter((_, j) => j !== idx);
+      return { order: ordem, turn: turnoAposRemover(atual.turn, idx, ordem.length) };
     });
+    // Tirar da ordem não vai pro log, então desfazer também não grava nada lá.
+    if (feito) {
+      sala.lembrarDesfazer({
+        rotulo: `${pvDe(saindo.slug)?.name ?? saindo.name} saiu da ordem`,
+        textoLog: null,
+        personagens: [],
+        combate: feito,
+        criados: [],
+      });
+    }
   }
 
   function trocar(i: number, j: number) {
@@ -567,7 +632,17 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
       entrou = r.entraram.length > 0;
       return { order: r.ordem };
     });
-    if (feito && entrou) sala.registrarLog(`${personagem.name} entrou no combate (iniciativa ${iniciativa})`);
+    if (feito && entrou) {
+      const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa})`;
+      sala.registrarLog(linha);
+      sala.lembrarDesfazer({
+        rotulo: linha,
+        textoLog: textoDesfeito([linha], ""),
+        personagens: [],
+        combate: feito,
+        criados: [],
+      });
+    }
     setIni("");
   }
 

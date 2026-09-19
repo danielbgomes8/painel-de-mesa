@@ -5,6 +5,7 @@ import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import { condicaoComLog, curaComLog, danoComLog } from "@/lib/regras";
+import { contarAlvos, mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 
 /** Área de efeito: seleciona vários personagens/NPCs e aplica dano, cura ou
  *  uma condição em todos de uma vez. Só o Mestre vê. */
@@ -27,25 +28,34 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
     if (Number.isNaN(n) || n <= 0) return;
     // Uma escrita só pros personagens todos, uma escrita só pro log —
     // antes disparava até duas requisições por alvo selecionado.
-    const alvos: { id: string; patch: Partial<Personagem> }[] = [];
+    const mudancas: MudancaPersonagem[] = [];
     const textos: string[] = [];
     for (const p of selecionados) {
       // As duas escondem nome de NPC oculto e PV de NPC no log (é público);
       // danoComLog ainda avisa o teste de concentração (ou a perda dela a 0 PV).
       const { patch, texto }: { patch: Partial<Personagem>; texto: string | null } =
         sinal > 0 ? curaComLog(p, n) : danoComLog(p, n);
-      alvos.push({ id: p.id, patch });
+      mudancas.push(mudancaDe(p, patch));
       if (texto) textos.push(texto);
     }
     // Só loga depois que a escrita das fichas confirmar — senão o log jura
     // uma cura que não aconteceu se a escrita falhar (achado ao testar).
-    const deuCerto = await sala.atualizarVariosPersonagens(alvos);
-    if (deuCerto) sala.registrarVariosLogs(textos);
+    const deuCerto = await sala.atualizarVariosPersonagens(mudancas.map((m) => ({ id: m.id, patch: m.depois })));
     setValor("");
+    if (!deuCerto) return;
+    sala.registrarVariosLogs(textos);
+    const oQue = `${sinal > 0 ? "cura" : "dano"} de ${n} em ${contarAlvos(mudancas.length)}`;
+    sala.lembrarDesfazer({
+      rotulo: oQue.charAt(0).toUpperCase() + oQue.slice(1),
+      textoLog: textoDesfeito(textos, oQue),
+      personagens: mudancas,
+      combate: null,
+      criados: [],
+    });
   }
 
   async function aplicarCondicao(ligar: boolean) {
-    const alvos: { id: string; patch: Partial<Personagem> }[] = [];
+    const mudancas: MudancaPersonagem[] = [];
     const textos: string[] = [];
     for (const p of selecionados) {
       const jaEstava = Boolean(p.cond?.[cond]);
@@ -53,11 +63,20 @@ export function AcoesEmMassa({ sala }: { sala: Sala }) {
       // Mesma regra do toggle individual na ficha (limpa o prazo ao tirar,
       // quebra a concentração ao ligar Atordoado/Inconsciente/...).
       const { patch, texto } = condicaoComLog(p, cond, ligar);
-      alvos.push({ id: p.id, patch });
+      mudancas.push(mudancaDe(p, patch));
       textos.push(texto);
     }
-    const deuCerto = await sala.atualizarVariosPersonagens(alvos);
-    if (deuCerto) sala.registrarVariosLogs(textos);
+    const deuCerto = await sala.atualizarVariosPersonagens(mudancas.map((m) => ({ id: m.id, patch: m.depois })));
+    if (!deuCerto) return;
+    sala.registrarVariosLogs(textos);
+    const oQue = `${ligar ? cond : `fim de ${cond}`} em ${contarAlvos(mudancas.length)}`;
+    sala.lembrarDesfazer({
+      rotulo: oQue.charAt(0).toUpperCase() + oQue.slice(1),
+      textoLog: textoDesfeito(textos, oQue),
+      personagens: mudancas,
+      combate: null,
+      criados: [],
+    });
   }
 
   const n = selecionados.length;

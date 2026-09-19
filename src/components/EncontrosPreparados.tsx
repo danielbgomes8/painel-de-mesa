@@ -5,6 +5,7 @@ import type { Sala } from "@/hooks/useSala";
 import type { Encontro, FichaMonstro, GrupoEncontro, ItemIniciativa } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
 import { MONSTROS_SRD, buscarMonstros } from "@/lib/monstrosSrd";
+import { textoDesfeito } from "@/lib/desfazer";
 import {
   adicionarAoEncontro,
   entrarNaOrdem,
@@ -276,9 +277,17 @@ export function ComecarEncontro({ sala }: { sala: Sala }) {
     // O log é público: nem o nome do encontro nem o dos monstros vão pra lá,
     // senão "Emboscada do Dragão Vermelho" entregaria o chefão antes da hora.
     // Quem joga vê "Inimigo N" na ordem, como com qualquer NPC não revelado.
-    sala.registrarLog(
-      entraram === 1 ? "1 inimigo entrou no combate" : `${entraram} inimigos entraram no combate`,
-    );
+    const linha = entraram === 1 ? "1 inimigo entrou no combate" : `${entraram} inimigos entraram no combate`;
+    sala.registrarLog(linha);
+    // Encontro começado por engano: desfazer tira todo mundo da ordem e apaga
+    // as fichas criadas agora (o encontro preparado continua salvo).
+    sala.lembrarDesfazer({
+      rotulo: `Encontro "${e.name || "sem nome"}" começou`,
+      textoLog: textoDesfeito([linha], ""),
+      personagens: [],
+      combate: feito,
+      criados: criados.map((p) => p.id),
+    });
   }
 
   return (
