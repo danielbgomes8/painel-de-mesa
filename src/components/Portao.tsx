@@ -3,16 +3,21 @@
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Identidade } from "@/lib/identidade";
+import { mestreDaSala } from "@/lib/sala";
+import { EscolherCampanha } from "@/components/EscolherCampanha";
 
 export function Portao({
   sala,
+  codigo,
   rotulo,
   onEntrar,
 }: {
   sala: Sala;
+  codigo: string;
   rotulo: string;
   onEntrar: (id: Identidade) => void;
 }) {
+  const mestre = mestreDaSala(codigo);
   const [nome, setNome] = useState("");
   const [criando, setCriando] = useState(false);
 
@@ -40,6 +45,14 @@ export function Portao({
     <div className="gate">
       <div className="eyebrow">{rotulo} · mesa</div>
       <h1>Painel de Mesa</h1>
+
+      {/* Quem abre o link puro cai na última campanha do aparelho (ou na
+          Sétimo Raio): daqui dá pra ir pra outra antes de escolher quem é. */}
+      <div className="gatecampanha">
+        <div className="gatecampanharotulo">Campanha</div>
+        <EscolherCampanha atual={codigo} />
+      </div>
+
       <p className="lead">
         Escolha quem você é nesta sessão. Fica salvo só neste navegador — cada
         pessoa escolhe o seu, uma vez.
@@ -54,7 +67,9 @@ export function Portao({
           <span>
             <span className="rname">Sou o Mestre</span>
             <br />
-            <span className="rclass">Painel completo, todas as fichas e o combate</span>
+            <span className="rclass">
+              {mestre ? `${mestre} · ` : ""}Painel completo, todas as fichas e o combate
+            </span>
           </span>
           <span className="go">→</span>
         </button>

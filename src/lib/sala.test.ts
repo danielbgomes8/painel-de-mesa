@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { escolherSala, rotuloDaSala, SALA_PADRAO } from "./sala";
+import {
+  campanhasParaEscolher,
+  codigoDigitado,
+  escolherSala,
+  mestreDaSala,
+  rotuloDaSala,
+  SALA_PADRAO,
+} from "./sala";
 
 describe("qual sala abrir", () => {
   it("o ?sala= do link sempre manda, mesmo com outra sala lembrada", () => {
@@ -27,5 +34,46 @@ describe("rótulo da sala", () => {
 
   it("sala nova vira título a partir do código", () => {
     expect(rotuloDaSala("cripta-de-ferro")).toBe("Cripta De Ferro");
+  });
+});
+
+describe("campanhas pra escolher", () => {
+  const codigos = (salas: string[], atual: string) =>
+    campanhasParaEscolher(salas, atual).map((c) => c.codigo);
+
+  it("as campanhas do grupo aparecem pra qualquer um, mesmo em aparelho novo", () => {
+    expect(codigos([], "setimo-raio")).toEqual(["setimo-raio", "forgotten-realms"]);
+  });
+
+  it("a Forgotten Realms é do Diogo, com nome bonito", () => {
+    expect(rotuloDaSala("forgotten-realms")).toBe("Forgotten Realms");
+    expect(mestreDaSala("forgotten-realms")).toBe("Diogo");
+    expect(mestreDaSala("cripta-de-ferro")).toBeUndefined();
+  });
+
+  it("sala aberta por código neste aparelho entra depois das do grupo, sem repetir", () => {
+    expect(codigos(["zz-teste", "forgotten-realms", "cripta-de-ferro"], "setimo-raio")).toEqual([
+      "setimo-raio",
+      "forgotten-realms",
+      "cripta-de-ferro",
+      "zz-teste",
+    ]);
+  });
+
+  it("a sala aberta agora aparece mesmo antes de a pessoa entrar nela", () => {
+    expect(codigos([], "cripta-de-ferro")).toEqual(["setimo-raio", "forgotten-realms", "cripta-de-ferro"]);
+    expect(codigos(["cripta-de-ferro"], "cripta-de-ferro")).toHaveLength(3);
+  });
+});
+
+describe("código digitado", () => {
+  it("nome escrito do jeito que der vira o código da sala", () => {
+    expect(codigoDigitado("  Forgotten Realms ")).toBe("forgotten-realms");
+    expect(codigoDigitado("Cripta-de-Ferro-7K2")).toBe("cripta-de-ferro-7k2");
+  });
+
+  it("campo vazio não leva ninguém pra Sétimo Raio sem querer", () => {
+    expect(codigoDigitado("")).toBeNull();
+    expect(codigoDigitado(" !! ")).toBeNull();
   });
 });

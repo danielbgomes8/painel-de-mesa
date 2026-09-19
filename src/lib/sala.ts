@@ -60,19 +60,96 @@ export function codigoDaSala(): string {
   return escolherSala(new URLSearchParams(window.location.search).get("sala"), lerUltimaSala());
 }
 
-/** Nome com acento das salas que já existem — o código não guarda acento. */
-const NOMES_DAS_SALAS: Record<string, string> = { "setimo-raio": "Sétimo Raio" };
+/** Evento disparado por `irParaSala` — `useCodigoSala` escuta ele e o
+ *  `popstate` (voltar do Android/navegador volta pra campanha anterior). */
+const EVENTO_TROCA_DE_SALA = "mesa-sala-mudou";
+
+/** subscribe do external store do código da sala. */
+export function assinarTrocaDeSala(aoMudar: () => void): () => void {
+  window.addEventListener("popstate", aoMudar);
+  window.addEventListener(EVENTO_TROCA_DE_SALA, aoMudar);
+  return () => {
+    window.removeEventListener("popstate", aoMudar);
+    window.removeEventListener(EVENTO_TROCA_DE_SALA, aoMudar);
+  };
+}
+
+/**
+ * Troca de campanha sem recarregar: o endereço ganha o `?sala=` novo (então
+ * recarregar e copiar o link continuam certos) e o Painel remonta a sala do
+ * zero (`key={codigo}`). É o que o botão de trocar campanha usa — no app
+ * instalado não há barra de endereço pra mexer em link.
+ */
+export function irParaSala(codigo: string): void {
+  const url = new URL(window.location.href);
+  url.search = ""; // leva só a sala: `?telao=1` é da aba do telão, não daqui
+  url.searchParams.set("sala", codigo);
+  window.history.pushState(null, "", url);
+  window.dispatchEvent(new Event(EVENTO_TROCA_DE_SALA));
+  window.scrollTo(0, 0);
+}
+
+/** Código digitado à mão ("Forgotten Realms", "cripta-de-ferro-7k2") → código
+ *  de sala, ou `null` se não sobrou nada — aqui não cai no padrão, pra um
+ *  campo vazio não levar ninguém pra Sétimo Raio sem querer. */
+export function codigoDigitado(bruto: string): string | null {
+  return aSlug(bruto) || null;
+}
+
+export type Campanha = {
+  codigo: string;
+  /** Nome com acento — o código não guarda acento. */
+  nome: string;
+  mestre?: string;
+};
+
+/**
+ * Campanhas do grupo, que aparecem pra todo mundo no botão de trocar
+ * campanha e na tela de entrada. Campanha nova do grupo entra aqui; uma que
+ * não deve aparecer pra quem abre o app fica de fora e é aberta pelo código
+ * (campo "outra campanha") — o código da sala é a única "senha" (ver
+ * "Segurança" no README).
+ */
+export const CAMPANHAS: readonly Campanha[] = [
+  { codigo: "setimo-raio", nome: "Sétimo Raio" },
+  { codigo: "forgotten-realms", nome: "Forgotten Realms", mestre: "Diogo" },
+];
+
+function campanhaDoCatalogo(codigo: string): Campanha | undefined {
+  return CAMPANHAS.find((c) => c.codigo === codigo);
+}
 
 /** Rótulo curto pra mostrar no topo e na aba do navegador. */
 export function rotuloDaSala(codigo: string): string {
   return (
-    NOMES_DAS_SALAS[codigo] ??
+    campanhaDoCatalogo(codigo)?.nome ??
     codigo
       .split("-")
       .filter(Boolean)
       .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
       .join(" ")
   );
+}
+
+/** Nome de quem mestra a campanha, quando o catálogo sabe. */
+export function mestreDaSala(codigo: string): string | undefined {
+  return campanhaDoCatalogo(codigo)?.mestre;
+}
+
+/**
+ * O que o seletor de campanha mostra: as campanhas do grupo, depois as salas
+ * em que este aparelho já entrou (fora do catálogo — uma aberta por código),
+ * e a sala aberta agora mesmo que não esteja em nenhuma das duas (chegou por
+ * link e ainda não entrou), pra ela aparecer marcada.
+ */
+export function campanhasParaEscolher(salasDoAparelho: string[], atual: string): Campanha[] {
+  const fora = new Set(
+    [...salasDoAparelho, atual].filter((s) => s && !campanhaDoCatalogo(s)),
+  );
+  return [
+    ...CAMPANHAS,
+    ...[...fora].sort().map((codigo) => ({ codigo, nome: rotuloDaSala(codigo) })),
+  ];
 }
 
 /** slug a partir de um nome; garante que não colide com os `existentes`. */

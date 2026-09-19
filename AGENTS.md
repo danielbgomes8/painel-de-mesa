@@ -16,7 +16,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   sala na URL (`?sala=...`). Sem `?sala=`, abre a última sala em que o
   aparelho entrou, e só então o padrão `setimo-raio` (`escolherSala` em
   `src/lib/sala.ts`) — é o que faz o app instalado na tela de início abrir a
-  campanha de cada um.
+  campanha de cada um. Campanha do grupo (nome com acento, quem mestra) mora
+  em `CAMPANHAS`, no mesmo arquivo.
 - **Regras de negócio fechadas** ficam em `src/lib/regras.ts`, cada uma pura e
   testada em `src/lib/regras.test.ts` (`npm run teste`). Não reimplementar em
   componente — importar de lá. O mesmo vale pro catálogo de monstros:
@@ -208,13 +209,28 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   (não do metadata do layout — o Next aplica aquele por último e passava por
   cima), o manifest ficou genérico, e o app instalado abre a **última sala em
   que o aparelho entrou** (só grava depois de entrar, não num link espiado).
-  Quem está em mais de uma campanha ganha "↔ outra mesa" no topo — o app
-  instalado não tem barra de endereço, sem isso não havia como trocar. A
-  sala só é montada **depois da hidratação** (`useNoNavegador`): montando
+  A sala só é montada **depois da hidratação** (`useNoNavegador`): montando
   antes, o efeito que grava `?sala=` no endereço prendia a pessoa na sala
-  padrão e ainda abria uma conexão à toa com ela — achado testando. O código
-  da sala é a única "senha" (modelo aberto, ver "Segurança" no README):
-  campanha nova deve usar um código difícil de chutar.
+  padrão e ainda abria uma conexão à toa com ela — achado testando.
+- **Trocar de campanha sem link** (19/09/2026, sem migration,
+  `EscolherCampanha.tsx`): na tela de entrada (antes de escolher quem é — quem
+  abre o link puro cai na Sétimo Raio e precisa sair dela) e no botão
+  "⇄ trocar campanha" do topo. Lista as campanhas do grupo (`CAMPANHAS` em
+  `sala.ts`, hoje Sétimo Raio e Forgotten Realms do Diogo), depois as salas
+  que o aparelho já abriu por código e a sala aberta agora
+  (`campanhasParaEscolher`), mais um campo pra digitar o código de outra
+  (`codigoDigitado`, que devolve `null` em vez de cair no padrão). A troca é
+  **sem recarregar**: `irParaSala` faz `pushState` com `?sala=` e dispara um
+  evento que o `useCodigoSala` assina junto com o `popstate` (voltar do
+  Android volta pra campanha anterior); o `key={codigo}` do `Painel` remonta a
+  sala e o cleanup do `useSala` fecha o canal da anterior — testado: tempo
+  real certo depois de várias idas e voltas, sem vazar evento de uma sala pra
+  outra. O Enter do campo de código é tratado no `onKeyDown` (como no
+  Portão), sem depender do envio implícito do form — a ferramenta de teste
+  manda Enter sem `keypress` e o form não enviava. O código da sala é a única
+  "senha" (modelo aberto, ver "Segurança" no README): as da lista aparecem
+  pra qualquer um; campanha que não deve aparecer fica fora dela, com código
+  difícil de chutar.
 - **Log de combate é público** (`nomeNoLog`/`pvNoLog`/`curaComLog` em
   `regras.ts`): cada jogador lê o log no próprio celular, então ele segue a
   mesma regra da ordem e do telão — NPC não revelado aparece como "Um

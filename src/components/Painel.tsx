@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
-import { useIdentidade, useOutrasSalas } from "@/hooks/useIdentidade";
+import { useIdentidade } from "@/hooks/useIdentidade";
 import { useModoTelao } from "@/hooks/useModoTelao";
 import {
   limparIdentidade,
@@ -25,6 +25,7 @@ import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { Telao } from "@/components/Telao";
 import { BarraAbas, type Aba } from "@/components/BarraAbas";
+import { EscolherCampanha } from "@/components/EscolherCampanha";
 
 export function Painel() {
   const codigo = useCodigoSala();
@@ -52,7 +53,9 @@ export function Painel() {
   // Aba do navegador com o nome da campanha aberta: o React 19 leva o <title>
   // pro <head>. Não fica no metadata do layout — lá é fixo e o Next o aplica
   // depois da montagem, por cima de um document.title (achado testando).
-  // key=codigo: trocar de sala remonta do zero.
+  // key=codigo: trocar de sala (link, botão de trocar campanha ou voltar)
+  // remonta do zero — estado, conexão e tempo real da campanha anterior vão
+  // embora juntos.
   return (
     <>
       <title>{`Painel de Mesa — ${rotuloDaSala(codigo)}`}</title>
@@ -96,7 +99,7 @@ function PainelSala({ codigo }: { codigo: string }) {
     return sala.personagens.find((p) => p.slug === identidade.slug) ?? null;
   }, [identidade, sala.personagens]);
 
-  const outrasSalas = useOutrasSalas(codigo);
+  const [trocandoCampanha, setTrocandoCampanha] = useState(false);
 
   // A sala vai pro endereço mesmo quando veio da "última sala" (ver
   // escolherSala): recarregar fica na mesma, e o link copiado dali leva
@@ -137,7 +140,7 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
 
   if (!identidade) {
-    return <Portao sala={sala} rotulo={rotulo} onEntrar={entrar} />;
+    return <Portao sala={sala} codigo={codigo} rotulo={rotulo} onEntrar={entrar} />;
   }
 
   const quem =
@@ -173,13 +176,32 @@ function PainelSala({ codigo }: { codigo: string }) {
           <button className="linkbtn" type="button" onClick={trocar}>
             trocar
           </button>
-          {outrasSalas.map((s) => (
-            <a key={s} className="linkbtn" href={`?sala=${encodeURIComponent(s)}`}>
-              ↔ {rotuloDaSala(s)}
-            </a>
-          ))}
+          <button
+            className="linkbtn"
+            type="button"
+            aria-expanded={trocandoCampanha}
+            onClick={() => setTrocandoCampanha((v) => !v)}
+          >
+            ⇄ trocar campanha
+          </button>
         </div>
       </div>
+
+      {trocandoCampanha && (
+        <section className="combat" aria-label="Trocar de campanha">
+          <div className="combat-head">
+            <h2>Trocar de campanha</h2>
+            <button className="linkbtn" type="button" onClick={() => setTrocandoCampanha(false)}>
+              fechar
+            </button>
+          </div>
+          <p className="bkpexplica">
+            Cada campanha tem as fichas, o combate e o diário dela. Em cada uma você
+            entra uma vez como Mestre ou personagem, e o aparelho lembra.
+          </p>
+          <EscolherCampanha atual={codigo} />
+        </section>
+      )}
 
       {sala.avisoFalha && (
         <div className="avisofalha" role="alert" aria-live="polite">

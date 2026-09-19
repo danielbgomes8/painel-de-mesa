@@ -2,14 +2,16 @@
 
 Painel de combate e fichas pra mesa de **D&D 5.5** (regras 2024, SRD 5.2) do
 Daniel — campanha **"Sétimo Raio"**, jogada presencialmente com cada pessoa no
-seu aparelho.
+seu aparelho. O mesmo app serve outras campanhas do grupo, cada uma com os
+dados separados (hoje também a **"Forgotten Realms"**, mestrada pelo Diogo).
 
 Não é ficha completa de personagem: é o punhado de coisas que muda o tempo todo
 durante a sessão — PV, exaustão, condições, testes de morte, iniciativa — com
 tudo sincronizando na hora entre celular, tablet e notebook.
 
-**Sem login.** Cada pessoa abre o link e diz quem é (Mestre, um personagem da
-lista, ou digita um nome novo). Essa escolha fica salva só no navegador dela.
+**Sem login.** Cada pessoa abre o link, escolhe a campanha e diz quem é
+(Mestre, um personagem da lista, ou digita um nome novo). Essa escolha fica
+salva só no navegador dela, uma por campanha.
 
 ---
 
@@ -153,12 +155,17 @@ na última versão que funcionava, em vez de ir pro ar quebrado. O GitHub
 também roda a mesma verificação a cada push (`.github/workflows/verificar.yml`)
 e marca o commit com ✓ ou ✗.
 
-Para abrir outra mesa no mesmo deploy, use `?sala=<codigo>` na URL
-(ex.: `/?sala=cripta-de-ferro-7k2`). A sala é criada sozinha no primeiro
-acesso. Como o código da sala é o que protege a mesa (quem tem o link entra),
-use um código difícil de chutar. O app instalado na tela de início abre a
-última mesa em que o aparelho entrou, e quem joga em mais de uma troca pelo
-atalho "↔" no topo.
+Cada campanha é uma sala, com os dados separados, e todas moram no mesmo
+deploy. As campanhas do grupo ficam na lista `CAMPANHAS` de
+[`src/lib/sala.ts`](src/lib/sala.ts) (nome, código e quem mestra) e aparecem
+pra todo mundo: na tela de entrada e no botão **"⇄ trocar campanha"** do topo,
+que troca na hora, sem recarregar e sem mexer em link. Campanha nova do grupo
+é uma linha nessa lista. Uma que não deve aparecer pra quem abre o app fica de
+fora e entra pelo campo **"outra campanha (com código)"** ou pelo link
+`?sala=<codigo>` (ex.: `/?sala=cripta-de-ferro-7k2`). Nesse caso use um código
+difícil de chutar, porque ele é a única "senha" da mesa. A sala é criada
+sozinha no primeiro acesso. O app instalado na tela de início abre a última
+campanha em que o aparelho entrou.
 
 ---
 
@@ -179,6 +186,9 @@ jogador); não é segredo criptográfico, é combinado entre amigos.
 
 A chave `anon` do Supabase é **pública por natureza** — vai no bundle do
 navegador. Ela não é o segredo; o "segredo" é o código da sala não ser divulgado.
+As campanhas da lista `CAMPANHAS` (ver acima) aparecem pra qualquer um que abra
+o app — do mesmo jeito que a `setimo-raio` sempre esteve aberta pra quem tem o
+link do deploy.
 
 Se um dia a mesa quiser isolamento de verdade, o caminho é adicionar auth do
 Supabase (magic link, sem senha) e trocar as policies por filtros que amarrem
@@ -222,4 +232,5 @@ Pré-requisito: `gh auth login` e `vercel login` já feitos.
    (adicionar as duas variáveis nos três ambientes: Production, Preview e Development.)
 
 Depois é só mandar o link pra mesa. Pro grupo, a URL pode ser a raiz mesmo — a
-sala `setimo-raio` é o padrão e nem aparece pro jogador.
+sala `setimo-raio` abre pra quem ainda não entrou em nenhuma campanha, e cada
+um escolhe a sua na tela de entrada.

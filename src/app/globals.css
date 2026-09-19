@@ -211,11 +211,6 @@ button:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
 }
-/* O "↔ outra mesa" é link de verdade (troca de sala recarregando a página). */
-a.linkbtn {
-  display: inline-block;
-  text-decoration: none;
-}
 .synctag {
   font-size: 11px;
   color: var(--dim);
@@ -334,6 +329,67 @@ a.linkbtn {
   font-size: 12px;
   color: var(--dim);
   line-height: 1.7;
+}
+
+/* ---------- escolher campanha (tela de entrada e "trocar campanha") ---------- */
+.gatecampanha {
+  margin: 18px 0 20px;
+  text-align: left;
+}
+.gatecampanharotulo {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+.campanhas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.campanhalista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.campanhabtn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.campanhabtn:hover {
+  border-color: var(--accent);
+}
+.campanhabtn[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+  cursor: default;
+}
+.campanhabtn .cnome {
+  font-family: var(--f-display);
+  font-size: 15px;
+}
+.campanhabtn .cinfo {
+  font-size: 12px;
+  color: var(--muted);
+}
+.addrow.campanhacodigo {
+  margin-top: 0;
+  width: 100%;
+}
+.addrow button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---------- layout ---------- */
