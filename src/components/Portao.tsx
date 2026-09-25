@@ -96,7 +96,8 @@ export function Portao({
           type="text"
           value={nome}
           maxLength={40}
-          placeholder="Nome do seu personagem (se ainda não está na lista)"
+          placeholder="Novo personagem: nome"
+          aria-label="Nome do seu personagem, se ele ainda não está na lista"
           onChange={(e) => setNome(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") entrarComNovo();

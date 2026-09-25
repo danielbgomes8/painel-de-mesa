@@ -890,8 +890,19 @@ button:focus-visible {
   font-size: 13px;
 }
 .addcombatant input.num {
-  width: 84px;
+  /* Cabe "iniciativa" e "desl. (m)" inteiros: a 84px o placeholder saía
+     cortado ("iniciati") no celular. */
+  width: 108px;
   font-family: var(--f-mono);
+}
+@media (max-width: 520px) {
+  /* Campo de texto do formulário ocupa a linha toda: nome/ataque com
+     placeholder longo ("ataque (ex.: Cimitarra +4, 1d6+2)") não cabem no
+     tamanho padrão de um input a 375px. Os numéricos seguem lado a lado. */
+  .addcombatant input:not(.num) {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
 }
 
 /* ---------- ações em massa ---------- */
@@ -1310,6 +1321,15 @@ button:focus-visible {
   color: var(--muted);
   font-size: 13px;
   margin: 0;
+}
+.fc-barra {
+  display: flex;
+  justify-content: flex-end;
+}
+/* Cabeçalho de seção inteiro é alvo de toque (ver SecaoRecolhivel). */
+.fc-sechead--toca {
+  cursor: pointer;
+  touch-action: manipulation;
 }
 .fc-secao {
   border-top: 1px solid var(--line);

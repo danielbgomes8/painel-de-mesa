@@ -632,7 +632,8 @@ function FormContador({
         className="num"
         type="number"
         inputMode="numeric"
-        placeholder={comDescansoCurto ? "usos" : "quantidade/estados"}
+        placeholder={comDescansoCurto ? "usos" : "quantidade"}
+        aria-label={comDescansoCurto ? "usos por descanso" : "quantidade ou estados (ex.: 3 de desgaste)"}
         value={max}
         onChange={(e) => setMax(e.target.value)}
         onKeyDown={(e) => {

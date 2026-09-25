@@ -1,0 +1,55 @@
+# Cópia de segurança diária do banco do Painel de Mesa.
+#
+# O plano gratuito do Supabase NÃO faz backup e pausa o projeto depois de uns
+# 7 dias sem uso. Este job lê todas as salas todo dia (só leitura), guarda o
+# resultado por 90 dias e, de brinde, mantém o projeto com movimento.
+#
+# Onde achar a cópia: GitHub → Actions → "Backup diário" → a execução do dia →
+# "Artifacts" no fim da página (arquivo .zip com um .json por sala).
+# Se o job ficar vermelho (banco pausado, chave trocada...), o GitHub manda
+# e-mail — olhar o log da execução.
+#
+# Precisa de dois segredos no repositório (Settings → Secrets → Actions):
+#   SUPABASE_URL        (= NEXT_PUBLIC_SUPABASE_URL do painel)
+#   SUPABASE_ANON_KEY   (= NEXT_PUBLIC_SUPABASE_ANON_KEY do painel)
+# Ambos são públicos por natureza (vão no navegador de quem abre o app); estão
+# como segredo só pra não ficarem soltos no código.
+
+name: Backup diário
+
+on:
+  schedule:
+    # 08:17 UTC = 05:17 em Brasília, fora da hora cheia (que o GitHub atrasa).
+    - cron: "17 8 * * *"
+  workflow_dispatch: # também dá pra rodar à mão, na aba Actions
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Copiar todas as salas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node scripts/backup-salas.mjs backup
+
+      - name: Dia da cópia
+        id: dia
+        run: echo "data=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: backup-salas-${{ steps.dia.outputs.data }}
+          path: backup/
+          retention-days: 90
+          if-no-files-found: error

@@ -23,7 +23,18 @@ export function SecaoRecolhivel({
   const [aberto, setAberto] = useState(abertoInicial);
   return (
     <div className="fc-secao">
-      <div className="fc-sechead">
+      {/* Tocar em qualquer ponto do cabeçalho abre/fecha — sumário de seções
+          fechadas só funciona no celular se o título também for alvo de toque,
+          não só a setinha. Campo, botão e link dentro do cabeçalho (o modo
+          edição da ficha põe inputs ali) seguem funcionando sozinhos. A
+          setinha continua sendo o controle de teclado/leitor de tela. */}
+      <div
+        className="fc-sechead fc-sechead--toca"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("button, input, select, textarea, a")) return;
+          setAberto((v) => !v);
+        }}
+      >
         <button
           type="button"
           className="fc-chev"

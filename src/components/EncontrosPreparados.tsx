@@ -68,7 +68,7 @@ function FormNovoEncontro({ sala }: { sala: Sala }) {
     <div className="addcombatant">
       <input
         type="text"
-        placeholder="nome do encontro (ex.: Emboscada na ponte)"
+        placeholder="nome do encontro (ex.: Emboscada)"
         maxLength={60}
         value={nome}
         onChange={(e) => setNome(e.target.value)}

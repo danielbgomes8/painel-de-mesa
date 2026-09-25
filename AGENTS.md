@@ -442,6 +442,43 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   ambos re-obteníveis (`vercel env pull`, ou o painel do Supabase) se
   precisar reconfigurar em outra máquina.
 
+## Revisão de 25/09/2026 (antes da sessão de domingo)
+
+Revisão completa feita contra o site publicado, numa sala descartável, em 375px
+(mestre e jogador: ordem, monstros, encontro, dano/condição/desfazer, virada de
+rodada, concentração, testes de morte, telão, queda de rede com sincronização,
+tempo real). Nada quebrou; saíram estes ajustes:
+
+- **Ficha completa abre pra LER** (`FichaCompleta.tsx`): texto inteiro, sem a
+  caixinha de 3 linhas com rolagem por dentro, e as seções vêm **recolhidas**
+  (sumário; a ficha do Daniel Gracewick ia de ~22 mil px pra ~5 mil). Quem pode
+  editar liga o modo edição no botão "✎ editar ficha" do topo (`editando`,
+  local — fecha junto com a ficha). Seção criada agora nasce **aberta**
+  (`qtdAoAbrir`), senão sumiria da tela. O cabeçalho inteiro de qualquer
+  `SecaoRecolhivel` abre/fecha ao toque, não só a setinha (campo/botão dentro do
+  cabeçalho seguem funcionando: o clique só alterna se não veio de
+  `button, input, select, textarea, a`).
+- **Campo que não cabe a 375px é defeito.** Placeholder cortado ("iniciati",
+  "desl. (m") não some sozinho: `.addcombatant input.num` tem 108px (cabe
+  "iniciativa") e, em telas ≤520px, campo de texto do formulário ocupa a linha
+  toda. Teste que achou 16 cortes e hoje dá 0 — no console, pra cada `input`
+  vazio com `placeholder`, comparar `canvas.measureText(placeholder).width`
+  (com a fonte computada do input) com `clientWidth - padding`. **Placeholder
+  novo: encurte, e ponha o texto longo no `aria-label`.**
+- **Backup diário** (`scripts/backup-salas.mjs` + `.github/workflows/backup-diario.yml`,
+  sem migration): lê todas as salas todo dia (só leitura, sem dependência), guarda
+  90 dias como artifact e mantém o projeto do Supabase com movimento (o plano
+  gratuito não faz backup e pausa após ~7 dias parado). Falha alto (exit 1) —
+  banco sem sala ou erro HTTP não vira "backup vazio". **Tabela nova com
+  `room_code` precisa entrar em `TABELAS_COM_SALA`**: `backupBruto.test.ts`
+  compara a lista com as migrations e quebra o `npm run verificar` se faltar.
+  Segredos no repositório: `SUPABASE_URL` e `SUPABASE_ANON_KEY` (públicos por
+  natureza). Cópia bruta, reinserível por REST; o restaurável pelo app é o
+  botão "backup" do Mestre.
+- **Nome de ataque não leva parênteses** (`lerSegmentoAtaque`): tudo entre `()`
+  é descartado como observação, então "Espada Longa (1 mão)" e "(2 mãos)" viravam
+  dois botões 🎲 idênticos. Use "Espada Longa, uma mão: +7, 1d8+5 …".
+
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram

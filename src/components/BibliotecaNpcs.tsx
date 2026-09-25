@@ -65,7 +65,7 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
         <input
           type="search"
           aria-label="Buscar monstro no catálogo do SRD"
-          placeholder={`buscar entre ${MONSTROS_SRD.length} monstros (ex.: goblin, morto-vivo)…`}
+          placeholder="ex.: goblin, morto-vivo"
           value={busca}
           autoComplete="off"
           spellCheck={false}

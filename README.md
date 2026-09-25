@@ -215,6 +215,24 @@ Se um dia a mesa quiser isolamento de verdade, o caminho é adicionar auth do
 Supabase (magic link, sem senha) e trocar as policies por filtros que amarrem
 `room_code` a quem está logado.
 
+### Cópia de segurança (todo dia, automática)
+
+O plano gratuito do Supabase **não faz backup** e pausa o projeto depois de uns
+7 dias sem uso. Por isso o GitHub roda, todo dia de madrugada, o
+[`backup-diario.yml`](.github/workflows/backup-diario.yml): lê todas as salas
+(só leitura), guarda por **90 dias** e, de brinde, mantém o projeto com
+movimento.
+
+- **Onde está a cópia:** GitHub → aba *Actions* → *Backup diário* → a execução
+  do dia → *Artifacts* no fim da página (um `.zip` com um `.json` por sala).
+- **Se ficar vermelho** (banco pausado, chave trocada...), o GitHub manda
+  e-mail — abrir o log da execução. Dá pra rodar na hora pelo botão *Run
+  workflow*, ou à mão: `SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/backup-salas.mjs`.
+- **Segredos necessários** (Settings → Secrets → Actions): `SUPABASE_URL` e
+  `SUPABASE_ANON_KEY` (os mesmos valores das variáveis `NEXT_PUBLIC_…` do app).
+- É uma cópia **bruta** do banco. O backup que o app restaura sozinho é o
+  botão "backup" do Mestre; este é o plano B, caso o projeto inteiro se perca.
+
 ---
 
 ## Publicar (passos do Daniel, fora do Claude)

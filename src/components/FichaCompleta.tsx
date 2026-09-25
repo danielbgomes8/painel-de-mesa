@@ -56,6 +56,11 @@ export function FichaCompleta({
 }) {
   const [novoTitulo, setNovoTitulo] = useState("");
   const [novoTipo, setNovoTipo] = useState<"lista" | "texto">("lista");
+  // A ficha abre pra LER: texto corrido inteiro, sem caixinha de 3 linhas com
+  // rolagem por dentro (ninguém lê uma regra assim no meio do turno). Quem
+  // pode editar (o dono e o Mestre) liga o modo edição no botão do topo.
+  const [editando, setEditando] = useState(false);
+  const modoEdicao = editavel && editando;
 
   // `?? []`/`?? ""`: só entram em jogo na janela entre publicar este código e
   // rodar a migration 0012 — sem isso, uma linha ainda sem a coluna nova
@@ -63,6 +68,11 @@ export function FichaCompleta({
   // por ser string tolera vir undefined).
   const secoes = p.ficha_secoes ?? [];
   const epiteto = p.ficha_epiteto ?? "";
+  // As seções que já existiam quando a ficha abriu começam recolhidas (são
+  // um sumário: 15 seções abertas davam ~19 mil px de rolagem no celular);
+  // uma seção criada agora, no modo edição, já nasce aberta — senão ela
+  // sumiria da tela logo depois de criada.
+  const [qtdAoAbrir] = useState(secoes.length);
 
   function adicionarSecao() {
     const titulo = novoTitulo.trim();
@@ -77,7 +87,15 @@ export function FichaCompleta({
 
   return (
     <div className="fichacompleta">
-      {editavel ? (
+      {editavel && (
+        <div className="fc-barra">
+          <button type="button" className="btn" aria-pressed={editando} onClick={() => setEditando((v) => !v)}>
+            {editando ? "✓ concluir edição" : "✎ editar ficha"}
+          </button>
+        </div>
+      )}
+
+      {modoEdicao ? (
         <div className="notesbox">
           <span className="sectitle">Epígrafe</span>
           <CampoTextoAdiado
@@ -91,13 +109,18 @@ export function FichaCompleta({
         epiteto && <p className="fc-epiteto">{epiteto}</p>
       )}
 
-      {vazia && !editavel && <p className="empty-note">Nada cadastrado ainda.</p>}
+      {vazia && !modoEdicao && (
+        <p className="empty-note">
+          {editavel ? "Nada cadastrado ainda — toque em “editar ficha” pra começar." : "Nada cadastrado ainda."}
+        </p>
+      )}
 
       {secoes.map((secao, i) => (
         <SecaoRecolhivel
           key={i}
+          abertoInicial={i >= qtdAoAbrir}
           titulo={
-            editavel ? (
+            modoEdicao ? (
               <>
                 <CampoTexto
                   valor={secao.titulo}
@@ -120,7 +143,7 @@ export function FichaCompleta({
             )
           }
           cabecalhoExtra={
-            editavel && (
+            modoEdicao && (
               <BotaoRemover
                 aria={`remover seção ${secao.titulo}`}
                 confirmar={`Remover a seção "${secao.titulo}"?`}
@@ -130,7 +153,7 @@ export function FichaCompleta({
           }
         >
           {secao.tipo === "texto" ? (
-            editavel ? (
+            modoEdicao ? (
               <CampoTextoAdiado
                 valor={secao.texto ?? ""}
                 maxLength={4000}
@@ -145,7 +168,7 @@ export function FichaCompleta({
             <div className="fc-itens">
               {(secao.itens ?? []).map((item, j) => (
                 <div key={j} className="fc-item">
-                  {editavel ? (
+                  {modoEdicao ? (
                     <>
                       <div className="fc-itemhead">
                         <CampoTexto
@@ -186,7 +209,7 @@ export function FichaCompleta({
                   )}
                 </div>
               ))}
-              {editavel && (
+              {modoEdicao && (
                 <button
                   type="button"
                   className="minilink"
@@ -200,11 +223,11 @@ export function FichaCompleta({
         </SecaoRecolhivel>
       ))}
 
-      {editavel && (
+      {modoEdicao && (
         <div className="addcombatant" style={{ marginTop: 12 }}>
           <input
             type="text"
-            placeholder="nome da seção (ex.: Características, Quem ele é)"
+            placeholder="nome da seção (ex.: Quem ele é)"
             maxLength={60}
             value={novoTitulo}
             onChange={(e) => setNovoTitulo(e.target.value)}
