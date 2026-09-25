@@ -1,6 +1,7 @@
 "use client";
 
 import type { Sala } from "@/hooks/useSala";
+import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import {
   estaCaido,
@@ -18,6 +19,9 @@ const QUANTOS_PROXIMOS = 3;
  *  jogador (nunca entrega nome de NPC ainda não revelado). */
 export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
   const { combate, personagens } = sala;
+  // Ninguém mexe no aparelho do telão: sem isto a tela apaga (ou o notebook
+  // entra em descanso) no meio do combate.
+  const tela = useTelaAcesa();
   const atual = combate.order[combate.turn];
   const pv = atual ? personagens.find((p) => p.slug === atual.slug) ?? null : null;
   const contagensNpc = numerarNpcsNaOrdem(
@@ -54,7 +58,7 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
   });
 
   return (
-    <div className="telao">
+    <div className="telao" data-tela={tela ?? undefined}>
       <div className="telao-eyebrow">
         {rotulo} · Rodada {combate.round}
       </div>
@@ -87,6 +91,12 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
         </>
       ) : (
         <div className="telao-nome">Sem combate no momento</div>
+      )}
+      {(tela === "recusada" || tela === "sem-suporte") && (
+        <p className="telao-aviso">
+          Este navegador não deixou manter a tela acesa: desligue o descanso de tela do aparelho
+          {tela === "recusada" ? " (ou a economia de bateria)" : ""}.
+        </p>
       )}
     </div>
   );

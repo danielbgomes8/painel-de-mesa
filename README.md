@@ -90,7 +90,9 @@ iniciativa, linha de ataque), notas privadas que só o Mestre enxerga,
 revelar/ocultar NPC, remover personagens e NPCs, **modo telão** (tela cheia
 pra projetar ou compartilhar, sem os controles de edição, mostrando de quem
 é a vez, as condições dela e quem vem a seguir, com o mesmo segredo de PV
-de NPC) e **backup** (baixa tudo da sala num `.json`).
+de NPC; segura a tela acesa, pra TV ou o notebook não apagarem no meio do
+combate — se o navegador não deixar, o telão avisa) e **backup** (baixa tudo
+da sala num `.json`).
 
 ---
 
@@ -141,12 +143,14 @@ src/
                   CampoNumero · CampoTexto · CampoTextoAdiado · BotaoRemover ·
                   ListaLog (campos e blocos reutilizáveis)
   hooks/          useSala (carrega a sala + assina o Realtime + mutações) ·
-                  useCodigoSala · useIdentidade · useModoTelao
+                  useCodigoSala · useIdentidade · useModoTelao ·
+                  useTelaAcesa
   lib/            regras · condicoes · identidade · sala · supabase · tipos ·
                   dados (rolagem d20/d100) · alerta (vibração/bipe de turno) ·
                   bastiaoDmg (catálogo do Bastião) · classesSrd (habilidades
                   por classe/nível) · monstrosSrd (catálogo de monstros) ·
-                  backup (exporta a sala num .json)
+                  backup (exporta a sala num .json) · telaAcesa (segura a
+                  tela do telão acesa)
 supabase/
   migrations/     0001 a 0016 — do esquema inicial até os encontros
                   preparados; o
@@ -232,6 +236,20 @@ movimento.
   `SUPABASE_ANON_KEY` (os mesmos valores das variáveis `NEXT_PUBLIC_…` do app).
 - É uma cópia **bruta** do banco. O backup que o app restaura sozinho é o
   botão "backup" do Mestre; este é o plano B, caso o projeto inteiro se perca.
+
+### Atualizações (robô do GitHub)
+
+Toda segunda de manhã o **Dependabot** (robô do próprio GitHub, configurado em
+[`.github/dependabot.yml`](.github/dependabot.yml)) confere se saiu versão nova
+das peças do app e, se saiu, abre **um** pedido de atualização (pull request)
+com todas juntas; o GitHub testa o pedido sozinho. Versão grande (que costuma
+quebrar coisa) fica de fora, de propósito. Pra aplicar, é só pedir pro Claude:
+o que vai pro ar precisa sair com você como autor, senão o Vercel bloqueia.
+
+Os **alertas de segurança** do GitHub (que avisam na hora quando uma peça tem
+falha conhecida) estão **desligados** neste repositório. Pra ligar: GitHub →
+*Settings* → *Advanced Security* (ou *Code security*) → **Dependabot alerts** e
+**Dependabot security updates** → *Enable*.
 
 ---
 

@@ -1,0 +1,5 @@
+# Script com "#!/usr/bin/env node" na 1ª linha precisa de fim de linha LF.
+# Num checkout Windows (core.autocrlf=true) ele vinha com CRLF e o Vitest
+# não conseguia importar (SyntaxError em backupBruto.test.ts) — o verificar
+# quebrava só na máquina Windows; no GitHub e no Vercel (Linux) passava.
+scripts/** text eol=lf

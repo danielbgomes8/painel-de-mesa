@@ -1,0 +1,53 @@
+# Robô de atualizações (Dependabot, do próprio GitHub). Toda segunda de
+# manhã ele confere se saiu versão nova das peças do app e, se saiu, abre UM
+# pedido (pull request) com todas juntas. O workflow "Verificar" roda nele
+# sozinho — testes, tipos, lint e build.
+#
+# Por que existe: em 25/09/2026 o Next.js estava com um alerta crítico de
+# segurança já corrigido havia semanas, e ninguém ficou sabendo até alguém ir
+# olhar. Atualização pequena (16.3.1 → 16.3.6) chega sozinha por aqui.
+#
+# Versão GRANDE (TypeScript 7, Vitest 5, ESLint 10…) fica de fora de
+# propósito: costuma quebrar coisa e é decisão pra fazer junto, com calma.
+# Isso não esconde alerta de segurança — o `ignore` só vale pras
+# atualizações de rotina.
+#
+# Pra aplicar um pedido do robô: ver AGENTS.md ("Robô de atualizações") —
+# o commit que vai pro ar precisa ter o Daniel como autor, senão o Vercel
+# bloqueia o deploy.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+    # Versão publicada há menos de 3 dias ainda não entra: é quando aparece
+    # (e é retirada) a maioria das versões quebradas ou adulteradas.
+    cooldown:
+      default-days: 3
+    groups:
+      pecas-do-app:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "Atualiza"
+
+  # As ações dos workflows (checkout, setup-node, upload-artifact).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      timezone: "America/Sao_Paulo"
+    groups:
+      acoes:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Atualiza"

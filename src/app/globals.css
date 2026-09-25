@@ -1735,6 +1735,14 @@ body:has(.telao) {
 .telao-proximos li + li {
   color: var(--dim);
 }
+/* Só aparece quando o navegador não segura a tela acesa (useTelaAcesa). */
+.telao-aviso {
+  margin: 12px 0 0;
+  max-width: 44ch;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dim);
+}
 
 /* ---------- diário da campanha ---------- */
 .diariolist {

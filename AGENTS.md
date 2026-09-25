@@ -211,7 +211,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   inteira ver, como já valiam na ordem e no log; NPC a 0 PV não entra nisso,
   que é PV dele disfarçado. A folga do corpo da página some no telão
   (`body:has(.telao)`): ela empurrava o conteúdo pra fora da tela da TV e
-  deixava a página rolando 84px à toa (achado medindo).
+  deixava a página rolando 84px à toa (achado medindo). Desde 25/09/2026
+  **segura a tela acesa** — ver "Revisão de tecnologia" mais abaixo.
 - **Várias campanhas no mesmo deploy** (19/09/2026, sem migration): cada
   campanha é uma sala (`?sala=codigo`), criada sozinha no primeiro acesso,
   com dados totalmente separados. O que prendia tudo à sala padrão foi solto:
@@ -478,6 +479,78 @@ tempo real). Nada quebrou; saíram estes ajustes:
 - **Nome de ataque não leva parênteses** (`lerSegmentoAtaque`): tudo entre `()`
   é descartado como observação, então "Espada Longa (1 mão)" e "(2 mãos)" viravam
   dois botões 🎲 idênticos. Use "Espada Longa, uma mão: +7, 1d8+5 …".
+
+## Revisão de tecnologia (25/09/2026, noite)
+
+O Daniel pediu "o que falta de tecnologia no app" e aprovou os dois
+primeiros itens; os outros estão na lista do fim desta seção.
+
+- **Next.js 16.3.1 → 16.3.6** (e `eslint-config-next` junto, versão exata como
+  antes). O `npm audit` apontava dois alertas **críticos** — execução de código
+  em servidor **Windows** e na otimização de imagem **AVIF** (`sharp`/`libheif`).
+  Nenhum atingia o site (o Vercel roda Linux e o app não usa `next/image`),
+  mas era atualização de conserto, sem mudança de uso. `npm audit --omit=dev`
+  = 0. Sobra um alerta moderado no **Vitest** (ferramenta de teste, não vai
+  pro site); a correção é o Vitest 5, versão grande — decisão pra depois.
+- **Robô de atualizações** (`.github/dependabot.yml`): toda segunda, 06:00 de
+  Brasília, UM pull request com todas as atualizações pequenas (`minor` +
+  `patch`) do npm; ações dos workflows uma vez por mês. Versão **grande** fica
+  de fora (`ignore` semver-major — TypeScript 7, Vitest 5, ESLint 10 quebram
+  coisa e são decisão conjunta); o `ignore` só vale pra atualização de rotina,
+  não pra de segurança. `cooldown` de 3 dias: versão recém-publicada espera
+  (é quando aparece — e é retirada — a maioria das quebradas ou adulteradas).
+  **Aplicar um pedido do robô**: o commit que vai pro ar precisa ter o Daniel
+  como autor (`danielbgomes8@gmail.com`), senão o Vercel bloqueia o deploy —
+  então não é "Squash and merge" pelo site: rodar as mesmas versões aqui
+  (`npm install --save-exact …`), `npm run verificar`, commitar com o autor
+  inline; o robô fecha o PR dele sozinho quando vê a versão já aplicada. O
+  preview do Vercel no PR do robô pode aparecer bloqueado pelo mesmo motivo;
+  o que vale lá é o check "Verificar".
+  **Os alertas de segurança do GitHub estão desligados** no repositório
+  (`vulnerability-alerts` = 404, `automated-security-fixes` = false). Ligar é
+  configuração de segurança da conta: é o Daniel quem liga (Settings →
+  Advanced Security → Dependabot alerts + security updates), não mexer por API.
+- **Telão segura a tela acesa** (`lib/telaAcesa.ts`, testado com navegador e
+  documento falsos em `telaAcesa.test.ts`; `hooks/useTelaAcesa.ts`, usado só
+  no `Telao`): pede a trava de tela (Screen Wake Lock) ao abrir e **de novo
+  a cada volta** — o navegador solta sozinho quando a aba some (troca de aba,
+  minimizar). Se o navegador negar (economia de bateria) ou não tiver o
+  recurso (antigo, ou página sem HTTPS), o telão mostra um aviso pequeno pra
+  desligar o descanso de tela. A situação fica em `data-tela` no `.telao`
+  (`acesa` / `recusada` / `sem-suporte`) pra conferir de fora.
+  **O navegador embutido do Claude nega a trava** (`permissions.query` =
+  `denied`, "Wake Lock permission request denied") — nele só dá pra ver o
+  aviso. Pra ver funcionando: Chrome sem janela com perfil temporário
+  (`chrome --headless=new --remote-debugging-port=9333
+  --user-data-dir=<pasta temporária>`) e um script Node falando o protocolo de
+  depuração (CDP) por WebSocket — abrir o telão, ler `data-tela`, trocar de aba
+  com `Target.activateTarget` e contar os pedidos embrulhando
+  `navigator.wakeLock.request`. Resultado em 25/09: `acesa`, permissão
+  `granted`, um pedido novo a cada volta, trava nova ativa. Com
+  `Browser.setPermission` negando `screen-wake-lock`, o aviso aparece
+  (conferido em foto a 1280×720, sem rolagem).
+- **`.gitattributes` (`scripts/** eol=lf`)**: num checkout Windows
+  (`core.autocrlf=true`) o `scripts/backup-salas.mjs` vinha com CRLF, e o
+  Vitest não importava arquivo com `#!/usr/bin/env node` + CRLF
+  (`SyntaxError` no `backupBruto.test.ts`) — o `verificar` quebrava só no
+  Windows. GitHub e Vercel (Linux) passavam.
+
+**Ainda da revisão (não feito, esperando o Daniel):**
+3. Erros dos celulares somem no `console.error` do aparelho — guardar um
+   resumo numa tabela do Supabase (sem serviço novo).
+4. Nenhum teste cobre tela nem o `useSala` (1.854 linhas, a parte mais
+   delicada) — robô que abre o app numa sala descartável a cada envio.
+5. **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
+   chave `anon` devolve todos os códigos (conferido). Então "código difícil de
+   chutar" (seção de trocar campanha, acima) **não esconde campanha nenhuma**.
+   Trava barata sem login: o app nunca apaga sala inteira, dá pra tirar o
+   `delete` de `rooms` do `anon` (as tabelas filhas continuam abertas).
+6. O backup diário nunca foi restaurado — ensaiar numa sala descartável.
+7. Menores: 280 KB compactados de JS na primeira abertura (catálogos de
+   monstros e classes no pacote principal); nada confere sozinho se o banco
+   bate com `tipos.ts` (conferido à mão em 25/09: bate). O log **não**
+   precisa de limpeza: 135 linhas na Salamina em duas semanas e o app só lê
+   as 40 últimas.
 
 ## Próximos passos (combinados em 17/09/2026)
 
