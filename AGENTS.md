@@ -414,8 +414,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     o que a nota automática já diz (ND, voo, imunidades). Ordem combinada com
     o Daniel em 26/09: **ND 0–2 primeiro** (a Forgotten Realms é nível 1; a
     Salamina é nível 7), depois ND 3–10, ND 11+ e os animais por último.
-    Lote 1 (20, PNJs e clássicos de masmorra) e lote 2 (28, o resto de ND
-    0 a 1) em 26/09. **Na open5e, "RECHARGE" também é recarga no dado** (o
+    Em 26/09 saíram os lotes 1 (20, PNJs e clássicos de masmorra), 2 (28, o
+    resto de ND 0 a 1) e 3 (23, ND 2): **todos os 71 monstros gerados de ND 0
+    a 2 que não são animais têm dica**. Próximo: ND 3–10 (71), depois ND 11+
+    (46) e os 87 animais. O lote 3 achou mais um erro do gerador: a vírgula de
+    lista ("using Bite, Claw, or Harpoon") cortava a frase do ataque múltiplo
+    e o Merrow saía sem "2 ataques:" — só ele mudou ao corrigir. **Na open5e, "RECHARGE" também é recarga no dado** (o
     "Recharge 4-6" do cão intermitente) — o gerador chegou a traduzir como
     "1x por descanso"; não afetava linha nenhuma (as 13 são ações bônus),
     mas foi corrigido.

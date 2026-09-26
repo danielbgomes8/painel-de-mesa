@@ -316,7 +316,9 @@ function recarga(limite) {
  *  / "one Bite attack and two Claw attacks" → como montar a linha. */
 function lerMultiataque(desc) {
   let frase = desc.split(/\.(?:\s|$)/)[0];
-  frase = frase.split(/, or it makes|, or |\bor uses\b|\band uses\b|\band can use\b|, and it (?:uses|can)|, uses /)[0];
+  // Só corta na alternativa ("..., or it makes three Poison Ray attacks"): a
+  // vírgula de lista ("using Bite, Claw, or Harpoon") não pode cortar.
+  frase = frase.split(/, or it makes|\bor uses\b|\band uses\b|\band can use\b|, and it (?:uses|can)|, uses /)[0];
   const qualquer = frase.match(/makes (\w+)(?: other)? attacks, using (.+?) in any combination/);
   const antes = frase.match(/makes one ([A-Z][\w' -]*?) attack and (\w+) other attacks, using (.+?) in any combination/);
   if (antes) {

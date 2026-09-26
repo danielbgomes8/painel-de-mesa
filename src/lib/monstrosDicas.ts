@@ -112,4 +112,51 @@ export const DICAS_TATICA: Record<string, string> = {
     "Cada acerto do Drenar Vida também reduz o PV máximo do alvo no mesmo tanto — perigoso pra personagem de nível baixo. Terminar o turno dentro de parede custa 1d10 de força. Resiste a quase todo dano elemental; arma comum, radiante e força funcionam.",
   "Sphinx of Wonder":
     "Reação 2x/dia, Lampejo de Engenho: +2 num teste de atributo ou de resistência dela ou de outra criatura a até 9m. O rasgo soma 2d6 radiante. Arcanismo e Religião +4.",
+  // ── Lote 3 (26/09/2026): ND 2 — fecha tudo de ND 0 a 2 ──
+  "Animated Rug of Smothering":
+    "Em alvo Médio ou menor, pode agarrar em vez de causar dano (escapar CD 13): a vítima fica Cega, Contida, sufocando e leva 2d6+3 contundente no começo de cada turno dela. Enquanto agarra, o tapete toma metade do dano que recebe, e a vítima leva o mesmo tanto — bater no tapete machuca o amigo.",
+  "Ankheg":
+    "Sente vibração a até 18m e sai do chão por baixo. A mordida agarra alvo Grande ou menor (escapar CD 13), e contra quem está agarrado ataca com vantagem. Borrifo ácido (recarga 6) em linha de 9m: 4d6 ácido (Destreza CD 12).",
+  "Awakened Tree":
+    "Lenta, mas bate forte e de longe (alcance 3m, 2d8+4), e tem muito PV pro nível de desafio.",
+  "Azer Sentinel":
+    "No fim de cada turno dele, quem ele escolher a até 1,5m leva 1d10 de fogo — ficar colado custa caro. Brilha (luz forte de 3m): não se esconde no escuro.",
+  "Black Dragon Wyrmling":
+    "Dois rasgos por turno. Sopro ácido (recarga 5-6) em linha de 4,5m: 5d8 (Destreza CD 11) — derruba um personagem de nível 1 sozinho.",
+  "Bronze Dragon Wyrmling":
+    "Dois rasgos por turno. Sopro de relâmpago (recarga 5-6) em linha de 12m: 3d10 (Destreza CD 12). Tem também o Sopro de Repulsão, em cone de 9m (Força CD 12): empurra 9m e derruba.",
+  "Green Dragon Wyrmling":
+    "Dois rasgos por turno. Sopro venenoso (recarga 5-6) em cone de 4,5m: 6d6 (Constituição CD 11) — pega o grupo junto se estiver amontoado.",
+  "Silver Dragon Wyrmling":
+    "Dois rasgos por turno. Sopro de frio (recarga 5-6) em cone de 4,5m: 4d8 (Constituição CD 13). Tem também o Sopro Paralisante (mesmo cone e CD): na primeira falha, Incapacitado até o fim do próximo turno e testa de novo; na segunda, Paralisado (repete o teste no fim de cada turno, até 1 minuto).",
+  "White Dragon Wyrmling":
+    "Dois rasgos por turno. Sopro de frio (recarga 5-6) em cone de 4,5m: 5d8 (Constituição CD 12). Anda e escala gelo sem teste, e neve ou gelo não atrasam ele.",
+  "Centaur Trooper":
+    "Rápido (15m). Dois ataques por turno: pique (alcance 3m) ou arco longo. Ação bônus Investida Pisoteadora (recarga 5-6): corre sem provocar ataque de oportunidade, atravessando criaturas Médias ou menores; cada uma faz Força CD 14 ou leva 1d6+4 contundente e cai.",
+  "Druid":
+    "Dois ataques por turno (cajado de vinha, ou fagulha a até 27m). Conjura Constrição e Onda Trovejante 2x/dia e Raio Lunar 1x/dia (CD 13) — prende e separa o grupo. Percepção e Medicina +5.",
+  "Ettercap":
+    "Vive entre teias: anda nelas sem prender e sente quem encosta. Fio de teia (recarga 5-6), até 9m: Destreza CD 12 ou Contido (a teia tem CA 10 e 5 PV, e fogo a destrói fácil); com ação bônus puxa o preso 7,5m pra perto. A mordida envenena até o próximo turno dele.",
+  "Ghast":
+    "Fedor: quem começa o turno a até 1,5m faz Constituição CD 10 ou fica Envenenado até o próximo turno (passou, fica imune por 24h). A garra paralisa quem não é morto-vivo até o fim do próximo turno (Constituição CD 10), e a mordida soma 2d8 necrótico — ele morde o paralisado.",
+  "Gibbering Mouther":
+    "Balbucio: quem começa o turno a até 6m faz Sabedoria CD 10 ou rola 1d8 — 1-4 não faz nada, 5-6 anda pra direção aleatória, 7-8 ataca alguém aleatório ao alcance. O chão a até 3m é terreno difícil. A mordida derruba alvo Médio ou menor, e quem cai a 0 PV por ela morre e é absorvido.",
+  "Grick":
+    "Bico e tentáculos no mesmo turno; os tentáculos agarram alvo Médio ou menor (escapar CD 12). Escala e tem Furtividade +4: bom pra emboscada em caverna.",
+  "Merrow":
+    "Luta melhor na água. O arpão (arremessado até 6m) puxa alvo Grande ou menor 4,5m pra perto — arrasta pra dentro d'água. A mordida deixa Envenenado até o fim do próximo turno dele.",
+  "Minotaur Skeleton":
+    "Um ataque por turno: chifrada ou pancada (2d10+4). Correu 6m ou mais em linha reta antes de acertar a chifrada: +2d8 perfurante, e o alvo Grande ou menor cai.",
+  "Ochre Jelly":
+    "Escala parede e teto e passa por frestas. Reação Dividir: com 10 PV ou mais, quando chega à metade dos PV ou leva dano elétrico ou cortante, vira duas geleias menores com os PV divididos — machado e raio multiplicam o problema. Prefira contundente, perfurante, fogo ou frio.",
+  "Ogre Zombie":
+    "Muito PV e CA baixíssima. Ao cair a 0 PV, faz Constituição (CD 5 + o dano) pra ficar com 1 PV — não vale contra dano radiante nem acerto crítico.",
+  "Pegasus":
+    "Muito rápido, a pé (18m) e voando; o coice soma 2d4 radiante. Percepção +6.",
+  "Sea Hag":
+    "Aparência Vil: fera ou humanoide que começa o turno a até 9m vendo a forma verdadeira dela faz Sabedoria CD 11 ou fica Amedrontado (passou, imune por 24h). Olhar Mortal (recarga 5-6), só em alvo Amedrontado: falhou na Sabedoria CD 11, com 20 PV ou menos cai direto a 0 PV. Usa Disfarçar-se por 24h.",
+  "Wererat":
+    "Ação bônus: vira rato (Pequeno) ou híbrido. Dois ataques por turno, e pode trocar um por mordida: humanoide mordido faz Constituição CD 11 ou é amaldiçoado — se cair a 0 PV, vira homem-rato sob controle do Mestre, com 10 PV (passou, imune por 24h). Furtividade +5.",
+  "Will-o'-Wisp":
+    "Ação bônus: fica invisível, com a luz junto, até atacar. Com outra ação bônus mata quem está a 0 PV a até 1,5m (Constituição CD 10) e recupera 3d6 PV — proteja o caído perto dele. CA 19: difícil de acertar.",
 };
