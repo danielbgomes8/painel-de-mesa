@@ -303,9 +303,12 @@ function danoDoAtaque(desc) {
 
 function recarga(limite) {
   if (!limite) return "";
-  if (limite.type === "RECHARGE_ON_ROLL") return limite.param >= 6 ? " (recarga 6)" : ` (recarga ${limite.param}-6)`;
+  // A open5e usa os dois nomes pra recarga no dado ("Recharge 4-6" do cão
+  // intermitente vem como RECHARGE, param 4).
+  if (limite.type === "RECHARGE_ON_ROLL" || limite.type === "RECHARGE") {
+    return limite.param >= 6 ? " (recarga 6)" : ` (recarga ${limite.param}-6)`;
+  }
   if (limite.type === "PER_DAY") return ` (${limite.param}/dia)`;
-  if (limite.type === "RECHARGE") return " (1x por descanso)";
   return "";
 }
 

@@ -414,7 +414,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     o que a nota automática já diz (ND, voo, imunidades). Ordem combinada com
     o Daniel em 26/09: **ND 0–2 primeiro** (a Forgotten Realms é nível 1; a
     Salamina é nível 7), depois ND 3–10, ND 11+ e os animais por último.
-    Lote 1 (20, PNJs e clássicos de masmorra) em 26/09.
+    Lote 1 (20, PNJs e clássicos de masmorra) e lote 2 (28, o resto de ND
+    0 a 1) em 26/09. **Na open5e, "RECHARGE" também é recarga no dado** (o
+    "Recharge 4-6" do cão intermitente) — o gerador chegou a traduzir como
+    "1x por descanso"; não afetava linha nenhuma (as 13 são ações bônus),
+    mas foi corrigido.
   - **Pegadinhas da fonte, já tratadas no gerador:** (1) o `speed_all`
     inventa escalada/natação pela metade do deslocamento (regra geral) — usar
     só `speed`; (2) o **tamanho** "Small" da open5e junta Miúdo, Pequeno e
