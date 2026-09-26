@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CURADOS_EN, TOTAL_SRD_2024, nomeEmPortugues, tamanhoReal } from "../../scripts/gerar-monstros-srd.mjs";
 import { FAIXAS_ND, MONSTROS_CURADOS, MONSTROS_SRD, buscarMonstros, monstrosDaFaixa, ndTexto } from "./monstrosSrd";
 import { MONSTROS_GERADOS } from "./monstrosSrdGerados";
+import { DICAS_TATICA } from "./monstrosDicas";
 
 /** Os três do SRD que não atacam (só se movem ou gritam). */
 const SEM_ATAQUE = ["Mosca gigante", "Cavalo-marinho", "Fungo gritador"];
@@ -135,5 +136,26 @@ describe("gerador do catálogo (scripts/gerar-monstros-srd.mjs)", () => {
     expect(nomeEmPortugues("Black Dragon Wyrmling")).toBe("Dragão preto filhote");
     expect(nomeEmPortugues("Dragon Turtle")).toBe("Tartaruga-dragão");
     expect(nomeEmPortugues("Monstro inventado")).toBeNull();
+  });
+});
+
+describe("dicas de tática dos gerados (monstrosDicas.ts)", () => {
+  it("cada dica é de um monstro gerado que existe (a chave é o nome em inglês)", () => {
+    const gerados = new Set(MONSTROS_GERADOS.map((m) => m.en));
+    for (const en of Object.keys(DICAS_TATICA)) expect(gerados.has(en), en).toBe(true);
+  });
+
+  it("a dica vai na frente da nota automática, sem apagar ela", () => {
+    const chefe = MONSTROS_SRD.find((m) => m.en === "Goblin Boss")!;
+    expect(chefe.notes.startsWith(DICAS_TATICA["Goblin Boss"])).toBe(true);
+    expect(chefe.notes).toContain("ND 1 (200 XP)");
+  });
+
+  it("dica é frase curta e acabada, sem pé no lugar de metro", () => {
+    for (const [en, dica] of Object.entries(DICAS_TATICA)) {
+      expect(dica.length, en).toBeLessThanOrEqual(400);
+      expect(dica, en).toMatch(/[.)]$/);
+      expect(dica, en).not.toMatch(/\d+\s*(pés|ft)/);
+    }
   });
 });

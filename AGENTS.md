@@ -401,9 +401,20 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     142 ataques, 48 ações de resistência, danos, condições, tipos/tamanhos,
     algumas habilidades); as notas saem automáticas: ND e XP, deslocamentos
     além de andar, imunidades/resistências, Resistência Lendária, magia (CD),
-    ações lendárias. Pra caprichar num gerado: trazer pra lista curada e pôr o
-    nome em inglês em `CURADOS_EN`. Rodar de novo dá o mesmo arquivo
-    (conferido baixando da fonte).
+    ações lendárias. Rodar de novo dá o mesmo arquivo (conferido baixando da
+    fonte).
+  - **Dica de tática dos gerados** mora em `monstrosDicas.ts`
+    (`DICAS_TATICA`, chave = nome em inglês), **separada dos números** — o
+    gerador pode rodar de novo sem apagar nada; `MONSTROS_SRD` põe a dica na
+    frente da nota automática. Cada dica sai da **leitura da ficha 2024
+    daquele monstro na fonte** (traços, ações, ações bônus, reações), nunca de
+    memória: no lote 1 caíram três frases do tipo "parece decoração até
+    atacar", que era a Falsa Aparência de 2014 e não está na ficha 2024 da
+    Armadura animada, da Espada voadora nem do Limo cinzento. A dica não repete
+    o que a nota automática já diz (ND, voo, imunidades). Ordem combinada com
+    o Daniel em 26/09: **ND 0–2 primeiro** (a Forgotten Realms é nível 1; a
+    Salamina é nível 7), depois ND 3–10, ND 11+ e os animais por último.
+    Lote 1 (20, PNJs e clássicos de masmorra) em 26/09.
   - **Pegadinhas da fonte, já tratadas no gerador:** (1) o `speed_all`
     inventa escalada/natação pela metade do deslocamento (regra geral) — usar
     só `speed`; (2) o **tamanho** "Small" da open5e junta Miúdo, Pequeno e

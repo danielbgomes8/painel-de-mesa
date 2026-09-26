@@ -1,5 +1,6 @@
 import type { NovoModeloNpc } from "./tipos";
 import { MONSTROS_GERADOS } from "./monstrosSrdGerados";
+import { DICAS_TATICA } from "./monstrosDicas";
 
 /** Monstro do catálogo: a ficha que vai pra biblioteca/encontro (só os
  *  campos de `NovoModeloNpc` são copiados), mais o nível de desafio e o nome
@@ -85,8 +86,15 @@ export const MONSTROS_CURADOS: MonstroCatalogo[] = [
   { name: "Dragão vermelho jovem", en: "Young Red Dragon", nd: 10, cls: "Dragão grande", ac: 18, hp_max: 178, speed: 12, init_mod: 4, ataque: "3x Dilacerar +10, 2d6+6 cortante + 1d6 de fogo", notes: "Voa e escala (24m/12m). Três ataques por turno; sopro de fogo (recarga 5-6) em cone de 9m, 16d6 de fogo (metade se resistir na de Destreza CD 17). Imune a fogo." },
 ];
 
+/** Gerado com dica de tática escrita (monstrosDicas.ts): a dica vem antes da
+ *  nota automática. */
+function comDica(m: MonstroCatalogo): MonstroCatalogo {
+  const dica = DICAS_TATICA[m.en];
+  return dica ? { ...m, notes: `${dica} ${m.notes}` } : m;
+}
+
 /** O catálogo inteiro, do ND mais baixo pro mais alto. */
-export const MONSTROS_SRD: MonstroCatalogo[] = [...MONSTROS_CURADOS, ...MONSTROS_GERADOS].sort(
+export const MONSTROS_SRD: MonstroCatalogo[] = [...MONSTROS_CURADOS, ...MONSTROS_GERADOS.map(comDica)].sort(
   (a, b) => a.nd - b.nd || a.name.localeCompare(b.name, "pt-BR"),
 );
 
