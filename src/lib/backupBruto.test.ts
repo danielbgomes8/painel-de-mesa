@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TABELAS_COM_SALA, copiarSalas, lerTudo } from "../../scripts/backup-salas.mjs";
+import { TABELAS_COM_SALA, TABELAS_FORA_DO_BACKUP, copiarSalas, lerTudo } from "../../scripts/backup-salas.mjs";
 
 /** Resposta de mentira do PostgREST: `paginas` em ordem, uma por pedido. */
 function bancoDeMentira(respostas: Record<string, unknown[][] | { status: number }>) {
@@ -30,6 +30,7 @@ describe("backup bruto das salas", () => {
       for (const m of sql.matchAll(/create table (?:if not exists )?public\.([a-z_]+)/gi)) criadas.add(m[1]);
     }
     criadas.delete("rooms"); // a sala em si vai à parte
+    for (const fora of TABELAS_FORA_DO_BACKUP) criadas.delete(fora); // não é dado da campanha
     expect([...criadas].sort()).toEqual([...TABELAS_COM_SALA].sort());
   });
 

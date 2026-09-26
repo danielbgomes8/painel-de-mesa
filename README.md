@@ -134,7 +134,8 @@ Tudo roda no navegador: não há backend próprio nem segredo de servidor.
 src/
   app/            layout, página única, ícone/manifest gerados em código
                   (icon.tsx, apple-icon.tsx, manifest.ts), globals.css
-                  (tema "taverna")
+                  (tema "taverna"), error.tsx (tela "algo deu errado")
+  instrumentation-client.ts  pega erro solto no navegador e relata
   components/     Painel (orquestra as abas) · BarraAbas · Portao ·
                   DiarioCampanha · PainelBastiao · RastreadorCombate ·
                   AcoesEmMassa · LogCombate · BibliotecaNpcs · NotasDoMestre ·
@@ -150,10 +151,11 @@ src/
                   bastiaoDmg (catálogo do Bastião) · classesSrd (habilidades
                   por classe/nível) · monstrosSrd (catálogo de monstros) ·
                   backup (exporta a sala num .json) · telaAcesa (segura a
-                  tela do telão acesa)
+                  tela do telão acesa) · erros + relatarErro (relato de
+                  erro dos aparelhos)
 supabase/
-  migrations/     0001 a 0016 — do esquema inicial até os encontros
-                  preparados; o
+  migrations/     0001 a 0017 — do esquema inicial até os erros dos
+                  aparelhos; o
                   cabeçalho de cada arquivo diz depois de qual rodar
   seed.sql        dados da sala "setimo-raio" (Tibério Vaz)
 ```
@@ -236,6 +238,23 @@ movimento.
   `SUPABASE_ANON_KEY` (os mesmos valores das variáveis `NEXT_PUBLIC_…` do app).
 - É uma cópia **bruta** do banco. O backup que o app restaura sozinho é o
   botão "backup" do Mestre; este é o plano B, caso o projeto inteiro se perca.
+
+### Erros dos aparelhos
+
+Quando algo dá errado num celular ou notebook — o banco recusa uma gravação,
+um botão dá erro, uma tela quebra —, o app manda um resumo pra tabela
+**`erros`** do Supabase (migration `0017`), com a sala, quem estava usando
+(Mestre, o personagem ou o telão), o navegador e a versão publicada. Queda de
+internet **não** entra (essa já tem a fila própria). Tem freio: no máximo 20
+relatos por abertura do app, e o mesmo erro só uma vez a cada 5 minutos.
+
+- **Ver os erros:** Supabase → *Table Editor* → `erros`, ou pedir pro Claude
+  olhar.
+- Tela que quebra mostra "Algo deu errado nesta tela" com **Tentar de novo** e
+  **Recarregar a página**, em vez de ficar em branco. Recarregar não perde
+  nada: o que foi gravado está no banco, e o que esperava internet está na
+  fila do aparelho.
+- Só o site publicado relata; o `npm run dev` fica só no console.
 
 ### Atualizações (robô do GitHub)
 

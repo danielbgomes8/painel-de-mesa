@@ -12,6 +12,7 @@ import {
 } from "@/lib/identidade";
 import { lembrarSala, rotuloDaSala } from "@/lib/sala";
 import { horaCurta } from "@/lib/offline";
+import { definirContextoDoErro, relatarErro } from "@/lib/relatarErro";
 import { BackupSala, baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
@@ -38,7 +39,7 @@ export function Painel() {
   // versões de desenvolvimento e atrapalharia.
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").catch((e) => console.error("service worker", e));
+    navigator.serviceWorker.register("/sw.js").catch((e) => relatarErro("service worker", e));
   }, []);
 
   // No servidor e na hidratação a sala ainda não é conhecida: a página é
@@ -113,6 +114,19 @@ function PainelSala({ codigo }: { codigo: string }) {
   }, [identidade, sala.personagens]);
 
   const [trocandoCampanha, setTrocandoCampanha] = useState(false);
+
+  // Sala e quem está no aparelho vão junto de cada relato de erro (ver
+  // lib/relatarErro.ts) — "deu erro no celular do Tibério, no telão...".
+  const quemUsa = telao
+    ? "telão"
+    : identidade?.tipo === "mestre"
+      ? "Mestre"
+      : identidade?.tipo === "jogador"
+        ? (meuPersonagem?.name ?? identidade.slug)
+        : null;
+  useEffect(() => {
+    definirContextoDoErro(codigo, quemUsa);
+  }, [codigo, quemUsa]);
 
   // A sala vai pro endereço mesmo quando veio da "última sala" (ver
   // escolherSala): recarregar fica na mesma, e o link copiado dali leva

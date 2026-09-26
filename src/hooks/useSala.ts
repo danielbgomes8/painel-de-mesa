@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, supabaseConfigurado } from "@/lib/supabase";
+import { relatarErro } from "@/lib/relatarErro";
 import { slugUnico } from "@/lib/sala";
 import { turnoAposRemover } from "@/lib/regras";
 import { linhasParaInserir, type Backup } from "@/lib/backup";
@@ -77,7 +78,8 @@ type LinhaBastiao = Bastiao & { version: number };
 type ResultadoVersao<L> =
   | { tipo: "gravou"; linha: L }
   | { tipo: "conflito"; linha: L }
-  | { tipo: "erro"; mensagem: string; rede: boolean };
+  // `causa`: o erro inteiro do banco (com o código), pro relato de erro.
+  | { tipo: "erro"; mensagem: string; rede: boolean; causa: unknown };
 
 /** A sala inteira lida do banco na hora (não o que está na tela): o log vai
  *  completo, não só as últimas linhas. É o que vira arquivo de backup. */
@@ -242,12 +244,16 @@ async function gravarSeVersaoBater<L extends { version: number }>(
     .eq("version", versao)
     .select()
     .maybeSingle();
-  if (error) return { tipo: "erro", mensagem: error.message, rede: ehFalhaDeRede(error) };
+  if (error) return { tipo: "erro", mensagem: error.message, rede: ehFalhaDeRede(error), causa: error };
   if (data) return { tipo: "gravou", linha: data as L };
 
   const releitura = await supabase.from(tabela).select("*").eq("room_code", codigo).maybeSingle();
-  if (releitura.error) return { tipo: "erro", mensagem: releitura.error.message, rede: ehFalhaDeRede(releitura.error) };
-  if (!releitura.data) return { tipo: "erro", mensagem: `${tabela}: linha da sala sumiu`, rede: false };
+  if (releitura.error)
+    return { tipo: "erro", mensagem: releitura.error.message, rede: ehFalhaDeRede(releitura.error), causa: releitura.error };
+  if (!releitura.data) {
+    const mensagem = `${tabela}: linha da sala sumiu`;
+    return { tipo: "erro", mensagem, rede: false, causa: mensagem };
+  }
   return { tipo: "conflito", linha: releitura.data as L };
 }
 
@@ -552,7 +558,7 @@ export function useSala(codigo: string): Sala {
           }
         }
       } catch (e) {
-        console.error("sincronizar fila", e);
+        relatarErro("sincronizar fila", e);
         return false;
       }
       marcarSemInternet(false);
@@ -727,6 +733,7 @@ export function useSala(codigo: string): Sala {
       if (inicial) {
         if (pc.error && ehFalhaDeRede(pc.error)) return usarFoto();
         if (pc.error) {
+          relatarErro("carregar sala", pc.error);
           setErro(`Não consegui carregar a sala: ${pc.error.message}`);
           setCarregando(false);
           return;
@@ -737,7 +744,7 @@ export function useSala(codigo: string): Sala {
         // pro app tenta de novo.
         const falha = resultados.find((r) => r.error);
         if (falha?.error) {
-          console.error("recarregar sala", falha.error);
+          relatarErro("recarregar sala", falha.error);
           if (ehFalhaDeRede(falha.error)) marcarSemInternet(true);
           return;
         }
@@ -785,10 +792,10 @@ export function useSala(codigo: string): Sala {
           .then((acabou) => {
             if (acabou && vivo) return carregar(false);
           })
-          .catch((e) => console.error("recarregar sala", e));
+          .catch((e) => relatarErro("recarregar sala", e));
         return;
       }
-      carregar(false).catch((e) => console.error("recarregar sala", e));
+      carregar(false).catch((e) => relatarErro("recarregar sala", e));
     }
 
     recarregarRef.current = recarregar;
@@ -1037,7 +1044,7 @@ export function useSala(codigo: string): Sala {
         return;
       }
       if (error) {
-        console.error("atualizarPersonagem", error);
+        relatarErro("atualizarPersonagem", error);
         setPersonagens(anterior);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
       }
@@ -1095,7 +1102,7 @@ export function useSala(codigo: string): Sala {
       }
       const erro = erros.find((e) => e);
       if (erro) {
-        console.error("atualizarVariosPersonagens", erro);
+        relatarErro("atualizarVariosPersonagens", erro);
         // Volta ao estado de antes; quem gravou de verdade no meio do lote é
         // reposto pelo evento de tempo real da própria escrita.
         setPersonagens(anterior);
@@ -1129,7 +1136,7 @@ export function useSala(codigo: string): Sala {
       }
 
       if (resp.error) {
-        console.error("criarPersonagem", resp.error);
+        relatarErro("criarPersonagem", resp.error);
         setErro(`Não consegui criar o personagem: ${resp.error.message}`);
         return null;
       }
@@ -1174,7 +1181,7 @@ export function useSala(codigo: string): Sala {
       }
 
       if (resp.error) {
-        console.error("criarVariosPersonagens", resp.error);
+        relatarErro("criarVariosPersonagens", resp.error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return null;
       }
@@ -1233,7 +1240,7 @@ export function useSala(codigo: string): Sala {
         }
 
         if (r.tipo === "erro") {
-          console.error("definirCombate", r.mensagem);
+          relatarErro("definirCombate", r.causa);
           setCombate(original);
           setCombateVersao(versaoOriginal);
           setAvisoFalha(AVISO_FALHA_ESCRITA);
@@ -1253,7 +1260,7 @@ export function useSala(codigo: string): Sala {
         setCombateVersao(versao);
       }
 
-      console.error("definirCombate: contenção demais, desisti depois de", MAX_TENTATIVAS_VERSAO, "tentativas");
+      relatarErro("definirCombate", `contenção demais: desisti depois de ${MAX_TENTATIVAS_VERSAO} tentativas`);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
       return null;
     },
@@ -1267,7 +1274,7 @@ export function useSala(codigo: string): Sala {
       setPersonagens((atual) => atual.filter((p) => p.id !== id));
       const { error } = await supabase.from("characters").delete().eq("id", id);
       if (error) {
-        console.error("removerPersonagem", error);
+        relatarErro("removerPersonagem", error);
         setPersonagens(anterior);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
@@ -1297,7 +1304,7 @@ export function useSala(codigo: string): Sala {
         .update({ text: texto })
         .eq("room_code", codigo);
       if (error) {
-        console.error("definirNotasMestre", error);
+        relatarErro("definirNotasMestre", error);
         setNotasMestre(anterior);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
       }
@@ -1317,7 +1324,7 @@ export function useSala(codigo: string): Sala {
         .single();
       if (error && ehFalhaDeRede(error)) return naFila();
       if (error) {
-        console.error("registrarLog", error);
+        relatarErro("registrarLog", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
@@ -1339,7 +1346,7 @@ export function useSala(codigo: string): Sala {
         .select();
       if (error && ehFalhaDeRede(error)) return naFila();
       if (error) {
-        console.error("registrarVariosLogs", error);
+        relatarErro("registrarVariosLogs", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
@@ -1369,7 +1376,7 @@ export function useSala(codigo: string): Sala {
       };
       const { data, error } = await supabase.from("npc_templates").insert(linha).select().single();
       if (error) {
-        console.error("criarModeloNpc", error);
+        relatarErro("criarModeloNpc", error);
         return false;
       }
       const criado = data as ModeloNpc;
@@ -1384,7 +1391,7 @@ export function useSala(codigo: string): Sala {
     setModelosNpc((atual) => atual.map((m) => (m.id === id ? { ...m, ...patch } : m)));
     const { error } = await supabase.from("npc_templates").update(patch).eq("id", id);
     if (error) {
-      console.error("atualizarModeloNpc", error);
+      relatarErro("atualizarModeloNpc", error);
       setModelosNpc(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1395,7 +1402,7 @@ export function useSala(codigo: string): Sala {
     setModelosNpc((atual) => atual.filter((m) => m.id !== id));
     const { error } = await supabase.from("npc_templates").delete().eq("id", id);
     if (error) {
-      console.error("removerModeloNpc", error);
+      relatarErro("removerModeloNpc", error);
       setModelosNpc(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1406,7 +1413,7 @@ export function useSala(codigo: string): Sala {
       const linha = { room_code: codigo, title: dados.title, text: dados.text };
       const { data, error } = await supabase.from("diario").insert(linha).select().single();
       if (error) {
-        console.error("criarEntradaDiario", error);
+        relatarErro("criarEntradaDiario", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
@@ -1421,7 +1428,7 @@ export function useSala(codigo: string): Sala {
     setDiario((atual) => atual.map((e) => (e.id === id ? { ...e, ...patch } : e)));
     const { error } = await supabase.from("diario").update(patch).eq("id", id);
     if (error) {
-      console.error("atualizarEntradaDiario", error);
+      relatarErro("atualizarEntradaDiario", error);
       setDiario(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1432,7 +1439,7 @@ export function useSala(codigo: string): Sala {
     setDiario((atual) => atual.filter((e) => e.id !== id));
     const { error } = await supabase.from("diario").delete().eq("id", id);
     if (error) {
-      console.error("removerEntradaDiario", error);
+      relatarErro("removerEntradaDiario", error);
       setDiario(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1459,7 +1466,7 @@ export function useSala(codigo: string): Sala {
         const r = await gravarSeVersaoBater<LinhaBastiao>("bastiao", codigo, versao, parcial);
 
         if (r.tipo === "erro") {
-          console.error("definirBastiao", r.mensagem);
+          relatarErro("definirBastiao", r.causa);
           setBastiao(original);
           setBastiaoVersao(versaoOriginal);
           setAvisoFalha(AVISO_FALHA_ESCRITA);
@@ -1478,7 +1485,7 @@ export function useSala(codigo: string): Sala {
         setBastiaoVersao(versao);
       }
 
-      console.error("definirBastiao: contenção demais, desisti depois de", MAX_TENTATIVAS_VERSAO, "tentativas");
+      relatarErro("definirBastiao", `contenção demais: desisti depois de ${MAX_TENTATIVAS_VERSAO} tentativas`);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
       return null;
     },
@@ -1497,7 +1504,7 @@ export function useSala(codigo: string): Sala {
       };
       const { data, error } = await supabase.from("bastiao_instalacoes").insert(linha).select().single();
       if (error) {
-        console.error("criarInstalacaoBastiao", error);
+        relatarErro("criarInstalacaoBastiao", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
@@ -1512,7 +1519,7 @@ export function useSala(codigo: string): Sala {
     setInstalacoesBastiao((atual) => atual.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     const { error } = await supabase.from("bastiao_instalacoes").update(patch).eq("id", id);
     if (error) {
-      console.error("atualizarInstalacaoBastiao", error);
+      relatarErro("atualizarInstalacaoBastiao", error);
       setInstalacoesBastiao(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1523,7 +1530,7 @@ export function useSala(codigo: string): Sala {
     setInstalacoesBastiao((atual) => atual.filter((i) => i.id !== id));
     const { error } = await supabase.from("bastiao_instalacoes").delete().eq("id", id);
     if (error) {
-      console.error("removerInstalacaoBastiao", error);
+      relatarErro("removerInstalacaoBastiao", error);
       setInstalacoesBastiao(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1537,7 +1544,7 @@ export function useSala(codigo: string): Sala {
         .select()
         .single();
       if (error) {
-        console.error("registrarLogBastiao", error);
+        relatarErro("registrarLogBastiao", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
@@ -1555,7 +1562,7 @@ export function useSala(codigo: string): Sala {
         .select()
         .single();
       if (error) {
-        console.error("criarEncontro", error);
+        relatarErro("criarEncontro", error);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return null;
       }
@@ -1572,7 +1579,7 @@ export function useSala(codigo: string): Sala {
       setEncontros((atual) => atual.map((e) => (e.id === id ? { ...e, ...patch } : e)));
       const { error } = await supabase.from("encontros").update(patch).eq("id", id);
       if (error) {
-        console.error("atualizarEncontro", error);
+        relatarErro("atualizarEncontro", error);
         setEncontros(anterior);
         setAvisoFalha(AVISO_FALHA_ESCRITA);
       }
@@ -1585,7 +1592,7 @@ export function useSala(codigo: string): Sala {
     setEncontros((atual) => atual.filter((e) => e.id !== id));
     const { error } = await supabase.from("encontros").delete().eq("id", id);
     if (error) {
-      console.error("removerEncontro", error);
+      relatarErro("removerEncontro", error);
       setEncontros(anterior);
       setAvisoFalha(AVISO_FALHA_ESCRITA);
     }
@@ -1616,7 +1623,7 @@ export function useSala(codigo: string): Sala {
     if (falha) {
       // Backup pela metade seria pior que nenhum: prefere não entregar
       // arquivo nenhum e avisar.
-      console.error("exportarSala", falha);
+      relatarErro("exportarSala", falha);
       setAvisoFalha("Não consegui ler a sala inteira pro backup — confira a conexão e tente de novo.");
       return null;
     }
@@ -1676,7 +1683,7 @@ export function useSala(codigo: string): Sala {
           order_json: antes.order,
         });
         if (r.tipo === "erro") {
-          console.error("desfazer (combate)", r.mensagem);
+          relatarErro("desfazer (combate)", r.causa);
           setAvisoFalha(AVISO_FALHA_ESCRITA);
           // A pilha fica: foi a conexão, dá pra tentar de novo.
           return { ok: false, motivo: "não salvou — confira a conexão e tente de novo" };
@@ -1699,7 +1706,7 @@ export function useSala(codigo: string): Sala {
       for (const [coluna, valor] of camposConferiveis(m.depois)) consulta = consulta.eq(coluna, valor);
       const { data, error } = await consulta.select("id");
       if (error || !data || data.length === 0) {
-        if (error) console.error("desfazer (ficha)", error);
+        if (error) relatarErro("desfazer (ficha)", error);
         naoVoltaram.push(m.nome);
         continue;
       }
@@ -1711,7 +1718,7 @@ export function useSala(codigo: string): Sala {
     if (acao.criados.length > 0) {
       const { error } = await supabase.from("characters").delete().in("id", acao.criados);
       if (error) {
-        console.error("desfazer (criados)", error);
+        relatarErro("desfazer (criados)", error);
         naoVoltaram.push("as fichas criadas");
       } else {
         setPersonagens((lista) => lista.filter((p) => !acao.criados.includes(p.id)));
@@ -1753,7 +1760,7 @@ export function useSala(codigo: string): Sala {
       for (const [tabela] of tabelas) {
         const { error } = await supabase.from(tabela).delete().eq("room_code", codigo);
         if (error) {
-          console.error("restaurarBackup (limpar)", tabela, error);
+          relatarErro(`restaurarBackup (limpar) ${tabela}`, error);
           return { ok: false, erro: `Parei ao limpar ${tabela}: ${error.message}` };
         }
       }
@@ -1762,7 +1769,7 @@ export function useSala(codigo: string): Sala {
         for (const parte of pedacos(linhasParaInserir(linhas, codigo), 500)) {
           const { error } = await supabase.from(tabela).insert(parte);
           if (error) {
-            console.error("restaurarBackup (repor)", tabela, error);
+            relatarErro(`restaurarBackup (repor) ${tabela}`, error);
             return { ok: false, erro: `Parei ao repor ${tabela}: ${error.message}` };
           }
         }

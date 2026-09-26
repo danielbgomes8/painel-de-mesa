@@ -544,8 +544,8 @@ primeiros itens; os outros estão na lista do fim desta seção.
   Windows. GitHub e Vercel (Linux) passavam.
 
 **Ainda da revisão (não feito, esperando o Daniel):**
-3. Erros dos celulares somem no `console.error` do aparelho — guardar um
-   resumo numa tabela do Supabase (sem serviço novo).
+3. ~~Erros dos celulares somem no `console.error` do aparelho~~ — feito,
+   ver "Relato de erro dos aparelhos" logo abaixo.
 4. Nenhum teste cobre tela nem o `useSala` (1.854 linhas, a parte mais
    delicada) — robô que abre o app numa sala descartável a cada envio.
 5. **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
@@ -559,6 +559,51 @@ primeiros itens; os outros estão na lista do fim desta seção.
    bate com `tipos.ts` (conferido à mão em 25/09: bate). O log **não**
    precisa de limpeza: 135 linhas na Salamina em duas semanas e o app só lê
    as 40 últimas.
+
+### Relato de erro dos aparelhos (25/09/2026, migration `0017`)
+
+- **Tabela `erros`** (`0017_erros.sql`): sem ligação com `rooms` de propósito
+  (o relato não pode falhar porque a sala não existe, e apagar a sala não
+  apaga o histórico); `check` de tamanho em cada coluna, e o teste confere
+  que batem com `LIMITES_ERRO`. Policies de ler/inserir/apagar pro `anon`,
+  sem update. **Fora do backup** (`TABELAS_FORA_DO_BACKUP` em
+  `scripts/backup-salas.mjs`; `backupBruto.test.ts` respeita a lista).
+- **Regras puras** em `lib/erros.ts` (testadas): `resumirErro` (erro do
+  Supabase leva o `code` no detalhe — 42501 = RLS, PGRST204 = coluna que o
+  banco não tem, ou seja, migration que não rodou; erro de programa leva a
+  pilha), `deveRelatar` (queda de internet NÃO: ela tem a fila; nem o aviso
+  de `ResizeObserver` nem "Script error." de outro site), `criarFreio` (20 por
+  abertura, mesmo erro a cada 5 min).
+- **Quem manda**: `lib/relatarErro.ts` — `relatarErro(onde, erro)` faz o
+  `console.error` de sempre e insere na tabela; relato que falha vira só um
+  `console.warn` (nunca outro relato). **Só no build de produção**
+  (`NODE_ENV`), então `npm run dev` não suja a tabela; pra testar, `next
+  build && next start` com o `.env.local` (a versão sai "local"). A versão
+  publicada vem de `NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA` (o Vercel preenche no
+  build). Sala e quem usa o aparelho vêm de `definirContextoDoErro`, chamado
+  pelo `PainelSala`.
+- **Os três caminhos de erro**: todo `console.error` do `useSala` e do
+  `Painel` virou `relatarErro` (inclusive a primeira carga da sala que não é
+  queda de rede); `instrumentation-client.ts` (convenção do Next, roda antes
+  do app) ouve `error` e `unhandledrejection` da janela; e `app/error.tsx` é a
+  tela "Algo deu errado" (Tentar de novo / Recarregar), que relata "tela
+  quebrou". **Erro novo no app: use `relatarErro`, não `console.error`.**
+  O `gravarSeVersaoBater` devolve `causa` (o erro inteiro, com o código) pra
+  isso.
+- **Testado** (25/09, build de produção local contra o banco real, salas
+  descartáveis e relatos de teste apagados depois): erro solto e promessa sem
+  tratamento chegaram na tabela com sala, "Mestre", pilha e versão "local";
+  o `TypeError: Failed to fetch` não entrou, e o mesmo erro repetido foi
+  segurado pelo freio. Gravação recusada (resposta 403 com código 42501
+  simulada trocando `window.fetch` só pro PATCH de `characters`) entrou como
+  `atualizarVariosPersonagens` / "código 42501", e a tela desfez o dano e
+  avisou "Não salvou". Uma ficha com `resources` estragado
+  (`{}` em vez de lista) quebrou a aba Fichas e caiu na tela "Algo deu
+  errado" em vez de página em branco. O `error.tsx` pega a página inteira
+  (é um segmento só): uma ficha estragada derruba o app todo **naquele
+  aparelho**, até o dado ser consertado — antes era a mesma coisa, só que em
+  branco. No `localhost` o service worker não registra e isso também vira
+  relato (no site publicado ele registra).
 
 ## Próximos passos (combinados em 17/09/2026)
 
