@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MONSTROS_SRD, buscarMonstros } from "./monstrosSrd";
+import { CURADOS_EN, TOTAL_SRD_2024, nomeEmPortugues, tamanhoReal } from "../../scripts/gerar-monstros-srd.mjs";
+import { FAIXAS_ND, MONSTROS_CURADOS, MONSTROS_SRD, buscarMonstros, monstrosDaFaixa, ndTexto } from "./monstrosSrd";
+import { MONSTROS_GERADOS } from "./monstrosSrdGerados";
+
+/** Os três do SRD que não atacam (só se movem ou gritam). */
+const SEM_ATAQUE = ["Mosca gigante", "Cavalo-marinho", "Fungo gritador"];
 
 const nomes = (termo: string) => buscarMonstros(termo).map((m) => m.name);
 
@@ -23,20 +28,62 @@ describe("buscarMonstros", () => {
     expect(buscarMonstros("   ")).toEqual([]);
   });
 
-  it("devolve vazio quando não existe", () => {
-    expect(buscarMonstros("tarrasque")).toEqual([]);
+  it("devolve vazio quando não existe (o Observador não está no SRD)", () => {
+    expect(buscarMonstros("observador")).toEqual([]);
+  });
+
+  it("acha pelo nome em inglês, o do livro", () => {
+    expect(nomes("owlbear")).toEqual(["Urso-coruja"]);
+    expect(nomes("tarrasque")).toEqual(["Tarrasque"]);
+    expect(nomes("adult red")).toEqual(["Dragão vermelho adulto"]);
+  });
+
+  it("'nd 1/4' e 'nd 5' devolvem só os daquele nível de desafio", () => {
+    const quarto = buscarMonstros("nd 1/4");
+    expect(quarto.map((m) => m.name)).toContain("Goblin");
+    expect(quarto.every((m) => m.nd === 0.25)).toBe(true);
+    const cinco = buscarMonstros("ND 5");
+    expect(cinco.map((m) => m.name)).toEqual(expect.arrayContaining(["Troll", "Elemental do fogo"]));
+    expect(cinco.every((m) => m.nd === 5)).toBe(true);
+    expect(ndTexto(0.125)).toBe("1/8");
   });
 
   it("não tem nome repetido no catálogo (nome é a chave da lista)", () => {
     expect(new Set(MONSTROS_SRD.map((m) => m.name)).size).toBe(MONSTROS_SRD.length);
+    expect(new Set(MONSTROS_SRD.map((m) => m.en)).size).toBe(MONSTROS_SRD.length);
   });
 
-  it("todo monstro tem tipo, nota e ataque preenchidos", () => {
+  it("todo monstro tem tipo e nota; ataque, todos menos os três que não atacam", () => {
     for (const m of MONSTROS_SRD) {
       expect(m.cls, m.name).not.toBe("");
       expect(m.notes, m.name).not.toBe("");
-      expect(m.ataque, m.name).not.toBe("");
+      if (!SEM_ATAQUE.includes(m.name)) expect(m.ataque, m.name).not.toBe("");
     }
+  });
+
+  it("tem o SRD 5.2 inteiro: curados + gerados, sem sobreposição", () => {
+    expect(MONSTROS_SRD).toHaveLength(TOTAL_SRD_2024);
+    expect(MONSTROS_CURADOS.map((m) => m.en).sort()).toEqual([...CURADOS_EN].sort());
+    const curados = new Set(CURADOS_EN);
+    expect(MONSTROS_GERADOS.filter((m) => curados.has(m.en))).toEqual([]);
+  });
+
+  it("o tipo segue 'Tipo tamanho' (a busca por tipo depende disso)", () => {
+    const tipo =
+      /^(Aberração|Fera|Celestial|Constructo|Dragão|Elemental|Fada|Corruptor|Gigante|Humanoide|Monstruosidade|Limo|Planta|Morto-vivo) /;
+    const tamanho = / (miúd[oa]|pequen[oa]|médi[oa]|médio ou pequeno|média ou pequena|grande|enorme|imens[oa])$/;
+    for (const m of MONSTROS_SRD) {
+      expect(m.cls, m.name).toMatch(tipo);
+      expect(m.cls, m.name).toMatch(tamanho);
+    }
+  });
+
+  it("faixas de ND cobrem o catálogo inteiro, cada monstro uma vez", () => {
+    const somados = FAIXAS_ND.reduce((soma, f) => soma + monstrosDaFaixa(f).length, 0);
+    expect(somados).toBe(MONSTROS_SRD.length);
+    expect(monstrosDaFaixa(FAIXAS_ND[0]).every((m) => m.nd === 0)).toBe(true);
+    // nenhuma faixa vira lista de metros no celular
+    for (const f of FAIXAS_ND) expect(monstrosDaFaixa(f).length, f.rotulo).toBeLessThanOrEqual(60);
   });
 
   // Guarda de edição: o catálogo já esteve com números de 2014 num app que joga
@@ -60,10 +107,33 @@ describe("buscarMonstros", () => {
     );
   });
 
-  it("toda linha de ataque tem bônus de acerto e dado de dano", () => {
+  it("toda linha de ataque tem bônus de acerto e dano", () => {
     for (const m of MONSTROS_SRD) {
+      if (SEM_ATAQUE.includes(m.name)) continue;
       expect(m.ataque, `${m.name} sem bônus de acerto`).toMatch(/[+-]\d+/);
-      expect(m.ataque, `${m.name} sem dado de dano`).toMatch(/\d+d\d+/);
+      expect(m.ataque, `${m.name} sem dano`).toMatch(/\d+d\d+|[+-]\d+, \d+ /);
     }
+  });
+});
+
+describe("gerador do catálogo (scripts/gerar-monstros-srd.mjs)", () => {
+  it("a fonte marca Miúdo e 'Médio ou Pequeno' como Small: o dado de vida desempata", () => {
+    const pequeno = (hit_dice: string) => tamanhoReal({ size: { name: "Small" }, hit_dice });
+    expect(pequeno("1d4")).toBe("Tiny");
+    expect(pequeno("3d6")).toBe("Small");
+    expect(pequeno("2d8 + 2")).toBe("MediumOrSmall");
+    expect(tamanhoReal({ size: { name: "Large" }, hit_dice: "8d10" })).toBe("Large");
+    const pega = (nome: string) => MONSTROS_SRD.find((m) => m.name === nome)!;
+    expect(pega("Gato").cls).toBe("Fera miúda");
+    expect(pega("Diabrete").cls).toBe("Corruptor miúdo");
+    expect(pega("Plebeu").cls).toBe("Humanoide médio ou pequeno");
+    expect(pega("Chefe goblin").cls).toBe("Fada pequena");
+  });
+
+  it("dragão de cor e idade vira nome em português", () => {
+    expect(nomeEmPortugues("Ancient Gold Dragon")).toBe("Dragão de ouro ancião");
+    expect(nomeEmPortugues("Black Dragon Wyrmling")).toBe("Dragão preto filhote");
+    expect(nomeEmPortugues("Dragon Turtle")).toBe("Tartaruga-dragão");
+    expect(nomeEmPortugues("Monstro inventado")).toBeNull();
   });
 });

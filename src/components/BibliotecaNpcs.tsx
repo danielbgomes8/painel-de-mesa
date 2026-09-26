@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { ModeloNpc, NovoModeloNpc } from "@/lib/tipos";
+import type { ModeloNpc } from "@/lib/tipos";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
-import { MONSTROS_SRD, buscarMonstros } from "@/lib/monstrosSrd";
+import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
+import type { MonstroCatalogo } from "@/lib/monstrosSrd";
 
 /** Prep de mesa: NPCs/monstros que podem aparecer ou não, com ficha básica e
  *  notas de tática, prontos pra puxar no rastreador de combate quando
@@ -38,15 +39,31 @@ export function BibliotecaNpcs({ sala }: { sala: Sala }) {
   );
 }
 
+/** Acima disso a busca mostra a linha compacta (ver `detalhado`). */
+const MAX_DETALHADOS = 8;
+
 function CatalogoSrd({ sala }: { sala: Sala }) {
+  const { catalogo, falhou, tentarDeNovo } = useCatalogoMonstros();
   const [busca, setBusca] = useState("");
-  const [verTodos, setVerTodos] = useState(false);
+  // Faixa de ND aberta no "ver todos" (índice em FAIXAS_ND); null = fechado.
+  // São 331 monstros: a lista inteira de uma vez dava metros de rolagem.
+  const [faixa, setFaixa] = useState<number | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
 
   const procurando = busca.trim().length > 0;
-  const achados = procurando ? buscarMonstros(busca) : verTodos ? MONSTROS_SRD : [];
+  const achados = !catalogo
+    ? []
+    : procurando
+      ? catalogo.buscarMonstros(busca)
+      : faixa !== null
+        ? catalogo.monstrosDaFaixa(catalogo.FAIXAS_ND[faixa])
+        : [];
 
-  async function copiar(m: Required<NovoModeloNpc>) {
+  // Ataque e notas só quando a lista é curta: "ver todos" e busca larga
+  // ("fera" = 91) ficam na linha compacta (~50px em vez de ~125px).
+  const detalhado = procurando && achados.length <= MAX_DETALHADOS;
+
+  async function copiar(m: MonstroCatalogo) {
     const deuCerto = await sala.criarModeloNpc(m);
     setAviso(
       deuCerto
@@ -64,17 +81,36 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
       <div className="catbusca">
         <input
           type="search"
-          aria-label="Buscar monstro no catálogo do SRD"
-          placeholder="ex.: goblin, morto-vivo"
+          aria-label="Buscar monstro no catálogo do SRD: nome, tipo, nome em inglês ou nd 2"
+          placeholder="ex.: goblin, morto-vivo, nd 2"
           value={busca}
           autoComplete="off"
           spellCheck={false}
           onChange={(e) => setBusca(e.target.value)}
         />
-        <button type="button" className="btn" onClick={() => setVerTodos(!verTodos)}>
-          {verTodos ? "esconder lista" : `ver todos (${MONSTROS_SRD.length})`}
+        <button type="button" className="btn" disabled={!catalogo} onClick={() => setFaixa(faixa === null ? 0 : null)}>
+          {faixa !== null ? "esconder lista" : `ver todos${catalogo ? ` (${catalogo.MONSTROS_SRD.length})` : ""}`}
         </button>
       </div>
+
+      {falhou && (
+        <p className="catcopiado falhou">
+          Não deu pra carregar o catálogo — sem internet?{" "}
+          <button type="button" className="linkbtn" onClick={tentarDeNovo}>
+            tentar de novo
+          </button>
+        </p>
+      )}
+
+      {catalogo && faixa !== null && !procurando && (
+        <div className="chips" role="group" aria-label="Nível de desafio">
+          {catalogo.FAIXAS_ND.map((f, i) => (
+            <button key={f.rotulo} type="button" className="chip" aria-pressed={i === faixa} onClick={() => setFaixa(i)}>
+              ND {f.rotulo} ({catalogo.monstrosDaFaixa(f).length})
+            </button>
+          ))}
+        </div>
+      )}
 
       <p className={aviso?.falhou ? "catcopiado falhou" : "catcopiado"} aria-live="polite">
         {aviso ? aviso.texto : ""}
@@ -84,16 +120,28 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
         <p className="empty-note">Nenhum monstro com esse nome no catálogo.</p>
       ) : null}
 
+      {achados.length > 0 && !detalhado && (
+        <p className="empty-note">
+          {procurando
+            ? `${achados.length} monstros — refine a busca (ex.: "dragão vermelho") pra ver ataques e notas.`
+            : "Toque pra copiar. Buscando pelo nome aparecem os ataques e as notas."}
+        </p>
+      )}
+
       <div className="catresultados">
         {achados.map((m) => (
           <button key={m.name} type="button" className="catitem" onClick={() => copiar(m)}>
-            <span className="catnome">{m.name}</span>
+            <span className="catnome">
+              {m.name}
+              {m.en !== m.name && <span className="caten"> · {m.en}</span>}
+            </span>
             <span className="catstats">
-              CA {m.ac} · {m.hp_max} PV · {m.speed}m · inic. {m.init_mod >= 0 ? "+" : ""}
+              ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · {m.speed}m · inic.{" "}
+              {m.init_mod >= 0 ? "+" : ""}
               {m.init_mod} · {m.cls}
             </span>
-            {m.ataque ? <span className="catataque">⚔ {m.ataque}</span> : null}
-            {m.notes ? <span className="catnota">{m.notes}</span> : null}
+            {detalhado && m.ataque ? <span className="catataque">⚔ {m.ataque}</span> : null}
+            {detalhado && m.notes ? <span className="catnota">{m.notes}</span> : null}
           </button>
         ))}
       </div>

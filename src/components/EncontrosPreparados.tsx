@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Encontro, FichaMonstro, GrupoEncontro, ItemIniciativa } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
-import { MONSTROS_SRD, buscarMonstros } from "@/lib/monstrosSrd";
+import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
 import { textoDesfeito } from "@/lib/desfazer";
 import {
   adicionarAoEncontro,
@@ -189,8 +189,9 @@ function EscolherMonstro({
   aoEscolher: (ficha: FichaMonstro) => void;
   aoFechar: () => void;
 }) {
+  const { catalogo, falhou, tentarDeNovo } = useCatalogoMonstros();
   const [busca, setBusca] = useState("");
-  const achados = busca.trim() ? buscarMonstros(busca) : [];
+  const achados = busca.trim() && catalogo ? catalogo.buscarMonstros(busca) : [];
 
   return (
     <div className="encescolher">
@@ -211,7 +212,7 @@ function EscolherMonstro({
         <input
           type="search"
           aria-label="Buscar monstro no catálogo do SRD pra pôr no encontro"
-          placeholder={`ou busque no catálogo (${MONSTROS_SRD.length} monstros)…`}
+          placeholder={catalogo ? `ou busque no catálogo (${catalogo.MONSTROS_SRD.length} monstros)…` : "ou busque no catálogo…"}
           value={busca}
           autoComplete="off"
           spellCheck={false}
@@ -222,16 +223,28 @@ function EscolherMonstro({
         </button>
       </div>
 
-      {busca.trim() && achados.length === 0 ? (
+      {falhou && (
+        <p className="catcopiado falhou">
+          Não deu pra carregar o catálogo — sem internet?{" "}
+          <button type="button" className="linkbtn" onClick={tentarDeNovo}>
+            tentar de novo
+          </button>
+        </p>
+      )}
+
+      {busca.trim() && catalogo && achados.length === 0 ? (
         <p className="empty-note">Nenhum monstro com esse nome no catálogo.</p>
       ) : null}
 
       <div className="catresultados">
         {achados.map((m) => (
           <button key={m.name} type="button" className="catitem" onClick={() => aoEscolher(fichaDeMonstro(m))}>
-            <span className="catnome">{m.name}</span>
+            <span className="catnome">
+              {m.name}
+              {m.en !== m.name && <span className="caten"> · {m.en}</span>}
+            </span>
             <span className="catstats">
-              CA {m.ac} · {m.hp_max} PV · inic. {m.init_mod >= 0 ? "+" : ""}
+              ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · inic. {m.init_mod >= 0 ? "+" : ""}
               {m.init_mod} · {m.cls}
             </span>
           </button>

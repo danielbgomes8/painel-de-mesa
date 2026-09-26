@@ -1047,6 +1047,8 @@ function lerSegmentoAtaque(bruto: string): AtaqueRolavel | null {
     vezes = Math.max(1, Number(mVezes[1]));
     s = s.slice(mVezes[0].length);
   }
+  const fixo = lerDanoFixo(s, vezes);
+  if (fixo) return fixo;
   const inicioDano = s.search(/\d+\s*d\s*\d+/i);
   if (inicioDano < 0) return null;
 
@@ -1072,6 +1074,27 @@ function lerSegmentoAtaque(bruto: string): AtaqueRolavel | null {
   }
   if (partes.length === 0) return null;
   return { nome: nome.replace(/[\s,:]+$/, "").trim() || "Ataque", bonus, vezes, partes };
+}
+
+/** Bicho miúdo tem dano fixo, sem dado: "Arranhão +4, 1 cortante" (gato,
+ *  morcego, rã do catálogo), às vezes com dado extra depois ("Mordida +4, 1
+ *  perfurante + 1d4 veneno", da aranha). Só vale com bônus de acerto e tipo
+ *  de dano conhecido — "Espada +1, 3 vezes por dia" não vira ataque. */
+function lerDanoFixo(s: string, vezes: number): AtaqueRolavel | null {
+  const m = s.match(/^(.*?)([+-]\d+)\s*,\s*(\d+)\s+(?:de\s+)?([a-zà-ÿ]+)/i);
+  if (!m || !TIPOS_DANO.has(m[4].toLowerCase())) return null;
+  const nome = m[1].replace(/[\s,:]+$/, "").trim() || "Ataque";
+  const partes: ParteDano[] = [{ qtd: 0, faces: 0, mod: Number(m[3]), tipo: m[4].toLowerCase() }];
+  for (const extra of s.slice(m[0].length).matchAll(DADO)) {
+    const tipo = (extra[5] ?? "").toLowerCase();
+    partes.push({
+      qtd: Number(extra[1]),
+      faces: Number(extra[2]),
+      mod: extra[4] ? Number(extra[4]) * (extra[3] === "-" ? -1 : 1) : 0,
+      tipo: TIPOS_DANO.has(tipo) ? tipo : "",
+    });
+  }
+  return { nome, bonus: Number(m[2]), vezes, partes };
 }
 
 /**
@@ -1161,7 +1184,7 @@ export function descreverAtaque(r: ResultadoAtaque, bonus: number | null): { ace
     acerto = r.critico ? `${conta} — 20 natural, CRÍTICO` : r.erroCritico ? `${conta} — 1 natural, erra` : conta;
   }
   const detalhe = (p: ResultadoAtaque["partes"][number]) =>
-    `${p.dados.join("+")}${p.mod ? ` ${comSinal(p.mod)}` : ""}`;
+    p.dados.length === 0 ? "fixo" : `${p.dados.join("+")}${p.mod ? ` ${comSinal(p.mod)}` : ""}`;
   const partes = r.partes.map((p) => `${p.total}${p.tipo ? ` ${p.tipo}` : ""} (${detalhe(p)})`);
   const dano = partes.length === 1 ? `${partes[0].replace(/^(\d+)/, "$1 de dano")}` : `${r.dano} de dano: ${partes.join(" + ")}`;
   return { acerto, dano };

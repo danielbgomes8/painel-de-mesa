@@ -85,8 +85,9 @@ lista, sem regra de D&D embutida).
 
 **Mestre** (aba própria) — biblioteca de NPCs pra preparar a mesa com
 antecedência (ficha completa + notas de tática, reaproveitável entre
-combates e sessões), busca no catálogo de monstros do SRD 2024 (CA, PV,
-iniciativa, linha de ataque), notas privadas que só o Mestre enxerga,
+combates e sessões), busca no catálogo de monstros do SRD 2024 — os 331,
+por nome em português ou inglês, tipo ou nível de desafio ("nd 2"), com CA,
+PV, iniciativa, linha de ataque e notas —, notas privadas que só o Mestre enxerga,
 revelar/ocultar NPC, remover personagens e NPCs, **modo telão** (tela cheia
 pra projetar ou compartilhar, sem os controles de edição, mostrando de quem
 é a vez, as condições dela e quem vem a seguir, com o mesmo segredo de PV
@@ -145,11 +146,13 @@ src/
                   ListaLog (campos e blocos reutilizáveis)
   hooks/          useSala (carrega a sala + assina o Realtime + mutações) ·
                   useCodigoSala · useIdentidade · useModoTelao ·
-                  useTelaAcesa
+                  useTelaAcesa · useCatalogoMonstros
   lib/            regras · condicoes · identidade · sala · supabase · tipos ·
                   dados (rolagem d20/d100) · alerta (vibração/bipe de turno) ·
                   bastiaoDmg (catálogo do Bastião) · classesSrd (habilidades
-                  por classe/nível) · monstrosSrd (catálogo de monstros) ·
+                  por classe/nível) · monstrosSrd + monstrosSrdGerados
+                  (catálogo de monstros; o segundo sai do
+                  scripts/gerar-monstros-srd.mjs) ·
                   backup (exporta a sala num .json) · telaAcesa (segura a
                   tela do telão acesa) · erros + relatarErro (relato de
                   erro dos aparelhos)

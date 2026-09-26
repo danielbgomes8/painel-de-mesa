@@ -9,14 +9,16 @@ const viciado = (...valores: number[]) => {
 };
 
 describe("ler o ataque do texto livre", () => {
-  it("todo monstro do catálogo tem pelo menos um ataque rolável, com acerto e dano", () => {
+  it("todo monstro do catálogo tem ataque rolável, e nenhum pedaço da linha se perde", () => {
     for (const m of MONSTROS_SRD) {
+      if (!m.ataque) continue; // os três do SRD que não atacam
       const { ataques } = lerAtaquesRolaveis(m.ataque);
-      expect(ataques.length, m.name).toBeGreaterThan(0);
-      for (const a of ataques) {
-        expect(a.bonus, `${m.name}: ${a.nome}`).not.toBeNull();
-        expect(a.partes.length, `${m.name}: ${a.nome}`).toBeGreaterThan(0);
-      }
+      expect(ataques.some((a) => a.bonus !== null), `${m.name}: nenhum ataque com acerto`).toBe(true);
+      for (const a of ataques) expect(a.partes.length, `${m.name}: ${a.nome}`).toBeGreaterThan(0);
+      // Cada ataque da linha vira um botão: se o leitor pular um pedaço, o
+      // Mestre fica sem o botão daquele ataque sem ninguém perceber.
+      const pedacos = m.ataque.replace(/^\d+ ataques?:\s*/, "").split(/\s+·\s+|\s+e\s+(?=[A-ZÀ-Ý])/);
+      expect(ataques.length, `${m.name}: ${m.ataque}`).toBe(pedacos.length);
     }
   });
 
@@ -80,6 +82,24 @@ describe("ler o ataque do texto livre", () => {
     expect(sopro.partes[0]).toEqual({ qtd: 4, faces: 6, mod: 0, tipo: "fogo" });
   });
 
+  it("dano fixo, sem dado (bicho miúdo): 'Arranhão +4, 1 cortante'", () => {
+    expect(lerAtaquesRolaveis("Arranhão +4, 1 cortante").ataques).toEqual([
+      { nome: "Arranhão", bonus: 4, vezes: 1, partes: [{ qtd: 0, faces: 0, mod: 1, tipo: "cortante" }] },
+    ]);
+    // fixo com dado extra depois (aranha)
+    expect(lerAtaquesRolaveis("Mordida +4, 1 perfurante + 1d4 veneno").ataques[0]).toEqual({
+      nome: "Mordida",
+      bonus: 4,
+      vezes: 1,
+      partes: [
+        { qtd: 0, faces: 0, mod: 1, tipo: "perfurante" },
+        { qtd: 1, faces: 4, mod: 0, tipo: "veneno" },
+      ],
+    });
+    // sem tipo de dano conhecido não é ataque
+    expect(lerAtaquesRolaveis("Espada +1, 3 vezes por dia").ataques).toEqual([]);
+  });
+
   it("texto sem dado nenhum não tem o que rolar", () => {
     expect(lerAtaquesRolaveis("").ataques).toEqual([]);
     expect(lerAtaquesRolaveis("foge com menos de 10 PV").ataques).toEqual([]);
@@ -128,6 +148,14 @@ describe("rolar o ataque", () => {
     expect(r.d20s).toEqual([]);
     expect(r.dano).toBe(7);
     expect(descreverAtaque(r, null).acerto).toBeNull();
+  });
+
+  it("dano fixo: não rola dado nem no crítico, e diz que é fixo", () => {
+    const [arranhao] = lerAtaquesRolaveis("Arranhão +4, 1 cortante").ataques;
+    const r = resolverAtaque(arranhao, "normal", viciado(20));
+    expect(r.critico).toBe(true);
+    expect(r.dano).toBe(1);
+    expect(descreverAtaque(r, 4).dano).toBe("1 de dano cortante (fixo)");
   });
 
   it("dano não fica negativo", () => {

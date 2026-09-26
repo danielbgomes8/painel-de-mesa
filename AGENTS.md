@@ -385,13 +385,51 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Vantagens & resistências** (`vantagens_resistencias`, migration `0011`):
   campo próprio na ficha, separado das Notas rápidas, só pra personagem de
   jogador. Antes isso ficava misturado em texto livre.
-- **Catálogo de monstros**: 56 criaturas, todas conferidas contra o SRD 2024
-  (ver a regra de edição acima), com CA, PV, iniciativa e linha de ataque
-  (acerto + dano). A busca ignora acento de propósito — no teclado do celular
-  se digita "manticora", não "Mantícora" — e casa também contra o tipo, então
-  "morto-vivo" devolve todos os mortos-vivos. Por isso o campo `cls` tem que
-  seguir o padrão "Monstruosidade média", "Morto-vivo médio": inventar outro
-  formato tira o bicho da busca por tipo.
+- **Catálogo de monstros**: o SRD 5.2 inteiro, **331 criaturas** (desde
+  26/09/2026; antes eram 56), com CA, PV, iniciativa, ND, linha de ataque
+  (acerto + dano) e notas. A busca ignora acento de propósito — no teclado do
+  celular se digita "manticora", não "Mantícora" — e casa também contra o
+  tipo ("morto-vivo" devolve todos os mortos-vivos) e o **nome em inglês**
+  ("owlbear", o do livro); "nd 5" ou "nd 1/4" devolve os daquele nível de
+  desafio. Por isso o campo `cls` tem que seguir o padrão "Monstruosidade
+  média", "Morto-vivo médio": inventar outro formato tira o bicho da busca
+  por tipo (o teste confere o padrão nos 331). Como é montado:
+  - **Duas listas.** `MONSTROS_CURADOS` (`monstrosSrd.ts`, 56, escritos à mão
+    com dica de tática) + `MONSTROS_GERADOS` (`monstrosSrdGerados.ts`, 275,
+    **gerado** por `scripts/gerar-monstros-srd.mjs` — não editar à mão). O
+    gerador lê a open5e (`srd-2024`) e traduz com tabelas próprias (nomes,
+    142 ataques, 48 ações de resistência, danos, condições, tipos/tamanhos,
+    algumas habilidades); as notas saem automáticas: ND e XP, deslocamentos
+    além de andar, imunidades/resistências, Resistência Lendária, magia (CD),
+    ações lendárias. Pra caprichar num gerado: trazer pra lista curada e pôr o
+    nome em inglês em `CURADOS_EN`. Rodar de novo dá o mesmo arquivo
+    (conferido baixando da fonte).
+  - **Pegadinhas da fonte, já tratadas no gerador:** (1) o `speed_all`
+    inventa escalada/natação pela metade do deslocamento (regra geral) — usar
+    só `speed`; (2) o **tamanho** "Small" da open5e junta Miúdo, Pequeno e
+    "Médio ou Pequeno" — o dado de vida desempata (d4 / d6 / d8; os 84
+    "Small" caem certinho), o que corrigiu 13 dos curados (humanoides eram
+    "pequeno", Diabrete e Estirge são miúdos); (3) o dano da desc é a fonte
+    confiável (o `attacks[]` estruturado troca o tipo de lugar), e o "+1d4 se
+    tiver vantagem" do goblin é condicional — fica fora da linha e vai pra
+    nota. Na conferência de 26/09 os 56 curados bateram 100% em CA, PV e
+    iniciativa; Estirge e Espectro tinham o **voo** no lugar do deslocamento
+    (corrigido: `speed` é andar, o voo vai na nota).
+  - O "Espectro" curado é o **Wraith**; o Specter entrou como "Aparição".
+  - Bicho miúdo tem **dano fixo** ("Arranhão +4, 1 cortante", "Mordida +4, 1
+    perfurante + 1d4 veneno"): `lerDanoFixo` em `regras.ts` lê isso, e o
+    resultado diz "(fixo)". O teste de `ataquesRolados.test.ts` confere que
+    **cada pedaço** de cada uma das 331 linhas vira um botão — foi ele que
+    achou a aranha. Três criaturas não atacam (Mosca gigante, Cavalo-marinho,
+    Fungo gritador) e ficam com `ataque` vazio.
+  - **Carrega sob demanda** (`useCatalogoMonstros`, `import()` dinâmico): o
+    catálogo é um pedaço de 17,6 KB compactado que só baixa quando a
+    biblioteca ou a montagem de encontro aparece — nunca na abertura do app.
+    Sem internet e sem ter baixado antes, a tela diz e oferece tentar de novo.
+  - **Medido a 375px:** "ver todos" abre por **faixa de ND** (8 faixas, a maior
+    com 54, ~3.900px), com a **linha compacta** (~62px: nome, ND, CA, PV, tipo);
+    ataque e notas só aparecem quando a busca devolve até 8. Com as 5 faixas
+    largas da primeira versão, "ND 0–1" tinha 135 monstros e 16.800px.
 - **Ataque do NPC** (`ataque`, migration `0008`): texto livre com acerto e
   dano, vindo do catálogo, editável na biblioteca e na ficha, e carregado
   junto quando o modelo entra no combate. Fica num campo que quebra linha, não
@@ -554,8 +592,8 @@ primeiros itens; os outros estão na lista do fim desta seção.
    Trava barata sem login: o app nunca apaga sala inteira, dá pra tirar o
    `delete` de `rooms` do `anon` (as tabelas filhas continuam abertas).
 6. O backup diário nunca foi restaurado — ensaiar numa sala descartável.
-7. Menores: 280 KB compactados de JS na primeira abertura (catálogos de
-   monstros e classes no pacote principal); nada confere sozinho se o banco
+7. Menores: 280 KB compactados de JS na primeira abertura (o de monstros
+   saiu dela em 26/09, carrega sob demanda; o de classes continua); nada confere sozinho se o banco
    bate com `tipos.ts` (conferido à mão em 25/09: bate). O log **não**
    precisa de limpeza: 135 linhas na Salamina em duas semanas e o app só lê
    as 40 últimas.
