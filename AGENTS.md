@@ -504,8 +504,16 @@ primeiros itens; os outros estão na lista do fim desta seção.
   então não é "Squash and merge" pelo site: rodar as mesmas versões aqui
   (`npm install --save-exact …`), `npm run verificar`, commitar com o autor
   inline; o robô fecha o PR dele sozinho quando vê a versão já aplicada. O
-  preview do Vercel no PR do robô pode aparecer bloqueado pelo mesmo motivo;
-  o que vale lá é o check "Verificar".
+  jeito mais fiel é pegar os dois arquivos do próprio PR
+  (`git checkout origin/<branch do robô> -- package.json package-lock.json`
+  + `npm ci`). O preview do Vercel no PR do robô passou normalmente no #1;
+  o que nunca se testou é produção com commit de autor `dependabot` — por
+  isso o caminho acima. Atualização com novidade de verdade (não só
+  conserto) merece o teste de uso numa sala descartável antes: o #1 (React
+  19.2.8 → 19.3.0, supabase-js 2.116 → 2.117, `@types/node`) foi aplicado em
+  25/09 depois de montar ordem, dano, condição, turno, desfazer, telão em
+  tempo real e a fila sem internet (o formato do erro de rede do supabase-js
+  é o que `ehFalhaDeRede` lê — conferir sempre que ele mudar de versão).
   **Os alertas de segurança do GitHub estão desligados** no repositório
   (`vulnerability-alerts` = 404, `automated-security-fixes` = false). Ligar é
   configuração de segurança da conta: é o Daniel quem liga (Settings →
