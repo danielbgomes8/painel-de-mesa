@@ -54,6 +54,9 @@ export type PecaNaTela = {
   selecionada: boolean;
   /** Quem olha pode arrastá-lo. */
   podeMover: boolean;
+  /** Deslocamento da ficha em metros, pra a régua dizer "cabe nos 9 m". Só quem
+   *  pode mexer no peão enxerga: o deslocamento de um inimigo é do Mestre. */
+  deslocamento: number | null;
   /** Aparece mesmo coberto de névoa (o Mestre vê tudo; o jogador vê o próprio). */
   semNevoa: boolean;
 };
@@ -198,7 +201,7 @@ export function iniciais(nome: string): string {
   return (palavras[0][0] + palavras[1][0]).toUpperCase();
 }
 
-type FichaParaPeca = { slug: string; name: string; is_npc: boolean; revealed: boolean };
+type FichaParaPeca = { slug: string; name: string; is_npc: boolean; revealed: boolean; speed?: number };
 
 /** O nome que esta pessoa pode ler no peão: o do marcador, o da ficha, ou "?"
  *  quando é um inimigo que a mesa ainda não conhece. */
@@ -237,6 +240,7 @@ export function montarPecasNaTela(entrada: {
       vez: p.slug !== null && p.slug === vezDe,
       selecionada: p.id === selecionadaId,
       podeMover: podeMoverPeca(p, visao),
+      deslocamento: podeMoverPeca(p, visao) && ficha && typeof ficha.speed === "number" && ficha.speed > 0 ? ficha.speed : null,
       semNevoa: visao.mestre || (p.slug !== null && p.slug === visao.meuSlug),
     };
   });

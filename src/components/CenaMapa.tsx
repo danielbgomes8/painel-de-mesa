@@ -24,11 +24,21 @@ import {
   type TamanhoPincel,
   type Vista,
 } from "@/lib/cenas";
-import { desenharCena, desenharNevoa, desenharPings, escalaDaNevoa, type FormaDesenhavel } from "@/lib/desenharCena";
+import {
+  desenharCena,
+  desenharNevoa,
+  desenharPings,
+  desenharReguas,
+  escalaDaNevoa,
+  type FormaDesenhavel,
+  type PreviaDeRegua,
+} from "@/lib/desenharCena";
+import { REGUA_MINIMA_PX, medirRegua, type ModoRegua, type ReguaNaTela } from "@/lib/regua";
+import { COR_PING_MESTRE } from "@/lib/ping";
 import { acharPecaNoPonto, encaixarNaGrade, type PecaNaTela } from "@/lib/pecas";
 import { PING_TOLERANCIA_PX, PING_TOQUE_LONGO_MS, type PingNaTela } from "@/lib/ping";
 
-export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping";
+export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua";
 
 /** O que o Mestre pode pedir ao mapa de fora (botões "enquadrar", "levar a mesa"). */
 export type CenaMapaApi = {
@@ -59,6 +69,12 @@ type Props = {
   /** Pings na tela (de quem for) e como pingar. Sem `aoPingar`, o mapa só mostra. */
   pings?: readonly PingNaTela[];
   aoPingar?: (x: number, y: number) => void;
+  /** Régua: o modo de medir, a cor da prévia (a de quem mede), as réguas na tela e
+   *  o que fazer quando soltar (mostrar pra mesa). Só mede com a ferramenta "regua". */
+  modoRegua?: ModoRegua;
+  corRegua?: string;
+  reguas?: readonly ReguaNaTela[];
+  aoMedir?: (a: Ponto, b: Ponto, modo: ModoRegua, deslocamento: number | null) => void;
   /** Peões da cena (já calculados pro ponto de vista de quem olha). */
   pecas?: readonly PecaNaTela[];
   /** Soltou um peão num lugar novo (já encaixado na grade). */
@@ -69,7 +85,7 @@ type Props = {
 };
 
 type Pintura = {
-  ferramenta: Exclude<Ferramenta, "mover" | "ping">;
+  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua">;
   modo: ModoNevoa;
   raio: number;
   pontos: Ponto[];
@@ -102,6 +118,10 @@ export function CenaMapa({
   aoPintar,
   pings,
   aoPingar,
+  modoRegua = "grade",
+  corRegua = COR_PING_MESTRE,
+  reguas,
+  aoMedir,
   pecas,
   aoMoverPeca,
   aoTocarPeca,
@@ -128,12 +148,14 @@ export function CenaMapa({
   const arrastoPeca = useRef<{ id: string; tamanho: number; dx: number; dy: number; x: number; y: number; telaX: number; telaY: number; moveu: boolean } | null>(null);
   /** Onde desenhar o peão mexido, até as propriedades novas chegarem (sem pulo). */
   const arrastoVisual = useRef<{ id: string; x: number; y: number } | null>(null);
+  /** Régua sendo arrastada agora (pontos em px do mapa; `telaA` pra saber se é toque ou medida). */
+  const reguaViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number }; desloc: number | null } | null>(null);
   /** "Este ponto está na névoa?" guardado, pra não reler o canvas da névoa a cada quadro. */
   const coberturaRef = useRef(new Map<string, boolean>());
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, pecas, aoMoverPeca, aoTocarPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, pecas, aoMoverPeca, aoTocarPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, pecas, aoMoverPeca, aoTocarPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, pecas, aoMoverPeca, aoTocarPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -188,7 +210,13 @@ export function CenaMapa({
       pecaCoberta: cobertaPorNevoa,
       arrasto: arrastoVisual.current,
     });
-    return desenharPings(ctx, p.pings ?? [], vistaRef.current, w, h, dpr, performance.now());
+    const agora = performance.now();
+    const viva = reguaViva.current;
+    const previa: PreviaDeRegua | null = viva ? { a: viva.a, b: viva.b, modo: p.modoRegua, cor: p.corRegua, desloc: viva.desloc } : null;
+    return (
+      desenharPings(ctx, p.pings ?? [], vistaRef.current, w, h, dpr, agora) +
+      desenharReguas(ctx, p.cena, p.reguas ?? [], previa, vistaRef.current, w, h, dpr, agora)
+    );
   }, [cobertaPorNevoa]);
 
   const pedirQuadro = useCallback(() => {
@@ -254,10 +282,10 @@ export function CenaMapa({
     };
   }, [imagemUrl, tentativa, pedirQuadro]);
 
-  // Ping novo (de quem for): começa a animar.
+  // Ping ou régua nova (de quem for): começa a animar.
   useEffect(() => {
     pedirQuadro();
-  }, [pings, pedirQuadro]);
+  }, [pings, reguas, pedirQuadro]);
 
   // O relógio do toque longo não pode sobreviver ao componente.
   useEffect(
@@ -395,6 +423,7 @@ export function CenaMapa({
       semArrastar.current = false;
       arrastoPeca.current = null;
       arrastoVisual.current = null;
+      reguaViva.current = null;
       pintura.current = null;
       previaRef.current = null;
       const [a, b] = [...dedos.current.values()];
@@ -405,6 +434,17 @@ export function CenaMapa({
         centro,
         ponto: noMapa(centro),
       };
+      pedirQuadro();
+      return;
+    }
+
+    // Régua: arrastar de um ponto a outro mede. Se o toque começa em cima de um
+    // peão, a medida leva o deslocamento dele ("cabe nos 9 m").
+    if (p.ferramenta === "regua" && p.aoMedir) {
+      const [mx, my] = noMapa(pos);
+      const peao = acharPecaNoPonto((p.pecas ?? []).filter((x) => x.deslocamento !== null), mx, my);
+      reguaViva.current = { a: [mx, my], b: [mx, my], telaA: pos, telaB: pos, desloc: peao?.deslocamento ?? null };
+      semArrastar.current = true;
       pedirQuadro();
       return;
     }
@@ -433,7 +473,7 @@ export function CenaMapa({
 
     const ferr = p.ferramenta;
     const pintavel =
-      p.mestre && ferr !== "mover" && ferr !== "ping" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
+      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
     if (!pintavel && p.aoPingar) {
       // Sem ferramenta de pintura em uso: dedo parado por um instante vira ping.
       cancelarToqueLongo();
@@ -503,6 +543,15 @@ export function CenaMapa({
       return;
     }
 
+    // Arrastando a régua.
+    const rv = reguaViva.current;
+    if (rv) {
+      rv.b = noMapa(agora);
+      rv.telaB = agora;
+      pedirQuadro();
+      return;
+    }
+
     // Arrastando um peão.
     const ar = arrastoPeca.current;
     if (ar) {
@@ -566,6 +615,18 @@ export function CenaMapa({
     if (dedos.current.size < 2) pinca.current = null;
     if (dedos.current.size === 0) {
       semArrastar.current = false;
+      const rv = reguaViva.current;
+      if (rv) {
+        reguaViva.current = null;
+        const arrastou = Math.hypot(rv.telaB.x - rv.telaA.x, rv.telaB.y - rv.telaA.y) >= REGUA_MINIMA_PX;
+        const p = propsRef.current;
+        // Um toque simples não é régua; medida de zero quadrado também não.
+        if (!cancelado && arrastou && medirRegua(p.cena, rv.a, rv.b, p.modoRegua).quadrados > 0) {
+          p.aoMedir?.(rv.a, rv.b, p.modoRegua, rv.desloc);
+        }
+        pedirQuadro();
+        return;
+      }
       const ar = arrastoPeca.current;
       if (ar) {
         arrastoPeca.current = null;
@@ -588,13 +649,13 @@ export function CenaMapa({
     }
   }
 
-  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping";
+  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua";
   return (
     <div ref={caixaRef} className="cena-caixa">
       <canvas
         ref={canvasRef}
         className="cena-canvas"
-        style={{ cursor: !interativo ? "default" : pintando ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
+        style={{ cursor: !interativo ? "default" : pintando || ferramenta === "regua" ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
         role="img"
         aria-label={`Mapa ${cena.nome || "sem nome"}`}
         onPointerDown={aoPressionar}

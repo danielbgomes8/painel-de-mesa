@@ -12,6 +12,16 @@ import {
   type PingNaTela,
   type PingRecebido,
 } from "@/lib/ping";
+import {
+  REGUA_DURACAO_MS,
+  adicionarRegua,
+  reguasAtivas,
+  validarRegua,
+  type ModoRegua,
+  type ReguaNaTela,
+  type ReguaRecebida,
+} from "@/lib/regua";
+import type { Ponto } from "@/lib/cenas";
 
 /** Quem está pingando neste aparelho: o nome que aparece no mapa e a cor. */
 export type QuemPinga = { nome: string; cor: string };
@@ -21,6 +31,10 @@ export type Pings = {
   pings: PingNaTela[];
   /** Pinga no ponto (px da imagem da cena). Sem `quem` (telão), não faz nada. */
   enviar: (x: number, y: number) => void;
+  /** Réguas que ainda estão na tela (a medida some depois de uns segundos). */
+  reguas: ReguaNaTela[];
+  /** Mostra pra mesa a régua de `a` até `b`; `desloc` = deslocamento (m) de quem foi medido. */
+  enviarRegua: (a: Ponto, b: Ponto, modo: ModoRegua, desloc: number | null) => void;
 };
 
 /**
@@ -37,6 +51,8 @@ export function usePing(
   quem: QuemPinga | null,
 ): Pings {
   const [pings, setPings] = useState<PingNaTela[]>([]);
+  const [reguas, setReguas] = useState<ReguaNaTela[]>([]);
+  const ultimaReguaRef = useRef<number | null>(null);
   const canalRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const ultimoRef = useRef<number | null>(null);
   const cenaId = cena?.id ?? null;
@@ -52,12 +68,18 @@ export function usePing(
         if (!ping) return;
         setPings((atual) => adicionarPing(atual, { ...ping, chegouEm: performance.now() }));
       })
+      .on("broadcast", { event: "regua" }, ({ payload }) => {
+        const regua = validarRegua(payload, { largura, altura });
+        if (!regua) return;
+        setReguas((atual) => adicionarRegua(atual, { ...regua, chegouEm: performance.now() }));
+      })
       .subscribe();
     canalRef.current = canal;
     return () => {
       canalRef.current = null;
       supabase.removeChannel(canal);
       setPings([]);
+      setReguas([]);
     };
   }, [cenaId, largura, altura]);
 
@@ -68,6 +90,35 @@ export function usePing(
     const t = window.setTimeout(() => setPings((atual) => pingsAtivos(atual, performance.now())), PING_DURACAO_MS + 200);
     return () => window.clearTimeout(t);
   }, [pings]);
+
+  useEffect(() => {
+    if (reguas.length === 0) return;
+    const t = window.setTimeout(() => setReguas((atual) => reguasAtivas(atual, performance.now())), REGUA_DURACAO_MS + 200);
+    return () => window.clearTimeout(t);
+  }, [reguas]);
+
+  const enviarRegua = useCallback<Pings["enviarRegua"]>(
+    (a, b, modo, desloc) => {
+      const canal = canalRef.current;
+      if (!quem || !canal) return;
+      const agora = performance.now();
+      if (!podePingar(ultimaReguaRef.current, agora)) return;
+      ultimaReguaRef.current = agora;
+      const regua: ReguaRecebida = {
+        id: crypto.randomUUID(),
+        a: [Math.round(a[0] * 10) / 10, Math.round(a[1] * 10) / 10],
+        b: [Math.round(b[0] * 10) / 10, Math.round(b[1] * 10) / 10],
+        modo,
+        de: quem.nome,
+        cor: quem.cor,
+        desloc,
+      };
+      // Aparece na hora pra quem mediu; o canal não devolve a própria mensagem.
+      setReguas((atual) => adicionarRegua(atual, { ...regua, chegouEm: agora }));
+      canal.send({ type: "broadcast", event: "regua", payload: regua }).catch((e: unknown) => relatarErro("enviarRegua", e));
+    },
+    [quem],
+  );
 
   const enviar = useCallback<Pings["enviar"]>(
     (x, y) => {
@@ -90,5 +141,5 @@ export function usePing(
     [quem],
   );
 
-  return { pings, enviar };
+  return { pings, enviar, reguas, enviarRegua };
 }

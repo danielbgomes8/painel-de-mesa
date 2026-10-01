@@ -683,6 +683,13 @@ primeiros itens; os outros estão na lista do fim desta seção.
   25/09 depois de montar ordem, dano, condição, turno, desfazer, telão em
   tempo real e a fila sem internet (o formato do erro de rede do supabase-js
   é o que `ehFalhaDeRede` lê — conferir sempre que ele mudar de versão).
+  Em 01/10/2026 entrou o supabase-js 2.117.0 → 2.117.2 (PR do robô, aplicado
+  pelo caminho acima). Conferido: o erro de queda de rede continua
+  `{message: "TypeError: Failed to fetch", code: ""}` (um teste provisório
+  rodou `ehFalhaDeRede` sobre o erro REAL do cliente instalado), e o robô de
+  tela passa nos 5 cenários — ele cobre o canal de transmissão do ping e da
+  régua, que é o que mais depende da biblioteca. **Atualização do cliente do
+  Supabase agora tem teste de verdade: rode `npm run e2e` antes de aceitar.**
   **Os alertas de segurança do GitHub estão desligados** no repositório
   (`vulnerability-alerts` = 404, `automated-security-fixes` = false). Ligar é
   configuração de segurança da conta: é o Daniel quem liga (Settings →
@@ -718,8 +725,8 @@ primeiros itens; os outros estão na lista do fim desta seção.
 4. ~~Nenhum teste cobre tela~~ — feito em 01/10/2026: robô de tela (ver "Robô
    de tela, trava de sala e restauração do backup"). O `useSala` (1.854 linhas)
    ainda não tem teste próprio; o robô cobre o caminho principal do combate.
-5. ~~Trava no apagar sala~~ — escrita em 01/10/2026 (`0020`, falta o Daniel
-   rodar). **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
+5. ~~Trava no apagar sala~~ — feito em 01/10/2026 (`0020`, rodada e conferida).
+   **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
    chave `anon` devolve todos os códigos (conferido). Então "código difícil de
    chutar" (seção de trocar campanha, acima) **não esconde campanha nenhuma**.
    Trava barata sem login: o app nunca apaga sala inteira, dá pra tirar o
@@ -782,8 +789,8 @@ primeiros itens; os outros estão na lista do fim desta seção.
 
 O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
 **1 está construída** (cena + grade + névoa ao vivo + telão + celular), a **2
-está pela metade** (ping e peões básicos prontos; régua e condições no peão
-não) e a 3 e a 4 ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
+está quase toda** (ping, peões básicos e régua prontos; faltam as condições
+como ícone no peão) e a 3 e a 4 ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
 essencial; peão é "bom ter"** (a mesa não vai usar muito):
 
 1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
@@ -914,6 +921,31 @@ Decisões que não estão no código à primeira vista:
   do outro (o arrasto pegava o de cima). Hoje `posicoesIniciais` recebe os lugares
   ocupados e desce/sobe a fileira até achar trecho livre (testado). **Um bug
   desses não aparece em teste de regra: olhe a foto.**
+- **Régua em metros** (`lib/regua.ts`, sem migration): ferramenta "📏 régua" do
+  Mestre e botão "📏 medir" do jogador; arrastar de um ponto a outro mede e a
+  MESA INTEIRA vê a linha com a medida por ~7 s (mesmo canal de transmissão do
+  ping, evento `regua`). A conta usa os dois números da cena (`grade_px` e
+  `metros`, em "Grade e névoa"), sempre em px da imagem, então o zoom não entra.
+  **Regra conferida no texto bruto das Regras Gratuitas 2024 ("Playing on a
+  Grid", seção Movimento e Posição)** — o resumo automático da página disse que
+  não havia regra de diagonal, e o texto bruto tem: *"It costs 1 square of
+  movement to enter an unoccupied square that's adjacent to your space
+  (orthogonally or diagonally adjacent)"* e o alcance se conta "pelo caminho mais
+  curto" a partir de um quadrado vizinho. Logo, **na grade a diagonal vale 1
+  quadrado** (distância = maior diferença entre colunas e linhas; pontos encaixam
+  no centro do quadradinho) e não existe a variante 5-10-5 nessa edição. O
+  segundo modo, "em linha reta", é a distância euclidiana (um quadrado na
+  diagonal = 1,4); com a grade desligada o modo grade vira reta sozinho. Cada
+  quadrado vale 5 pés = 1,5 m por padrão e a velocidade se converte dividindo
+  por 5 (9 m = 6 quadrados). **Começar a medida em cima de um peão leva o
+  deslocamento da ficha**: a etiqueta diz "cabe nos 9 m" ou "passa 3 m dos 9 m"
+  (só pra quem pode mexer naquele peão — o deslocamento de inimigo é do
+  Mestre). O pacote que viaja NÃO leva a distância: quem recebe refaz a conta com
+  a grade da própria cena (`validarRegua`), então ninguém mostra número falso na
+  mesa. Etiqueta em duas linhas e letra que encolhe: com nome + "passa 3 m dos 9
+  m" ela passava da largura de um celular (achado na foto). Conferido pelo robô
+  (o canvas não tem texto no DOM: o robô espia `fillText`): 5 quadrados = 7,5 m,
+  diagonal de 3 = 4,5 m, em reta 4,2 quadrados = 6,4 m, e o jogador vê o mesmo.
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).
@@ -929,7 +961,8 @@ Decisões que não estão no código à primeira vista:
   vê as abas sem erro na tela; combate (monstro na iniciativa, passa a vez);
   mapa (sobe a imagem, ela CARREGA — a política de segurança já bloqueou isso
   uma vez —, vai pra mesa, o jogador vê o aviso e abre o mapa, o telão mostra, o
-  Mestre tira e a aba some ao vivo). Erro no console conta como falha (o robô
+  Mestre tira e a aba some ao vivo); peões; régua (espia o `fillText` do canvas
+  pra ler a medida que foi DESENHADA). Erro no console conta como falha (o robô
   imprime o endereço que falhou). Local: `E2E_URL=http://localhost:3000 npm run
   e2e` (usa um servidor já rodando) ou `npm run e2e` (sobe o `next dev` na 3100;
   o Next 16 não deixa dois `next dev` na mesma pasta). **Não entra no `npm run
@@ -939,14 +972,17 @@ Decisões que não estão no código à primeira vista:
   **Já achou um erro de verdade:** com a tabela dos peões ainda não criada o
   console mostra um 404 (o app trata, mas o robô falha de propósito). Com a 0019
   rodada, os 4 cenários passam (~20 s).
-- **Trava no apagar sala** (`0020_sem_apagar_sala.sql`): `revoke delete on rooms
-  from anon`. O app só faz `upsert` da sala (nunca apaga), então nada muda pra
+- **Trava no apagar sala** (`0020_sem_apagar_sala.sql`, **rodada pelo Daniel em
+  01/10/2026 e conferida**: `DELETE rooms` com a chave pública devolve 401
+  "permission denied", enquanto criar/garantir sala e apagar ficha seguem
+  funcionando e o robô passa): `revoke delete on rooms from anon`. O app só faz `upsert` da sala (nunca apaga), então nada muda pra
   quem usa; o `on delete cascade` deixava qualquer aparelho com a chave pública
   apagar uma campanha inteira. **Consequência pra quem testa:** apagar sala de
   teste deixa de ser possível pela API — passa a ser no SQL Editor
   (`delete from public.rooms where code = 'teste-ui';`). As tabelas filhas
-  continuam apagáveis pela API (por isso o robô limpa filha por filha). Quem
-  roda a 0020 deve antes apagar as salas de teste que ainda existirem.
+  continuam apagáveis pela API (por isso o robô limpa filha por filha). Salas que
+  existem hoje: as reais (`setimo-raio`, `forgotten-realms`) e a `ci-teste` do
+  robô, que fica de propósito.
 - **Restaurar o backup diário bruto** (`scripts/restaurar-backup-bruto.mjs`):
   devolve ao banco uma sala a partir de `backup/<sala>.json`. Sem `--executar` só
   simula. Insere com "ignorar duplicata" pelo `id`: seguro por cima de uma sala

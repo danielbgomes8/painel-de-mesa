@@ -169,3 +169,79 @@ test("peões: o Mestre põe o grupo e os inimigos, oculta um, e o jogador põe o
   expect(erros).toEqual([]);
   expect(errosJogador).toEqual([]);
 });
+
+test("régua: o Mestre mede na grade (diagonal vale 1 quadrado) e o jogador vê a mesma medida", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("jogador-robo", "Jogador Robô");
+
+  // O canvas não tem texto no DOM: o robô escuta o que é DESENHADO nele.
+  const espiar = () => {
+    const w = window as unknown as { __textos: string[] };
+    w.__textos = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args: Parameters<typeof original>) {
+      w.__textos.push(String(args[0]));
+      return original.apply(this, args);
+    };
+  };
+  await page.addInitScript(espiar);
+  const textosDe = (p: typeof page) => p.evaluate(() => (window as unknown as { __textos: string[] }).__textos);
+
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-regua.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+
+  const contexto = await browser.newContext();
+  const jogador = await contexto.newPage();
+  await jogador.addInitScript(espiar);
+  await comoJogador(jogador, "jogador-robo");
+  await jogador.goto(`/?sala=${SALA}`);
+  await jogador.getByRole("button", { name: "ver o mapa" }).click();
+  await expect(jogador.locator(".cena-canvas")).toBeVisible();
+  await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+
+  await page.getByRole("button", { name: /régua/ }).click();
+  const canvas = page.locator(".cena-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const caixa = (await canvas.boundingBox())!;
+  // 900×600 de imagem, 30 quadrados na largura (30 px cada), vista = mapa inteiro com folga de 3%.
+  const escala = Math.min(caixa.width / (900 * 1.06), caixa.height / (600 * 1.06));
+  const naTela = (ix: number, iy: number) => ({
+    x: caixa.x + caixa.width / 2 + (ix - 450) * escala,
+    y: caixa.y + caixa.height / 2 + (iy - 300) * escala,
+  });
+  const medir = async (de: [number, number], para: [number, number]) => {
+    const a = naTela(...de);
+    const b = naTela(...para);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 8 });
+    await page.mouse.up();
+  };
+
+  // 5 quadrados na horizontal (do centro da coluna 5 ao da 10): 5 × 1,5 m = 7,5 m.
+  await medir([165, 165], [315, 165]);
+  await expect.poll(async () => (await textosDe(page)).some((t) => t === "5 quadrados · 7,5 m")).toBe(true);
+  await expect.poll(async () => (await textosDe(jogador)).some((t) => t === "Mestre: 5 quadrados · 7,5 m")).toBe(true);
+
+  // Na diagonal, 3 colunas e 3 linhas: a regra conta 3 (e não 4,2).
+  await page.waitForTimeout(900);
+  await medir([165, 165], [255, 255]);
+  await expect.poll(async () => (await textosDe(jogador)).some((t) => t === "Mestre: 3 quadrados · 4,5 m")).toBe(true);
+
+  // Em linha reta: 3 quadrados na diagonal viram 4,2 quadrados (a diagonal de verdade).
+  await page.waitForTimeout(900);
+  await page.getByRole("button", { name: "em linha reta" }).click();
+  await medir([165, 165], [255, 255]);
+  await expect.poll(async () => (await textosDe(jogador)).some((t) => /^Mestre: 4,2 quadrados · 6,4 m$/.test(t))).toBe(true);
+
+  await contexto.close();
+  expect(erros).toEqual([]);
+});

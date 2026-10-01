@@ -146,6 +146,7 @@ describe("clicar num peão", () => {
     vez: false,
     selecionada: false,
     podeMover: true,
+    deslocamento: null,
     semNevoa: true,
   });
 
@@ -258,6 +259,18 @@ describe("o que o canvas desenha", () => {
     const tela = montarPecasNaTela({ ...base, vezDe: null, visao: { mestre: false, meuSlug: "milo" } });
     expect(tela.map((p) => p.podeMover)).toEqual([false, true, false, false]);
     expect(tela.map((p) => p.semNevoa)).toEqual([false, true, false, false]);
+  });
+
+  it("o deslocamento da ficha vai pro peão só de quem pode mexer nele (o do inimigo é do Mestre)", () => {
+    const comVelocidade = [
+      { slug: "tiberio", name: "Tibério Vaz", is_npc: false, revealed: false, speed: 9 },
+      { slug: "milo", name: "Milo", is_npc: false, revealed: false, speed: 7.5 },
+      { slug: "dragao", name: "Dragão Vermelho", is_npc: true, revealed: false, speed: 18 },
+    ];
+    const jogador = montarPecasNaTela({ ...base, fichas: comVelocidade, vezDe: null, visao: { mestre: false, meuSlug: "milo" } });
+    expect(jogador.map((p) => p.deslocamento)).toEqual([null, 7.5, null, null]);
+    const mestre = montarPecasNaTela({ ...base, fichas: comVelocidade, vezDe: null, visao: { mestre: true, meuSlug: null } });
+    expect(mestre.map((p) => p.deslocamento)).toEqual([9, 7.5, 18, null]);
   });
 
   it("marca de quem é a vez, e a seleção", () => {

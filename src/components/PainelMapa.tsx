@@ -7,6 +7,7 @@ import { useNevoa } from "@/hooks/useNevoa";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { montarPecasNaTela, posicoesIniciais, type TamanhoPeca } from "@/lib/pecas";
+import type { ModoRegua } from "@/lib/regua";
 import {
   cameraValida,
   gradePxParaQuadrados,
@@ -50,6 +51,8 @@ export function VisorDaMesa({
   const ping = usePing(cena, quem);
   const banco = usePecas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
+  const [medindo, setMedindo] = useState(false);
+  const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   // Sempre do ponto de vista de jogador: o telão e os celulares nunca veem o
   // nome de um inimigo ainda não revelado (ver lib/pecas.ts).
   const pecas = useMemo(
@@ -85,6 +88,11 @@ export function VisorDaMesa({
         seguirCamera
         pings={ping.pings}
         aoPingar={quem ? ping.enviar : undefined}
+        ferramenta={medindo ? "regua" : "mover"}
+        modoRegua={modoRegua}
+        corRegua={quem?.cor}
+        reguas={ping.reguas}
+        aoMedir={quem ? ping.enviarRegua : undefined}
         pecas={pecas}
         aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
       />
@@ -98,11 +106,26 @@ export function VisorDaMesa({
                   pôr meu peão no mapa
                 </button>
               )}
+              {quem && (
+                <button type="button" className="chip alvo" aria-pressed={medindo} onClick={() => setMedindo((v) => !v)}>
+                  📏 medir
+                </button>
+              )}
               <button type="button" className="btn" onClick={() => mapaRef.current?.reenquadrar()}>
                 voltar à visão da mesa
               </button>
             </div>
           </div>
+          {medindo && (
+            <div className="mapa-ferr" role="group" aria-label="Como medir">
+              <button type="button" className="chip alvo" aria-pressed={modoRegua === "grade"} onClick={() => setModoRegua("grade")}>
+                na grade
+              </button>
+              <button type="button" className="chip alvo" aria-pressed={modoRegua === "reta"} onClick={() => setModoRegua("reta")}>
+                em linha reta
+              </button>
+            </div>
+          )}
           {banco.aviso && (
             <p className="mapa-erro" role="alert">
               {banco.aviso}
@@ -112,7 +135,9 @@ export function VisorDaMesa({
             <p className="mapa-dica">
               <span className="mapa-cor" style={{ background: quem.cor }} aria-hidden="true" />
               <b>Sua cor.</b> Segure o dedo parado no mapa pra mostrar um ponto pra todo mundo: o pulso aparece com o seu
-              nome na TV e nos outros celulares.
+              nome na TV e nos outros celulares. {medindo
+                ? "Medindo: arraste de um ponto a outro. Começando no seu peão, diz se cabe no seu deslocamento."
+                : "Toque em 📏 medir pra ver a distância em metros."}
             </p>
           )}
         </>
@@ -224,6 +249,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const ping = usePing(cena, quem);
   const banco = usePecas(cena?.id ?? null, codigo);
   const [pecaSelecionada, setPecaSelecionada] = useState<string | null>(null);
+  const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [nomeMarcador, setNomeMarcador] = useState("");
   const pecas = useMemo(
     () =>
@@ -429,9 +455,23 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "ping"} onClick={() => setFerramenta("ping")}>
                   📍 ping
                 </button>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "regua"} onClick={() => setFerramenta("regua")}>
+                  📏 régua
+                </button>
               </div>
 
-              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && (
+              {ferramentaAtiva === "regua" && (
+                <div className="mapa-ferr" role="group" aria-label="Como medir">
+                  <button type="button" className="chip alvo" aria-pressed={modoRegua === "grade"} onClick={() => setModoRegua("grade")}>
+                    na grade
+                  </button>
+                  <button type="button" className="chip alvo" aria-pressed={modoRegua === "reta"} onClick={() => setModoRegua("reta")}>
+                    em linha reta
+                  </button>
+                </div>
+              )}
+
+              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && (
                 <div className="mapa-ferr" role="group" aria-label="Opções da névoa">
                   <button type="button" className="chip alvo" aria-pressed={modo === "revelar"} onClick={() => setModo("revelar")}>
                     revelar
@@ -467,6 +507,10 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 aoPintar={(nova) => void nevoa.adicionar(nova)}
                 pings={ping.pings}
                 aoPingar={quem ? ping.enviar : undefined}
+                modoRegua={modoRegua}
+                corRegua={quem?.cor}
+                reguas={ping.reguas}
+                aoMedir={quem ? ping.enviarRegua : undefined}
                 pecas={pecas}
                 aoMoverPeca={(id, x, y) => void banco.atualizar(id, { x, y })}
                 aoTocarPeca={setPecaSelecionada}
@@ -476,7 +520,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                   ? "Arraste com um dedo e use a pinça pra dar zoom. Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
                   : ferramentaAtiva === "ping"
                     ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
-                    : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
+                    : ferramentaAtiva === "regua"
+                      ? `Arraste de um ponto a outro: a mesa vê a linha com a distância (${modoRegua === "grade" ? "diagonal vale 1 quadrado, como na regra" : "em linha reta"}). Começando num peão, diz se cabe no deslocamento dele. O valor do quadradinho está em "Grade e névoa".`
+                      : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
               </p>
 
               <div className="mapa-ferr">
