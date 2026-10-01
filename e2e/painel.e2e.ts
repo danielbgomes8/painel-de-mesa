@@ -8,6 +8,7 @@ import {
   criarFicha,
   entrarComoMestre,
   limparSala,
+  mudarFicha,
   pecasDoBanco,
   pngDeTeste,
   porNaIniciativa,
@@ -245,3 +246,84 @@ test("régua: o Mestre mede na grade (diagonal vale 1 quadrado) e o jogador vê 
   await contexto.close();
   expect(erros).toEqual([]);
 });
+
+test("condições no peão: o ícone é desenhado pra mesa, e o do inimigo oculto só o Mestre vê", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  // Vida cheia: jogador a 0 PV ganharia o 💤 sozinho e confundiria a conta.
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 10, hp_max: 10 });
+  await criarFicha("dragao-robo", "Dragão do Robô", { is_npc: true, hp: 50, hp_max: 50 });
+  await porNaIniciativa([
+    { slug: "jogador-robo", name: "Jogador Robô", init: 15 },
+    { slug: "dragao-robo", name: "Dragão do Robô", init: 10 },
+  ]);
+
+  // O canvas não tem texto no DOM: o robô escuta o que é DESENHADO nele.
+  const espiar = () => {
+    const w = window as unknown as { __textos: string[] };
+    w.__textos = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args: Parameters<typeof original>) {
+      w.__textos.push(String(args[0]));
+      return original.apply(this, args);
+    };
+  };
+  await page.addInitScript(espiar);
+  const textosDe = (p: typeof page) => p.evaluate(() => (window as unknown as { __textos: string[] }).__textos);
+  const zerarTextos = (p: typeof page) => p.evaluate(() => ((window as unknown as { __textos: string[] }).__textos = []));
+
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-condicoes.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await page.locator(".fc-sechead", { hasText: "Peões" }).click();
+  await page.getByRole("button", { name: "pôr o grupo no mapa" }).click();
+  await page.getByRole("button", { name: "pôr os inimigos da iniciativa" }).click();
+  await expect.poll(async () => (await pecasDoBanco()).length).toBe(2);
+  // O dragão entrou oculto: a mesa não o vê.
+  expect((await pecasDoBanco()).find((p) => p.slug === "dragao-robo")?.oculto).toBe(true);
+
+  const contexto = await browser.newContext();
+  const jogador = await contexto.newPage();
+  const errosJogador = coletarErros(jogador);
+  await jogador.addInitScript(espiar);
+  await comoJogador(jogador, "jogador-robo");
+  await jogador.goto(`/?sala=${SALA}`);
+  await jogador.getByRole("button", { name: "ver o mapa" }).click();
+  await expect(jogador.locator(".cena-canvas")).toBeVisible();
+  await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+
+  // Cego + exaustão 2 no jogador; Atordoado no dragão (oculto).
+  await mudarFicha("jogador-robo", { cond: { Cego: true }, exh: 2 });
+  await mudarFicha("dragao-robo", { cond: { Atordoado: true } });
+  await expect.poll(async () => (await textosDe(jogador)).includes("🙈")).toBe(true);
+  expect(await textosDe(jogador)).toContain("😫");
+  expect(await textosDe(jogador)).toContain("2");
+  // O Mestre vê o do dragão; a mesa, não (ele está oculto).
+  await expect.poll(async () => (await textosDe(page)).includes("💫")).toBe(true);
+  expect(await textosDe(jogador)).not.toContain("💫");
+
+  // Jogador a 0 PV aparece Inconsciente; tirando tudo, os ícones somem.
+  await zerarTextos(jogador);
+  await mudarFicha("jogador-robo", { cond: {}, exh: 0, hp: 0 });
+  await expect.poll(async () => (await textosDe(jogador)).includes("💤")).toBe(true);
+  expect(await textosDe(jogador)).not.toContain("🙈");
+  await zerarTextos(jogador);
+  await mudarFicha("jogador-robo", { hp: 10 });
+  await expect.poll(async () => (await textosDe(jogador)).includes("JR")).toBe(true);
+  expect(await textosDe(jogador)).not.toContain("💤");
+
+  // A legenda existe, recolhida, e não cita peão nenhum.
+  await expect(jogador.getByText("O que significam os ícones nos peões")).toBeVisible();
+
+  await contexto.close();
+  await apagarPecasDoBanco();
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
+});
+

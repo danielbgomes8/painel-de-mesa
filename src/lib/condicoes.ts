@@ -150,6 +150,32 @@ export const EFEITOS_EXAUSTAO: readonly EfeitoCondicao[] = [
   { titulo: "Descanso longo", texto: "tira 1 nível" },
 ];
 
+/** O desenho de cada condição no peão do mapa: um emoji (reconhecível de longe,
+ *  sem arquivo de imagem pra baixar) sobre uma cor de fundo. As cores separam
+ *  "grupos" de efeito pra bater o olho: roxo = mente, cinza-azul = corpo preso,
+ *  vermelho = perigo, verde = doença. */
+export type IconeDeCondicao = { emoji: string; cor: string };
+
+export const ICONE_CONDICAO: Record<Condicao, IconeDeCondicao> = {
+  Cego: { emoji: "🙈", cor: "#5b5f6b" },
+  Enfeitiçado: { emoji: "💘", cor: "#b5477a" },
+  Surdo: { emoji: "🙉", cor: "#5b5f6b" },
+  Amedrontado: { emoji: "😱", cor: "#7a54b5" },
+  Agarrado: { emoji: "✊", cor: "#8a6d3b" },
+  Incapacitado: { emoji: "🚫", cor: "#a63d33" },
+  Invisível: { emoji: "👻", cor: "#4a7fa8" },
+  Paralisado: { emoji: "⚡", cor: "#b8892a" },
+  Petrificado: { emoji: "🗿", cor: "#6b6659" },
+  Envenenado: { emoji: "🤢", cor: "#4f8a3f" },
+  Caído: { emoji: "🔻", cor: "#a63d33" },
+  Contido: { emoji: "🔗", cor: "#8a6d3b" },
+  Atordoado: { emoji: "💫", cor: "#b8892a" },
+  Inconsciente: { emoji: "💤", cor: "#3f5f9a" },
+};
+
+/** Exaustão não é uma das 14, mas também vai pro peão (com o nível ao lado). */
+export const ICONE_EXAUSTAO: IconeDeCondicao = { emoji: "😫", cor: "#7a5a2e" };
+
 /** Condições ativas de alguém, na ordem dos chips — só as que o app conhece
  *  (um nome estranho gravado no banco não vira etiqueta sem explicação). */
 export function condicoesAtivas(cond: Record<string, boolean> | null | undefined): Condicao[] {

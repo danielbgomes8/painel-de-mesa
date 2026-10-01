@@ -22,6 +22,7 @@ import { BotaoRemover } from "@/components/BotaoRemover";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CenaMapa, type CenaMapaApi, type Ferramenta } from "@/components/CenaMapa";
+import { LegendaIconesPeao } from "@/components/LegendaIconesPeao";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
 
 /**
@@ -140,6 +141,7 @@ export function VisorDaMesa({
                 : "Toque em 📏 medir pra ver a distância em metros."}
             </p>
           )}
+          <LegendaIconesPeao />
         </>
       )}
     </div>
@@ -524,6 +526,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                       ? `Arraste de um ponto a outro: a mesa vê a linha com a distância (${modoRegua === "grade" ? "diagonal vale 1 quadrado, como na regra" : "em linha reta"}). Começando num peão, diz se cabe no deslocamento dele. O valor do quadradinho está em "Grade e névoa".`
                       : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
               </p>
+              <LegendaIconesPeao />
 
               <div className="mapa-ferr">
                 <button type="button" className="btn" disabled={nevoa.regras.length === 0} onClick={() => void nevoa.desfazerUltima()}>

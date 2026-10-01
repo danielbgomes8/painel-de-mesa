@@ -60,6 +60,12 @@ export async function criarFicha(slug: string, nome: string, extra: Record<strin
   if (!r.ok) throw new Error(`não criou a ficha ${nome}: HTTP ${r.status} ${await r.text()}`);
 }
 
+/** Muda colunas de uma ficha direto no banco (o robô não precisa repetir a tela). */
+export async function mudarFicha(slug: string, patch: Record<string, unknown>): Promise<void> {
+  const r = await rest(`characters?room_code=eq.${SALA}&slug=eq.${slug}`, { method: "PATCH", body: JSON.stringify(patch) });
+  if (!r.ok) throw new Error(`não mudou a ficha ${slug}: HTTP ${r.status} ${await r.text()}`);
+}
+
 /** Põe gente na ordem de iniciativa direto no banco (o robô não precisa repetir o formulário). */
 export async function porNaIniciativa(itens: { slug: string; name: string; init: number }[]): Promise<void> {
   const r = await rest(`combat_state?room_code=eq.${SALA}`, {

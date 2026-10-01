@@ -6,12 +6,15 @@ import {
   acharPecaNoPonto,
   diametroDaPeca,
   encaixarNaGrade,
+  iconesDaPeca,
+  iconesVisiveis,
   iniciais,
   montarPecasNaTela,
   nomeDaPeca,
   normalizarPeca,
   pecaVisivel,
   podeMoverPeca,
+  posicoesDosIcones,
   posicoesIniciais,
   type Peca,
   type PecaNaTela,
@@ -148,6 +151,7 @@ describe("clicar num peão", () => {
     podeMover: true,
     deslocamento: null,
     semNevoa: true,
+    icones: [],
   });
 
   it("acha o peão sob o ponto e ignora quem está fora do círculo", () => {
@@ -296,5 +300,92 @@ describe("o que vem do banco", () => {
     expect(normalizarPeca({ id: "a", cena_id: "c", x: "abc", y: 1 })).toBeNull();
     expect(normalizarPeca({ id: "a", x: 1, y: 1 })).toBeNull();
     expect(normalizarPeca(null)).toBeNull();
+  });
+});
+
+describe("condições no peão", () => {
+  const ficha = (extra: Record<string, unknown> = {}) => ({
+    slug: "milo",
+    name: "Milo",
+    is_npc: false,
+    revealed: false,
+    ...extra,
+  });
+
+  it("peão sem ficha (marcador) ou sem condição não leva ícone", () => {
+    expect(iconesDaPeca(undefined)).toEqual([]);
+    expect(iconesDaPeca(ficha())).toEqual([]);
+    expect(iconesDaPeca(ficha({ cond: { Cego: false }, exh: 0, hp: 10 }))).toEqual([]);
+  });
+
+  it("cada condição ligada vira um ícone, na ordem dos chips", () => {
+    const icones = iconesDaPeca(ficha({ cond: { Atordoado: true, Cego: true, Surdo: true }, hp: 10 }));
+    expect(icones.map((i) => i.nome)).toEqual(["Cego", "Surdo", "Atordoado"]);
+    expect(icones.every((i) => i.emoji.length > 0 && /^#[0-9a-f]{6}$/i.test(i.cor))).toBe(true);
+  });
+
+  it("nome estranho gravado no banco não vira ícone sem explicação", () => {
+    expect(iconesDaPeca(ficha({ cond: { Teletransportado: true, Cego: true } })).map((i) => i.nome)).toEqual(["Cego"]);
+  });
+
+  it("jogador a 0 PV aparece Inconsciente, na frente; inimigo a 0 PV não (o PV dele é do Mestre)", () => {
+    const jogador = iconesDaPeca(ficha({ cond: { Cego: true }, hp: 0 }));
+    expect(jogador.map((i) => i.nome)).toEqual(["Inconsciente", "Cego"]);
+    expect(iconesDaPeca(ficha({ is_npc: true, hp: 0 }))).toEqual([]);
+  });
+
+  it("Inconsciente ligado na mão e 0 PV não duplicam", () => {
+    const icones = iconesDaPeca(ficha({ cond: { Inconsciente: true }, hp: 0 }));
+    expect(icones.map((i) => i.nome)).toEqual(["Inconsciente"]);
+  });
+
+  it("a exaustão vai por último, com o nível (no máximo 6)", () => {
+    const icones = iconesDaPeca(ficha({ cond: { Cego: true }, exh: 3 }));
+    expect(icones.map((i) => i.nome)).toEqual(["Cego", "Exaustão"]);
+    expect(icones[1].nivel).toBe(3);
+    expect(iconesDaPeca(ficha({ exh: 9 }))[0].nivel).toBe(6);
+  });
+
+  it("até quatro cabem; com mais, mostra três e o resto vira +N", () => {
+    const tres = iconesDaPeca(ficha({ cond: { Cego: true, Surdo: true, Caído: true } }));
+    expect(iconesVisiveis(tres)).toEqual({ mostrar: tres, extras: 0 });
+    const quatro = iconesDaPeca(ficha({ cond: { Cego: true, Surdo: true, Caído: true, Contido: true } }));
+    expect(iconesVisiveis(quatro).extras).toBe(0);
+    const seis = iconesDaPeca(ficha({ cond: { Cego: true, Surdo: true, Caído: true, Contido: true, Atordoado: true }, exh: 2 }));
+    const { mostrar, extras } = iconesVisiveis(seis);
+    expect(mostrar).toHaveLength(3);
+    expect(extras).toBe(3);
+  });
+
+  it("os ícones ficam sobre a borda, começando no alto à direita, sem encostar um no outro", () => {
+    const r = 40;
+    const raio = 15;
+    const lugares = posicoesDosIcones(4, r, raio);
+    expect(lugares).toHaveLength(4);
+    expect(lugares[0].dx).toBeGreaterThan(0);
+    expect(lugares[0].dy).toBeLessThan(0);
+    for (const l of lugares) expect(Math.hypot(l.dx, l.dy)).toBeCloseTo(r, 6);
+    for (let i = 1; i < lugares.length; i++) {
+      const d = Math.hypot(lugares[i].dx - lugares[i - 1].dx, lugares[i].dy - lugares[i - 1].dy);
+      expect(d).toBeGreaterThanOrEqual(raio * 2 - 1e-6);
+    }
+    expect(posicoesDosIcones(0, r, raio)).toEqual([]);
+  });
+
+  it("o peão que o canvas desenha leva as condições da ficha, pra mesa inteira (inimigo oculto também)", () => {
+    const fichas: { slug: string; name: string; is_npc: boolean; revealed: boolean; cond: Record<string, boolean>; hp: number }[] = [
+      { slug: "milo", name: "Milo", is_npc: false, revealed: false, cond: { Cego: true }, hp: 5 },
+      { slug: "orc", name: "Orc", is_npc: true, revealed: false, cond: { Atordoado: true }, hp: 0 },
+    ];
+    const tela = montarPecasNaTela({
+      pecas: [peca({ id: "a", slug: "milo" }), peca({ id: "b", slug: "orc" }), peca({ id: "c", slug: null })],
+      cena,
+      fichas,
+      vezDe: null,
+      slugsDosJogadores: ["milo"],
+      visao: { mestre: false, meuSlug: null },
+      selecionadaId: null,
+    });
+    expect(tela.map((p) => p.icones.map((i) => i.nome))).toEqual([["Cego"], ["Atordoado"], []]);
   });
 });

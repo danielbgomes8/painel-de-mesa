@@ -13,7 +13,7 @@ import {
   type Vista,
 } from "./cenas";
 import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
-import type { PecaNaTela } from "./pecas";
+import { iconesVisiveis, posicoesDosIcones, type PecaNaTela } from "./pecas";
 import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type ModoRegua, type ReguaNaTela } from "./regua";
 
 /** A névoa é desenhada num canvas à parte, menor que a imagem: pra um mapa de
@@ -135,7 +135,7 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
   }
 
   if (e.pecas && e.pecas.length > 0) {
-    desenharPecas(ctx, e.pecas, e.mestre, e.pecaCoberta ?? (() => false), e.arrasto ?? null);
+    desenharPecas(ctx, e.pecas, e.mestre, e.pecaCoberta ?? (() => false), e.arrasto ?? null, vista.escala);
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -152,6 +152,7 @@ function desenharPecas(
   mestre: boolean,
   coberta: (x: number, y: number) => boolean,
   arrasto: { id: string; x: number; y: number } | null,
+  escala: number,
 ): void {
   for (const p of pecas) {
     const x = arrasto?.id === p.id ? arrasto.x : p.x;
@@ -195,7 +196,60 @@ function desenharPecas(
     ctx.strokeText(p.rotulo, x, y + r * 0.04);
     ctx.fillStyle = "#fff";
     ctx.fillText(p.rotulo, x, y + r * 0.04);
+    desenharIcones(ctx, p, x, y, r, escala);
     ctx.restore();
+  }
+}
+
+/** Fonte de emoji de cada sistema (o `system-ui` sozinho não garante). */
+const FONTE_EMOJI = `"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif`;
+
+/** As condições do peão: bolinhas coloridas com um emoji, sobre a borda, por
+ *  cima de anel de vez e de seleção. Com mais de quatro, o resto vira "+N".
+ *  O tamanho acompanha o peão, mas nunca fica menor que ~7 px na tela (num mapa
+ *  afastado o peão é pequeno e o ícone ainda precisa ser reconhecível) nem
+ *  maior que meio peão. */
+function desenharIcones(ctx: CanvasRenderingContext2D, p: PecaNaTela, x: number, y: number, r: number, escala: number): void {
+  if (p.icones.length === 0) return;
+  const { mostrar, extras } = iconesVisiveis(p.icones);
+  const raio = Math.min(r * 0.55, Math.max(r * 0.38, 7 / escala));
+  const lugares = posicoesDosIcones(mostrar.length + (extras > 0 ? 1 : 0), r, raio);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  const bolinha = (cx: number, cy: number, cor: string) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, raio, 0, Math.PI * 2);
+    ctx.fillStyle = cor;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, raio * 0.16);
+    ctx.strokeStyle = "#fff";
+    ctx.stroke();
+  };
+  mostrar.forEach((icone, i) => {
+    const cx = x + lugares[i].dx;
+    const cy = y + lugares[i].dy;
+    bolinha(cx, cy, icone.cor);
+    ctx.font = `${Math.round(raio * 1.2)}px ${FONTE_EMOJI}`;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(icone.emoji, cx, cy + raio * 0.06);
+    if (icone.nivel) {
+      // O nível da exaustão, pequeno, no canto de baixo à direita da bolinha.
+      ctx.font = `800 ${Math.round(raio * 0.85)}px system-ui, sans-serif`;
+      ctx.lineWidth = Math.max(2, raio * 0.3);
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(String(icone.nivel), cx + raio * 0.7, cy + raio * 0.7);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(String(icone.nivel), cx + raio * 0.7, cy + raio * 0.7);
+    }
+  });
+  if (extras > 0) {
+    const cx = x + lugares[mostrar.length].dx;
+    const cy = y + lugares[mostrar.length].dy;
+    bolinha(cx, cy, "#2b2620");
+    ctx.font = `700 ${Math.round(raio * 0.95)}px system-ui, sans-serif`;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(`+${extras}`, cx, cy + raio * 0.04);
   }
 }
 

@@ -11,6 +11,8 @@
  */
 import { celulaNoPonto, gradeUsavel, ladoDeReferencia, type Cena, type Ponto, type Regiao } from "./cenas";
 import { corDoJogador } from "./ping";
+import { CONDICOES, ICONE_CONDICAO, ICONE_EXAUSTAO, condicoesAtivas } from "./condicoes";
+import { estaCaido } from "./regras";
 
 export type TamanhoPeca = 1 | 2 | 3 | 4;
 
@@ -33,6 +35,16 @@ export type Peca = {
 };
 
 export type NovaPeca = Pick<Peca, "slug" | "nome" | "x" | "y"> & Partial<Pick<Peca, "tamanho" | "cor" | "oculto">>;
+
+/** Uma condição desenhada no peão. */
+export type IconePeca = {
+  /** "Cego", "Exaustão"... — também é o texto de leitor de tela e da legenda. */
+  nome: string;
+  emoji: string;
+  cor: string;
+  /** Só na exaustão: o nível (1 a 6), desenhado pequeno no canto do ícone. */
+  nivel?: number;
+};
 
 /** O que o canvas desenha: já com rótulo, cor e "é a vez dele" calculados. */
 export type PecaNaTela = {
@@ -59,6 +71,8 @@ export type PecaNaTela = {
   deslocamento: number | null;
   /** Aparece mesmo coberto de névoa (o Mestre vê tudo; o jogador vê o próprio). */
   semNevoa: boolean;
+  /** Condições de quem o peão representa, na ordem de `iconesDaPeca`. */
+  icones: IconePeca[];
 };
 
 export const COR_PECA_INIMIGO = "#c0443a";
@@ -201,7 +215,65 @@ export function iniciais(nome: string): string {
   return (palavras[0][0] + palavras[1][0]).toUpperCase();
 }
 
-type FichaParaPeca = { slug: string; name: string; is_npc: boolean; revealed: boolean; speed?: number };
+type FichaParaPeca = {
+  slug: string;
+  name: string;
+  is_npc: boolean;
+  revealed: boolean;
+  speed?: number;
+  /** Pra desenhar as condições no peão; sem isso o peão sai limpo. */
+  cond?: Record<string, boolean>;
+  exh?: number;
+  hp?: number;
+};
+
+/** Os ícones de condição que a mesa vê no peão. Mesma regra da ordem de
+ *  iniciativa e do telão: valem pra todo mundo ver, inimigo oculto inclusive
+ *  (o log já anuncia "Um inimigo ficou Atordoado", e é o que decide se o
+ *  ataque tem vantagem). Jogador a 0 PV ganha o Inconsciente, que é a condição
+ *  que ele tem pelas regras mesmo sem ninguém ligar; inimigo a 0 PV não entra
+ *  nisso — o PV dele é informação do Mestre. Marcador sem ficha não tem nada. */
+export function iconesDaPeca(ficha: FichaParaPeca | undefined): IconePeca[] {
+  if (!ficha) return [];
+  const nomes = new Set<string>(condicoesAtivas(ficha.cond));
+  if (!ficha.is_npc && typeof ficha.hp === "number" && estaCaido(ficha.hp)) nomes.add("Inconsciente");
+  // Inconsciente primeiro (é o que mais pesa); depois a ordem dos chips.
+  const lista: IconePeca[] = [];
+  for (const nome of ["Inconsciente", ...CONDICOES]) {
+    if (!nomes.delete(nome)) continue;
+    const icone = ICONE_CONDICAO[nome as keyof typeof ICONE_CONDICAO];
+    lista.push({ nome, ...icone });
+  }
+  const exaustao = Math.floor(ficha.exh ?? 0);
+  if (exaustao > 0) lista.push({ nome: "Exaustão", ...ICONE_EXAUSTAO, nivel: Math.min(exaustao, 6) });
+  return lista;
+}
+
+/** Quantos ícones cabem em volta do peão antes de virar "+N". */
+export const ICONES_MAXIMOS_NO_PEAO = 4;
+
+/** Quais ícones desenhar e quantos ficaram de fora: com mais de 4, mostra 3 e o
+ *  resto vira um "+N". */
+export function iconesVisiveis(icones: readonly IconePeca[]): { mostrar: IconePeca[]; extras: number } {
+  if (icones.length <= ICONES_MAXIMOS_NO_PEAO) return { mostrar: [...icones], extras: 0 };
+  const mostrar = icones.slice(0, ICONES_MAXIMOS_NO_PEAO - 1);
+  return { mostrar, extras: icones.length - mostrar.length };
+}
+
+/** Onde cada ícone fica, em relação ao centro do peão, sobre a borda (raio `r`):
+ *  começa no alto à direita e vai se afastando pra esquerda por cima, sem um
+ *  encostar no outro (o espaçamento do arco é o diâmetro do ícone). `raioIcone`
+ *  é o raio de cada ícone. */
+export function posicoesDosIcones(quantos: number, r: number, raioIcone: number): { dx: number; dy: number }[] {
+  if (quantos <= 0 || r <= 0) return [];
+  // Ângulo entre dois ícones vizinhos pra a corda na borda ser o diâmetro dele.
+  const passo = 2 * Math.asin(Math.min(1, raioIcone / r));
+  const inicio = -Math.PI / 4; // alto à direita (o eixo y da tela cresce pra baixo)
+  return Array.from({ length: quantos }, (_, i) => {
+    const a = inicio - i * passo;
+    return { dx: Math.cos(a) * r, dy: Math.sin(a) * r };
+  });
+}
 
 /** O nome que esta pessoa pode ler no peão: o do marcador, o da ficha, ou "?"
  *  quando é um inimigo que a mesa ainda não conhece. */
@@ -242,6 +314,7 @@ export function montarPecasNaTela(entrada: {
       podeMover: podeMoverPeca(p, visao),
       deslocamento: podeMoverPeca(p, visao) && ficha && typeof ficha.speed === "number" && ficha.speed > 0 ? ficha.speed : null,
       semNevoa: visao.mestre || (p.slug !== null && p.slug === visao.meuSlug),
+      icones: iconesDaPeca(ficha),
     };
   });
 }

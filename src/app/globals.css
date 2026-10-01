@@ -3041,6 +3041,26 @@ input.fj-score:focus-visible {
   font-weight: 600;
 }
 
+/* Bolinha de condição na legenda: o mesmo desenho do peão no mapa. */
+.icone-cond {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  font-size: 13px;
+  line-height: 1;
+  flex: none;
+}
+.legenda-icones .condexplica {
+  margin-top: 6px;
+}
+.legenda-icones > p {
+  margin: 8px 0 0;
+}
+
 /* Aviso "tem um mapa na mesa" (BannerMapaNaMesa): mais discreto que o "É a sua
    vez!" — borda de destaque em vez de fundo cheio. */
 .mapabanner {

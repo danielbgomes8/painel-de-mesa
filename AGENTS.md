@@ -789,8 +789,8 @@ primeiros itens; os outros estão na lista do fim desta seção.
 
 O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
 **1 está construída** (cena + grade + névoa ao vivo + telão + celular), a **2
-está quase toda** (ping, peões básicos e régua prontos; faltam as condições
-como ícone no peão) e a 3 e a 4 ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
+está completa** (ping, peões, régua e condições como ícone no peão) e a 3 e a 4
+ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
 essencial; peão é "bom ter"** (a mesa não vai usar muito):
 
 1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
@@ -946,6 +946,28 @@ Decisões que não estão no código à primeira vista:
   m" ela passava da largura de um celular (achado na foto). Conferido pelo robô
   (o canvas não tem texto no DOM: o robô espia `fillText`): 5 quadrados = 7,5 m,
   diagonal de 3 = 4,5 m, em reta 4,2 quadrados = 6,4 m, e o jogador vê o mesmo.
+- **Condições no peão** (`ICONE_CONDICAO` em `lib/condicoes.ts`, `iconesDaPeca` /
+  `iconesVisiveis` / `posicoesDosIcones` em `lib/pecas.ts`, `desenharIcones` em
+  `lib/desenharCena.ts`, `LegendaIconesPeao.tsx`; sem migration): cada condição
+  ligada na ficha vira uma bolinha colorida com emoji sobre a borda do peão
+  (começa no alto à direita e vai pra esquerda por cima, sem encostar uma na
+  outra); exaustão é 😫 com o nível pequeno no canto; no máximo 4 bolinhas — com
+  mais, 3 e um "+N". Vale pro telão, celulares e Mestre, porque vem da ficha (a
+  mesma fonte da iniciativa): mudar a condição em qualquer lugar muda o peão ao
+  vivo. **Privacidade igual à da ordem de iniciativa e do telão:** condição de
+  inimigo aparece pra todos ("Um inimigo ficou Atordoado" já está no log), mas
+  **jogador a 0 PV ganha 💤 Inconsciente e inimigo a 0 PV não** (o PV dele é do
+  Mestre); peão oculto ou sob a névoa continua sem aparecer, ícones inclusive
+  (o robô confere que o ícone do dragão oculto é desenhado pro Mestre e NÃO pro
+  jogador). Nome estranho gravado em `cond` não vira ícone. O tamanho da
+  bolinha acompanha o peão (38% do raio), com piso de ~7 px na tela e teto de
+  55% do raio. **A legenda ("O que significam os ícones nos peões") fica
+  recolhida embaixo do mapa** e só explica o desenho — não lista peão nenhum,
+  senão entregaria quem está oculto. Não dá pra tocar num peão alheio pra ver a
+  condição (o toque só pega peão que a pessoa pode mover): por isso a legenda.
+  O emoji depende da fonte do aparelho (Emoji 12 ou mais; nada baixa). Se um dia
+  algum ficar igual a outro, o teste de `condicoes.test.ts` confere que os 15
+  emojis são distintos.
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).

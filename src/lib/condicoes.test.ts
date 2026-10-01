@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { CONDICOES, EFEITOS_CONDICAO, EFEITOS_EXAUSTAO, condicoesAtivas, textoPrazo } from "./condicoes";
+import {
+  CONDICOES,
+  EFEITOS_CONDICAO,
+  EFEITOS_EXAUSTAO,
+  ICONE_CONDICAO,
+  ICONE_EXAUSTAO,
+  condicoesAtivas,
+  textoPrazo,
+} from "./condicoes";
 import { CONDICOES_QUE_QUEBRAM_CONCENTRACAO } from "./regras";
 
 describe("o que cada condição faz", () => {
@@ -46,5 +54,17 @@ describe("o que cada condição faz", () => {
   it("prazo no singular e no plural", () => {
     expect(textoPrazo(1)).toBe("1 rodada");
     expect(textoPrazo(3)).toBe("3 rodadas");
+  });
+});
+
+describe("ícone de cada condição no peão", () => {
+  it("toda condição tem emoji e cor, e nenhuma se parece com outra (senão o ícone não diz qual é)", () => {
+    const emojis = [...CONDICOES.map((n) => ICONE_CONDICAO[n].emoji), ICONE_EXAUSTAO.emoji];
+    expect(new Set(emojis).size).toBe(emojis.length);
+    for (const nome of CONDICOES) {
+      expect(ICONE_CONDICAO[nome].emoji.trim(), nome).not.toBe("");
+      expect(ICONE_CONDICAO[nome].cor, nome).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+    expect(ICONE_EXAUSTAO.cor).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });
