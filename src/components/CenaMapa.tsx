@@ -28,17 +28,20 @@ import {
   desenharCena,
   desenharNevoa,
   desenharPings,
+  desenharAreas,
   desenharReguas,
   escalaDaNevoa,
   type FormaDesenhavel,
+  type PreviaDeArea,
   type PreviaDeRegua,
 } from "@/lib/desenharCena";
 import { REGUA_MINIMA_PX, medirRegua, type ModoRegua, type ReguaNaTela } from "@/lib/regua";
+import { MODELO_INICIAL, cruzamentoMaisPerto, type AreaNaTela, type ModeloArea } from "@/lib/area";
 import { COR_PING_MESTRE } from "@/lib/ping";
 import { acharPecaNoPonto, encaixarNaGrade, type PecaNaTela } from "@/lib/pecas";
 import { PING_TOLERANCIA_PX, PING_TOQUE_LONGO_MS, type PingNaTela } from "@/lib/ping";
 
-export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua";
+export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua" | "area";
 
 /** O que o Mestre pode pedir ao mapa de fora (botões "enquadrar", "levar a mesa"). */
 export type CenaMapaApi = {
@@ -75,6 +78,11 @@ type Props = {
   corRegua?: string;
   reguas?: readonly ReguaNaTela[];
   aoMedir?: (a: Ponto, b: Ponto, modo: ModoRegua, deslocamento: number | null) => void;
+  /** Modelos de magia: a forma e o tamanho escolhidos, as áreas na tela e o que
+   *  fazer quando soltar (mostrar pra mesa). Só desenha com a ferramenta "area". */
+  modeloArea?: ModeloArea;
+  areas?: readonly AreaNaTela[];
+  aoAreaar?: (modelo: ModeloArea, origem: Ponto, direcao: Ponto) => void;
   /** Peões da cena (já calculados pro ponto de vista de quem olha). */
   pecas?: readonly PecaNaTela[];
   /** Soltou um peão num lugar novo (já encaixado na grade). */
@@ -85,7 +93,7 @@ type Props = {
 };
 
 type Pintura = {
-  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua">;
+  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua" | "area">;
   modo: ModoNevoa;
   raio: number;
   pontos: Ponto[];
@@ -122,6 +130,9 @@ export function CenaMapa({
   corRegua = COR_PING_MESTRE,
   reguas,
   aoMedir,
+  modeloArea = MODELO_INICIAL,
+  areas,
+  aoAreaar,
   pecas,
   aoMoverPeca,
   aoTocarPeca,
@@ -149,13 +160,14 @@ export function CenaMapa({
   /** Onde desenhar o peão mexido, até as propriedades novas chegarem (sem pulo). */
   const arrastoVisual = useRef<{ id: string; x: number; y: number } | null>(null);
   /** Régua sendo arrastada agora (pontos em px do mapa; `telaA` pra saber se é toque ou medida). */
+  const areaViva = useRef<{ o: Ponto; d: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
   const reguaViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number }; desloc: number | null } | null>(null);
   /** "Este ponto está na névoa?" guardado, pra não reler o canvas da névoa a cada quadro. */
   const coberturaRef = useRef(new Map<string, boolean>());
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, pecas, aoMoverPeca, aoTocarPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, pecas, aoMoverPeca, aoTocarPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, pecas, aoMoverPeca, aoTocarPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, pecas, aoMoverPeca, aoTocarPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -213,7 +225,10 @@ export function CenaMapa({
     const agora = performance.now();
     const viva = reguaViva.current;
     const previa: PreviaDeRegua | null = viva ? { a: viva.a, b: viva.b, modo: p.modoRegua, cor: p.corRegua, desloc: viva.desloc } : null;
+    const vivaArea = areaViva.current;
+    const previaArea: PreviaDeArea | null = vivaArea ? { modelo: p.modeloArea, o: vivaArea.o, d: vivaArea.d, cor: p.corRegua } : null;
     return (
+      desenharAreas(ctx, p.cena, p.areas ?? [], previaArea, vistaRef.current, w, h, dpr, agora) +
       desenharPings(ctx, p.pings ?? [], vistaRef.current, w, h, dpr, agora) +
       desenharReguas(ctx, p.cena, p.reguas ?? [], previa, vistaRef.current, w, h, dpr, agora)
     );
@@ -285,7 +300,7 @@ export function CenaMapa({
   // Ping ou régua nova (de quem for): começa a animar.
   useEffect(() => {
     pedirQuadro();
-  }, [pings, reguas, pedirQuadro]);
+  }, [pings, reguas, areas, pedirQuadro]);
 
   // O relógio do toque longo não pode sobreviver ao componente.
   useEffect(
@@ -424,6 +439,7 @@ export function CenaMapa({
       arrastoPeca.current = null;
       arrastoVisual.current = null;
       reguaViva.current = null;
+      areaViva.current = null;
       pintura.current = null;
       previaRef.current = null;
       const [a, b] = [...dedos.current.values()];
@@ -444,6 +460,17 @@ export function CenaMapa({
       const [mx, my] = noMapa(pos);
       const peao = acharPecaNoPonto((p.pecas ?? []).filter((x) => x.deslocamento !== null), mx, my);
       reguaViva.current = { a: [mx, my], b: [mx, my], telaA: pos, telaB: pos, desloc: peao?.deslocamento ?? null };
+      semArrastar.current = true;
+      pedirQuadro();
+      return;
+    }
+
+    // Modelo de magia: o toque marca a origem (encaixada no cruzamento da grade);
+    // arrastar aponta a direção. Na esfera a origem é o centro e segue o dedo.
+    if (p.ferramenta === "area" && p.aoAreaar) {
+      const ponto = noMapa(pos);
+      const origem = cruzamentoMaisPerto(p.cena, ponto);
+      areaViva.current = { o: origem, d: p.modeloArea.forma === "esfera" ? origem : ponto, telaA: pos, telaB: pos };
       semArrastar.current = true;
       pedirQuadro();
       return;
@@ -473,7 +500,7 @@ export function CenaMapa({
 
     const ferr = p.ferramenta;
     const pintavel =
-      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
+      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && ferr !== "area" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
     if (!pintavel && p.aoPingar) {
       // Sem ferramenta de pintura em uso: dedo parado por um instante vira ping.
       cancelarToqueLongo();
@@ -548,6 +575,21 @@ export function CenaMapa({
     if (rv) {
       rv.b = noMapa(agora);
       rv.telaB = agora;
+      pedirQuadro();
+      return;
+    }
+
+    // Arrastando um modelo de magia.
+    const av = areaViva.current;
+    if (av) {
+      const ponto = noMapa(agora);
+      if (p.modeloArea.forma === "esfera") {
+        av.o = cruzamentoMaisPerto(p.cena, ponto);
+        av.d = av.o;
+      } else {
+        av.d = ponto;
+      }
+      av.telaB = agora;
       pedirQuadro();
       return;
     }
@@ -627,6 +669,17 @@ export function CenaMapa({
         pedirQuadro();
         return;
       }
+      const av = areaViva.current;
+      if (av) {
+        areaViva.current = null;
+        const p = propsRef.current;
+        // A esfera vale com um toque (cai onde está o dedo); cone, cubo e linha
+        // precisam de uma direção, então um toque simples não conta.
+        const arrastou = Math.hypot(av.telaB.x - av.telaA.x, av.telaB.y - av.telaA.y) >= REGUA_MINIMA_PX;
+        if (!cancelado && (p.modeloArea.forma === "esfera" || arrastou)) p.aoAreaar?.(p.modeloArea, av.o, av.d);
+        pedirQuadro();
+        return;
+      }
       const ar = arrastoPeca.current;
       if (ar) {
         arrastoPeca.current = null;
@@ -649,13 +702,13 @@ export function CenaMapa({
     }
   }
 
-  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua";
+  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua" && ferramenta !== "area";
   return (
     <div ref={caixaRef} className="cena-caixa">
       <canvas
         ref={canvasRef}
         className="cena-canvas"
-        style={{ cursor: !interativo ? "default" : pintando || ferramenta === "regua" ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
+        style={{ cursor: !interativo ? "default" : pintando || ferramenta === "regua" || ferramenta === "area" ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
         role="img"
         aria-label={`Mapa ${cena.nome || "sem nome"}`}
         onPointerDown={aoPressionar}

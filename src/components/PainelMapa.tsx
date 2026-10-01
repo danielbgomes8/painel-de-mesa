@@ -8,6 +8,7 @@ import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { montarPecasNaTela, posicoesIniciais, type TamanhoPeca } from "@/lib/pecas";
 import type { ModoRegua } from "@/lib/regua";
+import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
 import {
   cameraValida,
   gradePxParaQuadrados,
@@ -22,6 +23,7 @@ import { BotaoRemover } from "@/components/BotaoRemover";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CenaMapa, type CenaMapaApi, type Ferramenta } from "@/components/CenaMapa";
+import { ControlesDeArea } from "@/components/ControlesDeArea";
 import { LegendaIconesPeao } from "@/components/LegendaIconesPeao";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
 
@@ -52,8 +54,11 @@ export function VisorDaMesa({
   const ping = usePing(cena, quem);
   const banco = usePecas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
-  const [medindo, setMedindo] = useState(false);
+  // O que o toque faz no mapa: mexer, medir (régua) ou marcar uma área de magia.
+  const [uso, setUso] = useState<"mover" | "regua" | "area">("mover");
+  const medindo = uso === "regua";
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
+  const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
   // Sempre do ponto de vista de jogador: o telão e os celulares nunca veem o
   // nome de um inimigo ainda não revelado (ver lib/pecas.ts).
   const pecas = useMemo(
@@ -89,11 +94,14 @@ export function VisorDaMesa({
         seguirCamera
         pings={ping.pings}
         aoPingar={quem ? ping.enviar : undefined}
-        ferramenta={medindo ? "regua" : "mover"}
+        ferramenta={uso}
         modoRegua={modoRegua}
         corRegua={quem?.cor}
         reguas={ping.reguas}
         aoMedir={quem ? ping.enviarRegua : undefined}
+        modeloArea={modeloArea}
+        areas={ping.areas}
+        aoAreaar={quem ? ping.enviarArea : undefined}
         pecas={pecas}
         aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
       />
@@ -108,9 +116,14 @@ export function VisorDaMesa({
                 </button>
               )}
               {quem && (
-                <button type="button" className="chip alvo" aria-pressed={medindo} onClick={() => setMedindo((v) => !v)}>
-                  📏 medir
-                </button>
+                <>
+                  <button type="button" className="chip alvo" aria-pressed={medindo} onClick={() => setUso(medindo ? "mover" : "regua")}>
+                    📏 medir
+                  </button>
+                  <button type="button" className="chip alvo" aria-pressed={uso === "area"} onClick={() => setUso(uso === "area" ? "mover" : "area")}>
+                    ✨ área
+                  </button>
+                </>
               )}
               <button type="button" className="btn" onClick={() => mapaRef.current?.reenquadrar()}>
                 voltar à visão da mesa
@@ -127,6 +140,7 @@ export function VisorDaMesa({
               </button>
             </div>
           )}
+          {uso === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
           {banco.aviso && (
             <p className="mapa-erro" role="alert">
               {banco.aviso}
@@ -138,7 +152,9 @@ export function VisorDaMesa({
               <b>Sua cor.</b> Segure o dedo parado no mapa pra mostrar um ponto pra todo mundo: o pulso aparece com o seu
               nome na TV e nos outros celulares. {medindo
                 ? "Medindo: arraste de um ponto a outro. Começando no seu peão, diz se cabe no seu deslocamento."
-                : "Toque em 📏 medir pra ver a distância em metros."}
+                : uso === "area"
+                  ? "Área de magia: escolha a forma e o tamanho e arraste no mapa. A mesa vê a figura por alguns segundos."
+                  : "Toque em 📏 medir pra ver a distância em metros, ou em ✨ área pra mostrar o alcance de uma magia."}
             </p>
           )}
           <LegendaIconesPeao />
@@ -252,6 +268,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const banco = usePecas(cena?.id ?? null, codigo);
   const [pecaSelecionada, setPecaSelecionada] = useState<string | null>(null);
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
+  const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
   const [nomeMarcador, setNomeMarcador] = useState("");
   const pecas = useMemo(
     () =>
@@ -460,7 +477,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "regua"} onClick={() => setFerramenta("regua")}>
                   📏 régua
                 </button>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "area"} onClick={() => setFerramenta("area")}>
+                  ✨ área
+                </button>
               </div>
+
+              {ferramentaAtiva === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
 
               {ferramentaAtiva === "regua" && (
                 <div className="mapa-ferr" role="group" aria-label="Como medir">
@@ -473,7 +495,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 </div>
               )}
 
-              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && (
+              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && ferramentaAtiva !== "area" && (
                 <div className="mapa-ferr" role="group" aria-label="Opções da névoa">
                   <button type="button" className="chip alvo" aria-pressed={modo === "revelar"} onClick={() => setModo("revelar")}>
                     revelar
@@ -513,6 +535,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 corRegua={quem?.cor}
                 reguas={ping.reguas}
                 aoMedir={quem ? ping.enviarRegua : undefined}
+                modeloArea={modeloArea}
+                areas={ping.areas}
+                aoAreaar={quem ? ping.enviarArea : undefined}
                 pecas={pecas}
                 aoMoverPeca={(id, x, y) => void banco.atualizar(id, { x, y })}
                 aoTocarPeca={setPecaSelecionada}
@@ -522,7 +547,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                   ? "Arraste com um dedo e use a pinça pra dar zoom. Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
                   : ferramentaAtiva === "ping"
                     ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
-                    : ferramentaAtiva === "regua"
+                    : ferramentaAtiva === "area"
+                      ? "Escolha a forma e o tamanho e arraste no mapa: a origem encaixa no canto do quadradinho e a mesa vê a figura por alguns segundos, com o seu nome. Esfera: toque onde cai o centro. Cone, cubo e linha: arraste pra onde apontam."
+                      : ferramentaAtiva === "regua"
                       ? `Arraste de um ponto a outro: a mesa vê a linha com a distância (${modoRegua === "grade" ? "diagonal vale 1 quadrado, como na regra" : "em linha reta"}). Começando num peão, diz se cabe no deslocamento dele. O valor do quadradinho está em "Grade e névoa".`
                       : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
               </p>

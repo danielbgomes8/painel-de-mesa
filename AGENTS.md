@@ -789,8 +789,9 @@ primeiros itens; os outros estão na lista do fim desta seção.
 
 O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
 **1 está construída** (cena + grade + névoa ao vivo + telão + celular), a **2
-está completa** (ping, peões, régua e condições como ícone no peão) e a 3 e a 4
-ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
+está completa** (ping, peões, régua e condições como ícone no peão), a **4 está
+começada** (modelos de magia prontos; faltam desenhos e notas no mapa) e a 3
+(paredes e visão) ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
 essencial; peão é "bom ter"** (a mesa não vai usar muito):
 
 1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
@@ -968,6 +969,35 @@ Decisões que não estão no código à primeira vista:
   O emoji depende da fonte do aparelho (Emoji 12 ou mais; nada baixa). Se um dia
   algum ficar igual a outro, o teste de `condicoes.test.ts` confere que os 15
   emojis são distintos.
+- **Modelos de magia** (`lib/area.ts`, `ControlesDeArea.tsx`, `desenharAreas` em
+  `lib/desenharCena.ts`, evento `area` do canal `ping:<cena>`; sem migration):
+  botão "✨ área" do Mestre (ao lado do ping e da régua) e do jogador (ao lado de
+  "📏 medir"). Escolhe cone, esfera, cubo ou linha, o tamanho em metros (botões
+  prontos + um campo "outro") e, na linha, a largura; arrasta no mapa e a MESA
+  INTEIRA vê a figura por 9 s, com o nome de quem marcou ("Mestre: Esfera · raio
+  6 m"). **Formas conferidas no texto bruto do Rules Glossary das Regras
+  Gratuitas 2024** (Area of Effect, Cone, Cube, Line, Sphere): o cone tem largura
+  igual à distância da ponta (é um triângulo de base = comprimento); o cubo parte
+  do MEIO de uma face e o tamanho é o lado; a esfera tem a origem no CENTRO e o
+  tamanho é o raio (o cilindro, visto de cima, é o mesmo círculo); a linha leva
+  comprimento e largura (1,5 m = 5 pés é o comum). A origem encaixa no
+  CRUZAMENTO da grade (a regra põe a origem num ponto, e o canto de quadradinho é
+  onde as mesas põem); a direção é livre. Esfera vale com um toque (o centro segue
+  o dedo); cone, cubo e linha precisam de arrasto — um toque simples não conta,
+  como na régua. Como na régua, **o pacote leva metros, não pixels**: quem recebe
+  converte pela grade da PRÓPRIA cena (`formaNoMapa`), então zoom e tamanho de tela
+  não entram na conta e ninguém manda figura de tamanho falso; forma, tamanho,
+  pontos e cor passam por `validarArea`. **Cada pessoa tem uma figura por vez**
+  (`adicionarArea` troca a anterior dela): empilhadas, as etiquetas ficavam umas
+  por cima das outras (achado na foto). A figura é desenhada em coordenadas do
+  mapa (cobre o que cobre de verdade em qualquer zoom), abaixo de pings e réguas
+  e acima dos peões; não esconde nem revela nada, então vale também sobre névoa.
+  **Fora daqui:** a emanação de 2024 (a área acompanha uma criatura) — ela se mexe
+  com o peão e fica pra depois — e contar quem está dentro (revelaria peão oculto).
+  A etiqueta da régua foi extraída pra `desenharEtiqueta` e as duas usam a mesma.
+  O robô marca as quatro formas e confere pelo `fillText` que Mestre e jogador
+  veem "Mestre: Cone · 9 m" etc.; **a barra de tamanhos muda de altura conforme a
+  forma e empurra o mapa — o robô mede a posição do canvas a cada arrasto**.
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).

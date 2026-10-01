@@ -15,6 +15,7 @@ import {
 import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
 import { iconesVisiveis, posicoesDosIcones, type PecaNaTela } from "./pecas";
 import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type ModoRegua, type ReguaNaTela } from "./regua";
+import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type ModeloArea } from "./area";
 
 /** A névoa é desenhada num canvas à parte, menor que a imagem: pra um mapa de
  *  3000 px, 2048 já é mais do que a tela mostra, e poupa memória no celular. */
@@ -366,6 +367,111 @@ function desenharSeta(ctx: CanvasRenderingContext2D, x: number, y: number, angul
   ctx.restore();
 }
 
+/** Caixinha escura com texto (uma linha por item de `linhas`), acima do ponto
+ *  `(ax, ay)` da tela e sem sair dela. Se a etiqueta for mais larga que a tela
+ *  (celular pequeno) a letra encolhe, e quando ocupa a tela toda fica centrada. */
+function desenharEtiqueta(
+  ctx: CanvasRenderingContext2D,
+  linhas: readonly string[],
+  ax: number,
+  ay: number,
+  larguraTela: number,
+  alturaTela: number,
+  cor: string,
+): void {
+  let fonte = 13;
+  let largura = 0;
+  for (; fonte >= 9; fonte--) {
+    ctx.font = `600 ${fonte}px system-ui, sans-serif`;
+    largura = Math.max(...linhas.map((l) => ctx.measureText(l).width)) + 18;
+    if (largura <= larguraTela - 8) break;
+  }
+  const alturaEtiqueta = linhas.length * (fonte + 6) + 8;
+  const cx = largura >= larguraTela - 8 ? larguraTela / 2 : Math.min(larguraTela - largura / 2 - 4, Math.max(largura / 2 + 4, ax));
+  const cy = Math.min(alturaTela - alturaEtiqueta / 2 - 4, Math.max(alturaEtiqueta / 2 + 4, ay - alturaEtiqueta / 2));
+  ctx.fillStyle = "rgba(0,0,0,0.82)";
+  ctx.strokeStyle = cor;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(cx - largura / 2, cy - alturaEtiqueta / 2, largura, alturaEtiqueta, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  linhas.forEach((l, k) => ctx.fillText(l, cx, cy - alturaEtiqueta / 2 + 4 + (k + 0.5) * (fonte + 6)));
+}
+
+/** A área de magia que está sendo arrastada agora neste aparelho (ainda não enviada). */
+export type PreviaDeArea = { modelo: ModeloArea; o: Ponto; d: Ponto; cor: string };
+
+/** Desenha os modelos de magia (e a prévia do que está sendo arrastado) sobre o
+ *  mapa: a figura em cor translúcida com contorno, a origem marcada e uma
+ *  etiqueta ("Mestre: Esfera · raio 6 m"). Em coordenadas do mapa, então a figura
+ *  cobre o que cobre de verdade, em qualquer zoom. Devolve quantas estão vivas,
+ *  pro laço de quadros continuar. */
+export function desenharAreas(
+  ctx: CanvasRenderingContext2D,
+  cena: Pick<Cena, "grade_px" | "metros">,
+  areas: readonly AreaNaTela[],
+  previa: PreviaDeArea | null,
+  vista: Vista,
+  larguraTela: number,
+  alturaTela: number,
+  dpr: number,
+  agora: number,
+): number {
+  let vivas = 0;
+  const desenhar = (a: { forma: ModeloArea["forma"]; o: Ponto; d: Ponto; metros: number; largura: number; cor: string; de?: string }, opacidade: number) => {
+    const figura = formaNoMapa(cena, a);
+    ctx.setTransform(dpr * vista.escala, 0, 0, dpr * vista.escala, dpr * vista.tx, dpr * vista.ty);
+    ctx.beginPath();
+    if (figura.tipo === "circulo") {
+      ctx.arc(figura.centro[0], figura.centro[1], figura.raio, 0, Math.PI * 2);
+    } else {
+      figura.pontos.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+      ctx.closePath();
+    }
+    ctx.globalAlpha = opacidade * 0.3;
+    ctx.fillStyle = a.cor;
+    ctx.fill();
+    ctx.globalAlpha = opacidade;
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 5 / vista.escala;
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    ctx.stroke();
+    ctx.lineWidth = 2.5 / vista.escala;
+    ctx.strokeStyle = a.cor;
+    ctx.stroke();
+
+    // Origem e etiqueta, em coordenadas da tela (tamanho fixo em qualquer zoom).
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const [ox, oy] = mapaParaTela(vista, a.o[0], a.o[1]);
+    ctx.beginPath();
+    ctx.arc(ox, oy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = a.cor;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#000";
+    ctx.stroke();
+    const pontos = figura.tipo === "circulo" ? [[figura.centro[0], figura.centro[1] - figura.raio]] : figura.pontos;
+    const telaDos = pontos.map(([x, y]) => mapaParaTela(vista, x, y));
+    const topo = Math.min(...telaDos.map((q) => q[1]));
+    const meio = telaDos.reduce((soma, q) => soma + q[0], 0) / telaDos.length;
+    desenharEtiqueta(ctx, [(a.de ? `${a.de}: ` : "") + rotuloDaArea(a)], meio, topo - 8, larguraTela, alturaTela, a.cor);
+  };
+  for (const a of areas) {
+    const opacidade = opacidadeDaArea(agora - a.chegouEm);
+    if (opacidade === null) continue;
+    vivas++;
+    desenhar(a, opacidade);
+  }
+  if (previa) desenhar({ ...previa.modelo, o: previa.o, d: previa.d, cor: previa.cor }, 1);
+  ctx.globalAlpha = 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return vivas;
+}
+
 /** A régua que está sendo arrastada agora neste aparelho (ainda não enviada). */
 export type PreviaDeRegua = { a: Ponto; b: Ponto; modo: ModoRegua; cor: string; desloc: number | null };
 
@@ -425,32 +531,10 @@ export function desenharReguas(
       ctx.strokeStyle = "#000";
       ctx.stroke();
     }
-    // Etiqueta: a medida numa linha e, se houver, "cabe/passa" na outra. Se ainda
-    // assim for mais larga que a tela (celular pequeno), a letra encolhe.
     const { principal, detalhe } = partesDoRotulo(m, r.desloc);
     const linhas = [(r.de ? `${r.de}: ` : "") + principal, ...(detalhe ? [detalhe] : [])];
-    let fonte = 13;
-    let largura = 0;
-    for (; fonte >= 9; fonte--) {
-      ctx.font = `600 ${fonte}px system-ui, sans-serif`;
-      largura = Math.max(...linhas.map((l) => ctx.measureText(l).width)) + 18;
-      if (largura <= larguraTela - 8) break;
-    }
-    const alturaEtiqueta = linhas.length * (fonte + 6) + 8;
-    // No meio da linha, sem sair da tela (e centrada quando ocupa a tela toda).
-    const cx = largura >= larguraTela - 8 ? larguraTela / 2 : Math.min(larguraTela - largura / 2 - 4, Math.max(largura / 2 + 4, (x1 + x2) / 2));
-    const cy = Math.min(alturaTela - alturaEtiqueta / 2 - 4, Math.max(alturaEtiqueta / 2 + 4, (y1 + y2) / 2 - 10 - alturaEtiqueta / 2));
-    ctx.fillStyle = "rgba(0,0,0,0.82)";
-    ctx.strokeStyle = r.cor;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(cx - largura / 2, cy - alturaEtiqueta / 2, largura, alturaEtiqueta, 8);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    linhas.forEach((l, k) => ctx.fillText(l, cx, cy - alturaEtiqueta / 2 + 4 + (k + 0.5) * (fonte + 6)));
+    // No meio da linha, sem sair da tela.
+    desenharEtiqueta(ctx, linhas, (x1 + x2) / 2, (y1 + y2) / 2 - 10, larguraTela, alturaTela, r.cor);
   };
   for (const r of reguas) {
     const opacidade = opacidadeDaRegua(agora - r.chegouEm);

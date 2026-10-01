@@ -21,6 +21,15 @@ import {
   type ReguaNaTela,
   type ReguaRecebida,
 } from "@/lib/regua";
+import {
+  AREA_DURACAO_MS,
+  adicionarArea,
+  areasAtivas,
+  validarArea,
+  type AreaNaTela,
+  type AreaRecebida,
+  type ModeloArea,
+} from "@/lib/area";
 import type { Ponto } from "@/lib/cenas";
 
 /** Quem está pingando neste aparelho: o nome que aparece no mapa e a cor. */
@@ -35,6 +44,10 @@ export type Pings = {
   reguas: ReguaNaTela[];
   /** Mostra pra mesa a régua de `a` até `b`; `desloc` = deslocamento (m) de quem foi medido. */
   enviarRegua: (a: Ponto, b: Ponto, modo: ModoRegua, desloc: number | null) => void;
+  /** Modelos de magia que ainda estão na tela. */
+  areas: AreaNaTela[];
+  /** Mostra pra mesa a área do `modelo` com origem `o`, apontando pra `d`. */
+  enviarArea: (modelo: ModeloArea, o: Ponto, d: Ponto) => void;
 };
 
 /**
@@ -52,7 +65,9 @@ export function usePing(
 ): Pings {
   const [pings, setPings] = useState<PingNaTela[]>([]);
   const [reguas, setReguas] = useState<ReguaNaTela[]>([]);
+  const [areas, setAreas] = useState<AreaNaTela[]>([]);
   const ultimaReguaRef = useRef<number | null>(null);
+  const ultimaAreaRef = useRef<number | null>(null);
   const canalRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const ultimoRef = useRef<number | null>(null);
   const cenaId = cena?.id ?? null;
@@ -73,6 +88,11 @@ export function usePing(
         if (!regua) return;
         setReguas((atual) => adicionarRegua(atual, { ...regua, chegouEm: performance.now() }));
       })
+      .on("broadcast", { event: "area" }, ({ payload }) => {
+        const area = validarArea(payload, { largura, altura });
+        if (!area) return;
+        setAreas((atual) => adicionarArea(atual, { ...area, chegouEm: performance.now() }));
+      })
       .subscribe();
     canalRef.current = canal;
     return () => {
@@ -80,6 +100,7 @@ export function usePing(
       supabase.removeChannel(canal);
       setPings([]);
       setReguas([]);
+      setAreas([]);
     };
   }, [cenaId, largura, altura]);
 
@@ -96,6 +117,37 @@ export function usePing(
     const t = window.setTimeout(() => setReguas((atual) => reguasAtivas(atual, performance.now())), REGUA_DURACAO_MS + 200);
     return () => window.clearTimeout(t);
   }, [reguas]);
+
+  useEffect(() => {
+    if (areas.length === 0) return;
+    const t = window.setTimeout(() => setAreas((atual) => areasAtivas(atual, performance.now())), AREA_DURACAO_MS + 200);
+    return () => window.clearTimeout(t);
+  }, [areas]);
+
+  const enviarArea = useCallback<Pings["enviarArea"]>(
+    (modelo, o, d) => {
+      const canal = canalRef.current;
+      if (!quem || !canal) return;
+      const agora = performance.now();
+      if (!podePingar(ultimaAreaRef.current, agora)) return;
+      ultimaAreaRef.current = agora;
+      const arredondar = (n: number) => Math.round(n * 10) / 10;
+      const area: AreaRecebida = {
+        id: crypto.randomUUID(),
+        forma: modelo.forma,
+        o: [arredondar(o[0]), arredondar(o[1])],
+        d: [arredondar(d[0]), arredondar(d[1])],
+        metros: modelo.metros,
+        largura: modelo.largura,
+        de: quem.nome,
+        cor: quem.cor,
+      };
+      // Aparece na hora pra quem mandou; o canal não devolve a própria mensagem.
+      setAreas((atual) => adicionarArea(atual, { ...area, chegouEm: agora }));
+      canal.send({ type: "broadcast", event: "area", payload: area }).catch((e: unknown) => relatarErro("enviarArea", e));
+    },
+    [quem],
+  );
 
   const enviarRegua = useCallback<Pings["enviarRegua"]>(
     (a, b, modo, desloc) => {
@@ -141,5 +193,5 @@ export function usePing(
     [quem],
   );
 
-  return { pings, enviar, reguas, enviarRegua };
+  return { pings, enviar, reguas, enviarRegua, areas, enviarArea };
 }

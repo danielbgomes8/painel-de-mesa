@@ -327,3 +327,94 @@ test("condições no peão: o ícone é desenhado pra mesa, e o do inimigo ocult
   expect(errosJogador).toEqual([]);
 });
 
+test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, e a mesa vê a mesma figura", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 10, hp_max: 10 });
+
+  // O canvas não tem texto no DOM: o robô escuta o que é DESENHADO nele.
+  const espiar = () => {
+    const w = window as unknown as { __textos: string[] };
+    w.__textos = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args: Parameters<typeof original>) {
+      w.__textos.push(String(args[0]));
+      return original.apply(this, args);
+    };
+  };
+  await page.addInitScript(espiar);
+  const textosDe = (p: typeof page) => p.evaluate(() => (window as unknown as { __textos: string[] }).__textos);
+
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-area.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+
+  const contexto = await browser.newContext();
+  const jogador = await contexto.newPage();
+  await jogador.addInitScript(espiar);
+  await comoJogador(jogador, "jogador-robo");
+  await jogador.goto(`/?sala=${SALA}`);
+  await jogador.getByRole("button", { name: "ver o mapa" }).click();
+  await expect(jogador.locator(".cena-canvas")).toBeVisible();
+  await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+
+  // A barra de tamanhos muda de altura conforme a forma e empurra o mapa: a
+  // posição do canvas é medida de novo a cada arrasto.
+  const arrastar = async (quem: typeof page, de: [number, number], para: [number, number]) => {
+    const canvas = quem.locator(".cena-canvas");
+    await canvas.scrollIntoViewIfNeeded();
+    const c = (await canvas.boundingBox())!;
+    // 900×600 de imagem, vista = mapa inteiro com folga de 3%.
+    const escala = Math.min(c.width / (900 * 1.06), c.height / (600 * 1.06));
+    const naTela = (ix: number, iy: number) => ({ x: c.x + c.width / 2 + (ix - 450) * escala, y: c.y + c.height / 2 + (iy - 300) * escala });
+    const a = naTela(...de);
+    const b = naTela(...para);
+    await quem.mouse.move(a.x, a.y);
+    await quem.mouse.down();
+    await quem.mouse.move(b.x, b.y, { steps: 8 });
+    await quem.mouse.up();
+  };
+
+  // ── Mestre ──
+  await page.getByRole("button", { name: /área/ }).click();
+  // Esfera é o padrão: raio de 6 m (4 quadrados).
+  await expect(page.getByText("Esfera: raio de 6 m (4 quadrados).")).toBeVisible();
+  await arrastar(page, [300, 300], [300, 300]);
+  await expect.poll(async () => (await textosDe(page)).includes("Mestre: Esfera · raio 6 m")).toBe(true);
+  await expect.poll(async () => (await textosDe(jogador)).includes("Mestre: Esfera · raio 6 m")).toBe(true);
+
+  // Cone de 9 m (tamanho pronto), apontando pra direita.
+  await page.waitForTimeout(900);
+  await page.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Cone" }).click();
+  await page.getByRole("group", { name: /Tamanho/ }).getByRole("button", { name: "9 m" }).click();
+  await arrastar(page, [150, 150], [450, 150]);
+  await expect.poll(async () => (await textosDe(jogador)).includes("Mestre: Cone · 9 m")).toBe(true);
+
+  // Linha de 30 m por 1,5 m e cubo de 4,5 m (um tamanho que o Mestre digita).
+  await page.waitForTimeout(900);
+  await page.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Linha" }).click();
+  await arrastar(page, [150, 450], [500, 450]);
+  await expect.poll(async () => (await textosDe(jogador)).includes("Mestre: Linha · 30 m × 1,5 m")).toBe(true);
+  await page.waitForTimeout(900);
+  await page.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Cubo" }).click();
+  await page.getByLabel(/Outro tamanho/).fill("7,5");
+  await arrastar(page, [600, 300], [800, 300]);
+  await expect.poll(async () => (await textosDe(jogador)).includes("Mestre: Cubo · lado 7,5 m")).toBe(true);
+
+  // ── Jogador ── (a barra dele tem "✨ área", e o Mestre vê o nome dele)
+  await jogador.getByRole("button", { name: /área/ }).click();
+  await jogador.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Cone" }).click();
+  await jogador.getByRole("group", { name: /Tamanho/ }).getByRole("button", { name: "18 m" }).click();
+  await arrastar(jogador, [150, 300], [450, 300]);
+  await expect.poll(async () => (await textosDe(page)).includes("Jogador Robô: Cone · 18 m")).toBe(true);
+
+  await contexto.close();
+  expect(erros).toEqual([]);
+});
+

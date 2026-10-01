@@ -3054,6 +3054,17 @@ input.fj-score:focus-visible {
   line-height: 1;
   flex: none;
 }
+/* Campo "outro tamanho" dos modelos de magia: cabe ao lado dos botões a 375px. */
+.area-outro {
+  width: 76px;
+  min-height: 32px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 4px 12px;
+  color: var(--ink);
+  font-size: 12px;
+}
 .legenda-icones .condexplica {
   margin-top: 6px;
 }
