@@ -28,6 +28,7 @@ import {
   desenharCena,
   desenharNevoa,
   desenharPings,
+  comporNevoaComVisao,
   desenharAreas,
   desenharReguas,
   escalaDaNevoa,
@@ -37,14 +38,37 @@ import {
 } from "@/lib/desenharCena";
 import { REGUA_MINIMA_PX, medirRegua, type ModoRegua, type ReguaNaTela } from "@/lib/regua";
 import { MODELO_INICIAL, cruzamentoMaisPerto, type AreaNaTela, type ModeloArea } from "@/lib/area";
+import {
+  TOQUE_NA_PAREDE_PX,
+  acharParedeNoPonto,
+  paredeEntre,
+  paredesDoComodo,
+  pontoParaParede,
+  segmentosQueBloqueiam,
+  type ModoParede,
+  type NovaParede,
+  type Parede,
+} from "@/lib/paredes";
+import {
+  alcanceEmPx,
+  codificarMascara,
+  criarMascara,
+  decodificarMascara,
+  juntarMascaras,
+  marcarVistos,
+  poligonoDeVisao,
+  type Mascara,
+} from "@/lib/visao";
 import { COR_PING_MESTRE } from "@/lib/ping";
 import { acharPecaNoPonto, encaixarNaGrade, type PecaNaTela } from "@/lib/pecas";
 import { PING_TOLERANCIA_PX, PING_TOQUE_LONGO_MS, type PingNaTela } from "@/lib/ping";
 
-export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua" | "area";
+export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua" | "area" | "parede" | "colocar";
 
 /** O que o Mestre pode pedir ao mapa de fora (botões "enquadrar", "levar a mesa"). */
 export type CenaMapaApi = {
+  /** Esquece o que o grupo já viu (a memória da visão automática) neste aparelho. */
+  reiniciarMemoria: () => void;
   /** Mostra o mapa inteiro. */
   enquadrarTudo: () => void;
   /** Volta à visão de partida: a câmera do Mestre (mesa) ou o mapa inteiro. */
@@ -83,6 +107,24 @@ type Props = {
   modeloArea?: ModeloArea;
   areas?: readonly AreaNaTela[];
   aoAreaar?: (modelo: ModeloArea, origem: Ponto, direcao: Ponto) => void;
+  /** Paredes e portas (só o Mestre as vê; pra todos elas decidem o que a visão alcança). */
+  paredes?: readonly Parede[];
+  /** O que a ferramenta "parede" faz, e o que fazer com o que o Mestre desenhar. */
+  modoParede?: ModoParede;
+  aoCriarParedes?: (novas: NovaParede[]) => void;
+  aoApagarParede?: (id: string) => void;
+  /** Tocar numa porta com a ferramenta de mover (Mestre) abre ou fecha. */
+  aoAlternarPorta?: (id: string) => void;
+  /** Mestre: mostrar o que cada inimigo enxerga (não abre névoa pra mesa). */
+  verVisaoDosInimigos?: boolean;
+  /** Paredes e peões já foram lidos do banco. Enquanto não, a visão automática
+   *  espera (a névoa fica só a feita à mão): sem as paredes ela enxergaria
+   *  através de tudo e marcaria isso como "já visto" pra sempre. */
+  visaoPronta?: boolean;
+  /** Mestre: o que o grupo já viu mudou; guarda no banco (`cenas.explorado`). */
+  aoExplorar?: (texto: string) => void;
+  /** Ferramenta "colocar": o Mestre tocou num ponto do mapa. */
+  aoEscolherPonto?: (ponto: Ponto) => void;
   /** Peões da cena (já calculados pro ponto de vista de quem olha). */
   pecas?: readonly PecaNaTela[];
   /** Soltou um peão num lugar novo (já encaixado na grade). */
@@ -93,7 +135,7 @@ type Props = {
 };
 
 type Pintura = {
-  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua" | "area">;
+  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua" | "area" | "parede" | "colocar">;
   modo: ModoNevoa;
   raio: number;
   pontos: Ponto[];
@@ -133,6 +175,15 @@ export function CenaMapa({
   modeloArea = MODELO_INICIAL,
   areas,
   aoAreaar,
+  paredes,
+  modoParede = "parede",
+  aoCriarParedes,
+  aoApagarParede,
+  aoAlternarPorta,
+  verVisaoDosInimigos = false,
+  visaoPronta = true,
+  aoExplorar,
+  aoEscolherPonto,
   pecas,
   aoMoverPeca,
   aoTocarPeca,
@@ -164,10 +215,22 @@ export function CenaMapa({
   const reguaViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number }; desloc: number | null } | null>(null);
   /** "Este ponto está na névoa?" guardado, pra não reler o canvas da névoa a cada quadro. */
   const coberturaRef = useRef(new Map<string, boolean>());
+  /** A névoa que vale de fato: a feita à mão, ou ela com a visão automática por cima. */
+  const nevoaFinalRef = useRef<HTMLCanvasElement | null>(null);
+  const composicaoRef = useRef<HTMLCanvasElement | null>(null);
+  /** O que o grupo já viu (neste aparelho e o que o Mestre guardou), da cena `memoriaDaCena`. */
+  const memoriaRef = useRef<{ cenaId: string; mascara: Mascara } | null>(null);
+  const remotoAnteriorRef = useRef<{ cenaId: string; texto: string } | null>(null);
+  const explorarRef = useRef<{ timer: number; enviado: string }>({ timer: 0, enviado: "" });
+  const visaoDosInimigosRef = useRef<(readonly (readonly Ponto[])[])>([]);
+  const ultimaComposicaoRef = useRef(0);
+  /** Parede sendo desenhada agora (px do mapa, já encaixada) e porta tocada (abre no soltar). */
+  const paredeViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
+  const portaToque = useRef<{ id: string; x: number; y: number } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, pecas, aoMoverPeca, aoTocarPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, pecas, aoMoverPeca, aoTocarPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -185,7 +248,7 @@ export function CenaMapa({
   /** O ponto (px do mapa) está coberto de névoa? Lê o canvas da névoa uma vez
    *  por ponto e guarda; a névoa nova esvazia o guardado. */
   const cobertaPorNevoa = useCallback((x: number, y: number): boolean => {
-    const canvas = nevoaRef.current;
+    const canvas = nevoaFinalRef.current ?? nevoaRef.current;
     if (!canvas || canvas.width === 0) return false;
     const chave = `${Math.round(x)},${Math.round(y)}`;
     const guardado = coberturaRef.current.get(chave);
@@ -194,10 +257,79 @@ export function CenaMapa({
     const px = Math.min(canvas.width - 1, Math.max(0, Math.floor(x * fs)));
     const py = Math.min(canvas.height - 1, Math.max(0, Math.floor(y * fs)));
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const coberto = ctx ? ctx.getImageData(px, py, 1, 1).data[3] > 128 : false;
+    // Limiar baixo de propósito: a parte "já vista" (escurecida, metade da névoa)
+    // também conta como coberta — um inimigo não aparece num lugar que o grupo
+    // só lembra, só onde enxerga agora.
+    const coberto = ctx ? ctx.getImageData(px, py, 1, 1).data[3] > 40 : false;
     coberturaRef.current.set(chave, coberto);
     return coberto;
   }, []);
+
+  /** A memória do grupo desta cena (uma nova, se a cena ou a escala da grade mudou). */
+  const memoriaDaCena = useCallback((): Mascara => {
+    const c = propsRef.current.cena;
+    const nova = criarMascara(c);
+    const atual = memoriaRef.current;
+    if (atual && atual.cenaId === c.id && atual.mascara.cols === nova.cols && atual.mascara.rows === nova.rows && atual.mascara.lado === nova.lado) {
+      return atual.mascara;
+    }
+    memoriaRef.current = { cenaId: c.id, mascara: nova };
+    return nova;
+  }, []);
+
+  /** O Mestre guarda no banco o que o grupo já viu — 1,5 s depois da última mudança, e só se mudou. */
+  const agendarExplorar = useCallback(() => {
+    const p = propsRef.current;
+    if (!p.mestre || !p.aoExplorar || !p.cena.na_mesa) return;
+    const texto = codificarMascara(memoriaDaCena());
+    if (texto === p.cena.explorado || texto === explorarRef.current.enviado) return;
+    window.clearTimeout(explorarRef.current.timer);
+    explorarRef.current.timer = window.setTimeout(() => {
+      const agora = propsRef.current;
+      // O mapa pode ter saído da mesa (ou o aparelho deixado de ser o do Mestre) nesse 1,5 s.
+      if (!agora.mestre || !agora.cena.na_mesa) return;
+      const atual = codificarMascara(memoriaDaCena());
+      if (atual && atual !== agora.cena.explorado && atual !== explorarRef.current.enviado) {
+        explorarRef.current.enviado = atual;
+        propsRef.current.aoExplorar?.(atual);
+      }
+    }, 1500);
+  }, [memoriaDaCena]);
+
+  /** Refaz a névoa que vale (a feita à mão + a visão automática) e a visão dos
+   *  inimigos. Chamada quando muda peão, parede, porta, ajuste da cena ou névoa
+   *  — e, com o peão sendo arrastado, algumas vezes por segundo. */
+  const recomporNevoa = useCallback(() => {
+    const p = propsRef.current;
+    const fino = nevoaRef.current;
+    const c = p.cena;
+    if (!fino || c.largura <= 0 || c.altura <= 0) return;
+    coberturaRef.current.clear();
+    if (!c.visao_ligada || !p.visaoPronta) {
+      nevoaFinalRef.current = fino;
+      visaoDosInimigosRef.current = [];
+      return;
+    }
+    const segmentos = segmentosQueBloqueiam(p.paredes ?? []);
+    const alcance = alcanceEmPx(c);
+    const arr = arrastoVisual.current;
+    const onde = (x: PecaNaTela): Ponto => (arr && arr.id === x.id ? [arr.x, arr.y] : [x.x, x.y]);
+    const pecas = p.pecas ?? [];
+    const dosJogadores = pecas.filter((x) => x.observa).map((x) => poligonoDeVisao(onde(x), segmentos, alcance));
+    visaoDosInimigosRef.current = p.mestre && p.verVisaoDosInimigos ? pecas.filter((x) => x.inimigo).map((x) => poligonoDeVisao(onde(x), segmentos, alcance)) : [];
+    const memoria = memoriaDaCena();
+    // Só vira "já visto" o que a MESA viu: com o mapa ainda sendo preparado, o
+    // Mestre pode mexer nos peões à vontade sem gastar a névoa.
+    if (c.na_mesa) {
+      marcarVistos(memoria, dosJogadores);
+      // Sempre pergunta se há o que guardar (e não só quando surgiu célula nova): o
+      // relógio pode ter sido cancelado, e quem sabe se já foi tudo gravado é a comparação.
+      agendarExplorar();
+    }
+    if (!composicaoRef.current) composicaoRef.current = document.createElement("canvas");
+    comporNevoaComVisao(composicaoRef.current, fino, c, dosJogadores, memoria);
+    nevoaFinalRef.current = composicaoRef.current;
+  }, [memoriaDaCena, agendarExplorar]);
 
   /** Pinta um quadro. Devolve quantos pings ainda estão animando (o laço
    *  continua pedindo quadros enquanto for maior que zero). */
@@ -211,7 +343,7 @@ export function CenaMapa({
     desenharCena(ctx, {
       cena: p.cena,
       imagem: imagemRef.current,
-      nevoa: nevoaRef.current,
+      nevoa: nevoaFinalRef.current ?? nevoaRef.current,
       vista: vistaRef.current,
       larguraTela: w,
       alturaTela: h,
@@ -221,6 +353,10 @@ export function CenaMapa({
       pecas: p.pecas,
       pecaCoberta: cobertaPorNevoa,
       arrasto: arrastoVisual.current,
+      // Só o Mestre vê paredes, portas e a visão dos inimigos.
+      paredes: p.mestre ? p.paredes : undefined,
+      previaParede: p.mestre && paredeViva.current ? { tipo: p.modoParede === "comodo" ? "comodo" : p.modoParede === "porta" ? "porta" : "parede", a: paredeViva.current.a, b: paredeViva.current.b } : null,
+      visaoDosInimigos: p.mestre ? visaoDosInimigosRef.current : undefined,
     });
     const agora = performance.now();
     const viva = reguaViva.current;
@@ -256,6 +392,13 @@ export function CenaMapa({
   useImperativeHandle(
     ref,
     () => ({
+      reiniciarMemoria: () => {
+        memoriaRef.current = null;
+        explorarRef.current.enviado = "";
+        window.clearTimeout(explorarRef.current.timer);
+        recomporNevoa();
+        pedirQuadro();
+      },
       reenquadrar: aplicarEnquadre,
       enquadrarTudo: () => {
         const { w, h } = tamanhoRef.current;
@@ -269,7 +412,7 @@ export function CenaMapa({
         return w === 0 ? null : regiaoVisivel(vistaRef.current, w, h);
       },
     }),
-    [pedirQuadro, aplicarEnquadre],
+    [pedirQuadro, aplicarEnquadre, recomporNevoa],
   );
 
   // Imagem da cena.
@@ -315,15 +458,45 @@ export function CenaMapa({
     if (!nevoaRef.current) nevoaRef.current = document.createElement("canvas");
     if (cena.largura > 0 && cena.altura > 0) desenharNevoa(nevoaRef.current, cena, regras);
     coberturaRef.current.clear();
+    recomporNevoa();
     pedirQuadro();
-  }, [cena, regras, pedirQuadro]);
+  }, [cena, regras, pedirQuadro, recomporNevoa]);
+
+  // O que o Mestre guardou como "já visto" chegou (ou foi zerado): junta com o
+  // que este aparelho viu, ou esquece tudo se o Mestre cobriu de novo.
+  useEffect(() => {
+    const anterior = remotoAnteriorRef.current;
+    remotoAnteriorRef.current = { cenaId: cena.id, texto: cena.explorado };
+    if (anterior && anterior.cenaId === cena.id && anterior.texto !== "" && cena.explorado === "") {
+      memoriaRef.current = null;
+      explorarRef.current.enviado = "";
+    } else if (cena.explorado) {
+      const remota = decodificarMascara(cena.explorado, cena);
+      if (remota) juntarMascaras(memoriaDaCena(), remota);
+    }
+    recomporNevoa();
+    pedirQuadro();
+  }, [cena.id, cena.explorado, cena, memoriaDaCena, recomporNevoa, pedirQuadro]);
+
+  // Paredes, portas e ajustes da visão: refaz a névoa.
+  useEffect(() => {
+    recomporNevoa();
+    pedirQuadro();
+  }, [paredes, verVisaoDosInimigos, visaoPronta, cena.visao_ligada, cena.visao_alcance, cena.metros, cena.grade_px, cena.na_mesa, recomporNevoa, pedirQuadro]);
+
+  // O relógio de guardar a memória não pode sobreviver ao componente.
+  useEffect(() => {
+    const guardado = explorarRef.current;
+    return () => window.clearTimeout(guardado.timer);
+  }, []);
 
   // Peões novos: o peão mexido já está no lugar certo, então o "desenhar aqui
   // enquanto não chega" pode sair (a não ser que ainda estejam arrastando).
   useEffect(() => {
     if (!arrastoPeca.current) arrastoVisual.current = null;
+    recomporNevoa();
     pedirQuadro();
-  }, [pecas, pedirQuadro]);
+  }, [pecas, pedirQuadro, recomporNevoa]);
 
   // Tamanho da caixa (e a rotação do celular).
   useEffect(() => {
@@ -440,6 +613,8 @@ export function CenaMapa({
       arrastoVisual.current = null;
       reguaViva.current = null;
       areaViva.current = null;
+      paredeViva.current = null;
+      portaToque.current = null;
       pintura.current = null;
       previaRef.current = null;
       const [a, b] = [...dedos.current.values()];
@@ -476,6 +651,30 @@ export function CenaMapa({
       return;
     }
 
+    // "Pôr o grupo onde eu tocar": o toque escolhe o ponto e a ferramenta acaba.
+    if (p.ferramenta === "colocar" && p.aoEscolherPonto) {
+      semArrastar.current = true;
+      p.aoEscolherPonto(noMapa(pos));
+      return;
+    }
+
+    // Paredes (Mestre): arrastar desenha; no modo apagar, tocar numa parede a tira.
+    if (p.ferramenta === "parede" && p.mestre) {
+      const ponto = noMapa(pos);
+      const escala = vistaRef.current.escala;
+      semArrastar.current = true;
+      if (p.modoParede === "apagar") {
+        const alvo = acharParedeNoPonto(p.paredes ?? [], ponto, TOQUE_NA_PAREDE_PX / escala);
+        if (alvo) p.aoApagarParede?.(alvo.id);
+        return;
+      }
+      if (!p.aoCriarParedes) return;
+      const inicio = pontoParaParede(p.cena, p.paredes ?? [], ponto, escala);
+      paredeViva.current = { a: inicio, b: inicio, telaA: pos, telaB: pos };
+      pedirQuadro();
+      return;
+    }
+
     // Ferramenta ping (Mestre): um toque já pinga.
     if (p.ferramenta === "ping" && p.aoPingar) {
       semArrastar.current = true;
@@ -498,9 +697,17 @@ export function CenaMapa({
       p.aoTocarPeca?.(null);
     }
 
+    // Mestre: tocar numa porta com a ferramenta de mover a abre ou fecha — mas só
+    // ao soltar, e só se o dedo não andou (senão era o começo de um arrasto do mapa).
+    if (p.ferramenta === "mover" && p.mestre && p.aoAlternarPorta) {
+      const [mx, my] = noMapa(pos);
+      const porta = acharParedeNoPonto(p.paredes ?? [], [mx, my], TOQUE_NA_PAREDE_PX / vistaRef.current.escala, "porta");
+      portaToque.current = porta ? { id: porta.id, x: pos.x, y: pos.y } : null;
+    }
+
     const ferr = p.ferramenta;
     const pintavel =
-      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && ferr !== "area" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
+      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && ferr !== "area" && ferr !== "parede" && ferr !== "colocar" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
     if (!pintavel && p.aoPingar) {
       // Sem ferramenta de pintura em uso: dedo parado por um instante vira ping.
       cancelarToqueLongo();
@@ -509,6 +716,7 @@ export function CenaMapa({
         toqueLongo.current = null;
         if (!t) return;
         semArrastar.current = true;
+        portaToque.current = null;
         propsRef.current.aoPingar?.(...noMapa({ x: t.x, y: t.y }));
         navigator.vibrate?.(25);
       }, PING_TOQUE_LONGO_MS);
@@ -579,6 +787,19 @@ export function CenaMapa({
       return;
     }
 
+    // A porta tocada só abre se o dedo ficou parado.
+    const pt = portaToque.current;
+    if (pt && Math.hypot(agora.x - pt.x, agora.y - pt.y) > PING_TOLERANCIA_PX) portaToque.current = null;
+
+    // Arrastando uma parede.
+    const pw = paredeViva.current;
+    if (pw) {
+      pw.b = pontoParaParede(p.cena, p.paredes ?? [], noMapa(agora), vistaRef.current.escala);
+      pw.telaB = agora;
+      pedirQuadro();
+      return;
+    }
+
     // Arrastando um modelo de magia.
     const av = areaViva.current;
     if (av) {
@@ -602,6 +823,14 @@ export function CenaMapa({
       ar.y = Math.min(p.cena.altura, Math.max(0, my - ar.dy));
       if (!ar.moveu && Math.hypot(agora.x - ar.telaX, agora.y - ar.telaY) > PING_TOLERANCIA_PX) ar.moveu = true;
       arrastoVisual.current = { id: ar.id, x: ar.x, y: ar.y };
+      // A visão acompanha o peão enquanto ele anda (poucas vezes por segundo: a conta pesa).
+      if (p.cena.visao_ligada) {
+        const t = performance.now();
+        if (t - ultimaComposicaoRef.current > 70) {
+          ultimaComposicaoRef.current = t;
+          recomporNevoa();
+        }
+      }
       pedirQuadro();
       return;
     }
@@ -669,6 +898,24 @@ export function CenaMapa({
         pedirQuadro();
         return;
       }
+      const pw = paredeViva.current;
+      if (pw) {
+        paredeViva.current = null;
+        const p = propsRef.current;
+        const arrastou = Math.hypot(pw.telaB.x - pw.telaA.x, pw.telaB.y - pw.telaA.y) >= REGUA_MINIMA_PX;
+        if (!cancelado && arrastou) {
+          const novas =
+            p.modoParede === "comodo"
+              ? paredesDoComodo(pw.a, pw.b)
+              : [paredeEntre(p.modoParede === "porta" ? "porta" : "parede", pw.a, pw.b)].filter((n): n is NovaParede => n !== null);
+          if (novas && novas.length > 0) p.aoCriarParedes?.(novas);
+        }
+        pedirQuadro();
+        return;
+      }
+      const pt = portaToque.current;
+      portaToque.current = null;
+      if (pt && !cancelado) propsRef.current.aoAlternarPorta?.(pt.id);
       const av = areaViva.current;
       if (av) {
         areaViva.current = null;
@@ -702,13 +949,13 @@ export function CenaMapa({
     }
   }
 
-  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua" && ferramenta !== "area";
+  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua" && ferramenta !== "area" && ferramenta !== "parede" && ferramenta !== "colocar";
   return (
     <div ref={caixaRef} className="cena-caixa">
       <canvas
         ref={canvasRef}
         className="cena-canvas"
-        style={{ cursor: !interativo ? "default" : pintando || ferramenta === "regua" || ferramenta === "area" ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
+        style={{ cursor: !interativo ? "default" : pintando || ferramenta === "regua" || ferramenta === "area" || ferramenta === "parede" || ferramenta === "colocar" ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
         role="img"
         aria-label={`Mapa ${cena.nome || "sem nome"}`}
         onPointerDown={aoPressionar}

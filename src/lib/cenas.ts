@@ -33,6 +33,13 @@ export type Cena = {
   na_mesa: boolean;
   /** Pedaço do mapa que a mesa enquadra; null = o mapa todo. */
   camera: Regiao | null;
+  /** Visão automática: a névoa se abre sozinha pelo que os peões dos jogadores
+   *  enxergam, com as paredes e portas da cena (ver lib/visao.ts). */
+  visao_ligada: boolean;
+  /** Alcance da visão em metros; null = até onde as paredes deixarem. */
+  visao_alcance: number | null;
+  /** O que o grupo já viu, como máscara compactada em texto (lib/visao.ts); vazio = nada. */
+  explorado: string;
   created_at: string;
 };
 
@@ -104,6 +111,9 @@ export function normalizarCena(linha: unknown): Cena | null {
     nevoa_ligada: o.nevoa_ligada !== false,
     na_mesa: o.na_mesa === true,
     camera: regiaoValida(o.camera),
+    visao_ligada: o.visao_ligada === true,
+    visao_alcance: typeof o.visao_alcance === "number" && o.visao_alcance > 0 ? o.visao_alcance : typeof o.visao_alcance === "string" && Number(o.visao_alcance) > 0 ? Number(o.visao_alcance) : null,
+    explorado: typeof o.explorado === "string" ? o.explorado : "",
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };
 }

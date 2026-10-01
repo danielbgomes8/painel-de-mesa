@@ -16,10 +16,11 @@ describe("restaurar o backup diário bruto", () => {
     expect([...ordem].slice(1).sort()).toEqual([...TABELAS_COM_SALA].sort());
   });
 
-  it("a sala vem primeiro e as cenas antes da névoa e dos peões (chave estrangeira)", () => {
+  it("a sala vem primeiro e as cenas antes da névoa, dos peões e das paredes (chave estrangeira)", () => {
     const ordem = ordemDeRestauracao();
     expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_nevoa"));
     expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_pecas"));
+    expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_paredes"));
     expect(ordem.indexOf("rooms")).toBeLessThan(ordem.indexOf("characters"));
   });
 

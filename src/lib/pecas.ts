@@ -73,6 +73,10 @@ export type PecaNaTela = {
   semNevoa: boolean;
   /** Condições de quem o peão representa, na ordem de `iconesDaPeca`. */
   icones: IconePeca[];
+  /** É o peão de um jogador: com a visão automática ligada, a névoa se abre pelo que ele enxerga. */
+  observa: boolean;
+  /** É o peão de um inimigo: só o Mestre pode pedir pra ver o que ele enxerga. */
+  inimigo: boolean;
 };
 
 export const COR_PECA_INIMIGO = "#c0443a";
@@ -173,6 +177,18 @@ export function posicoesIniciais(
     }
   }
   return montar(0);
+}
+
+/** Um trecho do mapa em volta de `ponto` (de `quadradinhos` de lado), pra
+ *  `posicoesIniciais` agrupar os peões ali em vez de no meio da tela — é o que
+ *  faz "pôr o grupo onde eu tocar". */
+export function regiaoEmTornoDe(
+  c: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura">,
+  ponto: Ponto,
+  quadradinhos = 6,
+): Regiao {
+  const lado = ladoDeReferencia(c) * quadradinhos;
+  return { x: ponto[0] - lado / 2, y: ponto[1] - lado / 2, w: lado, h: lado };
 }
 
 /** O peão mais "por cima" (o último da lista) que contém o ponto, entre os candidatos. */
@@ -315,6 +331,8 @@ export function montarPecasNaTela(entrada: {
       deslocamento: podeMoverPeca(p, visao) && ficha && typeof ficha.speed === "number" && ficha.speed > 0 ? ficha.speed : null,
       semNevoa: visao.mestre || (p.slug !== null && p.slug === visao.meuSlug),
       icones: iconesDaPeca(ficha),
+      observa: Boolean(ficha) && !ficha?.is_npc,
+      inimigo: Boolean(ficha?.is_npc),
     };
   });
 }

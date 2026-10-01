@@ -789,9 +789,9 @@ primeiros itens; os outros estão na lista do fim desta seção.
 
 O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
 **1 está construída** (cena + grade + névoa ao vivo + telão + celular), a **2
-está completa** (ping, peões, régua e condições como ícone no peão), a **4 está
-começada** (modelos de magia prontos; faltam desenhos e notas no mapa) e a 3
-(paredes e visão) ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
+está completa** (ping, peões, régua e condições como ícone no peão), a **3 está
+construída** (paredes, portas e visão automática; migration `0021`) e a **4 está
+começada** (modelos de magia prontos; faltam desenhos e notas no mapa). Prioridade dita pelo Daniel em 01/10: **o ping é
 essencial; peão é "bom ter"** (a mesa não vai usar muito):
 
 1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
@@ -998,6 +998,84 @@ Decisões que não estão no código à primeira vista:
   O robô marca as quatro formas e confere pelo `fillText` que Mestre e jogador
   veem "Mestre: Cone · 9 m" etc.; **a barra de tamanhos muda de altura conforme a
   forma e empurra o mapa — o robô mede a posição do canvas a cada arrasto**.
+- **Paredes, portas e visão automática** (migration `0021_paredes.sql`,
+  `lib/paredes.ts`, `lib/visao.ts`, `hooks/useParedes.ts`, seção "Paredes e visão"
+  do Mestre, ferramenta "🧱 paredes"). O Mestre desenha **paredes** e **portas**
+  (segmentos, em px da imagem; modos parede / porta / cômodo = 4 paredes de uma
+  vez / apagar; as pontas encaixam na ponta de outra parede perto — sem fresta nos
+  cantos — ou, senão, no cruzamento da grade; no máximo 400 por cena). Com a "visão
+  automática" ligada na cena (`cenas.visao_ligada`, desligada por padrão: cena velha
+  não muda), **cada aparelho** calcula o que o grupo enxerga e a névoa se abre
+  sozinha: de cada peão de JOGADOR (`PecaNaTela.observa`) saem raios até a primeira
+  parede/porta fechada ou até o alcance (`visao_alcance` em metros; vazio = até
+  onde as paredes deixarem); o polígono resultante abre a névoa (`poligonoDeVisao`,
+  `comporNevoaComVisao`). **Decisão do Daniel (01/10): visão do GRUPO** — telão e
+  celulares veem o que qualquer jogador enxerga, não cada um o seu. Feita à mão
+  (pincel etc.) a névoa continua valendo pra REVELAR; esconder à mão não segura
+  contra a visão (pra isso, desenhe uma parede). Porta aberta deixa passar; o
+  Mestre abre/fecha tocando nela com a ferramenta de mover (só ao soltar e se o
+  dedo não andou, e não se virou ping de toque longo).
+  - **O jogador (e o telão) NUNCA vê a marcação de parede ou porta**: só o Mestre as
+    desenha (vermelho = parede, dourado = porta, tracejada = aberta); a mesa vê o
+    desenho do mapa e a névoa se abrindo. Por isso **uma passagem secreta é só uma
+    porta fechada onde o mapa mostra uma parede comum**; o Mestre abre quando eles
+    descobrem. (Opção "mostrar a porta pra mesa" não existe; se pedirem, é por porta.)
+  - **A memória do "já visto" é compartilhada**: máscara de quadradinhos (célula =
+    quadradinho, piso de 32 px) compactada em texto em `cenas.explorado`
+    (`codificarMascara`: `"colsxrowsxlado:base64"`; vazio = nada). Aparece
+    escurecida (metade da névoa), não preta. **Só o aparelho do Mestre grava** (1,5 s
+    depois da última mudança, só se mudou, e só com o mapa NA MESA — com ele ainda em
+    preparo o Mestre mexe nos peões sem gastar a névoa); telão e celulares acumulam
+    localmente e juntam com o que o Mestre guardou. Mudou a escala da grade: a
+    memória antiga é descartada (`decodificarMascara` devolve null). "Cobrir de novo
+    o explorado" zera (`reiniciarMemoria` + `explorado = ''`; quem vê a transição
+    pra vazio também esquece). **Limite conhecido:** aparelho que abre depois do
+    Mestre e antes de ele gravar só tem o que viu desde que abriu.
+  - **Peão de inimigo sob a vista**: aparece só onde o grupo enxerga AGORA — não na
+    parte "já vista" (a névoa escurecida conta como coberta: o limiar de
+    `cobertaPorNevoa` caiu de 128 pra 40 de alfa).
+  - **O Mestre vê o que os inimigos enxergam** (`verVisaoDosInimigos`, caixinha na
+    seção "Paredes e visão"): véu vermelho com contorno por inimigo, pra saber se o
+    goblin está vendo o grupo. É só da tela do Mestre e **não abre névoa pra mesa**.
+  - **Onde os peões entram é o Mestre quem escolhe; nada nasce sozinho ao liberar o
+    mapa.** "Pôr o grupo no mapa" põe no meio do que ele está vendo; novos
+    "grupo/inimigos onde eu tocar" (`ferramenta "colocar"`, `regiaoEmTornoDe`) põem em
+    volta do ponto tocado. **Com a visão automática ligada o jogador NÃO põe o
+    próprio peão** ("pôr meu peão" some, com aviso): o lugar do peão abre a névoa.
+    O ideal é preparar peões, paredes e portas ANTES de "levar a mesa pra este mapa".
+  - **Desempenho:** a conta de visão roda por aparelho. Com o peão sendo arrastado,
+    recalcula no máximo a cada 70 ms; só entram na conta as paredes que o alcance
+    toca. Paredes são lidas por `useParedes` (canal próprio, como os peões) e a
+    tabela ausente é tolerada ("falta rodar a migration 0021"; o chip da ferramenta
+    some e a visão não liga).
+  - **Backup:** `cena_paredes` entrou em `TABELAS_COM_SALA` e na ordem de restauração
+    (depois de `cenas`); a memória vai junto na coluna `explorado`.
+  - **Lições:** (1) **o relógio de gravar a memória não pode ser armado só "quando
+    surge célula nova"**: o React em desenvolvimento liga, desliga e religa os
+    efeitos, o cleanup cancelava o relógio e nada mais o rearmava — hoje cada
+    recálculo pergunta "há o que guardar?" comparando com o último gravado, e o
+    relógio reconfere `na_mesa`/Mestre ao disparar. (2) Achado numa página
+    provisória com dados em memória (apagada): o desenho da visão (porta fechada
+    bloqueia, aberta abre em leque, memória, arrasto, "preparando" não gasta
+    explorado) foi conferido SEM banco antes de pedir a migration — a mesma técnica
+    da névoa. (3) Os testes de visão (`visao.test.ts`) conferem canto de parede
+    exato, alcance, cômodo fechado e a memória (guardar/ler/juntar/escala trocada).
+  - **Corrida de carregamento (achada numa foto real, 01/10):** ao abrir o mapa os
+    peões chegam antes das paredes; por instantes a conta rodava SEM parede, via
+    "através de tudo" e marcava isso como "já visto" — e a memória só cresce, então
+    ficava errado pra sempre (e o aparelho do Mestre gravaria no banco). Hoje
+    `visaoPronta` (paredes E peões já lidos; `!muros.carregando && !banco.carregando`)
+    segura a visão: até lá a névoa é só a feita à mão. O robô reproduz a corrida
+    atrasando a resposta de `cena_paredes` em 3,5 s num reload do Mestre
+    (`page.route`) e confere que a memória gravada não tem célula do outro lado da
+    parede; **sem a correção o teste falha (285 células)**. Vale pra qualquer
+    "estado derivado que só cresce": nunca calcular com a entrada ainda carregando.
+  - **Ainda não existe (perguntado pelo Daniel em 01/10):** a integração
+    mapa → iniciativa. Hoje a iniciativa manda no mapa (anel dourado da vez, "pôr os
+    inimigos da iniciativa", nome/cor/revelado/condições da ficha, deslocamento na
+    régua), mas NÃO: tocar no peão pra aplicar dano ou passar a vez; o peão do
+    inimigo nascer quando ele entra na iniciativa; o peão sair quando o inimigo é
+    removido (fica um marcador cinza "?" até o Mestre tirar).
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).

@@ -16,6 +16,8 @@ import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
 import { iconesVisiveis, posicoesDosIcones, type PecaNaTela } from "./pecas";
 import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type ModoRegua, type ReguaNaTela } from "./regua";
 import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type ModeloArea } from "./area";
+import type { Parede } from "./paredes";
+import type { Mascara } from "./visao";
 
 /** A névoa é desenhada num canvas à parte, menor que a imagem: pra um mapa de
  *  3000 px, 2048 já é mais do que a tela mostra, e poupa memória no celular. */
@@ -80,6 +82,111 @@ export function desenharNevoa(canvas: HTMLCanvasElement, cena: Cena, regras: rea
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
+/** Compõe a névoa que a mesa de fato vê quando a visão automática está ligada:
+ *  a névoa feita à mão (`fino`) com buracos por cima — o que o grupo JÁ viu
+ *  (a memória, escurecido: metade clara) e o que vê AGORA (aberto de vez).
+ *  Revelar à mão continua valendo; esconder à mão não segura contra a visão. */
+export function comporNevoaComVisao(
+  destino: HTMLCanvasElement,
+  fino: HTMLCanvasElement,
+  cena: Pick<Cena, "largura" | "altura">,
+  agora: readonly (readonly Ponto[])[],
+  memoria: Mascara | null,
+): void {
+  if (destino.width !== fino.width) destino.width = fino.width;
+  if (destino.height !== fino.height) destino.height = fino.height;
+  const ctx = destino.getContext("2d");
+  if (!ctx) return;
+  const fs = fino.width / Math.max(1, cena.largura);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, destino.width, destino.height);
+  ctx.drawImage(fino, 0, 0);
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.setTransform(fs, 0, 0, fs, 0, 0);
+  if (memoria) {
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "#000";
+    // +0,5 px de folga em cada célula pra não aparecer fresta entre elas.
+    for (let r = 0; r < memoria.rows; r++) {
+      for (let c = 0; c < memoria.cols; c++) {
+        if (memoria.celulas[r * memoria.cols + c]) ctx.fillRect(c * memoria.lado - 0.5, r * memoria.lado - 0.5, memoria.lado + 1, memoria.lado + 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = "#000";
+  for (const poli of agora) {
+    if (poli.length < 3) continue;
+    ctx.beginPath();
+    poli.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/** Paredes e portas, só pro Mestre: vermelho = parede, dourado = porta (cheia
+ *  fechada, tracejada aberta). A mesa nunca vê isso — só o desenho do mapa. */
+export function desenharParedes(
+  ctx: CanvasRenderingContext2D,
+  paredes: readonly Parede[],
+  escala: number,
+  previa: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | null,
+): void {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const traco = (x1: number, y1: number, x2: number, y2: number, cor: string, largura: number, tracejada: boolean) => {
+    ctx.setLineDash(tracejada ? [7 / escala, 6 / escala] : []);
+    ctx.lineWidth = (largura + 2.5) / escala;
+    ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.lineWidth = largura / escala;
+    ctx.strokeStyle = cor;
+    ctx.stroke();
+  };
+  for (const p of paredes) {
+    if (p.tipo === "porta") traco(p.x1, p.y1, p.x2, p.y2, "#f0b030", 4, p.aberta);
+    else traco(p.x1, p.y1, p.x2, p.y2, "#e0504f", 3, false);
+  }
+  if (previa) {
+    const [ax, ay] = previa.a;
+    const [bx, by] = previa.b;
+    ctx.globalAlpha = 0.9;
+    if (previa.tipo === "comodo") {
+      for (const [x1, y1, x2, y2] of [[ax, ay, bx, ay], [bx, ay, bx, by], [bx, by, ax, by], [ax, by, ax, ay]] as const) {
+        traco(x1, y1, x2, y2, "#e0504f", 3, true);
+      }
+    } else {
+      traco(ax, ay, bx, by, previa.tipo === "porta" ? "#f0b030" : "#e0504f", previa.tipo === "porta" ? 4 : 3, true);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.setLineDash([]);
+}
+
+/** O que cada inimigo enxerga, só pro Mestre: um véu vermelho com contorno
+ *  (pra saber se o goblin está vendo o grupo). Não abre névoa pra mesa. */
+export function desenharVisaoDosInimigos(ctx: CanvasRenderingContext2D, poligonos: readonly (readonly Ponto[])[], escala: number): void {
+  ctx.lineJoin = "round";
+  for (const poli of poligonos) {
+    if (poli.length < 3) continue;
+    ctx.beginPath();
+    poli.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.closePath();
+    ctx.fillStyle = "rgba(226, 75, 74, 0.16)";
+    ctx.fill();
+    ctx.lineWidth = 2 / escala;
+    ctx.strokeStyle = "rgba(226, 75, 74, 0.7)";
+    ctx.stroke();
+  }
+}
+
 export type EntradaDeDesenho = {
   cena: Cena;
   imagem: CanvasImageSource | null;
@@ -98,6 +205,10 @@ export type EntradaDeDesenho = {
   pecaCoberta?: (x: number, y: number) => boolean;
   /** Peão sendo arrastado: desenhado nesta posição em vez da gravada. */
   arrasto?: { id: string; x: number; y: number } | null;
+  /** Só pro Mestre: as paredes e portas, a parede em construção e a visão dos inimigos. */
+  paredes?: readonly Parede[];
+  previaParede?: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | null;
+  visaoDosInimigos?: readonly (readonly Ponto[])[];
 };
 
 /** Pinta um quadro completo. */
@@ -133,6 +244,12 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
     ctx.fillStyle = revelar ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.55)";
     ctx.strokeStyle = ctx.fillStyle;
     desenharForma(ctx, e.previa.forma);
+  }
+
+  // O que só o Mestre enxerga: sai de baixo dos peões (que ficam por cima).
+  if (e.mestre) {
+    if (e.visaoDosInimigos && e.visaoDosInimigos.length > 0) desenharVisaoDosInimigos(ctx, e.visaoDosInimigos, vista.escala);
+    if ((e.paredes && e.paredes.length > 0) || e.previaParede) desenharParedes(ctx, e.paredes ?? [], vista.escala, e.previaParede ?? null);
   }
 
   if (e.pecas && e.pecas.length > 0) {

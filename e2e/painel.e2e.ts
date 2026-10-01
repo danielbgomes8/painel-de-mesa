@@ -1,14 +1,21 @@
 import { expect, test } from "@playwright/test";
+import { decodificarMascara } from "../src/lib/visao";
 import {
   SALA,
   apagarPecasDoBanco,
+  cenaDoBanco,
   bancoConfigurado,
   coletarErros,
   comoJogador,
   criarFicha,
+  criarParedes,
+  criarPeca,
   entrarComoMestre,
   limparSala,
   mudarFicha,
+  mudarCena,
+  mudarParede,
+  paredesDoBanco,
   pecasDoBanco,
   pngDeTeste,
   porNaIniciativa,
@@ -415,6 +422,230 @@ test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, 
   await expect.poll(async () => (await textosDe(page)).includes("Jogador Robô: Cone · 18 m")).toBe(true);
 
   await contexto.close();
+  expect(erros).toEqual([]);
+});
+
+test("paredes e visão: a névoa abre sozinha pelo grupo, a porta decide, e a mesa nunca vê a marcação", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 10, hp_max: 10 });
+  await criarFicha("dragao-robo", "Dragão do Robô", { is_npc: true, hp: 50, hp_max: 50 });
+
+  // O canvas não tem texto no DOM: o robô escuta o que é DESENHADO nele (o nome
+  // do peão só é desenhado quando ele não está sob a névoa).
+  const espiar = () => {
+    const w = window as unknown as { __textos: string[] };
+    w.__textos = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args: Parameters<typeof original>) {
+      w.__textos.push(String(args[0]));
+      return original.apply(this, args);
+    };
+  };
+  const textosDe = (p: typeof page) => p.evaluate(() => (window as unknown as { __textos: string[] }).__textos);
+  const zerarTextos = (p: typeof page) => p.evaluate(() => ((window as unknown as { __textos: string[] }).__textos = []));
+
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-visao.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+
+  // A seção está ligada (senão ela diz "falta rodar a migration 0021").
+  await page.locator(".fc-sechead", { hasText: "Paredes e visão" }).click();
+  await expect(page.getByText("Falta rodar a migration 0021")).toHaveCount(0);
+  await page.getByLabel(/visão automática/).check();
+  const cena = await cenaDoBanco();
+  await expect.poll(async () => (await cenaDoBanco()).visao_ligada).toBe(true);
+
+  // Sala do jogador à esquerda, dragão à direita, uma parede inteira no meio com
+  // uma porta fechada (x = 450 numa imagem de 900 de largura).
+  await criarParedes(cena.id, [
+    { tipo: "parede", x1: 450, y1: 0, x2: 450, y2: 250 },
+    { tipo: "porta", x1: 450, y1: 250, x2: 450, y2: 350 },
+    { tipo: "parede", x1: 450, y1: 350, x2: 450, y2: 600 },
+  ]);
+  await criarPeca(cena.id, "jogador-robo", 150, 300);
+  await criarPeca(cena.id, "dragao-robo", 750, 300, { oculto: false });
+  await mudarFicha("dragao-robo", { revealed: true });
+
+  const contexto = await browser.newContext();
+  const jogador = await contexto.newPage();
+  const errosJogador = coletarErros(jogador);
+  await jogador.addInitScript(espiar);
+  await comoJogador(jogador, "jogador-robo");
+  await jogador.goto(`/?sala=${SALA}`);
+  await jogador.getByRole("button", { name: "ver o mapa" }).click();
+  await expect(jogador.locator(".cena-canvas")).toBeVisible();
+  await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+
+  // Porta fechada: o jogador se vê (JR), mas o dragão (DD) está atrás da parede.
+  await expect.poll(async () => (await textosDe(jogador)).includes("JR")).toBe(true);
+  await jogador.waitForTimeout(600);
+  expect(await textosDe(jogador)).not.toContain("DD");
+  // Com a visão automática ligada, quem põe o peão é o Mestre.
+  await expect(jogador.getByRole("button", { name: "pôr meu peão no mapa" })).toHaveCount(0);
+
+  // O Mestre abre a porta (tocando nela, com a ferramenta de mover): o dragão aparece.
+  await page.getByRole("button", { name: /mover/ }).first().click();
+  const canvas = page.locator(".cena-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const c = (await canvas.boundingBox())!;
+  const escala = Math.min(c.width / (900 * 1.06), c.height / (600 * 1.06));
+  const naTela = (ix: number, iy: number) => ({ x: c.x + c.width / 2 + (ix - 450) * escala, y: c.y + c.height / 2 + (iy - 300) * escala });
+  const porta = naTela(450, 300);
+  await page.mouse.click(porta.x, porta.y);
+  await expect.poll(async () => (await paredesDoBanco()).find((p) => p.tipo === "porta")?.aberta).toBe(true);
+  await expect.poll(async () => (await textosDe(jogador)).includes("DD")).toBe(true);
+
+  // O que o grupo viu fica guardado (o aparelho do Mestre grava).
+  await expect.poll(async () => (await cenaDoBanco()).explorado, { timeout: 15_000 }).not.toBe("");
+
+  // Fechando de novo (pelo banco, como outro aparelho), o dragão some outra vez.
+  const idDaPorta = (await paredesDoBanco()).find((p) => p.tipo === "porta")!.id;
+  await jogador.waitForTimeout(500);
+  await zerarTextos(jogador);
+  await mudarParede(idDaPorta, { aberta: false });
+  await expect.poll(async () => (await textosDe(jogador)).includes("JR")).toBe(true);
+  expect(await textosDe(jogador)).not.toContain("DD");
+
+  // Desligando a visão, volta o comportamento de antes (só a névoa feita à mão).
+  await mudarCena(cena.id, { visao_ligada: false });
+
+  await contexto.close();
+  await apagarPecasDoBanco();
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
+});
+
+test("paredes: o Mestre desenha parede, porta e cômodo, apaga, e escolhe onde o grupo entra", async ({ page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 10, hp_max: 10 });
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-paredes.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+
+  const arrastar = async (de: [number, number], para: [number, number]) => {
+    const canvas = page.locator(".cena-canvas");
+    await canvas.scrollIntoViewIfNeeded();
+    const c = (await canvas.boundingBox())!;
+    const escala = Math.min(c.width / (900 * 1.06), c.height / (600 * 1.06));
+    const p = (ix: number, iy: number) => ({ x: c.x + c.width / 2 + (ix - 450) * escala, y: c.y + c.height / 2 + (iy - 300) * escala });
+    const a = p(...de);
+    const b = p(...para);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 8 });
+    await page.mouse.up();
+  };
+  const modo = (nome: string) => page.getByRole("group", { name: "O que desenhar" }).getByRole("button", { name: nome });
+
+  await page.getByRole("button", { name: "🧱 paredes" }).click();
+  // Parede: as pontas encaixam no cruzamento da grade (o lado vem da cena, não é chute).
+  const lado = Number((await cenaDoBanco()).grade_px);
+  await modo("parede").click();
+  await arrastar([140, 140], [420, 140]);
+  await expect.poll(async () => (await paredesDoBanco()).length).toBe(1);
+  const parede = (await paredesDoBanco())[0];
+  expect(parede.tipo).toBe("parede");
+  expect(Number(parede.x1) % lado).toBeCloseTo(0, 5);
+  expect(Number(parede.y1) % lado).toBeCloseTo(0, 5);
+
+  // Porta nasce fechada.
+  await modo("porta").click();
+  await arrastar([420, 140], [420, 280]);
+  await expect.poll(async () => (await paredesDoBanco()).length).toBe(2);
+  expect((await paredesDoBanco()).find((p) => p.tipo === "porta")?.aberta).toBe(false);
+
+  // Cômodo: quatro paredes de uma vez.
+  await modo("cômodo").click();
+  await arrastar([560, 350], [840, 560]);
+  await expect.poll(async () => (await paredesDoBanco()).length).toBe(6);
+
+  // Apagar: tocar numa parede a tira.
+  await modo("apagar").click();
+  await arrastar([280, 140], [280, 140]);
+  await expect.poll(async () => (await paredesDoBanco()).length).toBe(5);
+
+  // Desfazer parede tira a mais recente.
+  await page.locator(".fc-sechead", { hasText: "Paredes e visão" }).click();
+  await page.getByRole("button", { name: "↩ desfazer parede" }).click();
+  await expect.poll(async () => (await paredesDoBanco()).length).toBe(4);
+
+  // Onde o grupo entra: o Mestre toca no mapa e os peões se agrupam em volta do ponto.
+  await page.locator(".fc-sechead", { hasText: "Peões" }).click();
+  await page.getByRole("button", { name: "grupo onde eu tocar" }).click();
+  await expect(page.getByText("Toque no mapa no lugar onde o grupo entra")).toBeVisible();
+  await arrastar([700, 120], [700, 120]);
+  await expect.poll(async () => (await pecasDoBanco()).length).toBe(1);
+  const peao = (await pecasDoBanco())[0];
+  expect(Math.hypot(Number(peao.x) - 700, Number(peao.y) - 120)).toBeLessThan(lado * 3);
+
+  await apagarPecasDoBanco();
+  expect(erros).toEqual([]);
+});
+
+test("visão: se as paredes demoram a chegar, a memória não ganha o que estava atrás delas", async ({ page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 10, hp_max: 10 });
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-corrida.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  const cena = await cenaDoBanco();
+  // Parede inteira no meio (x = 450), sem alcance: sem a parede, o grupo "veria" o mapa todo.
+  await criarParedes(cena.id, [{ tipo: "parede", x1: 450, y1: 0, x2: 450, y2: 600 }]);
+  await criarPeca(cena.id, "jogador-robo", 150, 300);
+  await mudarCena(cena.id, { visao_ligada: true, visao_alcance: null, explorado: "" });
+
+  // Recarrega a tela do Mestre com a resposta das paredes atrasada em 3,5 s.
+  await page.route("**/rest/v1/cena_paredes**", async (rota) => {
+    await new Promise((r) => setTimeout(r, 3500));
+    await rota.continue();
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  // O aparelho do Mestre grava o que o grupo viu 1,5 s depois de ver.
+  await expect.poll(async () => (await cenaDoBanco()).explorado, { timeout: 25_000 }).not.toBe("");
+  await page.waitForTimeout(2500);
+
+  const gravada = await cenaDoBanco();
+  const mascara = decodificarMascara(gravada.explorado, {
+    grade_ligada: Boolean(gravada.grade_ligada),
+    grade_px: Number(gravada.grade_px),
+    largura: Number(gravada.largura),
+    altura: Number(gravada.altura),
+  });
+  expect(mascara).not.toBeNull();
+  let vistasDoOutroLado = 0;
+  let vistasDesteLado = 0;
+  for (let r = 0; r < mascara!.rows; r++) {
+    for (let c = 0; c < mascara!.cols; c++) {
+      if (!mascara!.celulas[r * mascara!.cols + c]) continue;
+      if ((c + 0.5) * mascara!.lado > 450) vistasDoOutroLado++;
+      else vistasDesteLado++;
+    }
+  }
+  expect(vistasDesteLado).toBeGreaterThan(0);
+  expect(vistasDoOutroLado).toBe(0);
+
+  await apagarPecasDoBanco();
   expect(erros).toEqual([]);
 });
 

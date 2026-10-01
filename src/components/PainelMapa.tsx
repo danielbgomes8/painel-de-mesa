@@ -4,9 +4,11 @@ import { useMemo, useRef, useState } from "react";
 import type { Cenas } from "@/hooks/useCenas";
 import type { Sala } from "@/hooks/useSala";
 import { useNevoa } from "@/hooks/useNevoa";
+import { useParedes } from "@/hooks/useParedes";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
-import { montarPecasNaTela, posicoesIniciais, type TamanhoPeca } from "@/lib/pecas";
+import { montarPecasNaTela, posicoesIniciais, regiaoEmTornoDe, type TamanhoPeca } from "@/lib/pecas";
+import { ultimaParede, type ModoParede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
 import {
@@ -16,6 +18,7 @@ import {
   nomeDaCenaPeloArquivo,
   quadradosNaLargura,
   type Cena,
+  type Ponto,
   type ModoNevoa,
   type TamanhoPincel,
 } from "@/lib/cenas";
@@ -53,6 +56,8 @@ export function VisorDaMesa({
   const nevoa = useNevoa(cena.id, codigo);
   const ping = usePing(cena, quem);
   const banco = usePecas(cena.id, codigo);
+  // As paredes não aparecem pra mesa: só decidem o que a visão automática alcança.
+  const muros = useParedes(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
   // O que o toque faz no mapa: mexer, medir (régua) ou marcar uma área de magia.
   const [uso, setUso] = useState<"mover" | "regua" | "area">("mover");
@@ -102,6 +107,8 @@ export function VisorDaMesa({
         modeloArea={modeloArea}
         areas={ping.areas}
         aoAreaar={quem ? ping.enviarArea : undefined}
+        paredes={muros.paredes}
+        visaoPronta={!muros.carregando && !banco.carregando}
         pecas={pecas}
         aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
       />
@@ -110,7 +117,7 @@ export function VisorDaMesa({
           <div className="mapa-visor-barra">
             <span className="mapa-visor-nome">{cena.nome || "Mapa"}</span>
             <div className="mapa-visor-botoes">
-              {semMeuPeao && (
+              {semMeuPeao && !cena.visao_ligada && (
                 <button type="button" className="btn" onClick={porMeuPeao}>
                   pôr meu peão no mapa
                 </button>
@@ -139,6 +146,9 @@ export function VisorDaMesa({
                 em linha reta
               </button>
             </div>
+          )}
+          {semMeuPeao && cena.visao_ligada && (
+            <p className="fc-sub">Com a visão automática ligada, quem põe o seu peão no mapa é o Mestre: o lugar dele abre a névoa.</p>
           )}
           {uso === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
           {banco.aviso && (
@@ -223,7 +233,17 @@ export function PainelMapa({
 }
 
 /** Número com vírgula ou ponto ("1,5"), pros metros por quadrado. */
-function CampoMetros({ valor, onCommit }: { valor: number; onCommit: (n: number) => void }) {
+function CampoMetros({
+  valor,
+  onCommit,
+  aria = "Metros por quadrado",
+  maximo = 100,
+}: {
+  valor: number;
+  onCommit: (n: number) => void;
+  aria?: string;
+  maximo?: number;
+}) {
   const [rascunho, setRascunho] = useState(String(valor).replace(".", ","));
   const [focado, setFocado] = useState(false);
   const mostrado = focado ? rascunho : String(valor).replace(".", ",");
@@ -232,7 +252,7 @@ function CampoMetros({ valor, onCommit }: { valor: number; onCommit: (n: number)
       className="mapa-num"
       type="text"
       inputMode="decimal"
-      aria-label="Metros por quadrado"
+      aria-label={aria}
       value={mostrado}
       onFocus={() => {
         setRascunho(String(valor).replace(".", ","));
@@ -242,7 +262,7 @@ function CampoMetros({ valor, onCommit }: { valor: number; onCommit: (n: number)
       onBlur={() => {
         setFocado(false);
         const n = Number.parseFloat(rascunho.replace(",", "."));
-        if (Number.isFinite(n) && n > 0 && n <= 100 && n !== valor) onCommit(Math.round(n * 100) / 100);
+        if (Number.isFinite(n) && n > 0 && n <= maximo && n !== valor) onCommit(Math.round(n * 100) / 100);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
@@ -266,6 +286,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const nevoa = useNevoa(cena?.id ?? null, codigo);
   const ping = usePing(cena, quem);
   const banco = usePecas(cena?.id ?? null, codigo);
+  const muros = useParedes(cena?.id ?? null, codigo);
+  const [modoParede, setModoParede] = useState<ModoParede>("parede");
+  const [verInimigos, setVerInimigos] = useState(false);
+  /** Esperando o Mestre tocar no mapa pra dizer onde o grupo (ou os inimigos) entra. */
+  const [colocando, setColocando] = useState<"grupo" | "inimigos" | null>(null);
   const [pecaSelecionada, setPecaSelecionada] = useState<string | null>(null);
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
@@ -296,21 +321,30 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     return banco.pecas.map((p) => [p.x, p.y]);
   }
 
-  function porOGrupo() {
+  function porOGrupo(regiao: ReturnType<typeof regiaoAtual> = regiaoAtual()) {
     if (!cena) return;
     const faltam = sala.personagens.filter((p) => !p.is_npc && !banco.pecas.some((x) => x.slug === p.slug));
-    const lugares = posicoesIniciais(cena, faltam.length, regiaoAtual(), lugaresOcupados());
+    const lugares = posicoesIniciais(cena, faltam.length, regiao, lugaresOcupados());
     void banco.adicionar(faltam.map((p, i) => ({ slug: p.slug, nome: "", x: lugares[i][0], y: lugares[i][1] })));
   }
 
   /** Os inimigos que estão na iniciativa e ainda não têm peão. Entram OCULTOS:
    *  o Mestre mostra quando quiser (igual ao NPC oculto da ficha). */
-  function porOsInimigos() {
+  function porOsInimigos(regiao: ReturnType<typeof regiaoAtual> = regiaoAtual()) {
     if (!cena) return;
     const naOrdem = new Set(sala.combate.order.map((o) => o.slug));
     const faltam = sala.personagens.filter((p) => p.is_npc && naOrdem.has(p.slug) && !banco.pecas.some((x) => x.slug === p.slug));
-    const lugares = posicoesIniciais(cena, faltam.length, regiaoAtual(), lugaresOcupados());
+    const lugares = posicoesIniciais(cena, faltam.length, regiao, lugaresOcupados());
     void banco.adicionar(faltam.map((p, i) => ({ slug: p.slug, nome: "", x: lugares[i][0], y: lugares[i][1], oculto: true })));
+  }
+
+  /** O Mestre tocou no mapa: o grupo (ou os inimigos) entra em volta desse ponto. */
+  function colocarOnde(ponto: Ponto) {
+    if (!cena || !colocando) return;
+    const regiao = regiaoEmTornoDe(cena, ponto);
+    if (colocando === "grupo") porOGrupo(regiao);
+    else porOsInimigos(regiao);
+    setColocando(null);
   }
 
   function porMarcador() {
@@ -370,6 +404,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const podeQuadradinhos = cena ? gradeUsavel(cena) : false;
   // Sem grade, "quadradinhos" não existe: cai no pincel em vez de ficar sem ferramenta.
   const ferramentaAtiva: Ferramenta = ferramenta === "quadradinhos" && !podeQuadradinhos ? "pincel" : ferramenta;
+  /** Trocar de ferramenta desiste de "onde eu toco". */
+  function escolherFerramenta(f: Ferramenta) {
+    setColocando(null);
+    setFerramenta(f);
+  }
   const avisos = [cenas.aviso, nevoa.aviso].filter((a): a is string => Boolean(a));
 
   return (
@@ -452,7 +491,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
               </div>
 
               <div className="mapa-ferr" role="group" aria-label="Ferramenta">
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "mover"} onClick={() => setFerramenta("mover")}>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "mover"} onClick={() => escolherFerramenta("mover")}>
                   ✋ mover
                 </button>
                 {podeQuadradinhos && (
@@ -460,27 +499,42 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     type="button"
                     className="chip alvo"
                     aria-pressed={ferramentaAtiva === "quadradinhos"}
-                    onClick={() => setFerramenta("quadradinhos")}
+                    onClick={() => escolherFerramenta("quadradinhos")}
                   >
                     ▦ quadradinhos
                   </button>
                 )}
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "pincel"} onClick={() => setFerramenta("pincel")}>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "pincel"} onClick={() => escolherFerramenta("pincel")}>
                   🖌 pincel
                 </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "retangulo"} onClick={() => setFerramenta("retangulo")}>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "retangulo"} onClick={() => escolherFerramenta("retangulo")}>
                   ▭ retângulo
                 </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "ping"} onClick={() => setFerramenta("ping")}>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "ping"} onClick={() => escolherFerramenta("ping")}>
                   📍 ping
                 </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "regua"} onClick={() => setFerramenta("regua")}>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "regua"} onClick={() => escolherFerramenta("regua")}>
                   📏 régua
                 </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "area"} onClick={() => setFerramenta("area")}>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "area"} onClick={() => escolherFerramenta("area")}>
                   ✨ área
                 </button>
+                {!muros.indisponivel && (
+                  <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "parede"} onClick={() => escolherFerramenta("parede")}>
+                    🧱 paredes
+                  </button>
+                )}
               </div>
+
+              {ferramentaAtiva === "parede" && (
+                <div className="mapa-ferr" role="group" aria-label="O que desenhar">
+                  {([["parede", "parede"], ["porta", "porta"], ["comodo", "cômodo"], ["apagar", "apagar"]] as const).map(([modo, rotulo]) => (
+                    <button key={modo} type="button" className="chip alvo" aria-pressed={modoParede === modo} onClick={() => setModoParede(modo)}>
+                      {rotulo}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {ferramentaAtiva === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
 
@@ -495,7 +549,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 </div>
               )}
 
-              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && ferramentaAtiva !== "area" && (
+              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && ferramentaAtiva !== "area" && ferramentaAtiva !== "parede" && (
                 <div className="mapa-ferr" role="group" aria-label="Opções da névoa">
                   <button type="button" className="chip alvo" aria-pressed={modo === "revelar"} onClick={() => setModo("revelar")}>
                     revelar
@@ -525,7 +579,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 imagemUrl={cenas.urlDaImagem(cena)}
                 regras={nevoa.regras}
                 mestre
-                ferramenta={ferramentaAtiva}
+                ferramenta={colocando ? "colocar" : ferramentaAtiva}
                 modoNevoa={modo}
                 pincel={pincel}
                 aoPintar={(nova) => void nevoa.adicionar(nova)}
@@ -538,6 +592,15 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 modeloArea={modeloArea}
                 areas={ping.areas}
                 aoAreaar={quem ? ping.enviarArea : undefined}
+                paredes={muros.paredes}
+                modoParede={modoParede}
+                aoCriarParedes={(novas) => void muros.adicionar(novas)}
+                aoApagarParede={(id) => void muros.remover(id)}
+                aoAlternarPorta={(id) => void muros.alternarPorta(id)}
+                verVisaoDosInimigos={verInimigos}
+                visaoPronta={!muros.carregando && !banco.carregando}
+                aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
+                aoEscolherPonto={colocarOnde}
                 pecas={pecas}
                 aoMoverPeca={(id, x, y) => void banco.atualizar(id, { x, y })}
                 aoTocarPeca={setPecaSelecionada}
@@ -547,6 +610,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                   ? "Arraste com um dedo e use a pinça pra dar zoom. Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
                   : ferramentaAtiva === "ping"
                     ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
+                    : ferramentaAtiva === "parede"
+                      ? modoParede === "apagar"
+                        ? "Toque numa parede ou porta pra apagá-la."
+                        : modoParede === "comodo"
+                          ? "Arraste de um canto ao canto oposto: saem as quatro paredes do cômodo."
+                          : `Arraste de um ponto a outro pra desenhar ${modoParede === "porta" ? "uma porta" : "uma parede"}. As pontas encaixam nos cantos do quadradinho e nas pontas de outras paredes, pra não ficar fresta.`
                     : ferramentaAtiva === "area"
                       ? "Escolha a forma e o tamanho e arraste no mapa: a origem encaixa no canto do quadradinho e a mesa vê a figura por alguns segundos, com o seu nome. Esfera: toque onde cai o centro. Cone, cubo e linha: arraste pra onde apontam."
                       : ferramentaAtiva === "regua"
@@ -583,13 +652,27 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                       ocultos; a mesa vê “?” no peão de inimigo que ainda não foi revelado.
                     </p>
                     <div className="mapa-ferr">
-                      <button type="button" className="btn" onClick={porOGrupo}>
+                      <button type="button" className="btn" onClick={() => porOGrupo()}>
                         pôr o grupo no mapa
                       </button>
-                      <button type="button" className="btn" onClick={porOsInimigos}>
+                      <button type="button" className="btn" onClick={() => porOsInimigos()}>
                         pôr os inimigos da iniciativa
                       </button>
                     </div>
+                    <div className="mapa-ferr" role="group" aria-label="Escolher onde entram">
+                      <span className="fc-sub">ou escolha o lugar:</span>
+                      <button type="button" className="chip alvo" aria-pressed={colocando === "grupo"} onClick={() => setColocando(colocando === "grupo" ? null : "grupo")}>
+                        grupo onde eu tocar
+                      </button>
+                      <button type="button" className="chip alvo" aria-pressed={colocando === "inimigos"} onClick={() => setColocando(colocando === "inimigos" ? null : "inimigos")}>
+                        inimigos onde eu tocar
+                      </button>
+                    </div>
+                    {colocando && (
+                      <p className="fc-sub" role="status">
+                        Toque no mapa no lugar onde {colocando === "grupo" ? "o grupo entra" : "os inimigos entram"}: eles se agrupam em volta do ponto.
+                      </p>
+                    )}
                     <div className="mapa-linha">
                       <input
                         className="campotexto"
@@ -663,6 +746,115 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         tirar todos os peões
                       </button>
                     )}
+                  </>
+                )}
+              </SecaoRecolhivel>
+
+              <SecaoRecolhivel
+                abertoInicial={false}
+                titulo={<h4>Paredes e visão</h4>}
+                cabecalhoExtra={
+                  <span className="fc-sub">{muros.indisponivel ? "ainda não ligadas" : cena.visao_ligada ? "visão automática ligada" : "desligada"}</span>
+                }
+              >
+                {muros.indisponivel ? (
+                  <p className="fc-sub">
+                    Falta rodar a migration 0021_paredes.sql no SQL Editor do Supabase pra ligar as paredes e a visão automática. O resto do
+                    mapa funciona sem elas.
+                  </p>
+                ) : (
+                  <>
+                    <label className="checklabel">
+                      <input
+                        type="checkbox"
+                        checked={cena.visao_ligada}
+                        onChange={(e) => void cenas.atualizarCena(cena.id, { visao_ligada: e.target.checked })}
+                      />
+                      visão automática: a névoa se abre sozinha pelo que os jogadores enxergam
+                    </label>
+                    {cena.visao_ligada && (
+                      <>
+                        <label className="checklabel">
+                          <input
+                            type="checkbox"
+                            checked={cena.visao_alcance !== null}
+                            onChange={(e) => void cenas.atualizarCena(cena.id, { visao_alcance: e.target.checked ? 18 : null })}
+                          />
+                          limitar o alcance da visão
+                        </label>
+                        {cena.visao_alcance !== null && (
+                          <div className="mapa-grade">
+                            <label>
+                              alcance (metros)
+                              <CampoMetros
+                                aria="Alcance da visão, em metros"
+                                maximo={1000}
+                                valor={cena.visao_alcance}
+                                onCommit={(n) => void cenas.atualizarCena(cena.id, { visao_alcance: n })}
+                              />
+                            </label>
+                          </div>
+                        )}
+                        <label className="checklabel">
+                          <input type="checkbox" checked={verInimigos} onChange={(e) => setVerInimigos(e.target.checked)} />
+                          ver o que os inimigos enxergam (só você vê, em vermelho)
+                        </label>
+                        {!cena.nevoa_ligada && (
+                          <p className="fc-sub">A cena não começa coberta de névoa (veja “Grade e névoa”), então não há o que a visão abrir.</p>
+                        )}
+                      </>
+                    )}
+                    <p className="fc-sub">
+                      {muros.paredes.filter((w) => w.tipo === "parede").length} paredes · {muros.paredes.filter((w) => w.tipo === "porta").length} portas.
+                      Desenhe com a ferramenta 🧱 paredes. Pra abrir ou fechar uma porta, toque nela com a ferramenta de mover.
+                    </p>
+                    <p className="fc-sub">
+                      Os jogadores nunca veem as paredes nem as portas: só o desenho do mapa e a névoa se abrindo. Uma passagem secreta é uma
+                      porta fechada onde o mapa mostra uma parede comum; abra quando eles a descobrirem. Só o peão de jogador abre a névoa, e
+                      o que o grupo já viu só é guardado com o mapa na mesa.
+                    </p>
+                    {muros.aviso && (
+                      <p className="mapa-erro" role="alert">
+                        {muros.aviso}
+                      </p>
+                    )}
+                    <div className="mapa-ferr">
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={muros.paredes.length === 0}
+                        onClick={() => {
+                          const ultima = ultimaParede(muros.paredes);
+                          if (ultima) void muros.remover(ultima.id);
+                        }}
+                      >
+                        ↩ desfazer parede
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={muros.paredes.length === 0}
+                        onClick={() => {
+                          if (confirm("Apagar todas as paredes e portas deste mapa?")) void muros.removerTodas();
+                        }}
+                      >
+                        apagar todas
+                      </button>
+                      {cena.visao_ligada && (
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            if (confirm("Cobrir de novo tudo que o grupo já explorou neste mapa?")) {
+                              mapaRef.current?.reiniciarMemoria();
+                              void cenas.atualizarCena(cena.id, { explorado: "" });
+                            }
+                          }}
+                        >
+                          cobrir de novo o explorado
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </SecaoRecolhivel>

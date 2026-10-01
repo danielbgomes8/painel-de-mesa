@@ -45,7 +45,7 @@ async function limparImagens(): Promise<void> {
 export async function limparSala(): Promise<void> {
   if (!bancoConfigurado) return;
   await limparImagens();
-  for (const tabela of ["cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates"]) {
+  for (const tabela of ["cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates"]) {
     // Tabela que ainda não existe (migration por rodar) não é erro aqui.
     await rest(`${tabela}?room_code=eq.${SALA}`, { method: "DELETE" });
   }
@@ -86,6 +86,44 @@ export async function pecasDoBanco(): Promise<LinhaPeca[]> {
 
 export async function apagarPecasDoBanco(): Promise<void> {
   await rest(`cena_pecas?room_code=eq.${SALA}`, { method: "DELETE" });
+}
+
+/** A cena da sala de teste (a primeira), lida do banco. */
+export async function cenaDoBanco(): Promise<{ id: string; explorado: string; visao_ligada: boolean; grade_px: number; grade_ligada: boolean; largura: number; altura: number } & Record<string, unknown>> {
+  const r = await rest(`cenas?select=*&room_code=eq.${SALA}&order=created_at&limit=1`);
+  if (!r.ok) throw new Error(`não leu a cena: HTTP ${r.status}`);
+  const linhas = (await r.json()) as ({ id: string; explorado: string; visao_ligada: boolean; grade_px: number; grade_ligada: boolean; largura: number; altura: number } & Record<string, unknown>)[];
+  if (linhas.length === 0) throw new Error("a sala de teste não tem cena");
+  return linhas[0];
+}
+
+export async function mudarCena(id: string, patch: Record<string, unknown>): Promise<void> {
+  const r = await rest(`cenas?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+  if (!r.ok) throw new Error(`não mudou a cena: HTTP ${r.status} ${await r.text()}`);
+}
+
+/** Põe um peão numa posição conhecida (px da imagem). */
+export async function criarPeca(cenaId: string, slug: string, x: number, y: number, extra: Record<string, unknown> = {}): Promise<void> {
+  const r = await rest("cena_pecas", { method: "POST", body: JSON.stringify({ cena_id: cenaId, room_code: SALA, slug, nome: "", x, y, ...extra }) });
+  if (!r.ok) throw new Error(`não criou o peão: HTTP ${r.status} ${await r.text()}`);
+}
+
+export type LinhaParede = { id: string; tipo: string; x1: number; y1: number; x2: number; y2: number; aberta: boolean };
+
+export async function criarParedes(cenaId: string, linhas: { tipo: "parede" | "porta"; x1: number; y1: number; x2: number; y2: number }[]): Promise<void> {
+  const r = await rest("cena_paredes", { method: "POST", body: JSON.stringify(linhas.map((l) => ({ cena_id: cenaId, room_code: SALA, aberta: false, ...l }))) });
+  if (!r.ok) throw new Error(`não criou as paredes: HTTP ${r.status} ${await r.text()}`);
+}
+
+export async function paredesDoBanco(): Promise<LinhaParede[]> {
+  const r = await rest(`cena_paredes?select=id,tipo,x1,y1,x2,y2,aberta&room_code=eq.${SALA}&order=created_at`);
+  if (!r.ok) throw new Error(`não leu as paredes: HTTP ${r.status}`);
+  return (await r.json()) as LinhaParede[];
+}
+
+export async function mudarParede(id: string, patch: Record<string, unknown>): Promise<void> {
+  const r = await rest(`cena_paredes?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+  if (!r.ok) throw new Error(`não mudou a parede: HTTP ${r.status} ${await r.text()}`);
 }
 
 /** Entra na sala de teste como Mestre (o app não tem login: é só um clique). */

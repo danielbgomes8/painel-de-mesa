@@ -45,6 +45,8 @@ export const TABELAS_COM_SALA = [
   "cenas",
   "cena_nevoa",
   "cena_pecas",
+  // Paredes e portas (0021). O que já foi explorado vai junto, na coluna `explorado` de `cenas`.
+  "cena_paredes",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em

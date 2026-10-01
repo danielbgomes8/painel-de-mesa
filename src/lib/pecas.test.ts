@@ -16,6 +16,7 @@ import {
   podeMoverPeca,
   posicoesDosIcones,
   posicoesIniciais,
+  regiaoEmTornoDe,
   type Peca,
   type PecaNaTela,
 } from "./pecas";
@@ -152,6 +153,8 @@ describe("clicar num peão", () => {
     deslocamento: null,
     semNevoa: true,
     icones: [],
+    observa: true,
+    inimigo: false,
   });
 
   it("acha o peão sob o ponto e ignora quem está fora do círculo", () => {
@@ -387,5 +390,45 @@ describe("condições no peão", () => {
       selecionadaId: null,
     });
     expect(tela.map((p) => p.icones.map((i) => i.nome))).toEqual([["Cego"], ["Atordoado"], []]);
+  });
+});
+
+describe("quem enxerga", () => {
+  const fichas = [
+    { slug: "milo", name: "Milo", is_npc: false, revealed: false },
+    { slug: "orc", name: "Orc", is_npc: true, revealed: false },
+  ];
+  const tela = montarPecasNaTela({
+    pecas: [peca({ id: "a", slug: "milo" }), peca({ id: "b", slug: "orc" }), peca({ id: "c", slug: null, nome: "Armadilha" })],
+    cena,
+    fichas,
+    vezDe: null,
+    slugsDosJogadores: ["milo"],
+    visao: { mestre: false, meuSlug: null },
+    selecionadaId: null,
+  });
+
+  it("só o peão de jogador abre a névoa; o de inimigo e o marcador avulso não", () => {
+    expect(tela.map((p) => p.observa)).toEqual([true, false, false]);
+  });
+
+  it("o peão de inimigo é marcado (o Mestre pode pedir pra ver a visão dele)", () => {
+    expect(tela.map((p) => p.inimigo)).toEqual([false, true, false]);
+  });
+});
+
+describe("pôr o grupo onde o Mestre tocou", () => {
+  it("os peões se agrupam em volta do ponto tocado, não no meio do mapa", () => {
+    const toque: [number, number] = [2000, 1500];
+    const lugares = posicoesIniciais(cena, 4, regiaoEmTornoDe(cena, toque), []);
+    expect(lugares).toHaveLength(4);
+    for (const [x, y] of lugares) expect(Math.hypot(x - toque[0], y - toque[1])).toBeLessThan(cena.grade_px * 3);
+    // Em cima de gente que já está lá, desce uma fileira (não empilha).
+    const de_novo = posicoesIniciais(cena, 4, regiaoEmTornoDe(cena, toque), lugares);
+    expect(de_novo.some(([x, y]) => lugares.some(([ox, oy]) => Math.hypot(x - ox, y - oy) < cena.grade_px * 0.6))).toBe(false);
+  });
+
+  it("a região é um quadrado em volta do ponto, do tamanho pedido", () => {
+    expect(regiaoEmTornoDe(cena, [500, 400], 4)).toEqual({ x: 500 - 200, y: 400 - 200, w: 400, h: 400 });
   });
 });

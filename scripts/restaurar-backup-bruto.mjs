@@ -28,9 +28,9 @@ export const COLUNAS_GERADAS = { cena_nevoa: ["seq"] };
 
 const TAMANHO_LOTE = 200;
 
-/** Ordem de inserção: a sala primeiro; cenas antes da névoa e dos peões delas
+/** Ordem de inserção: a sala primeiro; cenas antes da névoa, dos peões e das paredes delas
  *  (chave estrangeira). O resto vem na ordem do backup. */
-const COM_CHAVE_ESTRANGEIRA = ["cenas", "cena_nevoa", "cena_pecas"];
+const COM_CHAVE_ESTRANGEIRA = ["cenas", "cena_nevoa", "cena_pecas", "cena_paredes"];
 
 export function ordemDeRestauracao() {
   const resto = TABELAS_COM_SALA.filter((t) => !COM_CHAVE_ESTRANGEIRA.includes(t));
