@@ -26,7 +26,7 @@ import { EncontrosPreparados } from "@/components/EncontrosPreparados";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { Telao } from "@/components/Telao";
-import { BarraAbas, type Aba } from "@/components/BarraAbas";
+import { BASTIAO_ATIVO, BarraAbas, type Aba } from "@/components/BarraAbas";
 import { EscolherCampanha } from "@/components/EscolherCampanha";
 import { BarraDesfazer } from "@/components/BarraDesfazer";
 
@@ -106,7 +106,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
   const souMestre = identidade?.tipo === "mestre";
   const [aba, setAba] = useState<Aba>("diario");
-  const abaEfetiva: Aba = aba === "mestre" && !souMestre ? "diario" : aba;
+  const abaEfetiva: Aba = (aba === "mestre" && !souMestre) || (aba === "bastiao" && !BASTIAO_ATIVO) ? "diario" : aba;
 
   const meuPersonagem = useMemo(() => {
     if (identidade?.tipo !== "jogador") return null;

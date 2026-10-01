@@ -2,9 +2,14 @@
 
 export type Aba = "diario" | "bastiao" | "combate" | "fichas" | "mestre";
 
+/** Interruptor do Bastião. Desligado (false), a aba some pra todo mundo, mas
+ *  NADA é apagado: o código, as tabelas e os dados da campanha ficam como estão,
+ *  e o backup continua levando o Bastião. Pra religar, troque por true. */
+export const BASTIAO_ATIVO: boolean = false;
+
 const ABAS_BASE: { id: Aba; rotulo: string }[] = [
   { id: "diario", rotulo: "Diário" },
-  { id: "bastiao", rotulo: "Bastião" },
+  ...(BASTIAO_ATIVO ? [{ id: "bastiao" as const, rotulo: "Bastião" }] : []),
   { id: "combate", rotulo: "Combate" },
   { id: "fichas", rotulo: "Fichas" },
 ];

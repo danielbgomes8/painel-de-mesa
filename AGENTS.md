@@ -580,6 +580,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   não tem Bastião — e "não tem" é diferente de "tem vazio": nesse caso o
   Bastião da sala não é apagado**, que é o que o aviso da tela promete;
   achado testando, porque a primeira versão apagava as instalações.
+- **Bastião desligado por enquanto** (01/10/2026, a mesa não está usando):
+  `BASTIAO_ATIVO = false` em `BarraAbas.tsx` esconde a aba. **Nada foi apagado**:
+  o `PainelBastiao`, a tabela, os dados da campanha, o carregamento no `useSala`
+  e o backup (que leva o Bastião) seguem como estavam. Religar = trocar por
+  `true`. Quem está no `Painel` com a aba "bastiao" aberta cai no Diário
+  (`abaEfetiva`).
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
