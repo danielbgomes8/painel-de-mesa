@@ -100,93 +100,11 @@ export function FichaPersonagem({
   const extrasEmBranco = p.is_npc && !temSaves && p.spell_dc === null;
   const escondeExtras = extrasEmBranco && !mostrarExtras;
 
-  return (
-    <div className={`card${ehMinha ? " mine" : ""}`}>
-      <div className="chead">
-        <div>
-          <h3>
-            {p.name}
-            {p.is_npc && <span className="npctag"> · NPC</span>}
-          </h3>
-          {p.cls && <div className="cls">{p.cls}</div>}
-        </div>
-        {souMestre && p.is_npc && (
-          <button
-            type="button"
-            className="chip"
-            aria-pressed={p.revealed}
-            onClick={() => patch({ revealed: !p.revealed })}
-          >
-            {p.revealed ? "revelado" : "oculto pro jogador"}
-          </button>
-        )}
-      </div>
+  // Quem joga vê a folha; o resumo de combate completo é só do Mestre.
+  const modoJogador = !souMestre && !p.is_npc;
 
-      <div className="body">
-        {caido && (
-          <div className="downbanner">
-            {/* NPC não tem a seção de testes de morte abaixo (monstro não
-             *  rola morte no 2024) — banner não pode mandar fazer um teste
-             *  que não existe na própria ficha. */}
-            {/* "Inconsciente", não "Caído": Caído é a condição de estar
-             *  derrubado no chão (Prone), com explicação própria na ficha. */}
-            {p.is_npc ? "⚠ A 0 PV — fora de combate" : "⚠ Inconsciente — a 0 PV, faça os testes de morte"}
-          </div>
-        )}
-
-        <div className="hprow">
-          <span className="lbl">PV</span>
-          <div className={`hpbar ${faixa}`}>
-            <i style={{ transform: `scaleX(${largura})` }} />
-          </div>
-          <span className="hpnum">
-            {p.hp} / {p.hp_max}
-          </span>
-          {p.hp_temp > 0 && <span className="hptemp">+{p.hp_temp} temp</span>}
-          {editavel && (
-            <div className="hpbtns">
-              <button type="button" className="pbtn" aria-label="Tirar 1 PV" onClick={() => mudarPV(-1)}>
-                −
-              </button>
-              <button type="button" className="pbtn" aria-label="Somar 1 PV" onClick={() => mudarPV(1)}>
-                +
-              </button>
-            </div>
-          )}
-        </div>
-
-        {editavel && (
-          <div className="hpsetrow">
-            <span>máx</span>
-            <CampoNumero
-              valor={p.hp_max}
-              onCommit={(n) => patch({ hp_max: Math.max(0, n), hp: limitarPV(p.hp, n) })}
-            />
-            <span>atual</span>
-            <CampoNumero valor={p.hp} onCommit={(n) => patch(ajustarPV(p, n))} />
-            <span>temp</span>
-            <CampoNumero valor={p.hp_temp} onCommit={(n) => patch({ hp_temp: Math.max(0, n) })} />
-          </div>
-        )}
-
-        {p.is_npc && (editavel || p.ataque) ? (
-          <div className="ataquebloco">
-            <span className="sectitle">Ataque</span>
-            {editavel ? (
-              <div className="notesbox">
-                <CampoTextoAdiado
-                  valor={p.ataque}
-                  maxLength={200}
-                  placeholder="ex.: Cimitarra +4, 1d6+2 cortante"
-                  onSalvar={(texto) => patch({ ataque: texto })}
-                />
-              </div>
-            ) : (
-              <p className="ataquetexto">{p.ataque}</p>
-            )}
-          </div>
-        ) : null}
-
+  const blocoAtaquesEDescansos = (
+    <>
         {p.is_npc ? null : (
           <AtaquesPersonagem
             texto={p.ataque ?? ""}
@@ -205,7 +123,11 @@ export function FichaPersonagem({
             </button>
           </div>
         ) : null}
+    </>
+  );
 
+  const blocoChipsEStats = (
+    <>
         <div className="chips">
           {p.is_npc ? null : (
             <button
@@ -290,6 +212,122 @@ export function FichaPersonagem({
             </div>
           )}
         </div>
+    </>
+  );
+
+  const blocoTestesDeMorte = (
+    <>
+        {p.is_npc ? null : (
+          <TestesDeMorte
+            sala={sala}
+            personagem={p}
+            editavel={editavel}
+            titulo="Testes de resistência contra a morte"
+          />
+        )}
+    </>
+  );
+
+  return (
+    <div className={`card${ehMinha ? " mine" : ""}`}>
+      <div className="chead">
+        <div>
+          <h3>
+            {p.name}
+            {p.is_npc && <span className="npctag"> · NPC</span>}
+          </h3>
+          {p.cls && <div className="cls">{p.cls}</div>}
+        </div>
+        {souMestre && p.is_npc && (
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={p.revealed}
+            onClick={() => patch({ revealed: !p.revealed })}
+          >
+            {p.revealed ? "revelado" : "oculto pro jogador"}
+          </button>
+        )}
+      </div>
+
+      <div className="body">
+        {caido && (
+          <div className="downbanner">
+            {/* NPC não tem a seção de testes de morte abaixo (monstro não
+             *  rola morte no 2024) — banner não pode mandar fazer um teste
+             *  que não existe na própria ficha. */}
+            {/* "Inconsciente", não "Caído": Caído é a condição de estar
+             *  derrubado no chão (Prone), com explicação própria na ficha. */}
+            {p.is_npc ? "⚠ A 0 PV — fora de combate" : "⚠ Inconsciente — a 0 PV, faça os testes de morte"}
+          </div>
+        )}
+
+        <div className="hprow">
+          <span className="lbl">PV</span>
+          <div className={`hpbar ${faixa}`}>
+            <i style={{ transform: `scaleX(${largura})` }} />
+          </div>
+          <span className="hpnum">
+            {p.hp} / {p.hp_max}
+          </span>
+          {p.hp_temp > 0 && <span className="hptemp">+{p.hp_temp} temp</span>}
+          {editavel && (
+            <div className="hpbtns">
+              <button type="button" className="pbtn" aria-label="Tirar 1 PV" onClick={() => mudarPV(-1)}>
+                −
+              </button>
+              <button type="button" className="pbtn" aria-label="Somar 1 PV" onClick={() => mudarPV(1)}>
+                +
+              </button>
+            </div>
+          )}
+        </div>
+
+        {editavel && (
+          <div className="hpsetrow">
+            <span>máx</span>
+            <CampoNumero
+              valor={p.hp_max}
+              onCommit={(n) => patch({ hp_max: Math.max(0, n), hp: limitarPV(p.hp, n) })}
+            />
+            <span>atual</span>
+            <CampoNumero valor={p.hp} onCommit={(n) => patch(ajustarPV(p, n))} />
+            <span>temp</span>
+            <CampoNumero valor={p.hp_temp} onCommit={(n) => patch({ hp_temp: Math.max(0, n) })} />
+          </div>
+        )}
+
+        {/* O jogador abre a PRÓPRIA ficha já na folha: vida e testes de morte no
+            topo, depois os números da folha e a ficha de atributos. O resumo
+            (cartão de combate completo + "ver ficha completa") é do Mestre. */}
+        {modoJogador && caido && blocoTestesDeMorte}
+        {modoJogador && blocoChipsEStats}
+        {modoJogador && (
+          <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} modo="jogador" />
+        )}
+        {modoJogador && blocoAtaquesEDescansos}
+
+        {p.is_npc && (editavel || p.ataque) ? (
+          <div className="ataquebloco">
+            <span className="sectitle">Ataque</span>
+            {editavel ? (
+              <div className="notesbox">
+                <CampoTextoAdiado
+                  valor={p.ataque}
+                  maxLength={200}
+                  placeholder="ex.: Cimitarra +4, 1d6+2 cortante"
+                  onSalvar={(texto) => patch({ ataque: texto })}
+                />
+              </div>
+            ) : (
+              <p className="ataquetexto">{p.ataque}</p>
+            )}
+          </div>
+        ) : null}
+
+        {!modoJogador && blocoAtaquesEDescansos}
+
+        {!modoJogador && blocoChipsEStats}
 
         {escondeExtras && editavel ? (
           <button type="button" className="minilink" onClick={() => setMostrarExtras(true)}>
@@ -297,7 +335,7 @@ export function FichaPersonagem({
           </button>
         ) : null}
 
-        {escondeExtras ? null : (
+        {escondeExtras || modoJogador ? null : (
         <div>
           <span className="sectitle">Bônus de resistência (saves)</span>
           <div className="statsrow">
@@ -398,14 +436,7 @@ export function FichaPersonagem({
         </div>
         )}
 
-        {p.is_npc ? null : (
-          <TestesDeMorte
-            sala={sala}
-            personagem={p}
-            editavel={editavel}
-            titulo="Testes de resistência contra a morte"
-          />
-        )}
+        {!(modoJogador && caido) && blocoTestesDeMorte}
 
         <div>
           <span className="sectitle">Condições</span>
@@ -502,7 +533,14 @@ export function FichaPersonagem({
           )
         )}
 
-        {!p.is_npc && (
+        {modoJogador && (
+          <>
+            <FichaClasse personagem={p} editavel={editavel} patch={patch} />
+            <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
+          </>
+        )}
+
+        {!modoJogador && !p.is_npc && (
           <div>
             <button
               type="button"

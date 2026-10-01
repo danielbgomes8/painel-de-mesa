@@ -118,8 +118,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
   (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
 - **Ficha clássica do jogador** (`FichaClassicaJogador.tsx`, 01/10/2026, sem
-  migration): em "+ ver ficha completa", acima das seções de sempre. **O
-  arranjo é o da folha de papel** (o Daniel pediu o arranjo, não o visual de
+  migration). **Quem joga abre a própria ficha já na folha; o resumo de
+  combate completo é só do Mestre** (combinado com o Daniel; a primeira versão
+  deixou a folha atrás de "+ ver ficha completa" pra todo mundo e ele
+  cobrou). `FichaPersonagem` tem `modoJogador = !souMestre && !p.is_npc`: o
+  jogador vê PV (−/+, máx/atual/temp), os testes de morte **no topo quando
+  está a 0 PV**, inspiração/concentração, CA/iniciativa/deslocamento/PP/CD
+  editáveis, **a folha** (`modo="jogador"`: não repete CA/iniciativa/
+  deslocamento, e chama o cartão de "resumo", que é o que o Mestre vê), ataques
+  e descansos, exaustão/dados de vida/condições, recursos, munição,
+  vantagens, notas, "Classe e conjuração" e as seções da ficha completa — sem
+  botão pra abrir; a linha editável de "Bônus de resistência" some (os blocos
+  da folha cobrem). O Mestre vê o cartão resumido de sempre, com o "+ ver ficha
+  completa" (que abre a mesma folha). A 375px o cartão do jogador tem ~3.600px
+  (o do Mestre, ~1.800px): é uma ficha inteira, as seções recolhem. **O arranjo
+  da folha é o da folha de papel** (o Daniel pediu o arranjo, não o visual de
   papel: a paleta é a do app): faixa de identidade ("Classe · Nível ·
   Proficiência"), card recolhido "Próximo nível · Paladino 2" (o que a classe
   ganha, `habilidadesDoNivel`, e o PV ao subir, `pvAoSubir`: valor fixo do dado

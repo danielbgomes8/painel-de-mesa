@@ -45,12 +45,14 @@ function Tile({
   rotulo,
   valor,
   cartao,
+  termo,
   onUsar,
 }: {
   rotulo: string;
   valor: string | number;
   /** Valor que está no cartão de combate lá em cima, quando é outro. */
   cartao?: string;
+  termo: string;
   onUsar?: () => void;
 }) {
   return (
@@ -59,7 +61,7 @@ function Tile({
       <span className="fj-tilel">{rotulo}</span>
       {cartao !== undefined && (
         <span className="fj-tilec">
-          cartão {cartao}
+          {termo} {cartao}
           {onUsar && (
             <>
               {" · "}
@@ -84,11 +86,18 @@ export function FichaClassicaJogador({
   personagem: p,
   editavel,
   patch,
+  modo = "mestre",
 }: {
   personagem: Personagem;
   editavel: boolean;
   patch: (mudanca: Partial<Personagem>) => void;
+  /** "jogador": a folha é a ficha principal de quem joga — CA, iniciativa e
+   *  deslocamento já estão editáveis logo acima (não repete), e o "cartão" de
+   *  combate é chamado de "resumo", que é o que o Mestre enxerga. */
+  modo?: "mestre" | "jogador";
 }) {
+  const doJogador = modo === "jogador";
+  const termoCartao = doJogador ? "resumo" : "cartão";
   // `??`: janela entre publicar este código e rodar as migrations 0013/0014.
   const atributos = p.atributos ?? { for: 10, des: 10, con: 10, int: 10, sab: 10, car: 10 };
   const proficiencias = p.proficiencias ?? { saves: [], pericias: {} };
@@ -210,10 +219,15 @@ export function FichaClassicaJogador({
           <div className="fj-tiles">
             {/* Os três de cima da folha de papel. Só leitura: edita-se no
                 cartão de combate, que é onde mudam durante a luta. */}
-            <Tile rotulo="CA" valor={p.ac} />
-            <Tile rotulo="Iniciativa" valor={sinal(p.init_mod)} />
-            <Tile rotulo="Deslocamento" valor={formatarMetros(p.speed)} />
+            {!doJogador && (
+              <>
+                <Tile rotulo="CA" valor={p.ac} termo={termoCartao} />
+                <Tile rotulo="Iniciativa" valor={sinal(p.init_mod)} termo={termoCartao} />
+                <Tile rotulo="Deslocamento" valor={formatarMetros(p.speed)} termo={termoCartao} />
+              </>
+            )}
             <Tile
+              termo={termoCartao}
               rotulo="Perc. passiva"
               valor={ppCalculado}
               cartao={ppCalculado !== p.pp ? String(p.pp) : undefined}
@@ -225,19 +239,21 @@ export function FichaClassicaJogador({
                 c.cd !== null && (
                   <Tile
                     key={`cd${i}`}
+                    termo={termoCartao}
                     rotulo={`CD de magia${sufixo}`}
                     valor={c.cd}
                     cartao={c.cd !== p.spell_dc ? (p.spell_dc === null ? "—" : String(p.spell_dc)) : undefined}
                     onUsar={editavel ? () => patch({ spell_dc: c.cd as number }) : undefined}
                   />
                 ),
-                c.ataque !== null && <Tile key={`atq${i}`} rotulo={`Ataque de magia${sufixo}`} valor={sinal(c.ataque)} />,
+                c.ataque !== null && <Tile key={`atq${i}`} termo={termoCartao} rotulo={`Ataque de magia${sufixo}`} valor={sinal(c.ataque)} />,
               ];
             })}
           </div>
           {editavel && qtdDiferencas > 0 && (
             <p className="fj-nota">
-              O cartão de combate tem {qtdDiferencas === 1 ? "1 valor" : `${qtdDiferencas} valores`} diferente
+              {doJogador ? "O resumo que o Mestre vê" : "O cartão de combate"} tem{" "}
+              {qtdDiferencas === 1 ? "1 valor" : `${qtdDiferencas} valores`} diferente
               {qtdDiferencas === 1 ? "" : "s"} do calculado (resistências, percepção, CD).{" "}
               <button type="button" className="minilink" onClick={() => patch(diferencas as Partial<Personagem>)}>
                 usar {qtdDiferencas === 1 ? "o calculado" : "todos os calculados"}
@@ -295,7 +311,7 @@ export function FichaClassicaJogador({
                       </button>
                       {s.calculado !== s.cartao && (
                         <span className="fj-dica">
-                          cartão {sinal(s.cartao)}
+                          {termoCartao} {sinal(s.cartao)}
                           {editavel && (
                             <>
                               {" · "}
