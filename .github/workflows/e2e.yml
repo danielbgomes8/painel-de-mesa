@@ -1,0 +1,63 @@
+# Robô que abre o app de verdade (build de produção + Chrome) e usa: entra como
+# Mestre, põe um monstro na iniciativa, sobe um mapa, confere que ele aparece
+# pro jogador e no telão. Pega o que os testes de regras não pegam — foi um
+# robô assim que teria achado a política de segurança bloqueando as imagens do
+# mapa. Ver e2e/ e playwright.config.ts.
+#
+# Como o `verificar.yml`, isto AVISA (✗ no commit, e-mail) mas não segura o
+# deploy. Roda no banco de verdade, numa sala fixa de teste (`ci-teste`) que o
+# próprio robô limpa antes e depois; por isso é um de cada vez.
+#
+# Segredos do repositório (os mesmos do backup diário): SUPABASE_URL e
+# SUPABASE_ANON_KEY — públicos por natureza, ver README, "Segurança".
+
+name: Robô de tela
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A sala de teste é uma só: duas execuções ao mesmo tempo se atrapalhariam.
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # O app lê o endereço do banco na hora do build (NEXT_PUBLIC_*).
+      - name: Build de produção
+        run: npm run build
+
+      - name: Instalar o Chrome
+        run: npx playwright install chrome
+
+      - name: Robô de tela
+        run: npm run e2e
+
+      # Só se falhar: o vídeo passo a passo (trace) de cada teste que quebrou.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: relatorio-do-robo
+          path: test-results/
+          retention-days: 7

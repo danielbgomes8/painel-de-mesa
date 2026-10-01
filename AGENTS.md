@@ -589,10 +589,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0018` e o `seed.sql`
-  já rodadas — o banco tem `rooms` mais doze filhas (as dez de antes, `cenas`
-  e `cena_nevoa`), todas com `on delete cascade` ligado em `rooms`, fora a
-  `erros`, e o bucket de imagens `mapas`. **Pegadinha real já resolvida
+  Paulo), separado do gb-reserva. Migrations `0001` a `0019` e o `seed.sql`
+  já rodadas — o banco tem `rooms` mais treze filhas (as dez de antes, `cenas`,
+  `cena_nevoa` e `cena_pecas`), todas com `on delete cascade` ligado em `rooms`,
+  fora a `erros`, e o bucket de imagens `mapas`. (A 0020, que tira do `anon` o
+  direito de apagar sala, é escrita à parte: ver "Robô de tela, trava de sala e
+  restauração do backup".) **Pegadinha real já resolvida
   uma vez**: se criar tabela nova
   sem "Automatically expose new tables", ela não pega GRANT pro `anon`
   automaticamente — RLS sozinho não basta, tem que dar `grant select,
@@ -713,14 +715,18 @@ primeiros itens; os outros estão na lista do fim desta seção.
 **Ainda da revisão (não feito, esperando o Daniel):**
 3. ~~Erros dos celulares somem no `console.error` do aparelho~~ — feito,
    ver "Relato de erro dos aparelhos" logo abaixo.
-4. Nenhum teste cobre tela nem o `useSala` (1.854 linhas, a parte mais
-   delicada) — robô que abre o app numa sala descartável a cada envio.
-5. **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
+4. ~~Nenhum teste cobre tela~~ — feito em 01/10/2026: robô de tela (ver "Robô
+   de tela, trava de sala e restauração do backup"). O `useSala` (1.854 linhas)
+   ainda não tem teste próprio; o robô cobre o caminho principal do combate.
+5. ~~Trava no apagar sala~~ — escrita em 01/10/2026 (`0020`, falta o Daniel
+   rodar). **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
    chave `anon` devolve todos os códigos (conferido). Então "código difícil de
    chutar" (seção de trocar campanha, acima) **não esconde campanha nenhuma**.
    Trava barata sem login: o app nunca apaga sala inteira, dá pra tirar o
    `delete` de `rooms` do `anon` (as tabelas filhas continuam abertas).
-6. O backup diário nunca foi restaurado — ensaiar numa sala descartável.
+6. ~~O backup diário nunca foi restaurado~~ — feito em 01/10/2026: script
+   `restaurar-backup-bruto.mjs` + ensaio contra o banco de verdade, sem
+   diferenças.
 7. Menores: 280 KB compactados de JS na primeira abertura (o de monstros
    saiu dela em 26/09, carrega sob demanda; o de classes continua); nada confere sozinho se o banco
    bate com `tipos.ts` (conferido à mão em 25/09: bate). O log **não**
@@ -775,8 +781,10 @@ primeiros itens; os outros estão na lista do fim desta seção.
 ## Mapas com névoa de guerra (01/10/2026, migration `0018_cenas.sql`, já rodada)
 
 O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
-**1 está construída** (cena + grade + névoa ao vivo + telão + celular), as
-outras ainda não:
+**1 está construída** (cena + grade + névoa ao vivo + telão + celular), a **2
+está pela metade** (ping e peões básicos prontos; régua e condições no peão
+não) e a 3 e a 4 ainda não. Prioridade dita pelo Daniel em 01/10: **o ping é
+essencial; peão é "bom ter"** (a mesa não vai usar muito):
 
 1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
    telão e celular. *(feito, ver abaixo)*
@@ -860,9 +868,103 @@ Decisões que não estão no código à primeira vista:
   `storage`); a aba que mudou não se atualiza sozinha, é preciso recarregar.
   (3) `window.confirm` trava a ferramenta: sobrescrever por `() => true` antes de
   tocar em "cobrir tudo", "revelar tudo" e "apagar cena".
+- **Ping** (`lib/ping.ts`, `hooks/usePing.ts`, sem migration): segure o dedo
+  parado ~450 ms no mapa (ou Shift+clique no notebook, ou a ferramenta "📍 ping"
+  do Mestre) e a mesa vê um pulso com o nome de quem apontou, no telão e nos
+  celulares. **Não grava nada**: viaja pelo canal de transmissão do Supabase
+  Realtime (`broadcast`, um canal `ping:<cena>`) e some em 3,6 s. Tudo que chega
+  passa por `validarPing` (ponto dentro do mapa, nome cortado em 30, cor só da
+  paleta — o canal é aberto), com freio de 1 ping por 700 ms por aparelho. O
+  telão só recebe. **Cor de cada jogador** = posição da ficha entre as dos
+  jogadores da sala (`corDoJogador`, a mesma do peão): nunca repete até 9
+  jogadores, ao contrário de sortear pelo nome; Mestre é dourado. Ping fora da
+  parte visível vira uma seta na borda. O gesto: mexer o dedo mais de 10 px antes
+  de completar o toque longo cancela (é arrasto); o segundo dedo cancela e vira
+  pinça. **Testado** com PointerEvent sintético: arrasto cancela, dois dedos não
+  pingam, tremidinha de 4 px ainda pinga, toque rápido não pinga, Shift pinga na
+  hora. **Armadilha de teste:** a captura de tela sai logo depois do comando; um
+  `setInterval` que só dispara 1 s depois faz o pulso "não aparecer" (perdi uns
+  vinte minutos nisso) — espere antes de capturar, ou conte `arc()` no canvas.
+  Também: o canvas fica "contaminado" (imagem de outro endereço), então
+  `getImageData` nele falha — normal, não é bug.
+- **Aviso "Tem um mapa na mesa"** (`BannerMapaNaMesa.tsx`): faixa pro jogador
+  quando há mapa na mesa e ele não está na aba Mapa. `mapaVisto` guarda o id do
+  último mapa que a pessoa viu (abrir ou SAIR da aba conta); trocar de mapa faz
+  o aviso voltar; ✕ dispensa. Uma vibração curta, sem som.
+- **Peões** (migration `0019_pecas.sql`, `lib/pecas.ts`, `hooks/usePecas.ts`):
+  tabela `cena_pecas` (x, y = CENTRO em px da imagem; `slug` liga à ficha, nulo =
+  marcador avulso com nome/cor próprios; índice único (cena, slug): uma ficha, um
+  peão por cena). **Nome, cor e "inimigo revelado" vêm da ficha, não são
+  copiados** — revelar o NPC na ficha revela o peão. Regras: o Mestre move todos,
+  o jogador só o da própria ficha; peão **oculto** ou **sob a névoa** não aparece
+  pra mesa (checa o canvas da névoa no centro do peão, com cache), exceto o do
+  próprio jogador; NPC não revelado é "?" vermelho pra jogador (e PV nunca
+  aparece); o anel dourado é a vez da iniciativa; encaixa no centro do
+  quadradinho (peão de tamanho par, no cruzamento das linhas). "Pôr o grupo" e
+  "pôr os inimigos da iniciativa" (esses entram ocultos) ficam na seção Peões do
+  Mestre; o jogador tem "pôr meu peão no mapa". Arrastar peão só vale com a
+  ferramenta mover; arrastar fora de peão arrasta o mapa. Sem a tabela, a seção
+  diz "falta rodar a migration 0019" e o resto do mapa funciona. Conferido em
+  01/10/2026 com a migration rodada: o robô de tela cobre pôr o grupo/inimigos,
+  inimigo entra oculto, tocar de novo não duplica, revelar, tamanho e "pôr meu
+  peão"; e um script de verificação (apagado) tirou fotos a 375px e **arrastou um
+  peão com o mouse na aplicação de verdade** (saiu de 435,285 pra 615,405,
+  encaixado no centro do quadradinho). **Defeito achado nas fotos:** "pôr o
+  grupo" e depois "pôr os inimigos" caíam todos no mesmo lugar, um peão em cima
+  do outro (o arrasto pegava o de cima). Hoje `posicoesIniciais` recebe os lugares
+  ocupados e desce/sobe a fileira até achar trecho livre (testado). **Um bug
+  desses não aparece em teste de regra: olhe a foto.**
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).
+
+## Robô de tela, trava de sala e restauração do backup (01/10/2026)
+
+- **Robô de tela** (`e2e/*.e2e.ts`, `playwright.config.ts`,
+  `.github/workflows/e2e.yml`, `npm run e2e`): Playwright com o **Chrome já
+  instalado** (`channel: "chrome"`, nada é baixado; no CI roda
+  `npx playwright install chrome`). Abre o app de verdade numa sala **fixa**
+  `ci-teste` que ele mesmo limpa antes e depois (`e2e/apoio.ts`; fixa porque
+  depois da migration 0020 ninguém apaga sala pelo app). Cobre: Mestre entra e
+  vê as abas sem erro na tela; combate (monstro na iniciativa, passa a vez);
+  mapa (sobe a imagem, ela CARREGA — a política de segurança já bloqueou isso
+  uma vez —, vai pra mesa, o jogador vê o aviso e abre o mapa, o telão mostra, o
+  Mestre tira e a aba some ao vivo). Erro no console conta como falha (o robô
+  imprime o endereço que falhou). Local: `E2E_URL=http://localhost:3000 npm run
+  e2e` (usa um servidor já rodando) ou `npm run e2e` (sobe o `next dev` na 3100;
+  o Next 16 não deixa dois `next dev` na mesma pasta). **Não entra no `npm run
+  verificar`** (precisa do banco) e **só avisa** (✗ no commit), como o
+  `verificar.yml`. Segredos do repositório: os mesmos do backup diário.
+  Os arquivos são `.e2e.ts`, não `.test.ts`, pra o Vitest não tentar rodá-los.
+  **Já achou um erro de verdade:** com a tabela dos peões ainda não criada o
+  console mostra um 404 (o app trata, mas o robô falha de propósito). Com a 0019
+  rodada, os 4 cenários passam (~20 s).
+- **Trava no apagar sala** (`0020_sem_apagar_sala.sql`): `revoke delete on rooms
+  from anon`. O app só faz `upsert` da sala (nunca apaga), então nada muda pra
+  quem usa; o `on delete cascade` deixava qualquer aparelho com a chave pública
+  apagar uma campanha inteira. **Consequência pra quem testa:** apagar sala de
+  teste deixa de ser possível pela API — passa a ser no SQL Editor
+  (`delete from public.rooms where code = 'teste-ui';`). As tabelas filhas
+  continuam apagáveis pela API (por isso o robô limpa filha por filha). Quem
+  roda a 0020 deve antes apagar as salas de teste que ainda existirem.
+- **Restaurar o backup diário bruto** (`scripts/restaurar-backup-bruto.mjs`):
+  devolve ao banco uma sala a partir de `backup/<sala>.json`. Sem `--executar` só
+  simula. Insere com "ignorar duplicata" pelo `id`: seguro por cima de uma sala
+  que já tem dados (o que existe fica, o que falta volta, rodar duas vezes não
+  duplica). Tira a coluna `seq` da névoa (o banco recusa) e insere a névoa na
+  ordem do `seq`. Ordem: sala, o resto, cenas, névoa, peões (chave estrangeira).
+  `restaurarBackupBruto.test.ts` confere que **toda** tabela do backup é
+  restaurada. As imagens dos mapas NÃO estão no backup. **Ensaiado em 01/10/2026
+  contra o banco de verdade**, numa sala fictícia `ensaio-backup` com dados em
+  todas as 14 tabelas: backup pelo script, sala APAGADA inteira (como se o banco
+  tivesse se perdido), simulação (não gravou nada), restauração, comparação
+  linha a linha — **zero diferenças**, ordem da névoa preservada, rodar de novo
+  não duplica. Achou uma lacuna: o backup guardava da sala só o `code`, e a sala
+  restaurada ganhava `created_at` novo; hoje lê `rooms?select=*`. Uso:
+  `SUPABASE_URL=… SUPABASE_ANON_KEY=… node scripts/restaurar-backup-bruto.mjs
+  backup/sala.json --executar`.
+- **`rm -rf .next/dev` com o servidor de teste rodando o corrompe** ("Internal
+  Server Error", `routes-manifest.json` sumiu): pare o servidor antes de limpar.
 
 ## Próximos passos (combinados em 17/09/2026)
 

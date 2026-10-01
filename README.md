@@ -246,6 +246,21 @@ movimento.
   `SUPABASE_ANON_KEY` (os mesmos valores das variáveis `NEXT_PUBLIC_…` do app).
 - É uma cópia **bruta** do banco. O backup que o app restaura sozinho é o
   botão "backup" do Mestre; este é o plano B, caso o projeto inteiro se perca.
+- **Pra devolver uma sala ao banco** a partir dessa cópia:
+  `SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/restaurar-backup-bruto.mjs backup/sala.json`
+  (sem mais nada, só **simula**; acrescente `--executar` pra valer). É seguro
+  rodar por cima de uma sala que já tem dados: o que existe fica, o que falta
+  volta. As **imagens dos mapas** não estão na cópia (ficam no Storage): guarde
+  o arquivo original de cada mapa.
+
+### Robô de tela
+
+A cada envio pra `main`, o GitHub abre o app de verdade num Chrome
+([`e2e.yml`](.github/workflows/e2e.yml)): entra como Mestre, põe um monstro na
+iniciativa, sobe um mapa e confere que ele aparece pro jogador e no telão, numa
+sala fixa de teste (`ci-teste`) que o próprio robô limpa. Se algo quebrar, o
+commit ganha um ✗ e vem um e-mail — mas isso só **avisa**, não impede o deploy.
+Pra rodar à mão: `npm run e2e` (precisa do `.env.local`).
 
 ### Erros dos aparelhos
 

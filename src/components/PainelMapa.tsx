@@ -1,8 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Cenas } from "@/hooks/useCenas";
+import type { Sala } from "@/hooks/useSala";
 import { useNevoa } from "@/hooks/useNevoa";
+import { usePecas } from "@/hooks/usePecas";
+import { usePing, type QuemPinga } from "@/hooks/usePing";
+import { montarPecasNaTela, posicoesIniciais, type TamanhoPeca } from "@/lib/pecas";
 import {
   cameraValida,
   gradePxParaQuadrados,
@@ -27,15 +31,48 @@ export function VisorDaMesa({
   cena,
   codigo,
   urlDaImagem,
+  sala,
+  quem = null,
+  meuSlug = null,
   telao = false,
 }: {
   cena: Cena;
   codigo: string;
   urlDaImagem: (c: Cena) => string | null;
+  sala: Sala;
+  /** Quem está olhando: com isso a pessoa também pinga. O telão só recebe. */
+  quem?: QuemPinga | null;
+  /** A ficha de quem joga (move o peão dela); null no telão. */
+  meuSlug?: string | null;
   telao?: boolean;
 }) {
   const nevoa = useNevoa(cena.id, codigo);
+  const ping = usePing(cena, quem);
+  const banco = usePecas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
+  // Sempre do ponto de vista de jogador: o telão e os celulares nunca veem o
+  // nome de um inimigo ainda não revelado (ver lib/pecas.ts).
+  const pecas = useMemo(
+    () =>
+      montarPecasNaTela({
+        pecas: banco.pecas,
+        cena,
+        fichas: sala.personagens,
+        vezDe: sala.combate.order[sala.combate.turn]?.slug ?? null,
+        slugsDosJogadores: sala.personagens.filter((p) => !p.is_npc).map((p) => p.slug),
+        visao: { mestre: false, meuSlug },
+        selecionadaId: null,
+      }),
+    [banco.pecas, cena, sala.personagens, sala.combate, meuSlug],
+  );
+  const minhaFicha = meuSlug ? sala.personagens.find((p) => p.slug === meuSlug) : undefined;
+  const semMeuPeao = Boolean(minhaFicha) && !banco.pecas.some((p) => p.slug === meuSlug);
+
+  function porMeuPeao() {
+    if (!minhaFicha) return;
+    const [x, y] = posicoesIniciais(cena, 1, mapaRef.current?.regiaoVisivel() ?? null, banco.pecas.map((p) => [p.x, p.y]))[0];
+    void banco.adicionar([{ slug: minhaFicha.slug, nome: "", x, y }]);
+  }
   return (
     <div className={telao ? "mapa-visor mapa-visor--telao" : "mapa-visor"}>
       <CenaMapa
@@ -46,21 +83,60 @@ export function VisorDaMesa({
         mestre={false}
         interativo={!telao}
         seguirCamera
+        pings={ping.pings}
+        aoPingar={quem ? ping.enviar : undefined}
+        pecas={pecas}
+        aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
       />
       {!telao && (
-        <div className="mapa-visor-barra">
-          <span className="mapa-visor-nome">{cena.nome || "Mapa"}</span>
-          <button type="button" className="btn" onClick={() => mapaRef.current?.reenquadrar()}>
-            voltar à visão da mesa
-          </button>
-        </div>
+        <>
+          <div className="mapa-visor-barra">
+            <span className="mapa-visor-nome">{cena.nome || "Mapa"}</span>
+            <div className="mapa-visor-botoes">
+              {semMeuPeao && (
+                <button type="button" className="btn" onClick={porMeuPeao}>
+                  pôr meu peão no mapa
+                </button>
+              )}
+              <button type="button" className="btn" onClick={() => mapaRef.current?.reenquadrar()}>
+                voltar à visão da mesa
+              </button>
+            </div>
+          </div>
+          {banco.aviso && (
+            <p className="mapa-erro" role="alert">
+              {banco.aviso}
+            </p>
+          )}
+          {quem && (
+            <p className="mapa-dica">
+              <span className="mapa-cor" style={{ background: quem.cor }} aria-hidden="true" />
+              <b>Sua cor.</b> Segure o dedo parado no mapa pra mostrar um ponto pra todo mundo: o pulso aparece com o seu
+              nome na TV e nos outros celulares.
+            </p>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 /** Conteúdo da aba Mapa: o Mestre edita; os jogadores só veem o que está na mesa. */
-export function PainelMapa({ cenas, codigo, souMestre }: { cenas: Cenas; codigo: string; souMestre: boolean }) {
+export function PainelMapa({
+  cenas,
+  codigo,
+  souMestre,
+  quem,
+  sala,
+  meuSlug,
+}: {
+  cenas: Cenas;
+  codigo: string;
+  souMestre: boolean;
+  quem: QuemPinga | null;
+  sala: Sala;
+  meuSlug: string | null;
+}) {
   if (cenas.indisponivel) {
     return (
       <section className="combat" aria-label="Mapa">
@@ -80,7 +156,14 @@ export function PainelMapa({ cenas, codigo, souMestre }: { cenas: Cenas; codigo:
     return (
       <section className="combat" aria-label="Mapa">
         {cenas.naMesa ? (
-          <VisorDaMesa cena={cenas.naMesa} codigo={codigo} urlDaImagem={cenas.urlDaImagem} />
+          <VisorDaMesa
+            cena={cenas.naMesa}
+            codigo={codigo}
+            urlDaImagem={cenas.urlDaImagem}
+            sala={sala}
+            quem={quem}
+            meuSlug={meuSlug}
+          />
         ) : (
           <>
             <div className="combat-head">
@@ -93,7 +176,7 @@ export function PainelMapa({ cenas, codigo, souMestre }: { cenas: Cenas; codigo:
     );
   }
 
-  return <EditorDoMestre cenas={cenas} codigo={codigo} />;
+  return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
 }
 
 /** Número com vírgula ou ponto ("1,5"), pros metros por quadrado. */
@@ -125,7 +208,7 @@ function CampoMetros({ valor, onCommit }: { valor: number; onCommit: (n: number)
   );
 }
 
-function EditorDoMestre({ cenas, codigo }: { cenas: Cenas; codigo: string }) {
+function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: string; quem: QuemPinga | null; sala: Sala }) {
   const [escolhida, setEscolhida] = useState<string | null>(null);
   const cena = cenas.cenas.find((c) => c.id === escolhida) ?? cenas.naMesa ?? cenas.cenas[0] ?? null;
 
@@ -138,6 +221,65 @@ function EditorDoMestre({ cenas, codigo }: { cenas: Cenas; codigo: string }) {
   const mapaRef = useRef<CenaMapaApi>(null);
 
   const nevoa = useNevoa(cena?.id ?? null, codigo);
+  const ping = usePing(cena, quem);
+  const banco = usePecas(cena?.id ?? null, codigo);
+  const [pecaSelecionada, setPecaSelecionada] = useState<string | null>(null);
+  const [nomeMarcador, setNomeMarcador] = useState("");
+  const pecas = useMemo(
+    () =>
+      cena
+        ? montarPecasNaTela({
+            pecas: banco.pecas,
+            cena,
+            fichas: sala.personagens,
+            vezDe: sala.combate.order[sala.combate.turn]?.slug ?? null,
+            slugsDosJogadores: sala.personagens.filter((p) => !p.is_npc).map((p) => p.slug),
+            visao: { mestre: true, meuSlug: null },
+            selecionadaId: pecaSelecionada,
+          })
+        : [],
+    [banco.pecas, cena, sala.personagens, sala.combate, pecaSelecionada],
+  );
+
+  /** Onde cair um peão novo: o meio do que o Mestre está vendo. */
+  function regiaoAtual() {
+    return mapaRef.current?.regiaoVisivel() ?? null;
+  }
+
+  /** Onde já tem peão (pra os novos não caírem em cima). */
+  function lugaresOcupados(): [number, number][] {
+    return banco.pecas.map((p) => [p.x, p.y]);
+  }
+
+  function porOGrupo() {
+    if (!cena) return;
+    const faltam = sala.personagens.filter((p) => !p.is_npc && !banco.pecas.some((x) => x.slug === p.slug));
+    const lugares = posicoesIniciais(cena, faltam.length, regiaoAtual(), lugaresOcupados());
+    void banco.adicionar(faltam.map((p, i) => ({ slug: p.slug, nome: "", x: lugares[i][0], y: lugares[i][1] })));
+  }
+
+  /** Os inimigos que estão na iniciativa e ainda não têm peão. Entram OCULTOS:
+   *  o Mestre mostra quando quiser (igual ao NPC oculto da ficha). */
+  function porOsInimigos() {
+    if (!cena) return;
+    const naOrdem = new Set(sala.combate.order.map((o) => o.slug));
+    const faltam = sala.personagens.filter((p) => p.is_npc && naOrdem.has(p.slug) && !banco.pecas.some((x) => x.slug === p.slug));
+    const lugares = posicoesIniciais(cena, faltam.length, regiaoAtual(), lugaresOcupados());
+    void banco.adicionar(faltam.map((p, i) => ({ slug: p.slug, nome: "", x: lugares[i][0], y: lugares[i][1], oculto: true })));
+  }
+
+  function porMarcador() {
+    if (!cena) return;
+    const nome = nomeMarcador.trim().slice(0, 30);
+    if (!nome) return;
+    const [x, y] = posicoesIniciais(cena, 1, regiaoAtual(), lugaresOcupados())[0];
+    void banco.adicionar([{ slug: null, nome, x, y }]);
+    setNomeMarcador("");
+  }
+
+  function proximoTamanho(t: TamanhoPeca): TamanhoPeca {
+    return (t >= 3 ? 1 : t + 1) as TamanhoPeca;
+  }
 
   async function aoEscolherArquivo(arquivos: FileList | null) {
     const arquivo = arquivos?.[0];
@@ -284,9 +426,12 @@ function EditorDoMestre({ cenas, codigo }: { cenas: Cenas; codigo: string }) {
                 <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "retangulo"} onClick={() => setFerramenta("retangulo")}>
                   ▭ retângulo
                 </button>
+                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "ping"} onClick={() => setFerramenta("ping")}>
+                  📍 ping
+                </button>
               </div>
 
-              {ferramentaAtiva !== "mover" && (
+              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && (
                 <div className="mapa-ferr" role="group" aria-label="Opções da névoa">
                   <button type="button" className="chip alvo" aria-pressed={modo === "revelar"} onClick={() => setModo("revelar")}>
                     revelar
@@ -320,11 +465,18 @@ function EditorDoMestre({ cenas, codigo }: { cenas: Cenas; codigo: string }) {
                 modoNevoa={modo}
                 pincel={pincel}
                 aoPintar={(nova) => void nevoa.adicionar(nova)}
+                pings={ping.pings}
+                aoPingar={quem ? ping.enviar : undefined}
+                pecas={pecas}
+                aoMoverPeca={(id, x, y) => void banco.atualizar(id, { x, y })}
+                aoTocarPeca={setPecaSelecionada}
               />
               <p className="mapa-dica">
                 {ferramentaAtiva === "mover"
-                  ? "Arraste com um dedo e use a pinça pra dar zoom. A névoa aparece meio transparente pra você; pra mesa ela é preta."
-                  : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
+                  ? "Arraste com um dedo e use a pinça pra dar zoom. Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
+                  : ferramentaAtiva === "ping"
+                    ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
+                    : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
               </p>
 
               <div className="mapa-ferr">
@@ -338,6 +490,106 @@ function EditorDoMestre({ cenas, codigo }: { cenas: Cenas; codigo: string }) {
                   cobrir tudo
                 </button>
               </div>
+
+              <SecaoRecolhivel
+                abertoInicial={false}
+                titulo={<h4>Peões</h4>}
+                cabecalhoExtra={<span className="fc-sub">{banco.indisponivel ? "ainda não ligados" : `${banco.pecas.length} no mapa`}</span>}
+              >
+                {banco.indisponivel ? (
+                  <p className="fc-sub">
+                    Falta rodar a migration 0019_pecas.sql no SQL Editor do Supabase pra ligar os peões. O resto do mapa funciona sem eles.
+                  </p>
+                ) : (
+                  <>
+                    <p className="fc-sub">
+                      Arraste um peão com um dedo (ele encaixa no quadradinho). Cada jogador move só o dele. Inimigos entram
+                      ocultos; a mesa vê “?” no peão de inimigo que ainda não foi revelado.
+                    </p>
+                    <div className="mapa-ferr">
+                      <button type="button" className="btn" onClick={porOGrupo}>
+                        pôr o grupo no mapa
+                      </button>
+                      <button type="button" className="btn" onClick={porOsInimigos}>
+                        pôr os inimigos da iniciativa
+                      </button>
+                    </div>
+                    <div className="mapa-linha">
+                      <input
+                        className="campotexto"
+                        value={nomeMarcador}
+                        maxLength={30}
+                        placeholder="nome do marcador"
+                        aria-label="Nome do marcador avulso"
+                        onChange={(e) => setNomeMarcador(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") porMarcador();
+                        }}
+                      />
+                      <button type="button" className="btn" onClick={porMarcador}>
+                        + marcador
+                      </button>
+                    </div>
+                    {banco.aviso && (
+                      <p className="mapa-erro" role="alert">
+                        {banco.aviso}
+                      </p>
+                    )}
+                    <div className="mapa-pecas">
+                      {banco.pecas.map((p) => {
+                        const naTela = pecas.find((x) => x.id === p.id);
+                        return (
+                          <div key={p.id} className={`mapa-peca${p.id === pecaSelecionada ? " sel" : ""}`}>
+                            <button type="button" className="mapa-peca-nome" onClick={() => setPecaSelecionada(p.id === pecaSelecionada ? null : p.id)}>
+                              <span className="mapa-cor" style={{ background: naTela?.cor }} aria-hidden="true" />
+                              {naTela?.nome ?? p.nome}
+                              {naTela?.vez ? " · vez" : ""}
+                            </button>
+                            <button
+                              type="button"
+                              className="chip alvo"
+                              aria-pressed={p.oculto}
+                              aria-label={`${p.oculto ? "Mostrar" : "Ocultar"} o peão ${naTela?.nome ?? p.nome} pra mesa`}
+                              onClick={() => void banco.atualizar(p.id, { oculto: !p.oculto })}
+                            >
+                              {p.oculto ? "oculto" : "visível"}
+                            </button>
+                            <button
+                              type="button"
+                              className="chip"
+                              aria-label={`Tamanho do peão ${naTela?.nome ?? p.nome}: ${p.tamanho}. Tocar muda.`}
+                              onClick={() => void banco.atualizar(p.id, { tamanho: proximoTamanho(p.tamanho) })}
+                            >
+                              tam {p.tamanho}
+                            </button>
+                            <BotaoRemover
+                              aria={`tirar o peão ${naTela?.nome ?? p.nome} do mapa`}
+                              onConfirmar={() => {
+                                if (pecaSelecionada === p.id) setPecaSelecionada(null);
+                                void banco.remover(p.id);
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {banco.pecas.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => {
+                          if (confirm("Tirar todos os peões deste mapa?")) {
+                            setPecaSelecionada(null);
+                            void banco.removerTodas();
+                          }
+                        }}
+                      >
+                        tirar todos os peões
+                      </button>
+                    )}
+                  </>
+                )}
+              </SecaoRecolhivel>
 
               <SecaoRecolhivel abertoInicial={false} titulo={<h4>Visão da mesa</h4>}>
                 <p className="fc-sub">

@@ -24,9 +24,11 @@ import {
   type TamanhoPincel,
   type Vista,
 } from "@/lib/cenas";
-import { desenharCena, desenharNevoa, type FormaDesenhavel } from "@/lib/desenharCena";
+import { desenharCena, desenharNevoa, desenharPings, escalaDaNevoa, type FormaDesenhavel } from "@/lib/desenharCena";
+import { acharPecaNoPonto, encaixarNaGrade, type PecaNaTela } from "@/lib/pecas";
+import { PING_TOLERANCIA_PX, PING_TOQUE_LONGO_MS, type PingNaTela } from "@/lib/ping";
 
-export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo";
+export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping";
 
 /** O que o Mestre pode pedir ao mapa de fora (botões "enquadrar", "levar a mesa"). */
 export type CenaMapaApi = {
@@ -54,11 +56,20 @@ type Props = {
   pincel?: TamanhoPincel;
   /** Chamado quando o Mestre solta uma pincelada. */
   aoPintar?: (nova: NovaRegra) => void;
+  /** Pings na tela (de quem for) e como pingar. Sem `aoPingar`, o mapa só mostra. */
+  pings?: readonly PingNaTela[];
+  aoPingar?: (x: number, y: number) => void;
+  /** Peões da cena (já calculados pro ponto de vista de quem olha). */
+  pecas?: readonly PecaNaTela[];
+  /** Soltou um peão num lugar novo (já encaixado na grade). */
+  aoMoverPeca?: (id: string, x: number, y: number) => void;
+  /** Tocou num peão (ou em lugar nenhum: null). */
+  aoTocarPeca?: (id: string | null) => void;
   ref?: Ref<CenaMapaApi>;
 };
 
 type Pintura = {
-  ferramenta: Exclude<Ferramenta, "mover">;
+  ferramenta: Exclude<Ferramenta, "mover" | "ping">;
   modo: ModoNevoa;
   raio: number;
   pontos: Ponto[];
@@ -89,6 +100,11 @@ export function CenaMapa({
   modoNevoa = "revelar",
   pincel = "m",
   aoPintar,
+  pings,
+  aoPingar,
+  pecas,
+  aoMoverPeca,
+  aoTocarPeca,
   ref,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -104,10 +120,20 @@ export function CenaMapa({
   const dedos = useRef(new Map<number, { x: number; y: number }>());
   const pinca = useRef<Pinca | null>(null);
   const pintura = useRef<Pintura | null>(null);
+  /** Dedo parado esperando virar ping (toque longo): onde começou e o relógio. */
+  const toqueLongo = useRef<{ x: number; y: number; timer: number } | null>(null);
+  /** Com a ferramenta ping, ou depois do ping, o dedo não arrasta o mapa. */
+  const semArrastar = useRef(false);
+  /** Peão sendo arrastado agora (posição em px do mapa; `moveu` = passou da tolerância). */
+  const arrastoPeca = useRef<{ id: string; tamanho: number; dx: number; dy: number; x: number; y: number; telaX: number; telaY: number; moveu: boolean } | null>(null);
+  /** Onde desenhar o peão mexido, até as propriedades novas chegarem (sem pulo). */
+  const arrastoVisual = useRef<{ id: string; x: number; y: number } | null>(null);
+  /** "Este ponto está na névoa?" guardado, pra não reler o canvas da névoa a cada quadro. */
+  const coberturaRef = useRef(new Map<string, boolean>());
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, pecas, aoMoverPeca, aoTocarPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, pecas, aoMoverPeca, aoTocarPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -122,12 +148,31 @@ export function CenaMapa({
         : "erro"
       : "carregando";
 
-  const pintar = useCallback(() => {
+  /** O ponto (px do mapa) está coberto de névoa? Lê o canvas da névoa uma vez
+   *  por ponto e guarda; a névoa nova esvazia o guardado. */
+  const cobertaPorNevoa = useCallback((x: number, y: number): boolean => {
+    const canvas = nevoaRef.current;
+    if (!canvas || canvas.width === 0) return false;
+    const chave = `${Math.round(x)},${Math.round(y)}`;
+    const guardado = coberturaRef.current.get(chave);
+    if (guardado !== undefined) return guardado;
+    const fs = escalaDaNevoa(propsRef.current.cena);
+    const px = Math.min(canvas.width - 1, Math.max(0, Math.floor(x * fs)));
+    const py = Math.min(canvas.height - 1, Math.max(0, Math.floor(y * fs)));
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const coberto = ctx ? ctx.getImageData(px, py, 1, 1).data[3] > 128 : false;
+    coberturaRef.current.set(chave, coberto);
+    return coberto;
+  }, []);
+
+  /** Pinta um quadro. Devolve quantos pings ainda estão animando (o laço
+   *  continua pedindo quadros enquanto for maior que zero). */
+  const pintar = useCallback((): number => {
     const canvas = canvasRef.current;
     const { w, h, dpr } = tamanhoRef.current;
-    if (!canvas || w === 0 || h === 0) return;
+    if (!canvas || w === 0 || h === 0) return 0;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) return 0;
     const p = propsRef.current;
     desenharCena(ctx, {
       cena: p.cena,
@@ -139,15 +184,20 @@ export function CenaMapa({
       dpr,
       mestre: p.mestre,
       previa: previaRef.current,
+      pecas: p.pecas,
+      pecaCoberta: cobertaPorNevoa,
+      arrasto: arrastoVisual.current,
     });
-  }, []);
+    return desenharPings(ctx, p.pings ?? [], vistaRef.current, w, h, dpr, performance.now());
+  }, [cobertaPorNevoa]);
 
   const pedirQuadro = useCallback(() => {
     if (quadroRef.current) return;
-    quadroRef.current = requestAnimationFrame(() => {
+    const quadro = () => {
       quadroRef.current = 0;
-      pintar();
-    });
+      if (pintar() > 0) quadroRef.current = requestAnimationFrame(quadro);
+    };
+    quadroRef.current = requestAnimationFrame(quadro);
   }, [pintar]);
 
   const aplicarEnquadre = useCallback(() => {
@@ -204,12 +254,33 @@ export function CenaMapa({
     };
   }, [imagemUrl, tentativa, pedirQuadro]);
 
+  // Ping novo (de quem for): começa a animar.
+  useEffect(() => {
+    pedirQuadro();
+  }, [pings, pedirQuadro]);
+
+  // O relógio do toque longo não pode sobreviver ao componente.
+  useEffect(
+    () => () => {
+      if (toqueLongo.current) window.clearTimeout(toqueLongo.current.timer);
+    },
+    [],
+  );
+
   // Névoa: redesenhada por inteiro a cada mudança das pinceladas.
   useEffect(() => {
     if (!nevoaRef.current) nevoaRef.current = document.createElement("canvas");
     if (cena.largura > 0 && cena.altura > 0) desenharNevoa(nevoaRef.current, cena, regras);
+    coberturaRef.current.clear();
     pedirQuadro();
   }, [cena, regras, pedirQuadro]);
+
+  // Peões novos: o peão mexido já está no lugar certo, então o "desenhar aqui
+  // enquanto não chega" pode sair (a não ser que ainda estejam arrastando).
+  useEffect(() => {
+    if (!arrastoPeca.current) arrastoVisual.current = null;
+    pedirQuadro();
+  }, [pecas, pedirQuadro]);
 
   // Tamanho da caixa (e a rotação do celular).
   useEffect(() => {
@@ -298,15 +369,32 @@ export function CenaMapa({
     }
   }
 
+  function cancelarToqueLongo() {
+    if (!toqueLongo.current) return;
+    window.clearTimeout(toqueLongo.current.timer);
+    toqueLongo.current = null;
+  }
+
   function aoPressionar(e: React.PointerEvent) {
     const p = propsRef.current;
     if (!p.interativo) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
     const pos = posicao(e);
+
+    // Shift+clique (notebook): ping na hora, sem arrastar nada.
+    if (e.shiftKey && p.aoPingar && dedos.current.size === 0) {
+      p.aoPingar(...noMapa(pos));
+      return;
+    }
+
+    e.currentTarget.setPointerCapture(e.pointerId);
     dedos.current.set(e.pointerId, pos);
 
     if (dedos.current.size >= 2) {
-      // Segundo dedo: cancela a pincelada e vira pinça.
+      // Segundo dedo: cancela a pincelada e o toque longo, e vira pinça.
+      cancelarToqueLongo();
+      semArrastar.current = false;
+      arrastoPeca.current = null;
+      arrastoVisual.current = null;
       pintura.current = null;
       previaRef.current = null;
       const [a, b] = [...dedos.current.values()];
@@ -321,18 +409,54 @@ export function CenaMapa({
       return;
     }
 
+    // Ferramenta ping (Mestre): um toque já pinga.
+    if (p.ferramenta === "ping" && p.aoPingar) {
+      semArrastar.current = true;
+      p.aoPingar(...noMapa(pos));
+      return;
+    }
+
+    // Peão: com a ferramenta de mover, tocar num peão que dá pra mexer o pega.
+    if (p.pecas && p.aoMoverPeca && p.ferramenta === "mover") {
+      const [mx, my] = noMapa(pos);
+      const alvo = acharPecaNoPonto(p.pecas.filter((x) => x.podeMover), mx, my);
+      if (alvo) {
+        cancelarToqueLongo();
+        arrastoPeca.current = { id: alvo.id, tamanho: alvo.tamanho, dx: mx - alvo.x, dy: my - alvo.y, x: alvo.x, y: alvo.y, telaX: pos.x, telaY: pos.y, moveu: false };
+        arrastoVisual.current = { id: alvo.id, x: alvo.x, y: alvo.y };
+        p.aoTocarPeca?.(alvo.id);
+        pedirQuadro();
+        return;
+      }
+      p.aoTocarPeca?.(null);
+    }
+
+    const ferr = p.ferramenta;
     const pintavel =
-      p.mestre && p.ferramenta !== "mover" && p.aoPintar && (p.ferramenta !== "quadradinhos" || gradeUsavel(p.cena));
-    if (pintavel && p.ferramenta !== "mover") {
+      p.mestre && ferr !== "mover" && ferr !== "ping" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
+    if (!pintavel && p.aoPingar) {
+      // Sem ferramenta de pintura em uso: dedo parado por um instante vira ping.
+      cancelarToqueLongo();
+      const timer = window.setTimeout(() => {
+        const t = toqueLongo.current;
+        toqueLongo.current = null;
+        if (!t) return;
+        semArrastar.current = true;
+        propsRef.current.aoPingar?.(...noMapa({ x: t.x, y: t.y }));
+        navigator.vibrate?.(25);
+      }, PING_TOQUE_LONGO_MS);
+      toqueLongo.current = { x: pos.x, y: pos.y, timer };
+    }
+    if (pintavel) {
       const ponto = noMapa(pos);
       pintura.current = {
-        ferramenta: p.ferramenta,
+        ferramenta: ferr,
         modo: p.modoNevoa,
         raio: raioDoPincel(p.cena, p.pincel),
         pontos: [ponto],
         inicio: ponto,
         ultimo: ponto,
-        celulas: p.ferramenta === "quadradinhos" ? celulasNoSegmento(p.cena, ponto, ponto) : [],
+        celulas: ferr === "quadradinhos" ? celulasNoSegmento(p.cena, ponto, ponto) : [],
       };
       atualizarPrevia();
       pedirQuadro();
@@ -379,6 +503,27 @@ export function CenaMapa({
       return;
     }
 
+    // Arrastando um peão.
+    const ar = arrastoPeca.current;
+    if (ar) {
+      const [mx, my] = noMapa(agora);
+      ar.x = Math.min(p.cena.largura, Math.max(0, mx - ar.dx));
+      ar.y = Math.min(p.cena.altura, Math.max(0, my - ar.dy));
+      if (!ar.moveu && Math.hypot(agora.x - ar.telaX, agora.y - ar.telaY) > PING_TOLERANCIA_PX) ar.moveu = true;
+      arrastoVisual.current = { id: ar.id, x: ar.x, y: ar.y };
+      pedirQuadro();
+      return;
+    }
+
+    // Dedo parado esperando virar ping: o mapa fica quieto enquanto ele não sair
+    // da tolerância; se sair, é arrasto e o ping é cancelado.
+    const t = toqueLongo.current;
+    if (t) {
+      if (Math.hypot(agora.x - t.x, agora.y - t.y) <= PING_TOLERANCIA_PX) return;
+      cancelarToqueLongo();
+    }
+    if (semArrastar.current) return;
+
     // Arrastar o mapa com um dedo.
     vistaRef.current = limitarVista(
       { ...vistaRef.current, tx: vistaRef.current.tx + (agora.x - antes.x), ty: vistaRef.current.ty + (agora.y - antes.y) },
@@ -417,8 +562,24 @@ export function CenaMapa({
   function aoSoltar(e: React.PointerEvent, cancelado: boolean) {
     if (!dedos.current.has(e.pointerId)) return;
     dedos.current.delete(e.pointerId);
+    cancelarToqueLongo();
     if (dedos.current.size < 2) pinca.current = null;
     if (dedos.current.size === 0) {
+      semArrastar.current = false;
+      const ar = arrastoPeca.current;
+      if (ar) {
+        arrastoPeca.current = null;
+        if (cancelado || !ar.moveu) {
+          arrastoVisual.current = null;
+        } else {
+          const [x, y] = encaixarNaGrade(propsRef.current.cena, ar.x, ar.y, ar.tamanho as 1 | 2 | 3 | 4);
+          // Fica desenhado no lugar novo até a lista de peões chegar com ele.
+          arrastoVisual.current = { id: ar.id, x, y };
+          propsRef.current.aoMoverPeca?.(ar.id, x, y);
+        }
+        pedirQuadro();
+        return;
+      }
       if (cancelado) {
         pintura.current = null;
         previaRef.current = null;
@@ -427,13 +588,13 @@ export function CenaMapa({
     }
   }
 
-  const pintando = mestre && ferramenta !== "mover";
+  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping";
   return (
     <div ref={caixaRef} className="cena-caixa">
       <canvas
         ref={canvasRef}
         className="cena-canvas"
-        style={{ cursor: !interativo ? "default" : pintando ? "crosshair" : "grab", pointerEvents: interativo ? "auto" : "none" }}
+        style={{ cursor: !interativo ? "default" : pintando ? "crosshair" : ferramenta === "ping" ? "pointer" : "grab", pointerEvents: interativo ? "auto" : "none" }}
         role="img"
         aria-label={`Mapa ${cena.nome || "sem nome"}`}
         onPointerDown={aoPressionar}

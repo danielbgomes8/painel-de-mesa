@@ -82,7 +82,7 @@ export function Telao({
     return (
       <div className="telao telao--mapa" data-tela={tela ?? undefined}>
         <div className="telao-mapa">
-          <VisorDaMesa cena={cenas.naMesa} codigo={codigo} urlDaImagem={cenas.urlDaImagem} telao />
+          <VisorDaMesa cena={cenas.naMesa} codigo={codigo} urlDaImagem={cenas.urlDaImagem} sala={sala} telao />
         </div>
         <div className="telao-faixa">
           {atual ? (

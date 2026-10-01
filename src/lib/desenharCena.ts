@@ -4,6 +4,7 @@
  */
 import {
   gradeUsavel,
+  mapaParaTela,
   type Cena,
   type ModoNevoa,
   type Ponto,
@@ -11,6 +12,8 @@ import {
   type Retangulo,
   type Vista,
 } from "./cenas";
+import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
+import type { PecaNaTela } from "./pecas";
 
 /** A névoa é desenhada num canvas à parte, menor que a imagem: pra um mapa de
  *  3000 px, 2048 já é mais do que a tela mostra, e poupa memória no celular. */
@@ -88,6 +91,11 @@ export type EntradaDeDesenho = {
   mestre: boolean;
   /** Pincelada em andamento (ainda não gravada). */
   previa?: { modo: ModoNevoa; forma: FormaDesenhavel } | null;
+  /** Peões, e como saber se um ponto do mapa está coberto de névoa. */
+  pecas?: readonly PecaNaTela[];
+  pecaCoberta?: (x: number, y: number) => boolean;
+  /** Peão sendo arrastado: desenhado nesta posição em vez da gravada. */
+  arrasto?: { id: string; x: number; y: number } | null;
 };
 
 /** Pinta um quadro completo. */
@@ -125,7 +133,69 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
     desenharForma(ctx, e.previa.forma);
   }
 
+  if (e.pecas && e.pecas.length > 0) {
+    desenharPecas(ctx, e.pecas, e.mestre, e.pecaCoberta ?? (() => false), e.arrasto ?? null);
+  }
+
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+const COR_VEZ = "#f0c24b";
+
+/** Os peões, em coordenadas do mapa (crescem com o zoom, como a miniatura numa
+ *  mesa de verdade). A mesa não vê peão oculto nem peão sob a névoa — só o
+ *  Mestre, e cada jogador o dele. */
+function desenharPecas(
+  ctx: CanvasRenderingContext2D,
+  pecas: readonly PecaNaTela[],
+  mestre: boolean,
+  coberta: (x: number, y: number) => boolean,
+  arrasto: { id: string; x: number; y: number } | null,
+): void {
+  for (const p of pecas) {
+    const x = arrasto?.id === p.id ? arrasto.x : p.x;
+    const y = arrasto?.id === p.id ? arrasto.y : p.y;
+    if (!mestre && !p.semNevoa && (p.oculto || coberta(x, y))) continue;
+    const r = p.diametro / 2;
+    ctx.save();
+    ctx.globalAlpha = mestre && p.oculto ? 0.55 : 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = p.cor;
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, r * 0.1);
+    ctx.strokeStyle = "#fff";
+    if (mestre && p.oculto) ctx.setLineDash([r * 0.35, r * 0.25]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (p.vez) {
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.16, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(3, r * 0.16);
+      ctx.strokeStyle = COR_VEZ;
+      ctx.stroke();
+    }
+    if (p.selecionada) {
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.34, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(2, r * 0.08);
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.setLineDash([r * 0.3, r * 0.2]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Letras com contorno escuro: legíveis sobre qualquer cor de peão.
+    ctx.font = `700 ${Math.round(r * (p.rotulo.length > 2 ? 0.7 : 0.9))}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(2, r * 0.16);
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    ctx.strokeText(p.rotulo, x, y + r * 0.04);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(p.rotulo, x, y + r * 0.04);
+    ctx.restore();
+  }
 }
 
 function desenharGrade(ctx: CanvasRenderingContext2D, c: Cena, escala: number): void {
@@ -153,4 +223,90 @@ function desenharGrade(ctx: CanvasRenderingContext2D, c: Cena, escala: number): 
     }
     ctx.stroke();
   }
+}
+
+/** Raio máximo do pulso na tela, em px: o mesmo tamanho em qualquer zoom (um
+ *  ping sobre o mapa inteiro não pode virar um ponto invisível). */
+const RAIO_PING = 52;
+
+/** Desenha os pings por cima de tudo, em coordenadas da TELA (não do mapa), pra
+ *  o pulso ter sempre o mesmo tamanho. Ping fora da parte visível vira uma seta
+ *  na borda apontando pra ele. Devolve quantos estão vivos: quem chama continua
+ *  pedindo quadro enquanto for maior que zero. */
+export function desenharPings(
+  ctx: CanvasRenderingContext2D,
+  pings: readonly PingNaTela[],
+  vista: Vista,
+  larguraTela: number,
+  alturaTela: number,
+  dpr: number,
+  agora: number,
+): number {
+  let vivos = 0;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  for (const p of pings) {
+    const anim = animacaoDoPing(agora - p.chegouEm);
+    if (!anim) continue;
+    vivos++;
+    const [sx, sy] = mapaParaTela(vista, p.x, p.y);
+    const borda = pontoNaBorda(sx, sy, larguraTela, alturaTela);
+    if (borda) {
+      desenharSeta(ctx, borda.x, borda.y, borda.angulo, p.cor, anim.ponto);
+      continue;
+    }
+    for (const anel of anim.aneis) {
+      ctx.globalAlpha = anel.alfa;
+      ctx.strokeStyle = p.cor;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 8 + RAIO_PING * anel.raio, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = anim.ponto;
+    ctx.fillStyle = p.cor;
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    desenharNome(ctx, p.de, sx, sy - 18, p.cor);
+  }
+  ctx.globalAlpha = 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return vivos;
+}
+
+/** O nome de quem pingou, com contorno escuro pra ler sobre qualquer mapa. */
+function desenharNome(ctx: CanvasRenderingContext2D, nome: string, x: number, y: number, cor: string): void {
+  ctx.font = "600 13px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(0,0,0,0.85)";
+  ctx.strokeText(nome, x, y);
+  ctx.fillStyle = cor;
+  ctx.fillText(nome, x, y);
+}
+
+function desenharSeta(ctx: CanvasRenderingContext2D, x: number, y: number, angulo: number, cor: string, alfa: number): void {
+  ctx.save();
+  ctx.globalAlpha = alfa;
+  ctx.translate(x, y);
+  ctx.rotate(angulo);
+  ctx.fillStyle = cor;
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(12, 0);
+  ctx.lineTo(-8, 9);
+  ctx.lineTo(-3, 0);
+  ctx.lineTo(-8, -9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }

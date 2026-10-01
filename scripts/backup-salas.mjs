@@ -44,6 +44,7 @@ export const TABELAS_COM_SALA = [
   // do Supabase e não entra nesta cópia — guarde o arquivo original do mapa.
   "cenas",
   "cena_nevoa",
+  "cena_pecas",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em
@@ -76,7 +77,7 @@ export async function lerTudo({ url, chave, caminho, buscar = fetch }) {
 
 /** Copia todas as salas. Devolve `[{ codigo, dados }]`. */
 export async function copiarSalas({ url, chave, buscar = fetch }) {
-  const salas = await lerTudo({ url, chave, caminho: "rooms?select=code&order=code.asc", buscar });
+  const salas = await lerTudo({ url, chave, caminho: "rooms?select=*&order=code.asc", buscar });
   if (salas.length === 0) {
     // Projeto pausado/vazio devolve erro ou lista vazia — nunca gravar
     // "backup" de nada e deixar todo mundo achando que está protegido.

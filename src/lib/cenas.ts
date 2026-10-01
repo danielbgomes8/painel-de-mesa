@@ -191,7 +191,7 @@ export function gradePxParaQuadrados(largura: number, quadrados: number): number
 
 /** Lado do quadradinho usado pra medir o pincel: o da grade, ou — sem grade —
  *  um trinta avos do mapa. */
-function ladoDeReferencia(c: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura">): number {
+export function ladoDeReferencia(c: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura">): number {
   return gradeUsavel(c) ? c.grade_px : Math.max(c.largura, c.altura, 300) / 30;
 }
 

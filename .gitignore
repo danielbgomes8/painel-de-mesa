@@ -36,3 +36,7 @@ next-env.d.ts
 
 # cópias do banco geradas por scripts/backup-salas.mjs (dados da campanha)
 /backup/
+
+# relatórios do robô de tela (Playwright, `npm run e2e`)
+/test-results/
+/playwright-report/

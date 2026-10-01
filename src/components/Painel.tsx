@@ -12,6 +12,8 @@ import {
   type Identidade,
 } from "@/lib/identidade";
 import { lembrarSala, rotuloDaSala } from "@/lib/sala";
+import { COR_PING_MESTRE, corDoJogador } from "@/lib/ping";
+import type { QuemPinga } from "@/hooks/usePing";
 import { horaCurta } from "@/lib/offline";
 import { definirContextoDoErro, relatarErro } from "@/lib/relatarErro";
 import { BackupSala, baixarBackupDaSala } from "@/components/BackupSala";
@@ -21,6 +23,7 @@ import { AcoesEmMassa } from "@/components/AcoesEmMassa";
 import { NotasDoMestre } from "@/components/NotasDoMestre";
 import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
+import { BannerMapaNaMesa } from "@/components/BannerMapaNaMesa";
 import { LogCombate } from "@/components/LogCombate";
 import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { EncontrosPreparados } from "@/components/EncontrosPreparados";
@@ -114,15 +117,34 @@ function PainelSala({ codigo }: { codigo: string }) {
   // O Mestre sempre vê a aba (é onde ele prepara, e onde descobre que falta a
   // migration); o jogador só quando há um mapa na mesa.
   const temMapa = souMestre || Boolean(cenas.naMesa);
+  // Último mapa que esta pessoa viu (abriu a aba ou dispensou o aviso): o aviso
+  // "tem um mapa na mesa" só aparece pra um mapa que ela ainda não viu.
+  const [mapaVisto, setMapaVisto] = useState<string | null>(null);
   const abaEfetiva: Aba =
     (aba === "mestre" && !souMestre) || (aba === "bastiao" && !BASTIAO_ATIVO) || (aba === "mapa" && !temMapa)
       ? "diario"
       : aba;
 
+  function mudarAba(nova: Aba) {
+    // Abrir o mapa, ou sair dele, conta como ter visto o que está na mesa agora.
+    if (nova === "mapa" || abaEfetiva === "mapa") setMapaVisto(cenas.naMesa?.id ?? null);
+    setAba(nova);
+  }
+
   const meuPersonagem = useMemo(() => {
     if (identidade?.tipo !== "jogador") return null;
     return sala.personagens.find((p) => p.slug === identidade.slug) ?? null;
   }, [identidade, sala.personagens]);
+
+  // Quem pinga no mapa e com que cor: o Mestre é dourado; cada jogador tem a
+  // sua, pela posição da ficha entre as dos jogadores (ver corDoJogador).
+  const quemPinga = useMemo<QuemPinga | null>(() => {
+    if (identidade?.tipo === "mestre") return { nome: "Mestre", cor: COR_PING_MESTRE };
+    if (identidade?.tipo !== "jogador") return null;
+    const slugs = sala.personagens.filter((p) => !p.is_npc).map((p) => p.slug);
+    const nome = meuPersonagem?.name ?? identidade.slug;
+    return { nome, cor: corDoJogador(identidade.slug, slugs, nome) };
+  }, [identidade, meuPersonagem, sala.personagens]);
 
   const [trocandoCampanha, setTrocandoCampanha] = useState(false);
 
@@ -266,7 +288,16 @@ function PainelSala({ codigo }: { codigo: string }) {
         <BannerSuaVez sala={sala} meuSlug={identidade.slug} />
       )}
 
-      <BarraAbas aba={abaEfetiva} onMudar={setAba} souMestre={souMestre} temMapa={temMapa} />
+      {!souMestre && abaEfetiva !== "mapa" && (
+        <BannerMapaNaMesa
+          cena={cenas.naMesa}
+          visto={mapaVisto}
+          aoAbrir={() => mudarAba("mapa")}
+          aoDispensar={() => setMapaVisto(cenas.naMesa?.id ?? null)}
+        />
+      )}
+
+      <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
       {abaEfetiva === "diario" && <DiarioCampanha sala={sala} souMestre={souMestre} />}
 
@@ -280,7 +311,14 @@ function PainelSala({ codigo }: { codigo: string }) {
         </>
       )}
 
-      {abaEfetiva === "mapa" && <PainelMapa cenas={cenas} codigo={codigo} souMestre={souMestre} />}
+      {abaEfetiva === "mapa" && <PainelMapa
+          cenas={cenas}
+          codigo={codigo}
+          souMestre={souMestre}
+          quem={quemPinga}
+          sala={sala}
+          meuSlug={identidade.tipo === "jogador" ? identidade.slug : null}
+        />}
 
       {abaEfetiva === "mestre" && souMestre && (
         <>

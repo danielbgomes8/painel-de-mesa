@@ -1,0 +1,149 @@
+import { deflateSync, crc32 } from "node:zlib";
+import type { Page } from "@playwright/test";
+
+/** A sala de teste do robô. Fixa: depois da migration 0020 ninguém apaga sala
+ *  pelo app, então uma sala por execução deixaria lixo; esta é limpa a cada vez. */
+export const SALA = "ci-teste";
+
+try {
+  // Local: lê o .env.local (o Playwright não lê). No CI as variáveis já vêm do ambiente.
+  process.loadEnvFile(".env.local");
+} catch {
+  // sem arquivo: segue com o que o ambiente tiver
+}
+
+const url = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
+const chave = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+export const bancoConfigurado = Boolean(url && chave);
+
+const cabecalhos = { apikey: chave, Authorization: `Bearer ${chave}`, "Content-Type": "application/json" };
+
+async function rest(caminho: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${url}/rest/v1/${caminho}`, { ...init, headers: { ...cabecalhos, ...(init.headers as Record<string, string>) } });
+}
+
+/** Tira do Storage as imagens de mapa da sala (o `delete` da cena no banco não leva o arquivo). */
+async function limparImagens(): Promise<void> {
+  const lista = await fetch(`${url}/storage/v1/object/list/mapas`, {
+    method: "POST",
+    headers: cabecalhos,
+    body: JSON.stringify({ prefix: SALA, limit: 200 }),
+  });
+  if (!lista.ok) return;
+  const arquivos = (await lista.json()) as { name: string }[];
+  if (arquivos.length === 0) return;
+  await fetch(`${url}/storage/v1/object/mapas`, {
+    method: "DELETE",
+    headers: cabecalhos,
+    body: JSON.stringify({ prefixes: arquivos.map((a) => `${SALA}/${a.name}`) }),
+  });
+}
+
+/** Deixa a sala de teste vazia: apaga o que o robô criou, tabela por tabela
+ *  (filhas antes das mães) e zera o combate. A linha da sala em si fica. */
+export async function limparSala(): Promise<void> {
+  if (!bancoConfigurado) return;
+  await limparImagens();
+  for (const tabela of ["cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates"]) {
+    // Tabela que ainda não existe (migration por rodar) não é erro aqui.
+    await rest(`${tabela}?room_code=eq.${SALA}`, { method: "DELETE" });
+  }
+  await rest(`combat_state?room_code=eq.${SALA}`, {
+    method: "PATCH",
+    body: JSON.stringify({ order_json: [], turn: 0, round: 1 }),
+  });
+}
+
+export async function criarFicha(slug: string, nome: string, extra: Record<string, unknown> = {}): Promise<void> {
+  const r = await rest("characters", { method: "POST", body: JSON.stringify({ room_code: SALA, slug, name: nome, ...extra }) });
+  if (!r.ok) throw new Error(`não criou a ficha ${nome}: HTTP ${r.status} ${await r.text()}`);
+}
+
+/** Põe gente na ordem de iniciativa direto no banco (o robô não precisa repetir o formulário). */
+export async function porNaIniciativa(itens: { slug: string; name: string; init: number }[]): Promise<void> {
+  const r = await rest(`combat_state?room_code=eq.${SALA}`, {
+    method: "PATCH",
+    body: JSON.stringify({ order_json: itens, turn: 0, round: 1 }),
+  });
+  if (!r.ok) throw new Error(`não pôs na iniciativa: HTTP ${r.status} ${await r.text()}`);
+}
+
+export type LinhaPeca = { slug: string | null; nome: string; oculto: boolean; tamanho: number; x: number; y: number };
+
+/** Os peões da sala, lidos do banco (o canvas não dá pra conferir pelo DOM). */
+export async function pecasDoBanco(): Promise<LinhaPeca[]> {
+  const r = await rest(`cena_pecas?select=slug,nome,oculto,tamanho,x,y&room_code=eq.${SALA}&order=created_at`);
+  if (!r.ok) throw new Error(`não leu os peões: HTTP ${r.status}`);
+  return (await r.json()) as LinhaPeca[];
+}
+
+export async function apagarPecasDoBanco(): Promise<void> {
+  await rest(`cena_pecas?room_code=eq.${SALA}`, { method: "DELETE" });
+}
+
+/** Entra na sala de teste como Mestre (o app não tem login: é só um clique). */
+export async function entrarComoMestre(page: Page): Promise<void> {
+  await page.goto(`/?sala=${SALA}`);
+  await page.getByText("Sou o Mestre").click();
+}
+
+/** Faz este navegador "ser" um personagem, como depois de escolher na tela de entrada. */
+export async function comoJogador(page: Page, slug: string): Promise<void> {
+  await page.addInitScript(
+    ([sala, quem]) => localStorage.setItem(`mesa-identidade:${sala}`, JSON.stringify({ tipo: "jogador", slug: quem })),
+    [SALA, slug],
+  );
+}
+
+/** Erros de verdade na tela (exceção solta, console.error), sem o ruído do modo de desenvolvimento. */
+export function coletarErros(page: Page): string[] {
+  const erros: string[] = [];
+  const ruido = /_next\/hmr|\/_next\/webpack-hmr|favicon|apple-icon|Download the React DevTools/i;
+  page.on("pageerror", (e) => erros.push(`exceção: ${e.message}`));
+  page.on("console", (m) => {
+    if (m.type() === "error" && !ruido.test(m.text() + m.location().url)) {
+      // O endereço que falhou vem junto: "Failed to load resource" sozinho não diz qual.
+      erros.push(`console: ${m.text()} [${m.location().url.replace(/^https?:\/\/[^/]+/, "")}]`);
+    }
+  });
+  return erros;
+}
+
+/** Um PNG de verdade (cor lisa com uma grade clara), feito aqui mesmo: sem arquivo de teste no repositório. */
+export function pngDeTeste(largura: number, altura: number): Buffer {
+  const crc = (buf: Buffer) => {
+    const b = Buffer.alloc(4);
+    b.writeUInt32BE(crc32(buf) >>> 0);
+    return b;
+  };
+  const bloco = (tipo: string, dados: Buffer) => {
+    const t = Buffer.from(tipo, "ascii");
+    const tam = Buffer.alloc(4);
+    tam.writeUInt32BE(dados.length);
+    return Buffer.concat([tam, t, dados, crc(Buffer.concat([t, dados]))]);
+  };
+  const cab = Buffer.alloc(13);
+  cab.writeUInt32BE(largura, 0);
+  cab.writeUInt32BE(altura, 4);
+  cab[8] = 8; // 8 bits por canal
+  cab[9] = 2; // RGB
+  const linhas = Buffer.alloc((largura * 3 + 1) * altura);
+  for (let y = 0; y < altura; y++) {
+    const base = y * (largura * 3 + 1);
+    linhas[base] = 0; // sem filtro
+    for (let x = 0; x < largura; x++) {
+      const linhaDeGrade = x % 50 === 0 || y % 50 === 0;
+      const i = base + 1 + x * 3;
+      linhas[i] = linhaDeGrade ? 200 : 74;
+      linhas[i + 1] = linhaDeGrade ? 190 : 67;
+      linhas[i + 2] = linhaDeGrade ? 160 : 56;
+    }
+  }
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    bloco("IHDR", cab),
+    bloco("IDAT", deflateSync(linhas)),
+    bloco("IEND", Buffer.alloc(0)),
+  ]);
+}
