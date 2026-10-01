@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HABILIDADES_CLASSE, habilidadesAte, habilidadesMulticlasse } from "./classesSrd";
+import { HABILIDADES_CLASSE, habilidadesAte, habilidadesDoNivel, habilidadesMulticlasse } from "./classesSrd";
 import type { ClasseBase } from "./tipos";
 
 const TODAS_AS_CLASSES: ClasseBase[] = [
@@ -124,5 +124,17 @@ describe("habilidadesAte", () => {
       "Defesa sem Armadura",
       "Maestria em Armas",
     ]);
+  });
+});
+
+describe("habilidadesDoNivel", () => {
+  it("devolve só o que a classe ganha exatamente naquele nível", () => {
+    expect(habilidadesDoNivel("paladino", 2).map((h) => h.nome)).toEqual(["Estilo de Combate", "Investida do Paladino"]);
+    expect(habilidadesDoNivel("paladino", 5).map((h) => h.nome)).toEqual(["Ataque Extra", "Montaria Fiel"]);
+  });
+
+  it("nível sem habilidade nova devolve vazio, e todo nível 1 de classe tem alguma", () => {
+    expect(habilidadesDoNivel("paladino", 21)).toEqual([]);
+    for (const classe of TODAS_AS_CLASSES) expect(habilidadesDoNivel(classe, 1).length, classe).toBeGreaterThan(0);
   });
 });

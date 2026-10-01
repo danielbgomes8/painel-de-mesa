@@ -1117,6 +1117,27 @@ export function habilidadesAte(classe: ClasseBase, nivel: number): HabilidadeCla
   return HABILIDADES_CLASSE.filter((h) => h.classe === classe && h.nivel <= nivel).sort((a, b) => a.nivel - b.nivel);
 }
 
+/** Nome de cada classe base, em ordem alfabética (é a ordem dos seletores). */
+export const NOME_CLASSE: Record<ClasseBase, string> = {
+  barbaro: "Bárbaro",
+  bardo: "Bardo",
+  bruxo: "Bruxo",
+  clerigo: "Clérigo",
+  druida: "Druida",
+  feiticeiro: "Feiticeiro",
+  guerreiro: "Guerreiro",
+  ladino: "Ladino",
+  mago: "Mago",
+  monge: "Monge",
+  paladino: "Paladino",
+  patrulheiro: "Patrulheiro",
+};
+
+/** O que a classe ganha exatamente neste nível — pro card "próximo nível". */
+export function habilidadesDoNivel(classe: ClasseBase, nivel: number): HabilidadeClasse[] {
+  return HABILIDADES_CLASSE.filter((h) => h.classe === classe && h.nivel === nivel);
+}
+
 /** Habilidades de todas as classes de um personagem multiclasse — cada
  *  entrada marcada com o índice da classe de origem (posição na lista de
  *  `classes`), pra agrupar na tela uma seção por classe. */

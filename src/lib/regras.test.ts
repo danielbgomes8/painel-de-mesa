@@ -40,6 +40,7 @@ import {
   podeEditarPersonagem,
   proximoTurno,
   proximosDaOrdem,
+  pvAoSubir,
   pvExibidoIniciativa,
   recuperarDadosDeVida,
   reducaoDeslocamento,
@@ -899,5 +900,21 @@ describe("encontros preparados", () => {
 
   it("quantidade estragada no banco não vira dezenas de fichas", () => {
     expect(npcsDoEncontro([{ ...goblin, quantidade: 500 }], [])).toHaveLength(QUANTIDADE_MAX_GRUPO);
+  });
+});
+
+describe("PV ao subir de nível (2024)", () => {
+  it("é o valor fixo do dado (metade + 1) mais a Constituição", () => {
+    expect(pvAoSubir("d6", 0)).toBe(4);
+    expect(pvAoSubir("d8", 1)).toBe(6);
+    expect(pvAoSubir("d10", 2)).toBe(8);
+    expect(pvAoSubir("d12", -1)).toBe(6);
+  });
+
+  it("aceita maiúscula e espaço, e devolve null se o campo não for um dado", () => {
+    expect(pvAoSubir(" D10 ", 0)).toBe(6);
+    expect(pvAoSubir("", 2)).toBeNull();
+    expect(pvAoSubir("1d10", 2)).toBeNull();
+    expect(pvAoSubir("d1", 2)).toBeNull();
   });
 });

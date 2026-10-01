@@ -793,6 +793,16 @@ export function bonusProficiencia(nivel: number): number {
   return 2 + Math.floor((Math.max(1, nivel) - 1) / 4);
 }
 
+/** PV que o personagem ganha ao subir de nível pela regra de 2024: o valor
+ *  fixo do dado de vida (metade do dado + 1: d6→4, d8→5, d10→6, d12→7) mais o
+ *  modificador de Constituição. É sugestão — quem soma é o jogador, e quem
+ *  prefere rolar o dado rola. `null` quando o campo do dado não é "dN". */
+export function pvAoSubir(dadoDeVida: string, modCon: number): number | null {
+  const faces = Number.parseInt(/^d(\d+)$/i.exec(dadoDeVida.trim())?.[1] ?? "", 10);
+  if (!Number.isFinite(faces) || faces < 2) return null;
+  return Math.floor(faces / 2) + 1 + modCon;
+}
+
 /** As dezoito perícias do SRD 2024 e o atributo de cada uma. */
 export const PERICIAS: { chave: Pericia; nome: string; atributo: Atributo }[] = [
   { chave: "atletismo", nome: "Atletismo", atributo: "for" },

@@ -7,25 +7,11 @@ import type {
   ClasseBase,
   ClassePersonagem,
   Modificador,
-  NivelProficiencia,
   Personagem,
   TipoConjurador,
 } from "@/lib/tipos";
-import { habilidadesMulticlasse } from "@/lib/classesSrd";
-import {
-  ataqueMagia,
-  bonusPericia,
-  bonusProficiencia,
-  bonusResistencia,
-  cdMagia,
-  espacosDeMagia,
-  modificador,
-  nivelTotal,
-  percepcaoPassiva,
-  PERICIAS,
-  PREFIXO_ESPACO_MAGIA,
-  somaModificadores,
-} from "@/lib/regras";
+import { NOME_CLASSE, habilidadesMulticlasse } from "@/lib/classesSrd";
+import { bonusProficiencia, espacosDeMagia, nivelTotal, PREFIXO_ESPACO_MAGIA } from "@/lib/regras";
 import { CampoNumero } from "@/components/CampoNumero";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
@@ -47,38 +33,18 @@ const TIPOS_CONJURADOR: { valor: TipoConjurador; nome: string }[] = [
   { valor: "pacto", nome: "Pacto de magia (Bruxo)" },
 ];
 
-const CLASSES_BASE: { valor: ClasseBase; nome: string }[] = [
-  { valor: "barbaro", nome: "Bárbaro" },
-  { valor: "bardo", nome: "Bardo" },
-  { valor: "bruxo", nome: "Bruxo" },
-  { valor: "clerigo", nome: "Clérigo" },
-  { valor: "druida", nome: "Druida" },
-  { valor: "feiticeiro", nome: "Feiticeiro" },
-  { valor: "guerreiro", nome: "Guerreiro" },
-  { valor: "ladino", nome: "Ladino" },
-  { valor: "mago", nome: "Mago" },
-  { valor: "monge", nome: "Monge" },
-  { valor: "paladino", nome: "Paladino" },
-  { valor: "patrulheiro", nome: "Patrulheiro" },
-];
+const CLASSES_BASE = (Object.keys(NOME_CLASSE) as ClasseBase[]).map((valor) => ({ valor, nome: NOME_CLASSE[valor] }));
 
-const CAMPO_SAVE: Record<Atributo, keyof Personagem> = {
-  for: "save_str",
-  des: "save_dex",
-  con: "save_con",
-  int: "save_int",
-  sab: "save_wis",
-  car: "save_cha",
-};
 
 function sinal(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
-/** Calculadora da ficha: atributos, proficiências, CD de magia e espaços —
- *  mostra o valor "de livro" ao lado do campo manual (CampoPersonagem já
- *  tem CA/saves/CD/PP), nunca sobrescreve sozinha. Ver decisão de
- *  arquitetura no plano: calcular é sugestão, não autoridade. */
+/** Configuração de classe da ficha: classes e conjuração, espaços de magia,
+ *  modificadores que ligam/desligam e as habilidades por nível. Os atributos,
+ *  as resistências, as perícias e os valores calculados (PP, CD, ataque de
+ *  magia) moram em FichaClassicaJogador, logo acima — que calcula como
+ *  sugestão, nunca sobrescreve o cartão de combate sozinha. */
 export function FichaClasse({
   personagem: p,
   editavel,
@@ -88,19 +54,13 @@ export function FichaClasse({
   editavel: boolean;
   patch: (mudanca: Partial<Personagem>) => void;
 }) {
-  const [mostrarPericias, setMostrarPericias] = useState(false);
-
   // `??`: janela entre publicar este código e rodar a migration 0013/0014.
-  const atributos = p.atributos ?? { for: 10, des: 10, con: 10, int: 10, sab: 10, car: 10 };
-  const proficiencias = p.proficiencias ?? { saves: [], pericias: {} };
   const classes = p.classes ?? [];
   const modificadores = p.modificadores ?? [];
 
   const nivel = nivelTotal(classes);
   const conjuradoras = classes.filter((c) => c.conjurador !== "nenhum" && c.atributo_conjuracao);
 
-  const ppCalculado = percepcaoPassiva(atributos, proficiencias, nivel) + somaModificadores(modificadores, "pp");
-  const periciasComProficiencia = PERICIAS.filter((info) => (proficiencias.pericias[info.chave] ?? "nenhuma") !== "nenhuma");
   const habilidades = habilidadesMulticlasse(classes);
 
   function patchClasse(i: number, mudanca: Partial<ClassePersonagem>) {
@@ -139,10 +99,6 @@ export function FichaClasse({
     patch({ resources: [...preservados, ...novos] });
   }
 
-  function usarValor(campo: keyof Personagem, valor: number) {
-    patch({ [campo]: valor } as Partial<Personagem>);
-  }
-
   function alternarModificador(i: number) {
     patch({ modificadores: modificadores.map((m, idx) => (idx === i ? { ...m, ativo: !m.ativo } : m)) });
   }
@@ -165,29 +121,12 @@ export function FichaClasse({
 
   return (
     <div className="fichaclasse">
-      <SecaoRecolhivel titulo={<h4>Atributos e nível</h4>}>
-        <div className="fc-atributos">
-          {ATRIBUTOS.map(({ chave, nome }) => (
-            <div key={chave} className="fc-atributo">
-              <div className="lbl">{nome}</div>
-              {editavel ? (
-                <CampoNumero
-                  valor={atributos[chave]}
-                  onCommit={(n) => patch({ atributos: { ...atributos, [chave]: Math.max(1, n) } })}
-                />
-              ) : (
-                <div className="val">{atributos[chave]}</div>
-              )}
-              <div className="fc-mod">{sinal(modificador(atributos[chave]))}</div>
-            </div>
-          ))}
-          <div className="fc-atributo">
-            <div className="lbl">Nível total</div>
-            <div className="val">{nivel}</div>
-            <div className="fc-mod">prof {sinal(bonusProficiencia(nivel))}</div>
-          </div>
-        </div>
-
+      <SecaoRecolhivel titulo={<h4>Classe e conjuração</h4>}>
+        {classes.length > 0 && (
+          <p className="fc-sub">
+            Nível total {nivel} · proficiência {sinal(bonusProficiencia(nivel))}
+          </p>
+        )}
         <div className="fc-classes">
           {classes.length === 0 && <p className="empty-note">Nenhuma classe cadastrada.</p>}
           {classes.map((c, i) => (
@@ -241,121 +180,6 @@ export function FichaClasse({
             </button>
           )}
         </div>
-      </SecaoRecolhivel>
-
-      <SecaoRecolhivel titulo={<h4>Resistências (saves)</h4>}>
-        <div className="fc-calclist">
-          {ATRIBUTOS.map(({ chave, nome }) => {
-            const proficiente = proficiencias.saves.includes(chave);
-            const calculado = bonusResistencia(atributos, proficiencias, nivel, chave);
-            const atual = p[CAMPO_SAVE[chave]] as number;
-            return (
-              <div key={chave} className="fc-calcrow">
-                {editavel && (
-                  <label className="checklabel">
-                    <input
-                      type="checkbox"
-                      checked={proficiente}
-                      onChange={(e) => {
-                        const saves = e.target.checked
-                          ? [...proficiencias.saves, chave]
-                          : proficiencias.saves.filter((a) => a !== chave);
-                        patch({ proficiencias: { ...proficiencias, saves } });
-                      }}
-                    />
-                    {nome}
-                  </label>
-                )}
-                {!editavel && <span>{nome}</span>}
-                <span className="fc-calcval">
-                  calculado {sinal(calculado)}
-                  {editavel && calculado !== atual && (
-                    <button type="button" className="minilink" onClick={() => usarValor(CAMPO_SAVE[chave], calculado)}>
-                      usar
-                    </button>
-                  )}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="fc-calcrow">
-          <span>Percepção passiva</span>
-          <span className="fc-calcval">
-            calculado {ppCalculado}
-            {editavel && ppCalculado !== p.pp && (
-              <button type="button" className="minilink" onClick={() => usarValor("pp", ppCalculado)}>
-                usar
-              </button>
-            )}
-          </span>
-        </div>
-
-        {conjuradoras.map((c, i) => {
-          const cd = cdMagia(atributos, nivel, c.atributo_conjuracao);
-          const atk = ataqueMagia(atributos, nivel, c.atributo_conjuracao);
-          if (cd === null) return null;
-          const cdComMods = cd + somaModificadores(modificadores, "cd_magia");
-          const nomeClasse = CLASSES_BASE.find((cb) => cb.valor === c.classe)?.nome;
-          return (
-            <div key={i} className="fc-calcrow">
-              <span>
-                {/* Modificador de CD não entra no ataque: Feitiçaria Inata,
-                    por exemplo, sobe a CD e dá vantagem no ataque, não +1 de
-                    acerto. Quem sobe os dois (varinha) cadastra as duas linhas. */}
-                CD de magia ({nomeClasse}){" "}
-                {atk !== null && `· ataque ${sinal(atk + somaModificadores(modificadores, "ataque_magia"))}`}
-              </span>
-              <span className="fc-calcval">
-                calculado {cdComMods}
-                {editavel && cdComMods !== p.spell_dc && (
-                  <button type="button" className="minilink" onClick={() => usarValor("spell_dc", cdComMods)}>
-                    usar
-                  </button>
-                )}
-              </span>
-            </div>
-          );
-        })}
-
-        {editavel && (
-          <button type="button" className="minilink" onClick={() => setMostrarPericias((v) => !v)}>
-            {mostrarPericias ? "− perícias" : "+ perícias (proficiência/especialista)"}
-          </button>
-        )}
-        {editavel && mostrarPericias && (
-          <div className="fc-periciaseditor">
-            {PERICIAS.map((info) => (
-              <label key={info.chave} className="fc-periciarow">
-                {info.nome}
-                <select
-                  value={proficiencias.pericias[info.chave] ?? "nenhuma"}
-                  onChange={(e) => {
-                    const valor = e.target.value as NivelProficiencia;
-                    const pericias = { ...proficiencias.pericias };
-                    if (valor === "nenhuma") delete pericias[info.chave];
-                    else pericias[info.chave] = valor;
-                    patch({ proficiencias: { ...proficiencias, pericias } });
-                  }}
-                >
-                  <option value="nenhuma">nenhuma</option>
-                  <option value="proficiente">proficiente</option>
-                  <option value="especialista">especialista</option>
-                </select>
-              </label>
-            ))}
-          </div>
-        )}
-        {periciasComProficiencia.length > 0 && (
-          <div className="fc-periciaslista">
-            {periciasComProficiencia.map((info) => (
-              <span key={info.chave} className="fc-tag">
-                {info.nome} {sinal(bonusPericia(atributos, proficiencias, nivel, info.chave))}
-              </span>
-            ))}
-          </div>
-        )}
       </SecaoRecolhivel>
 
       {conjuradoras.length === 1 && editavel && (

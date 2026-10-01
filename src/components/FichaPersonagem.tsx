@@ -28,6 +28,7 @@ import { BotaoRemover } from "@/components/BotaoRemover";
 import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
+import { FichaClassicaJogador } from "@/components/FichaClassicaJogador";
 import { CondicoesDaFicha } from "@/components/ExplicacaoCondicao";
 import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
 import { TestesDeMorte } from "@/components/TestesDeMorte";
@@ -512,6 +513,7 @@ export function FichaPersonagem({
             </button>
             {mostrarFichaCompleta && (
               <>
+                <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} />
                 <FichaClasse personagem={p} editavel={editavel} patch={patch} />
                 <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
               </>
