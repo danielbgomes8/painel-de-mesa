@@ -202,7 +202,7 @@ campanha em que o aparelho entrou.
 ## Segurança — por que o RLS é uma policy aberta
 
 O app **não tem autenticação**. A saída mais simples, e suficiente pra uma mesa
-de amigos, é: RLS ligado em todas as tabelas (`rooms` mais as nove filhas),
+de amigos, é: RLS ligado em todas as tabelas (`rooms` mais as filhas),
 com uma policy **`for all` que libera leitura e escrita pro papel `anon`**
 (ver o fim de [`0001_inicial.sql`](supabase/migrations/0001_inicial.sql) —
 tabela nova segue o mesmo padrão, incluindo o `grant` explícito pro `anon`
@@ -213,6 +213,11 @@ sala.** É a mesma confiança que o grupo já tem entre si na mesa física. Não
 guarda nada sensível aqui — PV, condições e anotações de RPG. As notas do Mestre
 ficam "privadas" só no cliente (o painel não as mostra a quem entrou como
 jogador); não é segredo criptográfico, é combinado entre amigos.
+
+Os **mapas** seguem a mesma ideia: a imagem fica num bucket público do Storage
+(`mapas`, nomes impossíveis de chutar) e a névoa é só uma camada desenhada por
+cima — o jogador não vê a parte escondida, mas ela não é segredo criptográfico:
+quem mexer nas ferramentas do navegador consegue achar o mapa inteiro.
 
 A chave `anon` do Supabase é **pública por natureza** — vai no bundle do
 navegador. Ela não é o segredo; o "segredo" é o código da sala não ser divulgado.

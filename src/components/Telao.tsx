@@ -1,6 +1,8 @@
 "use client";
 
 import type { Sala } from "@/hooks/useSala";
+import type { Cenas } from "@/hooks/useCenas";
+import { VisorDaMesa } from "@/components/PainelMapa";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import {
@@ -16,8 +18,19 @@ const QUANTOS_PROXIMOS = 3;
 
 /** Tela grande só com "de quem é a vez" — pensada pra um televisor/notebook
  *  central da mesa, não pro celular de ninguém. Sempre trata quem olha como
- *  jogador (nunca entrega nome de NPC ainda não revelado). */
-export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
+ *  jogador (nunca entrega nome de NPC ainda não revelado). Quando o Mestre
+ *  põe um mapa na mesa, o mapa ocupa a tela e a vez vira uma faixa embaixo. */
+export function Telao({
+  sala,
+  rotulo,
+  cenas,
+  codigo,
+}: {
+  sala: Sala;
+  rotulo: string;
+  cenas: Cenas;
+  codigo: string;
+}) {
   const { combate, personagens } = sala;
   // Ninguém mexe no aparelho do telão: sem isto a tela apaga (ou o notebook
   // entra em descanso) no meio do combate.
@@ -57,6 +70,57 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
     };
   });
 
+  const aviso =
+    tela === "recusada" || tela === "sem-suporte" ? (
+      <p className="telao-aviso">
+        Este navegador não deixou manter a tela acesa: desligue o descanso de tela do aparelho
+        {tela === "recusada" ? " (ou a economia de bateria)" : ""}.
+      </p>
+    ) : null;
+
+  if (cenas.naMesa) {
+    return (
+      <div className="telao telao--mapa" data-tela={tela ?? undefined}>
+        <div className="telao-mapa">
+          <VisorDaMesa cena={cenas.naMesa} codigo={codigo} urlDaImagem={cenas.urlDaImagem} telao />
+        </div>
+        <div className="telao-faixa">
+          {atual ? (
+            <>
+              <div className="telao-faixa-vez">
+                <span className="telao-faixa-rotulo">vez de</span>
+                <span className="telao-faixa-nome">{nomeExibido}</span>
+                {pvVisivel && (
+                  <span className="telao-faixa-pv">
+                    {pvVisivel.hp} / {pvVisivel.hp_max} PV
+                  </span>
+                )}
+              </div>
+              {etiquetas.length > 0 && (
+                <div className="telao-cond telao-cond--faixa">
+                  {etiquetas.map((e) => (
+                    <span key={e}>{e}</span>
+                  ))}
+                </div>
+              )}
+              {proximos.length > 0 && (
+                <div className="telao-faixa-prox">
+                  <span className="telao-proximos-rotulo">a seguir</span> {proximos.map((p) => p.nome).join(" · ")}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="telao-faixa-vez">
+              <span className="telao-faixa-rotulo">{rotulo}</span>
+              <span className="telao-faixa-nome">Sem combate no momento</span>
+            </div>
+          )}
+          {aviso}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="telao" data-tela={tela ?? undefined}>
       <div className="telao-eyebrow">
@@ -92,12 +156,7 @@ export function Telao({ sala, rotulo }: { sala: Sala; rotulo: string }) {
       ) : (
         <div className="telao-nome">Sem combate no momento</div>
       )}
-      {(tela === "recusada" || tela === "sem-suporte") && (
-        <p className="telao-aviso">
-          Este navegador não deixou manter a tela acesa: desligue o descanso de tela do aparelho
-          {tela === "recusada" ? " (ou a economia de bateria)" : ""}.
-        </p>
-      )}
+      {aviso}
     </div>
   );
 }

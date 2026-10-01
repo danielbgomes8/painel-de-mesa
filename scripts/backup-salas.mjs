@@ -40,6 +40,10 @@ export const TABELAS_COM_SALA = [
   "bastiao_instalacoes",
   "bastiao_log",
   "encontros",
+  // Mapas (0018): as linhas e a névoa. A IMAGEM de cada mapa fica no Storage
+  // do Supabase e não entra nesta cópia — guarde o arquivo original do mapa.
+  "cenas",
+  "cena_nevoa",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em

@@ -19,9 +19,14 @@ export const supabaseConfigurado = Boolean(url && anon);
  *  pendurado por dezenas de segundos, e até lá o app nem sabia que devia
  *  guardar as mudanças na fila. */
 const PRAZO_REDE_MS = 10_000;
+/** Envio de imagem (mapas, Storage) é bem mais pesado que uma ficha: no 4G um
+ *  JPEG de 2 MB leva mais que os 10 s de cima e seria cortado no meio. */
+const PRAZO_ARQUIVO_MS = 90_000;
 
 function fetchComPrazo(entrada: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-  const prazo = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(PRAZO_REDE_MS) : null;
+  const url = typeof entrada === "string" ? entrada : entrada instanceof URL ? entrada.href : entrada.url;
+  const ms = url.includes("/storage/v1/") ? PRAZO_ARQUIVO_MS : PRAZO_REDE_MS;
+  const prazo = typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(ms) : null;
   // Quem chamou pode ter mandado o próprio sinal de cancelar: vale o que vier
   // primeiro. Navegador sem AbortSignal.any fica só com o de quem chamou.
   const sinal =

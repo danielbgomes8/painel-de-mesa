@@ -2824,3 +2824,204 @@ input.fj-score:focus-visible {
 .fj-lista li.prof .fj-bonus {
   color: var(--accent);
 }
+
+/* ---------- mapa (cenas) ---------- */
+/* O canvas ocupa a caixa inteira e cuida do toque sozinho (zoom com pinça,
+   arrastar, pintar a névoa): sem touch-action: none o navegador rolaria a
+   página no meio do gesto. A altura é de tela de celular — passar disso
+   empurraria os botões pra fora do alcance do polegar. */
+.cena-caixa {
+  position: relative;
+  width: 100%;
+  height: clamp(300px, 62vh, 640px);
+  background: #0d0b09;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  touch-action: none;
+}
+.cena-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.cena-aviso {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.cena-aviso .btn {
+  pointer-events: auto;
+}
+.mapa-cenas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.mapa-linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mapa-linha .campotexto {
+  flex: 1;
+  min-width: 0;
+}
+.mapa-mesa {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.mapa-mesa-ok {
+  font-size: 13px;
+  color: var(--ok);
+}
+.mapa-ferr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.mapa-dica {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.mapa-erro {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--danger);
+}
+.mapa-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 8px 0;
+}
+.mapa-grade label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mapa-num {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  padding: 7px 10px;
+  min-height: 34px;
+  width: 100%;
+}
+.mapa-visor-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.mapa-visor-nome {
+  font-family: var(--f-display);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* Telão com mapa: o mapa ocupa a tela e a vez de quem joga vira uma faixa
+   embaixo (nome grande o bastante pra ler de longe). */
+.telao--mapa {
+  height: 100vh;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  justify-content: flex-start;
+  align-items: stretch;
+  text-align: left;
+  overflow: hidden;
+}
+.telao-mapa {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.mapa-visor--telao {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+.mapa-visor--telao .cena-caixa {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.telao-faixa {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 32px;
+  padding: 12px 28px;
+  background: var(--surface);
+  border-top: 2px solid var(--line);
+}
+.telao-faixa-vez {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.telao-faixa-rotulo {
+  font-size: clamp(16px, 1.8vw, 24px);
+  color: var(--muted);
+}
+.telao-faixa-nome {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: clamp(28px, 4.6vw, 60px);
+  color: var(--accent);
+  line-height: 1.1;
+}
+.telao-faixa-pv {
+  font-family: var(--f-mono);
+  font-size: clamp(18px, 2.2vw, 30px);
+  color: var(--ink);
+}
+.telao-faixa-prox {
+  font-family: var(--f-display);
+  font-size: clamp(16px, 2.2vw, 28px);
+  color: var(--muted);
+}
+.telao-cond--faixa {
+  justify-content: flex-start;
+}
+.telao--mapa .telao-aviso {
+  flex-basis: 100%;
+  margin: 0;
+  max-width: none;
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
+import { useCenas } from "@/hooks/useCenas";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
 import { useIdentidade } from "@/hooks/useIdentidade";
 import { useModoTelao } from "@/hooks/useModoTelao";
@@ -25,6 +26,7 @@ import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { EncontrosPreparados } from "@/components/EncontrosPreparados";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
+import { PainelMapa } from "@/components/PainelMapa";
 import { Telao } from "@/components/Telao";
 import { BASTIAO_ATIVO, BarraAbas, type Aba } from "@/components/BarraAbas";
 import { EscolherCampanha } from "@/components/EscolherCampanha";
@@ -77,6 +79,9 @@ export function Painel() {
 
 function PainelSala({ codigo }: { codigo: string }) {
   const sala = useSala(codigo);
+  // Mapas têm canal próprio: um problema neles (migration não rodada, imagem
+  // pesada) nunca derruba o combate.
+  const cenas = useCenas(codigo);
   const identidade = useIdentidade(codigo);
   const telao = useModoTelao();
   const rotulo = rotuloDaSala(codigo);
@@ -106,7 +111,13 @@ function PainelSala({ codigo }: { codigo: string }) {
 
   const souMestre = identidade?.tipo === "mestre";
   const [aba, setAba] = useState<Aba>("diario");
-  const abaEfetiva: Aba = (aba === "mestre" && !souMestre) || (aba === "bastiao" && !BASTIAO_ATIVO) ? "diario" : aba;
+  // O Mestre sempre vê a aba (é onde ele prepara, e onde descobre que falta a
+  // migration); o jogador só quando há um mapa na mesa.
+  const temMapa = souMestre || Boolean(cenas.naMesa);
+  const abaEfetiva: Aba =
+    (aba === "mestre" && !souMestre) || (aba === "bastiao" && !BASTIAO_ATIVO) || (aba === "mapa" && !temMapa)
+      ? "diario"
+      : aba;
 
   const meuPersonagem = useMemo(() => {
     if (identidade?.tipo !== "jogador") return null;
@@ -163,7 +174,7 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
 
   if (telao) {
-    return <Telao sala={sala} rotulo={rotulo} />;
+    return <Telao sala={sala} rotulo={rotulo} cenas={cenas} codigo={codigo} />;
   }
 
   if (!identidade) {
@@ -255,7 +266,7 @@ function PainelSala({ codigo }: { codigo: string }) {
         <BannerSuaVez sala={sala} meuSlug={identidade.slug} />
       )}
 
-      <BarraAbas aba={abaEfetiva} onMudar={setAba} souMestre={souMestre} />
+      <BarraAbas aba={abaEfetiva} onMudar={setAba} souMestre={souMestre} temMapa={temMapa} />
 
       {abaEfetiva === "diario" && <DiarioCampanha sala={sala} souMestre={souMestre} />}
 
@@ -268,6 +279,8 @@ function PainelSala({ codigo }: { codigo: string }) {
           <LogCombate log={sala.log} />
         </>
       )}
+
+      {abaEfetiva === "mapa" && <PainelMapa cenas={cenas} codigo={codigo} souMestre={souMestre} />}
 
       {abaEfetiva === "mestre" && souMestre && (
         <>

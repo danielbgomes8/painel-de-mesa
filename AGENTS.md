@@ -589,9 +589,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0016` e o `seed.sql`
-  já rodadas — o banco tem onze tabelas (`rooms` mais dez filhas, todas
-  com `on delete cascade` ligado em `rooms`). **Pegadinha real já resolvida
+  Paulo), separado do gb-reserva. Migrations `0001` a `0018` e o `seed.sql`
+  já rodadas — o banco tem `rooms` mais doze filhas (as dez de antes, `cenas`
+  e `cena_nevoa`), todas com `on delete cascade` ligado em `rooms`, fora a
+  `erros`, e o bucket de imagens `mapas`. **Pegadinha real já resolvida
   uma vez**: se criar tabela nova
   sem "Automatically expose new tables", ela não pega GRANT pro `anon`
   automaticamente — RLS sozinho não basta, tem que dar `grant select,
@@ -770,6 +771,98 @@ primeiros itens; os outros estão na lista do fim desta seção.
   aparelho**, até o dado ser consertado — antes era a mesma coisa, só que em
   branco. No `localhost` o service worker não registra e isso também vira
   relato (no site publicado ele registra).
+
+## Mapas com névoa de guerra (01/10/2026, migration `0018_cenas.sql`, já rodada)
+
+O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
+**1 está construída** (cena + grade + névoa ao vivo + telão + celular), as
+outras ainda não:
+
+1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
+   telão e celular. *(feito, ver abaixo)*
+2. **Peões** — nascem das fichas e da iniciativa, anel na vez de quem joga,
+   jogador move o próprio peão, peão oculto, condições como ícones, régua em
+   metros, ping.
+3. **Paredes e visão** — o Mestre desenha paredes/portas e a névoa abre sozinha
+   pelo que cada peão enxerga. A parte mais pesada.
+4. **Extras** — desenhos, modelos de magia (cone/esfera/linha), notas no mapa.
+
+Decisões que não estão no código à primeira vista:
+
+- **A névoa esconde NA TELA, não no banco.** O mapa inteiro está no Storage e as
+  pinceladas no Postgres, legíveis por qualquer aparelho — igual NPC oculto e PV
+  de inimigo já eram. O Daniel escolheu isso (01/10) sobre "segredo de verdade"
+  (o Mestre mandar só uma imagem já com o preto aplicado): peões que o jogador
+  move e visão automática exigem que cada aparelho calcule o que aparece, e sem
+  servidor não há como esconder o dado. **Não "consertar" achando que é falha.**
+- **Tabelas:** `cenas` (imagem, grade, `na_mesa`, `camera`, `nevoa_ligada`) e
+  `cena_nevoa` (uma linha por pincelada: `revelar`/`esconder` × `retangulos`/
+  `pincel`, em ordem por `seq`). Só UMA cena por sala fica `na_mesa` (índice
+  único parcial): trocar = tirar a antiga e pôr a nova, nessa ordem
+  (`mandarParaMesa`). Desfazer = apagar a pincelada mais nova.
+- **Coordenadas são sempre px da IMAGEM da cena**, nunca da tela. Os retângulos
+  da névoa não dependem da grade: recalibrar a grade depois não desloca o que já
+  foi revelado (o teste confere).
+- **`replica identity full` nas duas tabelas** (migration): sem isso o
+  apagamento (desfazer, cobrir tudo, tirar da mesa) não chega nos outros
+  aparelhos com o canal filtrado por sala — a limitação das outras tabelas
+  ("o tempo real não entrega apagamento feito em outro aparelho").
+- **`useCenas`/`useNevoa` têm canal próprio, fora do `useSala`**, pra um problema
+  de mapa nunca derrubar o combate. O código vai ao ar **antes** do SQL: se as
+  tabelas não existem (`ehTabelaAusente`), o app abre normal, o Mestre vê na aba
+  Mapa "falta rodar a migration 0018" e o jogador nem vê a aba. Testado
+  consultando o app sem as tabelas. A aba Mapa do jogador só aparece quando há
+  cena na mesa (`naMesa`).
+- **A imagem é reduzida no aparelho** (`lib/imagem.ts`): no máximo 3000 px, JPEG,
+  alvo de 3,5 MB (o bucket recusa mais de 8 MB). O cliente do Supabase dava só
+  10 s por pedido (`fetchComPrazo`); pro Storage agora são 90 s, senão o envio
+  de um mapa no 4G era cortado no meio.
+- **Telão com mapa:** o mapa ocupa a tela e a vez vira uma faixa embaixo (mesma
+  regra de privacidade de antes: NPC não revelado continua "Inimigo N", e PV de
+  NPC nunca aparece). O telão e os celulares enquadram a `camera` que o Mestre
+  definiu ("levar a mesa pra esta visão"); jogador pode dar zoom e voltar com
+  "voltar à visão da mesa".
+- **Backup:** `cenas` e `cena_nevoa` entram no backup DIÁRIO bruto, mas **não a
+  imagem** (fica no Storage) e **não** no botão "backup" do Mestre. O Mestre
+  deve guardar o arquivo original do mapa.
+- **Lint:** o projeto proíbe `setState` dentro de efeito (`react-hooks/set-state-in-effect`).
+  Os hooks derivam o valor (estado guarda a cena a que pertence) em vez de
+  zerar no efeito; ver `useNevoa`.
+- **Como testei o canvas sem o banco** (e como refazer): uma página provisória
+  (`src/app/mapa-teste/`, apagada depois) com imagem desenhada no próprio
+  canvas e névoa em memória. Toque de verdade não existe no navegador de teste:
+  dá pra disparar `PointerEvent` no `<canvas>` com `pointerType: 'touch'` e dois
+  `pointerId` (stub de `Element.prototype.setPointerCapture`, que recusa id
+  inventado). Conferido assim: pinça dá zoom, e **o segundo dedo cancela a
+  pincelada em andamento** (não deixa tinta); um dedo pinta. Pra testar o envio
+  de arquivo: montar um `File` do canvas e pôr num `DataTransfer` no `input.files`.
+- Limites: o banco recusa pincelada com mais de ~32 KB (o app simplifica o traço
+  pra no máximo 400 pontos e 600 retângulos); a névoa é lida em páginas de 1000.
+- **A política de segurança do site bloqueava as imagens** (`next.config.ts`,
+  `img-src 'self' data: blob:`): o mapa subia, a cena era criada e o canvas dizia
+  "não deu pra carregar" — só no navegador, nunca nos testes automáticos. Hoje o
+  `img-src` libera o host do Supabase (o mesmo do `connect-src`). **Recurso novo
+  que busque coisa de outro endereço tem de entrar na CSP**; conferir sempre no
+  navegador, com o servidor reiniciado (cabeçalho só muda no `next dev` novo).
+- **Conferido de ponta a ponta em 01/10/2026** (sala `teste-ui`, depois apagada,
+  Storage vazio): imagem de 5000×3333 reduzida pra 3000×2000; pincelada gravada;
+  mapa na mesa; **telão** com o mapa e a faixa da vez; **jogador** a 375px vê a
+  aba Mapa só enquanto há mapa na mesa (some ao vivo quando o Mestre tira);
+  **tempo real**: INSERT e DELETE de pincelada (inserido e apagado direto pela API
+  REST com o telão em primeiro plano — isso isola do releitura por
+  `visibilitychange`, que também atualiza a aba ao voltar pra frente); grade,
+  câmera da mesa, cobrir/revelar tudo; apagar cena remove o arquivo do Storage.
+- **Armadilhas do navegador de teste:** (1) `focus()`/`blur()` por script **não**
+  disparam `onFocus`/`onBlur` do React (a janela de teste não tem foco): o campo
+  parecia gravar e não gravava — usar clique e digitação reais (`triple_click`,
+  `type`, `Tab`). (2) A identidade fica no `localStorage`, então **trocar de
+  Mestre pra jogador numa aba troca nas outras abas do mesmo navegador** (evento
+  `storage`); a aba que mudou não se atualiza sozinha, é preciso recarregar.
+  (3) `window.confirm` trava a ferramenta: sobrescrever por `() => true` antes de
+  tocar em "cobrir tudo", "revelar tudo" e "apagar cena".
+- Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
+  do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
+  demanda como o catálogo de monstros (`import()` dinâmico).
 
 ## Próximos passos (combinados em 17/09/2026)
 
