@@ -64,17 +64,20 @@ const MAX_TENTATIVAS_VERSAO = 5;
 
 const BASTIAO_VAZIO: Bastiao = { room_code: "", turno: 1, tesouro_po: 0, defensores: 0, notes: "" };
 
-type LinhaCombate = {
+/** A linha de `combat_state` como está no banco (o robô do esquema confere as colunas). */
+export type LinhaCombate = {
   room_code: string;
   round: number;
   turn: number;
   order_json: ItemIniciativa[] | null;
   version: number;
+  /** Preenchida pelo banco (gatilho da migration 0001); o app não lê. */
+  updated_at: string;
 };
 
 /** A linha de `bastiao` no banco: o que a tela usa, mais o contador de versão
  *  (que é detalhe de escrita e por isso fica fora do tipo `Bastiao`). */
-type LinhaBastiao = Bastiao & { version: number };
+export type LinhaBastiao = Bastiao & { version: number };
 
 type ResultadoVersao<L> =
   | { tipo: "gravou"; linha: L }

@@ -19,7 +19,8 @@ export const bancoConfigurado = Boolean(url && chave);
 
 const cabecalhos = { apikey: chave, Authorization: `Bearer ${chave}`, "Content-Type": "application/json" };
 
-async function rest(caminho: string, init: RequestInit = {}): Promise<Response> {
+/** Pedido direto à API do banco, com a chave pública (o que qualquer aparelho faz). */
+export async function rest(caminho: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${url}/rest/v1/${caminho}`, { ...init, headers: { ...cabecalhos, ...(init.headers as Record<string, string>) } });
 }
 

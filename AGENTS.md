@@ -723,8 +723,22 @@ primeiros itens; os outros estão na lista do fim desta seção.
 3. ~~Erros dos celulares somem no `console.error` do aparelho~~ — feito,
    ver "Relato de erro dos aparelhos" logo abaixo.
 4. ~~Nenhum teste cobre tela~~ — feito em 01/10/2026: robô de tela (ver "Robô
-   de tela, trava de sala e restauração do backup"). O `useSala` (1.854 linhas)
-   ainda não tem teste próprio; o robô cobre o caminho principal do combate.
+   de tela, trava de sala e restauração do backup"). **O `useSala` ganhou teste
+   próprio em 01/10/2026** (`hooks/useSala.test.ts`, no `npm run verificar`): o
+   hook INTEIRO contra um Supabase falso em memória (`hooks/bancoFalsoParaTeste.ts`
+   — consultas em cadeia, chaves únicas/23505, tempo real filtrado por sala, e o
+   mesmo erro de queda de rede do supabase-js), com `happy-dom` +
+   `@testing-library/react` (só nesse arquivo: `// @vitest-environment happy-dom`;
+   o resto continua em `node`; o `vitest.config.ts` ganhou o `@/` do tsconfig).
+   Cobre o que o robô não alcança: abrir a sala, tempo real, dano que manda só a
+   coluna que mudou (a nota de outro celular fica), corrida na ordem (o aviso que
+   ainda não chegou — `comoOutroAparelho(..., { avisar: false })`), desfazer que
+   volta / que recusa quando outro aparelho mexeu / que devolve o peão, a fila sem
+   internet (vai quando volta; não atropela número NEM texto mudado no meio) e
+   ficha apagada levando o peão. **Conferido plantando defeitos**: refazer a conta
+   no conflito, gravar a linha inteira, esquecer o peão e pular a conferência da
+   fila — os quatro quebram teste. (O último só quebrou depois do caso de TEXTO:
+   número tem a segunda trava do próprio UPDATE, `camposConferiveis`; texto não.)
 5. ~~Trava no apagar sala~~ — feito em 01/10/2026 (`0020`, rodada e conferida).
    **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
    chave `anon` devolve todos os códigos (conferido). Então "código difícil de
@@ -756,8 +770,16 @@ primeiros itens; os outros estão na lista do fim desta seção.
    cortava "iniciativa" e "quanto?" — a medida por `measureText` NÃO pega isso
    (dava "cabe"); só a foto mostrou. Pra medir de verdade, compare o
    `scrollWidth` com um texto longo no notebook e no celular.
-   Ainda aberto deste item: nada confere sozinho se o banco bate com `tipos.ts`
-   (conferido à mão em 25/09: bate). O log **não**
+   **Banco × `tipos.ts`** (01/10/2026, `e2e/esquema.e2e.ts`): cada tabela tem a
+   lista das colunas que o código usa, escrita como objeto com todas as chaves do
+   tipo — o `tsc` não compila se faltar ou sobrar campo (conferido acrescentando um
+   campo de mentira em `Personagem`) — e o robô pede essas colunas ao banco
+   (`select=a,b&limit=0`, só leitura: coluna que falta volta 400 com o nome). A
+   chave pública NÃO lê o esquema (`/rest/v1/` pede chave secreta), então o
+   caminho inverso (coluna no banco que o tipo não tem) é conferido com `select=*`
+   nas tabelas em que a sala de teste sempre tem linha. **Já achou uma:**
+   `combat_state.updated_at` existia no banco e não no tipo `LinhaCombate` (agora
+   tem). Tabela ou coluna nova: acrescente na lista do `esquema.e2e.ts`. O log **não**
    precisa de limpeza: 135 linhas na Salamina em duas semanas e o app só lê
    as 40 últimas.
 
@@ -1155,6 +1177,12 @@ Decisões que não estão no código à primeira vista:
   verificar`** (precisa do banco) e **só avisa** (✗ no commit), como o
   `verificar.yml`. Segredos do repositório: os mesmos do backup diário.
   Os arquivos são `.e2e.ts`, não `.test.ts`, pra o Vitest não tentar rodá-los.
+  **Não rode o robô aqui enquanto o do GitHub está rodando** (`gh run list`): os
+  dois usam a MESMA sala `ci-teste` no MESMO banco, e um limpa a sala no meio do
+  teste do outro — em 01/10 isso derrubou os dois com erros que pareciam defeito.
+  E o robô não pode tocar no mapa logo que a imagem carrega: os peões chegam do
+  banco um instante depois (no CI o toque caiu 50 ms antes deles); repita o toque
+  até o efeito aparecer (`abrirCartao` em `mapaIniciativa.e2e.ts`).
   **Já achou um erro de verdade:** com a tabela dos peões ainda não criada o
   console mostra um 404 (o app trata, mas o robô falha de propósito). Com a 0019
   rodada, os 4 cenários passam (~20 s).
@@ -1228,8 +1256,8 @@ Os quatro foram feitos; a próxima lista sai de conversa nova com o Daniel.
    "Telão" em Estado).
 
 Lacunas mapeadas na mesma revisão e ainda abertas, fora da lista acima: os
-componentes não têm teste nenhum (os 219 que existem são todos de funções
-puras em `lib/`);
+componentes não têm teste de unidade (os de `lib/` são de funções puras; o
+`useSala` tem o dele desde 01/10; as telas são cobertas pelo robô);
 e `combat_log` nunca é podado. (A terceira — `definirBastiao` sem controle de
 concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
 de versão do combate, os dois agora passam por `gravarSeVersaoBater` em
