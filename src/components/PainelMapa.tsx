@@ -8,7 +8,7 @@ import { useParedes } from "@/hooks/useParedes";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { montarPecasNaTela, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
-import { ultimaParede, type ModoParede } from "@/lib/paredes";
+import { PAREDES_MAXIMAS, ultimoDesenho, type ModoParede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
 import {
@@ -563,7 +563,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
 
               {ferramentaAtiva === "parede" && (
                 <div className="mapa-ferr" role="group" aria-label="O que desenhar">
-                  {([["parede", "parede"], ["porta", "porta"], ["comodo", "cômodo"], ["apagar", "apagar"]] as const).map(([modo, rotulo]) => (
+                  {([["parede", "parede"], ["curva", "curva"], ["porta", "porta"], ["comodo", "cômodo"], ["apagar", "apagar"]] as const).map(([modo, rotulo]) => (
                     <button key={modo} type="button" className="chip alvo" aria-pressed={modoParede === modo} onClick={() => setModoParede(modo)}>
                       {rotulo}
                     </button>
@@ -661,7 +661,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
                     : ferramentaAtiva === "parede"
                       ? modoParede === "apagar"
-                        ? "Toque numa parede ou porta pra apagá-la."
+                        ? "Toque numa parede ou porta pra apagá-la, ou passe o dedo por cima de várias (borracha). Pra tirar o último desenho inteiro, use “↩ desfazer parede” em “Paredes e visão”."
+                        : modoParede === "curva"
+                          ? "Passe o dedo acompanhando a curva (parede de caverna, torre redonda, corredor torto): o traço vira uma parede de vários trechos curtos, sem encaixar na grade. As pontas grudam em outra parede que esteja perto, e voltando ao começo a volta se fecha. Dê zoom pra curvas apertadas."
                         : modoParede === "comodo"
                           ? "Arraste de um canto ao canto oposto: saem as quatro paredes do cômodo."
                           : `Arraste de um ponto a outro pra desenhar ${modoParede === "porta" ? "uma porta" : "uma parede"}. As pontas encaixam nos cantos do quadradinho e nas pontas de outras paredes, pra não ficar fresta.`
@@ -864,11 +866,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                       </>
                     )}
                     <p className="fc-sub">
-                      {muros.paredes.filter((w) => w.tipo === "parede").length} paredes · {muros.paredes.filter((w) => w.tipo === "porta").length} portas.
-                      Desenhe com a ferramenta 🧱 paredes. Pra abrir ou fechar uma porta, toque nela com a ferramenta de mover.
+                      {muros.paredes.filter((w) => w.tipo === "parede").length} paredes · {muros.paredes.filter((w) => w.tipo === "porta").length} portas
+                      (cabem {PAREDES_MAXIMAS} por mapa; cada trecho de uma curva conta como uma). Desenhe com a ferramenta 🧱 paredes. Pra abrir ou fechar uma porta, toque nela com a ferramenta de mover.
                     </p>
                     <p className="fc-sub">
-                      Os jogadores nunca veem as paredes nem as portas: só o desenho do mapa e a névoa se abrindo. Uma passagem secreta é uma
+                      Os jogadores nunca veem as paredes nem as portas: só o desenho do mapa e a névoa se abrindo. Mas elas
+                      seguram o peão deles: jogador não atravessa parede nem porta fechada (você, sim). Uma passagem secreta é uma
                       porta fechada onde o mapa mostra uma parede comum; abra quando eles a descobrirem. Só o peão de jogador abre a névoa, e
                       o que o grupo já viu só é guardado com o mapa na mesa.
                     </p>
@@ -883,8 +886,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         className="btn"
                         disabled={muros.paredes.length === 0}
                         onClick={() => {
-                          const ultima = ultimaParede(muros.paredes);
-                          if (ultima) void muros.remover(ultima.id);
+                          // O último desenho inteiro: a curva toda, o cômodo todo (ou a parede, se foi uma só).
+                          const ultimas = ultimoDesenho(muros.paredes);
+                          if (ultimas.length > 0) void muros.removerVarias(ultimas.map((p) => p.id));
                         }}
                       >
                         ↩ desfazer parede

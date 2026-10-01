@@ -20,6 +20,8 @@ export type Paredes = {
   /** Abre ou fecha uma porta (só ela muda: nunca a linha inteira). */
   alternarPorta: (id: string) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
+  /** Várias numa escrita só (desfazer uma curva ou um cômodo inteiro). */
+  removerVarias: (ids: string[]) => Promise<boolean>;
   removerTodas: () => Promise<boolean>;
 };
 
@@ -199,6 +201,25 @@ export function useParedes(cenaId: string | null, codigo: string): Paredes {
     [mexer],
   );
 
+  const removerVarias = useCallback<Paredes["removerVarias"]>(
+    async (ids) => {
+      if (ids.length === 0) return false;
+      const antes = ref.current;
+      const fora = new Set(ids);
+      mexer((atual) => atual.filter((p) => !fora.has(p.id)));
+      const { error } = await supabase.from("cena_paredes").delete().in("id", ids);
+      if (error) {
+        relatarErro("removerParedes (várias)", error);
+        mexer(() => antes);
+        setAviso(AVISO_NAO_SALVOU);
+        return false;
+      }
+      setAviso(null);
+      return true;
+    },
+    [mexer],
+  );
+
   const removerTodas = useCallback<Paredes["removerTodas"]>(async () => {
     if (!cenaId) return false;
     const antes = ref.current;
@@ -214,5 +235,5 @@ export function useParedes(cenaId: string | null, codigo: string): Paredes {
     return true;
   }, [cenaId, mexer]);
 
-  return { paredes, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, alternarPorta, remover, removerTodas };
+  return { paredes, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, alternarPorta, remover, removerVarias, removerTodas };
 }

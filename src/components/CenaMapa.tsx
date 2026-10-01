@@ -39,11 +39,17 @@ import {
 import { REGUA_MINIMA_PX, medirRegua, type ModoRegua, type ReguaNaTela } from "@/lib/regua";
 import { MODELO_INICIAL, cruzamentoMaisPerto, type AreaNaTela, type ModeloArea } from "@/lib/area";
 import {
+  ENCAIXE_NA_PONTA_PX,
+  TOLERANCIA_DA_CURVA_PX,
   TOQUE_NA_PAREDE_PX,
   acharParedeNoPonto,
   paredeEntre,
   paredesDoComodo,
   pontoParaParede,
+  andarComParedes,
+  paredesDoTraco,
+  pontaDeParedePerto,
+  pousoLivre,
   segmentosQueBloqueiam,
   type ModoParede,
   type NovaParede,
@@ -209,8 +215,9 @@ export function CenaMapa({
   const toqueLongo = useRef<{ x: number; y: number; timer: number } | null>(null);
   /** Com a ferramenta ping, ou depois do ping, o dedo não arrasta o mapa. */
   const semArrastar = useRef(false);
-  /** Peão sendo arrastado agora (posição em px do mapa; `moveu` = passou da tolerância). */
-  const arrastoPeca = useRef<{ id: string; tamanho: number; dx: number; dy: number; x: number; y: number; telaX: number; telaY: number; moveu: boolean } | null>(null);
+  /** Peão sendo arrastado agora (posição em px do mapa; `moveu` = passou da tolerância;
+   *  `ox`, `oy` = de onde saiu, pra voltar se não der pra pousar). */
+  const arrastoPeca = useRef<{ id: string; tamanho: number; dx: number; dy: number; x: number; y: number; ox: number; oy: number; telaX: number; telaY: number; moveu: boolean } | null>(null);
   /** Onde desenhar o peão mexido, até as propriedades novas chegarem (sem pulo). */
   const arrastoVisual = useRef<{ id: string; x: number; y: number } | null>(null);
   /** Régua sendo arrastada agora (pontos em px do mapa; `telaA` pra saber se é toque ou medida). */
@@ -228,7 +235,10 @@ export function CenaMapa({
   const visaoDosInimigosRef = useRef<(readonly (readonly Ponto[])[])>([]);
   const ultimaComposicaoRef = useRef(0);
   /** Parede sendo desenhada agora (px do mapa, já encaixada) e porta tocada (abre no soltar). */
-  const paredeViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
+  /** Parede sendo desenhada. No modo curva, `pontos` guarda o caminho do dedo (px do mapa). */
+  const paredeViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number }; pontos: Ponto[] | null } | null>(null);
+  /** Modo apagar com o dedo descendo: as paredes por onde ele passa saem (borracha). */
+  const apagandoParedes = useRef<Set<string> | null>(null);
   const portaToque = useRef<{ id: string; x: number; y: number } | null>(null);
 
   const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
@@ -358,7 +368,12 @@ export function CenaMapa({
       arrasto: arrastoVisual.current,
       // Só o Mestre vê paredes, portas e a visão dos inimigos.
       paredes: p.mestre ? p.paredes : undefined,
-      previaParede: p.mestre && paredeViva.current ? { tipo: p.modoParede === "comodo" ? "comodo" : p.modoParede === "porta" ? "porta" : "parede", a: paredeViva.current.a, b: paredeViva.current.b } : null,
+      previaParede:
+        !p.mestre || !paredeViva.current
+          ? null
+          : paredeViva.current.pontos
+            ? { tipo: "curva", pontos: paredeViva.current.pontos }
+            : { tipo: p.modoParede === "comodo" ? "comodo" : p.modoParede === "porta" ? "porta" : "parede", a: paredeViva.current.a, b: paredeViva.current.b },
       visaoDosInimigos: p.mestre ? visaoDosInimigosRef.current : undefined,
     });
     const agora = performance.now();
@@ -617,6 +632,7 @@ export function CenaMapa({
       reguaViva.current = null;
       areaViva.current = null;
       paredeViva.current = null;
+      apagandoParedes.current = null;
       portaToque.current = null;
       pintura.current = null;
       previaRef.current = null;
@@ -667,13 +683,26 @@ export function CenaMapa({
       const escala = vistaRef.current.escala;
       semArrastar.current = true;
       if (p.modoParede === "apagar") {
+        // Borracha: a parede sob o dedo sai, e as outras por onde ele passar também.
+        apagandoParedes.current = new Set();
         const alvo = acharParedeNoPonto(p.paredes ?? [], ponto, TOQUE_NA_PAREDE_PX / escala);
-        if (alvo) p.aoApagarParede?.(alvo.id);
+        if (alvo) {
+          apagandoParedes.current.add(alvo.id);
+          p.aoApagarParede?.(alvo.id);
+        }
         return;
       }
       if (!p.aoCriarParedes) return;
+      if (p.modoParede === "curva") {
+        // Traço livre: segue o dedo, sem grade. Só a ponta gruda em outra parede que esteja perto.
+        const dentro: Ponto = [Math.min(p.cena.largura, Math.max(0, ponto[0])), Math.min(p.cena.altura, Math.max(0, ponto[1]))];
+        const inicio = pontaDeParedePerto(p.paredes ?? [], dentro, escala) ?? dentro;
+        paredeViva.current = { a: inicio, b: inicio, telaA: pos, telaB: pos, pontos: [inicio] };
+        pedirQuadro();
+        return;
+      }
       const inicio = pontoParaParede(p.cena, p.paredes ?? [], ponto, escala);
-      paredeViva.current = { a: inicio, b: inicio, telaA: pos, telaB: pos };
+      paredeViva.current = { a: inicio, b: inicio, telaA: pos, telaB: pos, pontos: null };
       pedirQuadro();
       return;
     }
@@ -686,12 +715,14 @@ export function CenaMapa({
     }
 
     // Peão: com a ferramenta de mover, tocar num peão que dá pra mexer o pega.
-    if (p.pecas && p.aoMoverPeca && p.ferramenta === "mover") {
+    // Jogador só pega o peão depois de as paredes chegarem do banco: sem elas
+    // não haveria o que o segurar (ver `aoMover`).
+    if (p.pecas && p.aoMoverPeca && p.ferramenta === "mover" && (p.mestre || p.visaoPronta)) {
       const [mx, my] = noMapa(pos);
       const alvo = acharPecaNoPonto(p.pecas.filter((x) => x.podeMover), mx, my);
       if (alvo) {
         cancelarToqueLongo();
-        arrastoPeca.current = { id: alvo.id, tamanho: alvo.tamanho, dx: mx - alvo.x, dy: my - alvo.y, x: alvo.x, y: alvo.y, telaX: pos.x, telaY: pos.y, moveu: false };
+        arrastoPeca.current = { id: alvo.id, tamanho: alvo.tamanho, dx: mx - alvo.x, dy: my - alvo.y, x: alvo.x, y: alvo.y, ox: alvo.x, oy: alvo.y, telaX: pos.x, telaY: pos.y, moveu: false };
         arrastoVisual.current = { id: alvo.id, x: alvo.x, y: alvo.y };
         p.aoTocarPeca?.(alvo.id);
         pedirQuadro();
@@ -797,9 +828,33 @@ export function CenaMapa({
     // Arrastando uma parede.
     const pw = paredeViva.current;
     if (pw) {
-      pw.b = pontoParaParede(p.cena, p.paredes ?? [], noMapa(agora), vistaRef.current.escala);
+      if (pw.pontos) {
+        const [mx, my] = noMapa(agora);
+        const ponto: Ponto = [Math.min(p.cena.largura, Math.max(0, mx)), Math.min(p.cena.altura, Math.max(0, my))];
+        const ultimo = pw.pontos[pw.pontos.length - 1];
+        // Um ponto a cada ~1,5 px de tela (e um teto, pra um traço sem fim não pesar).
+        if (Math.hypot(ponto[0] - ultimo[0], ponto[1] - ultimo[1]) * vistaRef.current.escala >= 1.5 && pw.pontos.length < 4000) pw.pontos.push(ponto);
+        pw.b = ponto;
+      } else {
+        pw.b = pontoParaParede(p.cena, p.paredes ?? [], noMapa(agora), vistaRef.current.escala);
+      }
       pw.telaB = agora;
       pedirQuadro();
+      return;
+    }
+
+    // Borracha de paredes: cada parede por onde o dedo passa sai (uma vez só).
+    const apagadas = apagandoParedes.current;
+    if (apagadas) {
+      const alvo = acharParedeNoPonto(
+        (p.paredes ?? []).filter((w) => !apagadas.has(w.id)),
+        noMapa(agora),
+        TOQUE_NA_PAREDE_PX / vistaRef.current.escala,
+      );
+      if (alvo) {
+        apagadas.add(alvo.id);
+        p.aoApagarParede?.(alvo.id);
+      }
       return;
     }
 
@@ -822,8 +877,18 @@ export function CenaMapa({
     const ar = arrastoPeca.current;
     if (ar) {
       const [mx, my] = noMapa(agora);
-      ar.x = Math.min(p.cena.largura, Math.max(0, mx - ar.dx));
-      ar.y = Math.min(p.cena.altura, Math.max(0, my - ar.dy));
+      const alvoX = Math.min(p.cena.largura, Math.max(0, mx - ar.dx));
+      const alvoY = Math.min(p.cena.altura, Math.max(0, my - ar.dy));
+      if (p.mestre) {
+        ar.x = alvoX;
+        ar.y = alvoY;
+      } else {
+        // Jogador não atravessa parede nem porta fechada: o peão encosta e
+        // desliza por ela. Senão bastava arrastar o peão pra dentro de uma sala
+        // fechada e a visão automática abria a névoa de lá (o Mestre põe o
+        // peão onde quiser — é ele quem abre a porta).
+        [ar.x, ar.y] = andarComParedes([ar.x, ar.y], [alvoX, alvoY], segmentosQueBloqueiam(p.paredes ?? []));
+      }
       if (!ar.moveu && Math.hypot(agora.x - ar.telaX, agora.y - ar.telaY) > PING_TOLERANCIA_PX) ar.moveu = true;
       arrastoVisual.current = { id: ar.id, x: ar.x, y: ar.y };
       // A visão acompanha o peão enquanto ele anda (poucas vezes por segundo: a conta pesa).
@@ -889,6 +954,7 @@ export function CenaMapa({
     if (dedos.current.size < 2) pinca.current = null;
     if (dedos.current.size === 0) {
       semArrastar.current = false;
+      apagandoParedes.current = null;
       const rv = reguaViva.current;
       if (rv) {
         reguaViva.current = null;
@@ -906,7 +972,16 @@ export function CenaMapa({
         paredeViva.current = null;
         const p = propsRef.current;
         const arrastou = Math.hypot(pw.telaB.x - pw.telaA.x, pw.telaB.y - pw.telaA.y) >= REGUA_MINIMA_PX;
-        if (!cancelado && arrastou) {
+        if (!cancelado && pw.pontos) {
+          // Curva: o caminho do dedo vira trechos retos curtos. A última ponta
+          // gruda em outra parede perto; voltando ao começo, a volta fecha.
+          const escala = vistaRef.current.escala;
+          const fim = pw.pontos[pw.pontos.length - 1];
+          const grudado = pontaDeParedePerto(p.paredes ?? [], fim, escala);
+          const caminho = grudado ? [...pw.pontos, grudado] : pw.pontos;
+          const novas = paredesDoTraco(caminho, TOLERANCIA_DA_CURVA_PX / escala, ENCAIXE_NA_PONTA_PX / escala);
+          if (novas.length > 0) p.aoCriarParedes?.(novas);
+        } else if (!cancelado && arrastou) {
           const novas =
             p.modoParede === "comodo"
               ? paredesDoComodo(pw.a, pw.b)
@@ -938,10 +1013,24 @@ export function CenaMapa({
           // Toque sem arrasto: abre as ações do peão (dano, condição, a vez).
           if (!cancelado) propsRef.current.aoAbrirPeca?.(ar.id);
         } else {
-          const [x, y] = encaixarNaGrade(propsRef.current.cena, ar.x, ar.y, ar.tamanho as 1 | 2 | 3 | 4);
-          // Fica desenhado no lugar novo até a lista de peões chegar com ele.
-          arrastoVisual.current = { id: ar.id, x, y };
-          propsRef.current.aoMoverPeca?.(ar.id, x, y);
+          const p = propsRef.current;
+          const tamanho = ar.tamanho as 1 | 2 | 3 | 4;
+          let [x, y] = encaixarNaGrade(p.cena, ar.x, ar.y, tamanho);
+          if (!p.mestre) {
+            // O encaixe no quadradinho também não pode pular uma parede (uma
+            // que corte o quadradinho ao meio): pousa no vizinho mais perto a
+            // que dê pra chegar, e sem nenhum o peão volta pra onde estava.
+            const g = gradeUsavel(p.cena) ? p.cena.grade_px : 0;
+            const candidatos = [-1, 0, 1].flatMap((i) => [-1, 0, 1].map((j) => encaixarNaGrade(p.cena, ar.x + i * g, ar.y + j * g, tamanho)));
+            [x, y] = pousoLivre([ar.x, ar.y], candidatos, segmentosQueBloqueiam(p.paredes ?? [])) ?? [ar.ox, ar.oy];
+          }
+          if (x === ar.ox && y === ar.oy) {
+            arrastoVisual.current = null;
+          } else {
+            // Fica desenhado no lugar novo até a lista de peões chegar com ele.
+            arrastoVisual.current = { id: ar.id, x, y };
+            p.aoMoverPeca?.(ar.id, x, y);
+          }
         }
         pedirQuadro();
         return;
@@ -956,7 +1045,7 @@ export function CenaMapa({
 
   const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua" && ferramenta !== "area" && ferramenta !== "parede" && ferramenta !== "colocar";
   return (
-    <div ref={caixaRef} className="cena-caixa">
+    <div ref={caixaRef} className="cena-caixa" data-pronto={visaoPronta ? "sim" : "nao"}>
       <canvas
         ref={canvasRef}
         className="cena-canvas"

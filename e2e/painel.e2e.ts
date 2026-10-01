@@ -576,10 +576,12 @@ test("paredes: o Mestre desenha parede, porta e cômodo, apaga, e escolhe onde o
   await arrastar([280, 140], [280, 140]);
   await expect.poll(async () => (await paredesDoBanco()).length).toBe(5);
 
-  // Desfazer parede tira a mais recente.
+  // Desfazer tira o último DESENHO inteiro: as quatro paredes do cômodo saem
+  // juntas (era uma por toque — com parede em curva, seriam dezenas de toques).
   await page.locator(".fc-sechead", { hasText: "Paredes e visão" }).click();
   await page.getByRole("button", { name: "↩ desfazer parede" }).click();
-  await expect.poll(async () => (await paredesDoBanco()).length).toBe(4);
+  await expect.poll(async () => (await paredesDoBanco()).length).toBe(1);
+  expect((await paredesDoBanco())[0].tipo).toBe("porta");
 
   // Onde o grupo entra: o Mestre toca no mapa e os peões se agrupam em volta do ponto.
   await page.locator(".fc-sechead", { hasText: "Peões" }).click();

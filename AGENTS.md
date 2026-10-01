@@ -1054,7 +1054,7 @@ Decisões que não estão no código à primeira vista:
 - **Paredes, portas e visão automática** (migration `0021_paredes.sql`,
   `lib/paredes.ts`, `lib/visao.ts`, `hooks/useParedes.ts`, seção "Paredes e visão"
   do Mestre, ferramenta "🧱 paredes"). O Mestre desenha **paredes** e **portas**
-  (segmentos, em px da imagem; modos parede / porta / cômodo = 4 paredes de uma
+  (segmentos, em px da imagem; modos parede / curva / porta / cômodo = 4 paredes de uma
   vez / apagar; as pontas encaixam na ponta de outra parede perto — sem fresta nos
   cantos — ou, senão, no cruzamento da grade; no máximo 400 por cena). Com a "visão
   automática" ligada na cena (`cenas.visao_ligada`, desligada por padrão: cena velha
@@ -1123,6 +1123,40 @@ Decisões que não estão no código à primeira vista:
     (`page.route`) e confere que a memória gravada não tem célula do outro lado da
     parede; **sem a correção o teste falha (285 células)**. Vale pra qualquer
     "estado derivado que só cresce": nunca calcular com a entrada ainda carregando.
+  - **Parede e porta fechada seguram o peão do JOGADOR** (01/10/2026, sem migration;
+    achado do Daniel jogando: "mesmo com as salas fechadas o player atravessa a porta
+    e as paredes, podendo revelar qualquer área"). Antes elas só barravam a VISTA: o
+    jogador arrastava o peão pra dentro da sala fechada e a visão automática abria a
+    névoa de lá — nem precisava soltar, a visão acompanha o arrasto. Agora, a cada
+    movimento do dedo, o passo do peão é conferido contra `segmentosQueBloqueiam`
+    (`passoBloqueado`/`andarComParedes` em `lib/paredes.ts`): bateu, ele encosta e
+    desliza pela parede; porta ABERTA deixa passar. Detalhes que não são óbvios:
+    encostar conta e parar em cima da parede também (senão atravessava em dois
+    passos), mas SAIR de cima não (peão 2×2 fica no cruzamento da grade); fresta
+    menor que meio pixel não passa; o encaixe no quadradinho ao soltar também é
+    conferido (`pousoLivre`: o vizinho mais perto a que dê pra chegar, senão volta);
+    o jogador só pega o peão depois de as paredes chegarem do banco (`visaoPronta`).
+    **O Mestre passa sempre** (é ele quem abre a porta). Vale com a visão automática
+    ligada ou não. Como todo o resto do mapa, a trava é NA TELA: o banco é aberto.
+    Robô: `e2e/andarComParedes.e2e.ts` (falha com a trava desligada: o peão vai pra
+    525 em vez de parar em 435). `.cena-caixa[data-pronto]` existe pra o robô saber
+    que paredes e peões já chegaram.
+  - **Parede em curva** (01/10/2026, sem migration; pedido do Daniel: "curvas
+    próximas ficam difíceis, ela só faz de forma reta"): modo **curva** da
+    ferramenta 🧱 paredes. O Mestre passa o dedo acompanhando a curva e o traço vira
+    trechos retos curtos emendados (`paredesDoTraco`: Douglas-Peucker com folga de
+    `TOLERANCIA_DA_CURVA_PX` = 1,2 px de TELA — com 2,5 a onda virava zigue-zague e
+    o círculo um octógono, visto na foto a 375px), SEM encaixar na grade; a ponta
+    gruda na ponta de outra parede perto, e voltando ao começo a volta fecha. No
+    máximo 60 trechos por traço (afrouxa até caber). **O limite de 400 paredes por
+    cena fica**: a conta de visão é quadrática — medido aqui: 6 ms por peão com 400,
+    40 ms com 800, 92 ms com 1200 (alcance sem limite), e celular é 4 a 5× mais
+    lento. Cada trecho conta como uma parede (a tela mostra quantas cabem).
+    **"↩ desfazer parede" tira o último DESENHO inteiro** (`ultimoDesenho`: o que
+    entrou na mesma escrita tem a mesma hora — a curva toda, o cômodo todo) e o modo
+    **apagar virou borracha** (passar o dedo tira os trechos por onde ele passa).
+    Os contornos pretos são desenhados todos antes das cores (`desenharParedes`),
+    senão cada emenda da curva ganhava uma marca escura.
   - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
     Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
     condições da ficha). Agora vale nos dois sentidos:

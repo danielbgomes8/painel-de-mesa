@@ -134,27 +134,46 @@ export function desenharParedes(
   ctx: CanvasRenderingContext2D,
   paredes: readonly Parede[],
   escala: number,
-  previa: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | null,
+  previa: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | { tipo: "curva"; pontos: readonly Ponto[] } | null,
 ): void {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  const traco = (x1: number, y1: number, x2: number, y2: number, cor: string, largura: number, tracejada: boolean) => {
+  /** `passada`: "contorno" (o preto por baixo), "cor", ou as duas de uma vez. */
+  const traco = (x1: number, y1: number, x2: number, y2: number, cor: string, largura: number, tracejada: boolean, passada: "contorno" | "cor" | "tudo" = "tudo") => {
     ctx.setLineDash(tracejada ? [7 / escala, 6 / escala] : []);
-    ctx.lineWidth = (largura + 2.5) / escala;
-    ctx.strokeStyle = "rgba(0,0,0,0.7)";
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.lineWidth = largura / escala;
-    ctx.strokeStyle = cor;
-    ctx.stroke();
+    if (passada !== "cor") {
+      ctx.lineWidth = (largura + 2.5) / escala;
+      ctx.strokeStyle = "rgba(0,0,0,0.7)";
+      ctx.stroke();
+    }
+    if (passada !== "contorno") {
+      ctx.lineWidth = largura / escala;
+      ctx.strokeStyle = cor;
+      ctx.stroke();
+    }
   };
-  for (const p of paredes) {
-    if (p.tipo === "porta") traco(p.x1, p.y1, p.x2, p.y2, "#f0b030", 4, p.aberta);
-    else traco(p.x1, p.y1, p.x2, p.y2, "#e0504f", 3, false);
+  // Todos os contornos primeiro e as cores depois: desenhando parede por parede,
+  // o contorno preto de cada uma caía por cima da ponta da vizinha — numa curva
+  // (dezenas de trechos emendados) a parede parecia tracejada.
+  for (const passada of ["contorno", "cor"] as const) {
+    for (const p of paredes) {
+      if (p.tipo === "porta") traco(p.x1, p.y1, p.x2, p.y2, "#f0b030", 4, p.aberta, passada);
+      else traco(p.x1, p.y1, p.x2, p.y2, "#e0504f", 3, false, passada);
+    }
   }
-  if (previa) {
+  if (previa && previa.tipo === "curva") {
+    // O traço como o dedo fez; ao soltar ele vira os trechos retos de verdade.
+    ctx.globalAlpha = 0.9;
+    for (const passada of ["contorno", "cor"] as const) {
+      for (let i = 1; i < previa.pontos.length; i++) {
+        traco(previa.pontos[i - 1][0], previa.pontos[i - 1][1], previa.pontos[i][0], previa.pontos[i][1], "#e0504f", 3, false, passada);
+      }
+    }
+    ctx.globalAlpha = 1;
+  } else if (previa) {
     const [ax, ay] = previa.a;
     const [bx, by] = previa.b;
     ctx.globalAlpha = 0.9;
@@ -207,7 +226,7 @@ export type EntradaDeDesenho = {
   arrasto?: { id: string; x: number; y: number } | null;
   /** Só pro Mestre: as paredes e portas, a parede em construção e a visão dos inimigos. */
   paredes?: readonly Parede[];
-  previaParede?: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | null;
+  previaParede?: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | { tipo: "curva"; pontos: readonly Ponto[] } | null;
   visaoDosInimigos?: readonly (readonly Ponto[])[];
 };
 
