@@ -49,6 +49,18 @@ async function tocarNoMapa(page: Page, ix: number, iy: number) {
   await page.mouse.click(caixa.x + caixa.width / 2 + (ix - 450) * escala, caixa.y + caixa.height / 2 + (iy - 300) * escala);
 }
 
+/** Toca no peão até o cartão dele abrir: os peões chegam do banco um instante
+ *  DEPOIS do mapa (no CI, o primeiro toque caiu 50 ms antes deles e não pegou
+ *  nada — é o que aconteceria com uma pessoa também; ela tocaria de novo). */
+async function abrirCartao(page: Page, ix: number, iy: number) {
+  const cartao = page.locator(".mapa-cartao");
+  await expect(async () => {
+    await tocarNoMapa(page, ix, iy);
+    await expect(cartao).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 30_000 });
+  return cartao;
+}
+
 test("inimigo que entra na iniciativa ganha peão oculto; o que sai leva o peão, e desfazer devolve", async ({ page }) => {
   const erros = coletarErros(page);
   await criarFicha("ogro-robo", "Ogro do Robô", { is_npc: true, cls: "Gigante grande", hp: 30, hp_max: 30 });
@@ -76,6 +88,8 @@ test("inimigo que entra na iniciativa ganha peão oculto; o que sai leva o peão
   // Tirar o goblin da ordem tira o peão dele; desfazer devolve no mesmo lugar.
   await page.locator(".initrow", { hasText: "Goblin do Robô" }).getByRole("button", { name: "Remover da ordem" }).click();
   await expect.poll(async () => (await pecasDoBanco()).some((p) => p.id === goblin.id)).toBe(false);
+  // Espera a barra mostrar ESTA ação (o peão sai antes de o desfazer guardá-la).
+  await expect(page.locator(".desfazertexto")).toHaveText("Goblin do Robô saiu da ordem");
   await page.getByRole("button", { name: "↩ Desfazer" }).click();
   await expect(page.locator(".initrow", { hasText: "Goblin do Robô" })).toHaveCount(1);
   await expect
@@ -98,8 +112,7 @@ test("tocar no peão abre as ações: o Mestre dá dano e mostra o inimigo; o jo
   await entrarComoMestre(page);
   await page.getByRole("button", { name: "Mapa", exact: true }).click();
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
-  await tocarNoMapa(page, ogro.x, ogro.y);
-  const cartao = page.locator(".mapa-cartao");
+  const cartao = await abrirCartao(page, ogro.x, ogro.y);
   await expect(cartao).toContainText("Ogro do Robô");
   await expect(cartao).toContainText("30/30 PV");
   // O teclado do celular não sobe sozinho por cima do mapa.
@@ -131,8 +144,7 @@ test("tocar no peão abre as ações: o Mestre dá dano e mostra o inimigo; o jo
   await jogador.getByRole("button", { name: "ver o mapa" }).click();
   await expect(jogador.locator(".cena-canvas")).toBeVisible();
   await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
-  await tocarNoMapa(jogador, 165, 165);
-  const meu = jogador.locator(".mapa-cartao");
+  const meu = await abrirCartao(jogador, 165, 165);
   await expect(meu).toContainText("Jogador Robô");
   await expect(meu).toContainText("é a vez");
   // O jogador não esconde peão nem revela nome: isso é do Mestre.
