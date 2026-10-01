@@ -2560,13 +2560,18 @@ body:has(.telao) {
   border-left: 1px solid var(--line);
 }
 .fj-idcard > div:first-child {
-  flex-grow: 2;
+  flex: 1 1 0;
   border-left: none;
+}
+/* Nível e proficiência levam a largura do próprio conteúdo; a classe, o resto
+   (o rótulo "Proficiência" cortava com as três células repartindo igual). */
+.fj-idcard > div:not(:first-child) {
+  flex: 0 0 auto;
 }
 .fj-lbl {
   display: block;
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--dim);
 }
@@ -2594,7 +2599,7 @@ body:has(.telao) {
 }
 .fj-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 8px;
 }
 .fj-tile {
@@ -2617,7 +2622,7 @@ body:has(.telao) {
 }
 .fj-tilel {
   font-size: 9.5px;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--dim);
 }
@@ -2631,21 +2636,45 @@ body:has(.telao) {
   line-height: 1.5;
   color: var(--muted);
 }
-.fj-discos {
+.fj-blocos {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px 8px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
-@media (min-width: 480px) {
-  .fj-discos {
-    grid-template-columns: repeat(6, 1fr);
+/* Em tela larga os blocos se empacotam em duas colunas, sem esticar cada um até
+   a altura do vizinho (a CON, de uma linha só, ficaria com um buraco do lado
+   da INT, de seis). */
+@media (min-width: 560px) {
+  .fj-blocos {
+    display: block;
+    column-count: 2;
+    column-gap: 10px;
+  }
+  .fj-blocos > .fj-bloco {
+    break-inside: avoid;
+    margin-bottom: 10px;
   }
 }
-.fj-disco {
+.fj-bloco {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+/* A caixa do atributo da folha de papel: sigla, modificador grande, valor. */
+.fj-caixa {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
+  padding: 6px 0 8px;
+  background: var(--surface2);
+  border: 2px solid var(--line);
+  border-radius: 10px;
 }
 .fj-rotulo {
   font-size: 11px;
@@ -2653,43 +2682,31 @@ body:has(.telao) {
   letter-spacing: 0.06em;
   color: var(--muted);
 }
-.fj-aro {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 70px;
-  height: 70px;
-  border: 2px solid var(--line);
-  border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, var(--surface2), var(--surface) 70%);
-}
 .fj-mod {
   font-family: var(--f-mono);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 .fj-score {
-  width: 48px;
-  min-height: 32px;
-  padding: 3px 0;
-  text-align: center;
-  background: none;
-  border: none;
-  border-bottom: 1px dashed var(--dim);
-  font-family: var(--f-mono);
-  font-size: 13px;
-  color: var(--dim);
-}
-span.fj-score {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-bottom-style: none;
+  width: 46px;
+  min-height: 30px;
+  padding: 2px 0;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--muted);
 }
 input.fj-score:focus-visible {
-  outline: none;
-  border-bottom-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
   color: var(--ink);
 }
 .fj-lista {
@@ -2747,8 +2764,14 @@ input.fj-score:focus-visible {
 .fj-nome:disabled {
   cursor: default;
 }
-.fj-nome {
+.fj-nomecol {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fj-nome {
+  flex: none;
   min-width: 0;
   padding: 8px 0;
   text-align: left;
@@ -2762,12 +2785,6 @@ input.fj-score:focus-visible {
 .fj-lista li.prof .fj-nome {
   font-weight: 600;
   color: var(--ink);
-}
-.fj-atr {
-  margin-left: 6px;
-  font-size: 10.5px;
-  font-weight: 400;
-  color: var(--dim);
 }
 .fj-dica {
   flex: none;

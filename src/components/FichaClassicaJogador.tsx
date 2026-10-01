@@ -8,6 +8,7 @@ import {
   bonusProficiencia,
   bonusResistencia,
   cdMagia,
+  formatarMetros,
   modificador,
   nivelTotal,
   percepcaoPassiva,
@@ -207,6 +208,11 @@ export function FichaClassicaJogador({
       {nivel > 0 && (
         <>
           <div className="fj-tiles">
+            {/* Os três de cima da folha de papel. Só leitura: edita-se no
+                cartão de combate, que é onde mudam durante a luta. */}
+            <Tile rotulo="CA" valor={p.ac} />
+            <Tile rotulo="Iniciativa" valor={sinal(p.init_mod)} />
+            <Tile rotulo="Deslocamento" valor={formatarMetros(p.speed)} />
             <Tile
               rotulo="Perc. passiva"
               valor={ppCalculado}
@@ -241,121 +247,119 @@ export function FichaClassicaJogador({
         </>
       )}
 
-      <SecaoRecolhivel titulo={<h4>Atributos</h4>}>
-        <div className="fj-discos">
-          {ATRIBUTOS.map((a) => (
-            <div key={a.chave} className="fj-disco">
-              <span className="fj-rotulo" title={a.nome}>
-                {a.sigla}
-              </span>
-              <div className="fj-aro">
-                <span className="fj-mod">{sinal(modificador(atributos[a.chave]))}</span>
-              </div>
-              {editavel ? (
-                <CampoNumero
-                  className="fj-score"
-                  valor={atributos[a.chave]}
-                  onCommit={(n) => patch({ atributos: { ...atributos, [a.chave]: Math.max(1, n) } })}
-                />
-              ) : (
-                <span className="fj-score">{atributos[a.chave]}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </SecaoRecolhivel>
-
-      <SecaoRecolhivel titulo={<h4>Resistências</h4>}>
-        <ul className="fj-lista">
-          {saves.map((s) => (
-            <li key={s.chave} className={s.proficiente ? "prof" : ""}>
-              <button
-                type="button"
-                className={`fj-pip${s.proficiente ? " on" : ""}`}
-                aria-pressed={s.proficiente}
-                aria-label={`Proficiência em resistência de ${s.nome}`}
-                disabled={!editavel}
-                onClick={() => alternarSave(s.chave)}
-              />
-              <button type="button" className="fj-nome" disabled={!editavel} onClick={() => alternarSave(s.chave)}>
-                {s.nome}
-              </button>
-              {s.calculado !== s.cartao && (
-                <span className="fj-dica">
-                  cartão {sinal(s.cartao)}
-                  {editavel && (
-                    <>
-                      {" · "}
-                      <button
-                        type="button"
-                        className="minilink"
-                        onClick={() => patch({ [CAMPO_SAVE[s.chave]]: s.calculado } as Partial<Personagem>)}
-                      >
-                        usar
-                      </button>
-                    </>
-                  )}
-                </span>
-              )}
-              <span className="fj-bonus mono">{sinal(s.calculado)}</span>
-            </li>
-          ))}
-        </ul>
-      </SecaoRecolhivel>
-
-      {/* Recolhida: as 18 linhas juntas dão ~785px a 375px, mais que uma tela. */}
+      {/* Arranjo da folha de papel: cada atributo é uma caixa (modificador
+          grande, valor embaixo) e, ao lado, a resistência e as perícias dele. */}
       <SecaoRecolhivel
-        abertoInicial={false}
-        titulo={<h4>Perícias</h4>}
+        titulo={<h4>Atributos, resistências e perícias</h4>}
         cabecalhoExtra={
           <span className="fc-sub">
             {totalComProficiencia === 0
-              ? "nenhuma com proficiência"
-              : `${totalComProficiencia} com proficiência`}
+              ? "nenhuma perícia com proficiência"
+              : `${totalComProficiencia} ${totalComProficiencia === 1 ? "perícia" : "perícias"} com proficiência`}
           </span>
         }
       >
-        <ul className="fj-lista">
-          {PERICIAS.map((info) => {
-            const nivelProf: NivelProficiencia = proficiencias.pericias[info.chave] ?? "nenhuma";
-            const proficiente = nivelProf !== "nenhuma";
-            const especialista = nivelProf === "especialista";
+        <div className="fj-blocos">
+          {ATRIBUTOS.map((a) => {
+            const s = saves.find((x) => x.chave === a.chave)!;
             return (
-              <li key={info.chave} className={proficiente ? "prof" : ""}>
-                <button
-                  type="button"
-                  className={`fj-pip${proficiente ? " on" : ""}${especialista ? " dupla" : ""}`}
-                  aria-pressed={proficiente}
-                  aria-label={`Proficiência em ${info.nome}${especialista ? " (especialista)" : ""}`}
-                  disabled={!editavel}
-                  onClick={() => mudarPericia(info.chave, proficiente ? "nenhuma" : "proficiente")}
-                />
-                <button
-                  type="button"
-                  className="fj-nome"
-                  disabled={!editavel}
-                  onClick={() => mudarPericia(info.chave, proficiente ? "nenhuma" : "proficiente")}
-                >
-                  {info.nome}
-                  <span className="fj-atr">{info.atributo.toUpperCase()}</span>
-                </button>
-                {proficiente && editavel && (
-                  <button
-                    type="button"
-                    className={`fj-esp${especialista ? " on" : ""}`}
-                    aria-pressed={especialista}
-                    aria-label={`Especialista em ${info.nome} (bônus de proficiência em dobro)`}
-                    onClick={() => mudarPericia(info.chave, especialista ? "proficiente" : "especialista")}
-                  >
-                    ×2
-                  </button>
-                )}
-                <span className="fj-bonus mono">{sinal(bonusPericia(atributos, proficiencias, nivel, info.chave))}</span>
-              </li>
+              <div key={a.chave} className="fj-bloco">
+                <div className="fj-caixa">
+                  <span className="fj-rotulo" title={a.nome}>
+                    {a.sigla}
+                  </span>
+                  <span className="fj-mod">{sinal(modificador(atributos[a.chave]))}</span>
+                  {editavel ? (
+                    <CampoNumero
+                      className="fj-score"
+                      valor={atributos[a.chave]}
+                      onCommit={(n) => patch({ atributos: { ...atributos, [a.chave]: Math.max(1, n) } })}
+                    />
+                  ) : (
+                    <span className="fj-score">{atributos[a.chave]}</span>
+                  )}
+                </div>
+                <ul className="fj-lista">
+                  <li className={s.proficiente ? "prof" : ""}>
+                    <button
+                      type="button"
+                      className={`fj-pip${s.proficiente ? " on" : ""}`}
+                      aria-pressed={s.proficiente}
+                      aria-label={`Proficiência em resistência de ${a.nome}`}
+                      disabled={!editavel}
+                      onClick={() => alternarSave(a.chave)}
+                    />
+                    <div className="fj-nomecol">
+                      <button type="button" className="fj-nome" disabled={!editavel} onClick={() => alternarSave(a.chave)}>
+                        Resistência
+                      </button>
+                      {s.calculado !== s.cartao && (
+                        <span className="fj-dica">
+                          cartão {sinal(s.cartao)}
+                          {editavel && (
+                            <>
+                              {" · "}
+                              <button
+                                type="button"
+                                className="minilink"
+                                onClick={() => patch({ [CAMPO_SAVE[a.chave]]: s.calculado } as Partial<Personagem>)}
+                              >
+                                usar
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <span className="fj-bonus mono">{sinal(s.calculado)}</span>
+                  </li>
+                  {PERICIAS.filter((info) => info.atributo === a.chave).map((info) => {
+                    const nivelProf: NivelProficiencia = proficiencias.pericias[info.chave] ?? "nenhuma";
+                    const proficiente = nivelProf !== "nenhuma";
+                    const especialista = nivelProf === "especialista";
+                    return (
+                      <li key={info.chave} className={proficiente ? "prof" : ""}>
+                        <button
+                          type="button"
+                          className={`fj-pip${proficiente ? " on" : ""}${especialista ? " dupla" : ""}`}
+                          aria-pressed={proficiente}
+                          aria-label={`Proficiência em ${info.nome}${especialista ? " (especialista)" : ""}`}
+                          disabled={!editavel}
+                          onClick={() => mudarPericia(info.chave, proficiente ? "nenhuma" : "proficiente")}
+                        />
+                        <div className="fj-nomecol">
+                          <button
+                            type="button"
+                            className="fj-nome"
+                            disabled={!editavel}
+                            onClick={() => mudarPericia(info.chave, proficiente ? "nenhuma" : "proficiente")}
+                          >
+                            {info.nome}
+                          </button>
+                        </div>
+                        {proficiente && editavel && (
+                          <button
+                            type="button"
+                            className={`fj-esp${especialista ? " on" : ""}`}
+                            aria-pressed={especialista}
+                            aria-label={`Especialista em ${info.nome} (bônus de proficiência em dobro)`}
+                            onClick={() => mudarPericia(info.chave, especialista ? "proficiente" : "especialista")}
+                          >
+                            ×2
+                          </button>
+                        )}
+                        <span className="fj-bonus mono">
+                          {sinal(bonusPericia(atributos, proficiencias, nivel, info.chave))}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             );
           })}
-        </ul>
-        {editavel && <p className="fc-sub">Toque na perícia pra marcar proficiência; ×2 é especialista.</p>}
+        </div>
+        {editavel && <p className="fc-sub">Toque na resistência ou na perícia pra marcar proficiência; ×2 é especialista.</p>}
       </SecaoRecolhivel>
     </div>
   );

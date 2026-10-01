@@ -102,10 +102,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   código) em vez de mexer na `setimo-raio`, que tem os dados reais da mesa.
   A sala nasce sozinha no primeiro acesso. Pra apagar depois, basta remover
   a linha dela em `rooms` — as nove tabelas filhas têm `on delete cascade`,
-  então some tudo junto e nada encosta na campanha. **Feche as abas de teste
-  antes de apagar a sala**: o app recria a sala sozinho no acesso, e uma aba
-  esquecida aberta nela (a do navegador embutido inclusive) a faz renascer —
-  aconteceu em 01/10/2026; confira de novo uns segundos depois de apagar.
+  então some tudo junto e nada encosta na campanha. **A sala renasce se o
+  navegador de teste voltar a abrir o app**: o `preview_start` abre `/` sem
+  `?sala=`, e o app abre a última sala em que aquele aparelho entrou
+  (`mesa-ultima-sala` no localStorage) e a recria no acesso — aconteceu três
+  vezes em 01/10/2026. Pra encerrar de vez: feche as abas de teste, abra uma
+  página da mesma origem que não é o app (`/manifest.webmanifest`), rode
+  `localStorage.clear()`, feche, **só então** apague as salas pela API, e
+  confira duas vezes com uns segundos de intervalo.
 - O visual saiu do protótipo (Artifact) validado com a mesa: paleta e classes
   CSS estão em `src/app/globals.css`, praticamente iguais às do protótipo.
 
@@ -114,25 +118,31 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **No ar**: https://painel-de-mesa.vercel.app — testado de ponta a ponta
   (leitura e escrita reais), sala `setimo-raio` com o Tibério Vaz.
 - **Ficha clássica do jogador** (`FichaClassicaJogador.tsx`, 01/10/2026, sem
-  migration): em "+ ver ficha completa", acima das seções de sempre. Desenho do
-  protótipo do Artifact — "Classe · Nível · Proficiência", card recolhido
-  "Próximo nível · Paladino 2" (o que a classe ganha, de `habilidadesDoNivel`, e
-  o PV ao subir, `pvAoSubir`: valor fixo do dado + CON, só com uma classe), tiles
-  de percepção passiva/CD/ataque de magia, discos de atributo (o modificador
-  grande, o valor editável embaixo), resistências e perícias com bolinha de
-  proficiência e ×2 pra especialista. **As contas são todas de `regras.ts`**
+  migration): em "+ ver ficha completa", acima das seções de sempre. **O
+  arranjo é o da folha de papel** (o Daniel pediu o arranjo, não o visual de
+  papel: a paleta é a do app): faixa de identidade ("Classe · Nível ·
+  Proficiência"), card recolhido "Próximo nível · Paladino 2" (o que a classe
+  ganha, `habilidadesDoNivel`, e o PV ao subir, `pvAoSubir`: valor fixo do dado
+  + CON, só com uma classe), tiles (CA, iniciativa e deslocamento só leitura —
+  edita-se no cartão —, percepção passiva, CD e ataque de magia) e **seis blocos
+  de atributo**: caixa à esquerda (sigla, modificador grande, valor editável) e,
+  à direita, a resistência e as perícias DAQUELE atributo (o agrupamento sai de
+  `PERICIAS[].atributo`, não de memória), com bolinha de proficiência e ×2 pra
+  especialista. A 375px os blocos empilham (1.180px, tudo à vista); a partir de
+  560px viram duas colunas empacotadas (`column-count`, sem esticar um bloco até
+  a altura do vizinho). **As contas são todas de `regras.ts`**
   (`bonusResistencia`, `bonusPericia`, `cdMagia`...) — nada reimplementado.
   **Calcular continua sendo sugestão**: o cartão de combate manda (item mágico
   soma por cima da fórmula), então cada diferença aparece como "cartão +0 ·
   usar", e há um "usar todos os calculados" que grava só as colunas que
   mudaram. O que era do `FichaClasse` (grade de atributos, resistências,
   perícias, PP/CD) saiu de lá; ficou "Classe e conjuração", espaços de magia,
-  modificadores e habilidades por nível. **Perícias abre recolhida** (18 linhas
-  = 785px a 375px): resumo "N com proficiência" no cabeçalho. Medido a 375px:
-  ficha toda 949px com perícias fechada, linha de lista 36–38px, alvo do pip
-  esticado por `::after`. `FichaPersonagem` (o cartão de combate) não mudou.
-  Dado conferido: Paladino de FOR 20/CON 14/CAR 14 dá CD 12, ataque +4,
-  Atletismo +7 — os números da ficha real do Daniel Gracewick.
+  modificadores e habilidades por nível. `FichaPersonagem` (o cartão de
+  combate) não mudou. Dado conferido: Paladino de FOR 20/CON 14/CAR 14 dá CD
+  12, ataque +4, Atletismo +7 — os números da ficha real do Daniel Gracewick.
+  A primeira versão (discos + listas separadas, perícias recolhida) foi
+  publicada e o Daniel disse que não era a folha de papel: lição, **mostrar o
+  arranjo antes de portar pro app**.
 - **Ficha completa** (`ficha_secoes`/`ficha_epiteto`, migration `0012`,
   componente `FichaCompleta.tsx`): seções genéricas (texto ou lista de
   título+tag+descrição) dentro da mesma linha do personagem — história,
