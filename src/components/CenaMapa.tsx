@@ -131,6 +131,8 @@ type Props = {
   aoMoverPeca?: (id: string, x: number, y: number) => void;
   /** Tocou num peão (ou em lugar nenhum: null). */
   aoTocarPeca?: (id: string | null) => void;
+  /** Tocou num peão e soltou sem arrastar: abre as ações dele (cartão do peão). */
+  aoAbrirPeca?: (id: string) => void;
   ref?: Ref<CenaMapaApi>;
 };
 
@@ -187,6 +189,7 @@ export function CenaMapa({
   pecas,
   aoMoverPeca,
   aoTocarPeca,
+  aoAbrirPeca,
   ref,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -228,9 +231,9 @@ export function CenaMapa({
   const paredeViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
   const portaToque = useRef<{ id: string; x: number; y: number } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -932,6 +935,8 @@ export function CenaMapa({
         arrastoPeca.current = null;
         if (cancelado || !ar.moveu) {
           arrastoVisual.current = null;
+          // Toque sem arrasto: abre as ações do peão (dano, condição, a vez).
+          if (!cancelado) propsRef.current.aoAbrirPeca?.(ar.id);
         } else {
           const [x, y] = encaixarNaGrade(propsRef.current.cena, ar.x, ar.y, ar.tamanho as 1 | 2 | 3 | 4);
           // Fica desenhado no lugar novo até a lista de peões chegar com ele.

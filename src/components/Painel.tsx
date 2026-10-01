@@ -305,7 +305,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       {abaEfetiva === "combate" && (
         <>
-          <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} />
+          <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} cenaNaMesa={cenas.naMesa} />
           {souMestre && <AcoesEmMassa sala={sala} />}
           <LogCombate log={sala.log} />
         </>

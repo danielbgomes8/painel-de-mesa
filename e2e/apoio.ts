@@ -75,11 +75,27 @@ export async function porNaIniciativa(itens: { slug: string; name: string; init:
   if (!r.ok) throw new Error(`não pôs na iniciativa: HTTP ${r.status} ${await r.text()}`);
 }
 
-export type LinhaPeca = { slug: string | null; nome: string; oculto: boolean; tamanho: number; x: number; y: number };
+/** Uma ficha, lida do banco. */
+export async function fichaDoBanco(slug: string): Promise<{ hp: number; revealed: boolean } & Record<string, unknown>> {
+  const r = await rest(`characters?select=*&room_code=eq.${SALA}&slug=eq.${slug}`);
+  if (!r.ok) throw new Error(`não leu a ficha ${slug}: HTTP ${r.status}`);
+  const linhas = (await r.json()) as ({ hp: number; revealed: boolean } & Record<string, unknown>)[];
+  if (linhas.length === 0) throw new Error(`a ficha ${slug} não existe`);
+  return linhas[0];
+}
+
+/** A ordem de iniciativa da sala, lida do banco. */
+export async function combateDoBanco(): Promise<{ turn: number; round: number; order_json: { slug: string }[] }> {
+  const r = await rest(`combat_state?select=turn,round,order_json&room_code=eq.${SALA}`);
+  if (!r.ok) throw new Error(`não leu o combate: HTTP ${r.status}`);
+  return ((await r.json()) as { turn: number; round: number; order_json: { slug: string }[] }[])[0];
+}
+
+export type LinhaPeca = { id: string; slug: string | null; nome: string; oculto: boolean; tamanho: number; x: number; y: number };
 
 /** Os peões da sala, lidos do banco (o canvas não dá pra conferir pelo DOM). */
 export async function pecasDoBanco(): Promise<LinhaPeca[]> {
-  const r = await rest(`cena_pecas?select=slug,nome,oculto,tamanho,x,y&room_code=eq.${SALA}&order=created_at`);
+  const r = await rest(`cena_pecas?select=id,slug,nome,oculto,tamanho,x,y&room_code=eq.${SALA}&order=created_at`);
   if (!r.ok) throw new Error(`não leu os peões: HTTP ${r.status}`);
   return (await r.json()) as LinhaPeca[];
 }

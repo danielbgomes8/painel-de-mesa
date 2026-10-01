@@ -7,7 +7,7 @@ import { useNevoa } from "@/hooks/useNevoa";
 import { useParedes } from "@/hooks/useParedes";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
-import { montarPecasNaTela, posicoesIniciais, regiaoEmTornoDe, type TamanhoPeca } from "@/lib/pecas";
+import { montarPecasNaTela, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
 import { ultimaParede, type ModoParede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
@@ -25,10 +25,25 @@ import {
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
+import { CartaoDoPeao } from "@/components/CartaoDoPeao";
 import { CenaMapa, type CenaMapaApi, type Ferramenta } from "@/components/CenaMapa";
 import { ControlesDeArea } from "@/components/ControlesDeArea";
 import { LegendaIconesPeao } from "@/components/LegendaIconesPeao";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
+
+/** O peão com o cartão de ações aberto e a ficha dele — só se ainda existem
+ *  (peão tirado, ficha apagada ou marcador avulso: nada a abrir). */
+function cartaoAberto(id: string | null, pecas: readonly Peca[], sala: Sala) {
+  const peca = id ? pecas.find((p) => p.id === id) : undefined;
+  const ficha = peca?.slug ? sala.personagens.find((f) => f.slug === peca.slug) : undefined;
+  if (!peca || !ficha) return null;
+  return {
+    peca,
+    ficha,
+    vez: sala.combate.order[sala.combate.turn]?.slug === ficha.slug,
+    naOrdem: sala.combate.order.some((o) => o.slug === ficha.slug),
+  };
+}
 
 /**
  * A mesa vendo o mapa: o que o Mestre pôs na tela, com a névoa. Usado na aba
@@ -64,6 +79,9 @@ export function VisorDaMesa({
   const medindo = uso === "regua";
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
+  // O jogador só consegue tocar no próprio peão (ver CenaMapa), então o cartão é sempre o dele.
+  const [cartao, setCartao] = useState<string | null>(null);
+  const aberto = telao ? null : cartaoAberto(cartao, banco.pecas, sala);
   // Sempre do ponto de vista de jogador: o telão e os celulares nunca veem o
   // nome de um inimigo ainda não revelado (ver lib/pecas.ts).
   const pecas = useMemo(
@@ -111,9 +129,21 @@ export function VisorDaMesa({
         visaoPronta={!muros.carregando && !banco.carregando}
         pecas={pecas}
         aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
+        aoAbrirPeca={telao ? undefined : setCartao}
       />
       {!telao && (
         <>
+          {aberto && aberto.ficha.slug === meuSlug && (
+            <CartaoDoPeao
+              key={aberto.peca.id}
+              sala={sala}
+              personagem={aberto.ficha}
+              souMestre={false}
+              vez={aberto.vez}
+              naOrdem={aberto.naOrdem}
+              aoFechar={() => setCartao(null)}
+            />
+          )}
           <div className="mapa-visor-barra">
             <span className="mapa-visor-nome">{cena.nome || "Mapa"}</span>
             <div className="mapa-visor-botoes">
@@ -164,7 +194,7 @@ export function VisorDaMesa({
                 ? "Medindo: arraste de um ponto a outro. Começando no seu peão, diz se cabe no seu deslocamento."
                 : uso === "area"
                   ? "Área de magia: escolha a forma e o tamanho e arraste no mapa. A mesa vê a figura por alguns segundos."
-                  : "Toque em 📏 medir pra ver a distância em metros, ou em ✨ área pra mostrar o alcance de uma magia."}
+                  : "Toque no seu peão pra dano, cura, condições e passar a vez; em 📏 medir pra ver a distância em metros; ou em ✨ área pra mostrar o alcance de uma magia."}
             </p>
           )}
           <LegendaIconesPeao />
@@ -292,6 +322,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   /** Esperando o Mestre tocar no mapa pra dizer onde o grupo (ou os inimigos) entra. */
   const [colocando, setColocando] = useState<"grupo" | "inimigos" | null>(null);
   const [pecaSelecionada, setPecaSelecionada] = useState<string | null>(null);
+  /** Peão com o cartão de ações aberto (tocou e soltou sem arrastar, ou tocou o nome na lista). */
+  const [cartao, setCartao] = useState<string | null>(null);
+  const aberto = cartaoAberto(cartao, banco.pecas, sala);
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
   const [nomeMarcador, setNomeMarcador] = useState("");
@@ -335,7 +368,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     const naOrdem = new Set(sala.combate.order.map((o) => o.slug));
     const faltam = sala.personagens.filter((p) => p.is_npc && naOrdem.has(p.slug) && !banco.pecas.some((x) => x.slug === p.slug));
     const lugares = posicoesIniciais(cena, faltam.length, regiao, lugaresOcupados());
-    void banco.adicionar(faltam.map((p, i) => ({ slug: p.slug, nome: "", x: lugares[i][0], y: lugares[i][1], oculto: true })));
+    void banco.adicionar(
+      faltam.map((p, i) => ({ slug: p.slug, nome: "", x: lugares[i][0], y: lugares[i][1], oculto: true, tamanho: tamanhoPeloTipo(p.cls) })),
+    );
   }
 
   /** O Mestre tocou no mapa: o grupo (ou os inimigos) entra em volta desse ponto. */
@@ -604,10 +639,24 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 pecas={pecas}
                 aoMoverPeca={(id, x, y) => void banco.atualizar(id, { x, y })}
                 aoTocarPeca={setPecaSelecionada}
+                aoAbrirPeca={setCartao}
               />
+              {aberto && (
+                <CartaoDoPeao
+                  key={aberto.peca.id}
+                  sala={sala}
+                  personagem={aberto.ficha}
+                  souMestre
+                  vez={aberto.vez}
+                  naOrdem={aberto.naOrdem}
+                  oculto={aberto.peca.oculto}
+                  aoAlternarOculto={() => void banco.atualizar(aberto.peca.id, { oculto: !aberto.peca.oculto })}
+                  aoFechar={() => setCartao(null)}
+                />
+              )}
               <p className="mapa-dica">
                 {ferramentaAtiva === "mover"
-                  ? "Arraste com um dedo e use a pinça pra dar zoom. Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
+                  ? "Arraste com um dedo e use a pinça pra dar zoom. Toque num peão sem arrastar pra abrir as ações dele (dano, condições, a vez). Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
                   : ferramentaAtiva === "ping"
                     ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
                     : ferramentaAtiva === "parede"
@@ -648,8 +697,10 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 ) : (
                   <>
                     <p className="fc-sub">
-                      Arraste um peão com um dedo (ele encaixa no quadradinho). Cada jogador move só o dele. Inimigos entram
-                      ocultos; a mesa vê “?” no peão de inimigo que ainda não foi revelado.
+                      Arraste um peão com um dedo (ele encaixa no quadradinho); toque sem arrastar pra abrir as ações dele. Cada
+                      jogador move só o dele. Inimigos entram ocultos; a mesa vê “?” no peão de inimigo que ainda não foi revelado.
+                      Com um mapa na mesa, o inimigo que entra na iniciativa ganha peão oculto sozinho, e o que sai da ordem sai
+                      do mapa (desfazer devolve). Reiniciar o combate não mexe nos peões.
                     </p>
                     <div className="mapa-ferr">
                       <button type="button" className="btn" onClick={() => porOGrupo()}>
@@ -699,7 +750,15 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         const naTela = pecas.find((x) => x.id === p.id);
                         return (
                           <div key={p.id} className={`mapa-peca${p.id === pecaSelecionada ? " sel" : ""}`}>
-                            <button type="button" className="mapa-peca-nome" onClick={() => setPecaSelecionada(p.id === pecaSelecionada ? null : p.id)}>
+                            <button
+                              type="button"
+                              className="mapa-peca-nome"
+                              onClick={() => {
+                                const escolher = p.id !== pecaSelecionada;
+                                setPecaSelecionada(escolher ? p.id : null);
+                                setCartao(escolher ? p.id : null);
+                              }}
+                            >
                               <span className="mapa-cor" style={{ background: naTela?.cor }} aria-hidden="true" />
                               {naTela?.nome ?? p.nome}
                               {naTela?.vez ? " · vez" : ""}

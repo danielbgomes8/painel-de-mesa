@@ -9,6 +9,7 @@
  */
 
 import type { EstadoCombate, Personagem } from "./tipos";
+import type { Peca } from "./pecas";
 
 /** Quantas ações ficam guardadas. Desfazer volta uma de cada vez, sempre a
  *  mais nova, e o botão diz qual é antes do toque. */
@@ -25,6 +26,15 @@ export type MudancaPersonagem = {
 
 export type MudancaCombate = { antes: EstadoCombate; depois: EstadoCombate };
 
+/** Peões do mapa que a ação mexeu junto: o inimigo entrou na ordem e ganhou
+ *  peão, ou saiu dela e o peão saiu do mapa (ver lib/pecasNoBanco.ts). */
+export type PecasDaAcao = {
+  /** Peões que a ação criou: desfazer apaga. */
+  criadas: string[];
+  /** Peões que a ação tirou do mapa: desfazer devolve no mesmo lugar. */
+  tiradas: Peca[];
+};
+
 export type AcaoDesfazivel = {
   id: string;
   /** O que o botão mostra ("Goblin sofreu 5 de dano (2/7)"). Fica só neste
@@ -38,6 +48,9 @@ export type AcaoDesfazivel = {
   combate: MudancaCombate | null;
   /** Fichas que a ação criou (NPC novo, encontro): desfazer apaga. */
   criados: string[];
+  /** Peões que a ação pôs ou tirou do mapa. Ausente = nenhum (e é o que as
+   *  pilhas guardadas antes dos peões têm). */
+  pecas?: PecasDaAcao;
 };
 
 export type NovaAcaoDesfazivel = Omit<AcaoDesfazivel, "id">;
@@ -86,6 +99,7 @@ export function mesmoCombate(a: EstadoCombate, b: EstadoCombate): boolean {
 export function mudouAlgo(acao: NovaAcaoDesfazivel): boolean {
   return (
     acao.criados.length > 0 ||
+    (acao.pecas !== undefined && acao.pecas.criadas.length + acao.pecas.tiradas.length > 0) ||
     (acao.combate !== null && !mesmoCombate(acao.combate.antes, acao.combate.depois)) ||
     acao.personagens.some((m) => !mesmosCampos(m.antes, m.depois))
   );
@@ -156,6 +170,8 @@ export function lerPilhaGuardada(cru: string | null): AcaoDesfazivel[] {
         (a.textoLog === null || typeof a.textoLog === "string") &&
         Array.isArray(a.personagens) &&
         Array.isArray(a.criados) &&
+        (a.pecas === undefined ||
+          (a.pecas !== null && typeof a.pecas === "object" && Array.isArray(a.pecas.criadas) && Array.isArray(a.pecas.tiradas))) &&
         (a.combate === null || typeof a.combate === "object"),
     );
     return validas.slice(0, MAX_DESFAZER);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { relatarErro } from "@/lib/relatarErro";
+import { desfazerPecas, tirarPecasDasFichas } from "@/lib/pecasNoBanco";
 import { slugUnico } from "@/lib/sala";
 import { turnoAposRemover } from "@/lib/regras";
 import { linhasParaInserir, type Backup } from "@/lib/backup";
@@ -1279,6 +1280,9 @@ export function useSala(codigo: string): Sala {
         setAvisoFalha(AVISO_FALHA_ESCRITA);
         return;
       }
+      // O peão dela sai de todos os mapas: sem a ficha, ele virava um "?"
+      // cinza sem dono, parado lá até o Mestre tirar na mão.
+      if (removido) void tirarPecasDasFichas(codigo, [removido.slug], null);
       // Se estava na ordem de iniciativa, tira o slot dali também — senão
       // fica um slug órfão apontando pra ninguém, e a numeração dos NPCs
       // seguintes na ordem desloca (numerarNpcsNaOrdem não acha mais o
@@ -1292,7 +1296,7 @@ export function useSala(codigo: string): Sala {
         });
       }
     },
-    [definirCombate],
+    [codigo, definirCombate],
   );
 
   const definirNotasMestre = useCallback(
@@ -1716,14 +1720,22 @@ export function useSala(codigo: string): Sala {
     // 3. Fichas que a ação criou (NPC novo, encontro) — já saíram da ordem
     //    no passo 1.
     if (acao.criados.length > 0) {
+      const slugsCriados = ref.current.personagens.filter((p) => acao.criados.includes(p.id)).map((p) => p.slug);
       const { error } = await supabase.from("characters").delete().in("id", acao.criados);
       if (error) {
         relatarErro("desfazer (criados)", error);
         naoVoltaram.push("as fichas criadas");
       } else {
         setPersonagens((lista) => lista.filter((p) => !acao.criados.includes(p.id)));
+        // Ficha apagada não deixa peão órfão em mapa nenhum.
+        void tirarPecasDasFichas(codigo, slugsCriados, null);
       }
     }
+
+    // 4. Peões que a ação pôs ou tirou do mapa junto com a ordem. Como tudo do
+    //    mapa, é melhor esforço: se um não voltar, aparece no mapa e o Mestre
+    //    arruma na mão — não vira "desfeito em parte" do combate.
+    if (acao.pecas) await desfazerPecas(acao.pecas);
 
     setPilhaDesfazer((pilha) => pilha.filter((a) => a.id !== acao.id));
     if (acao.textoLog) registrarLog(acao.textoLog);

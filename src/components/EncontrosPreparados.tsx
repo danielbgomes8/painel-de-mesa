@@ -6,6 +6,8 @@ import type { Encontro, FichaMonstro, GrupoEncontro, ItemIniciativa } from "@/li
 import { d20 } from "@/lib/dados";
 import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
 import { textoDesfeito } from "@/lib/desfazer";
+import type { Cena } from "@/lib/cenas";
+import { porPecasDosQueEntram } from "@/lib/pecasNoBanco";
 import {
   adicionarAoEncontro,
   entrarNaOrdem,
@@ -262,7 +264,7 @@ function EscolherMonstro({
  * nenhuma), e só depois entram na ordem. Se a ordem falhar, as fichas já
  * existem na sala — aparecem na lista de quem pode entrar, dá pra pôr na mão.
  */
-export function ComecarEncontro({ sala }: { sala: Sala }) {
+export function ComecarEncontro({ sala, cenaNaMesa = null }: { sala: Sala; cenaNaMesa?: Cena | null }) {
   const [ocupado, setOcupado] = useState(false);
   const prontos = sala.encontros.filter((e) => totalDoEncontro(e.grupos) > 0);
   if (prontos.length === 0) return null;
@@ -285,13 +287,18 @@ export function ComecarEncontro({ sala }: { sala: Sala }) {
       entraram = r.entraram.length;
       return { order: r.ordem };
     });
-    setOcupado(false);
-    if (!feito || entraram === 0) return;
+    if (!feito || entraram === 0) {
+      setOcupado(false);
+      return;
+    }
     // O log é público: nem o nome do encontro nem o dos monstros vão pra lá,
     // senão "Emboscada do Dragão Vermelho" entregaria o chefão antes da hora.
     // Quem joga vê "Inimigo N" na ordem, como com qualquer NPC não revelado.
     const linha = entraram === 1 ? "1 inimigo entrou no combate" : `${entraram} inimigos entraram no combate`;
     sala.registrarLog(linha);
+    // Com mapa na mesa, cada monstro ganha peão oculto (o Mestre arruma e mostra).
+    const pecas = await porPecasDosQueEntram(cenaNaMesa, criados);
+    setOcupado(false);
     // Encontro começado por engano: desfazer tira todo mundo da ordem e apaga
     // as fichas criadas agora (o encontro preparado continua salvo).
     sala.lembrarDesfazer({
@@ -300,6 +307,7 @@ export function ComecarEncontro({ sala }: { sala: Sala }) {
       personagens: [],
       combate: feito,
       criados: criados.map((p) => p.id),
+      pecas,
     });
   }
 

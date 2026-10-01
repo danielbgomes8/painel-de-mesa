@@ -1070,12 +1070,47 @@ Decisões que não estão no código à primeira vista:
     (`page.route`) e confere que a memória gravada não tem célula do outro lado da
     parede; **sem a correção o teste falha (285 células)**. Vale pra qualquer
     "estado derivado que só cresce": nunca calcular com a entrada ainda carregando.
-  - **Ainda não existe (perguntado pelo Daniel em 01/10):** a integração
-    mapa → iniciativa. Hoje a iniciativa manda no mapa (anel dourado da vez, "pôr os
-    inimigos da iniciativa", nome/cor/revelado/condições da ficha, deslocamento na
-    régua), mas NÃO: tocar no peão pra aplicar dano ou passar a vez; o peão do
-    inimigo nascer quando ele entra na iniciativa; o peão sair quando o inimigo é
-    removido (fica um marcador cinza "?" até o Mestre tirar).
+  - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
+    Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
+    condições da ficha). Agora vale nos dois sentidos:
+    - **Inimigo que entra na ordem ganha peão OCULTO** no mapa que está NA MESA
+      (`porPecasDosQueEntram` em `lib/pecasNoBanco.ts`, regra pura
+      `pecasDosQueEntram` em `lib/pecas.ts`): pelo formulário, pela ficha que já
+      existia e pelo "começar encontro". Só NPC, só quem ainda não tem peão naquela
+      cena, no meio do pedaço que a mesa vê (`cena.camera`), sem cair em cima de
+      ninguém. **Tamanho pelo tipo da ficha** (`tamanhoPeloTipo`: "Fera grande" = 2×2,
+      enorme = 3, imenso = 4 — o catálogo escreve assim; vale também pro botão "pôr
+      os inimigos da iniciativa"). Sem mapa na mesa, nada nasce. Isso **não contraria**
+      "nada nasce sozinho ao liberar o mapa": o gatilho é o inimigo ENTRAR na ordem,
+      nunca o mapa ir pra mesa.
+    - **Inimigo que sai da ordem (✕) sai do mapa da mesa**; jogador fica (continua ali
+      fora do combate). **Ficha apagada** (aba Fichas ou desfazer de NPC criado) tira o
+      peão de TODOS os mapas da sala — era o "?" cinza órfão. **Reiniciar o combate não
+      mexe em peão** (de propósito: o Mestre reinicia pra rolar de novo e o inimigo que
+      volta acha o peão onde estava, sem nascer outro).
+    - **Desfazer leva os peões junto** (`AcaoDesfazivel.pecas`, opcional — pilha
+      guardada antes disso continua valendo): desfazer a entrada apaga o peão criado;
+      desfazer a saída devolve o peão com o mesmo id e no mesmo lugar.
+    - **Tocar num peão (soltar sem arrastar) abre o cartão dele** embaixo do mapa
+      (`CartaoDoPeao.tsx`, callback `aoAbrirPeca` do `CenaMapa`; o arrasto não abre):
+      o mesmo painel da linha da iniciativa (`AcoesNaLinha`, agora exportado: dano,
+      metade, cura, ataques, condições, testes de morte), "Passar a vez →" quando é a
+      vez dele, e — só pro Mestre — mostrar/esconder o peão e revelar o nome. Mesmas
+      funções da iniciativa (`mudarPVComLog`, `avancarTurno`), então log, desfazer e
+      anti-spoiler são os mesmos. O jogador só abre o do próprio peão (é o único que o
+      toque dele pega). No mapa o campo de dano **não** ganha foco sozinho
+      (`focarAoAbrir={false}`): o teclado subiria por cima do mapa a cada toque. O
+      cartão rola a página só o necessário pra aparecer (`scrollIntoView nearest`) e
+      continua aberto depois do dano, pronto pro próximo golpe. Tocar no nome do peão
+      na lista do Mestre também abre.
+    - **Tudo do mapa aqui é melhor esforço**: erro vai pro relato, sem aviso na tela e
+      sem travar o combate; sem internet nem tenta. Sem a tabela de peões, não faz nada.
+    - **Robô** (`e2e/mapaIniciativa.e2e.ts`): entrada (form e ficha existente, tamanho
+      2×2), saída + desfazer (mesmo id e lugar), cartão do Mestre (dano no banco, campo
+      sem foco, mostrar, revelar), cartão do jogador (só o dele, passa a vez) e ficha
+      apagada. Conferido que ele FALHA com o toque no peão desligado.
+    - De passagem: o campo "quanto?" da linha da iniciativa cortava o texto por 1 px
+      a 375px (precisava 63, cabia 62); `.initajuste input.num` foi de 84 pra 90 px.
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).

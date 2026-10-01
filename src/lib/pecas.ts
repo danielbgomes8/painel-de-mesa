@@ -179,6 +179,50 @@ export function posicoesIniciais(
   return montar(0);
 }
 
+// ── Iniciativa → mapa ──────────────────────────────────────────────────────
+
+/** Tamanho do peão pelo tipo escrito na ficha: o catálogo de monstros põe o
+ *  tamanho no `cls` ("Fera grande", "Dragão imenso" — ver monstrosSrd.ts).
+ *  Sem tamanho reconhecível, um quadradinho (pequeno, médio e miúdo ocupam um). */
+export function tamanhoPeloTipo(cls: string | null | undefined): TamanhoPeca {
+  const t = ` ${(cls ?? "").toLowerCase()} `;
+  if (/[\s(]imens[oa][\s,)]/.test(t) || t.includes(" gargantuan ")) return 4;
+  if (/[\s(]enorme[\s,)]/.test(t) || t.includes(" huge ")) return 3;
+  if (/[\s(]grande[\s,)]/.test(t) || t.includes(" large ")) return 2;
+  return 1;
+}
+
+type FichaQueEntra = { slug: string; is_npc: boolean; cls?: string };
+
+/**
+ * Os peões que nascem quando inimigos entram na iniciativa com um mapa na
+ * mesa: só NPC (o grupo o Mestre põe quando quer), só quem ainda não tem peão
+ * nesta cena, OCULTOS (a mesa não vê até o Mestre mostrar, como em "pôr os
+ * inimigos da iniciativa") e no meio do pedaço que a mesa está vendo, sem cair
+ * em cima de ninguém. O tamanho vem do tipo da ficha.
+ */
+export function pecasDosQueEntram(entrada: {
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura" | "camera">;
+  fichas: readonly FichaQueEntra[];
+  existentes: readonly Pick<Peca, "slug" | "x" | "y">[];
+}): NovaPeca[] {
+  const { cena, fichas, existentes } = entrada;
+  const jaTem = new Set(existentes.map((p) => p.slug).filter((s): s is string => Boolean(s)));
+  const faltam: FichaQueEntra[] = [];
+  for (const f of fichas) {
+    if (!f.is_npc || jaTem.has(f.slug)) continue;
+    jaTem.add(f.slug);
+    faltam.push(f);
+  }
+  if (faltam.length === 0) return [];
+  const lugares = posicoesIniciais(cena, faltam.length, cena.camera, existentes.map((p) => [p.x, p.y]));
+  return faltam.map((f, i) => {
+    const tamanho = tamanhoPeloTipo(f.cls);
+    const [x, y] = encaixarNaGrade(cena, lugares[i][0], lugares[i][1], tamanho);
+    return { slug: f.slug, nome: "", x, y, tamanho, oculto: true };
+  });
+}
+
 /** Um trecho do mapa em volta de `ponto` (de `quadradinhos` de lado), pra
  *  `posicoesIniciais` agrupar os peões ali em vez de no meio da tela — é o que
  *  faz "pôr o grupo onde eu tocar". */

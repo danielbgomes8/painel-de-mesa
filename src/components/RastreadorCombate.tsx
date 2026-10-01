@@ -3,6 +3,8 @@
 import { Fragment, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
+import type { Cena } from "@/lib/cenas";
+import { porPecasDosQueEntram, tirarPecasDasFichas } from "@/lib/pecasNoBanco";
 import { d20 } from "@/lib/dados";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
@@ -81,12 +83,18 @@ export function RastreadorCombate({
   sala,
   souMestre,
   meuPersonagem,
+  cenaNaMesa = null,
 }: {
   sala: Sala;
   souMestre: boolean;
   meuPersonagem: Personagem | null;
+  /** O mapa que a mesa está vendo: inimigo que entra na ordem ganha peão
+   *  oculto nele, e o que sai leva o peão junto. */
+  cenaNaMesa?: Cena | null;
 }) {
   const { combate, personagens } = sala;
+  // Sem internet o mapa não funciona: nem tenta mexer nos peões.
+  const mapa = sala.semInternet ? null : cenaNaMesa;
 
   const [quem, setQuem] = useState(NOVO_NPC);
   const [nomeNpc, setNomeNpc] = useState("");
@@ -184,10 +192,13 @@ export function RastreadorCombate({
       entrou = r.entraram.length > 0;
       return { order: r.ordem };
     });
+    setIni("");
     if (feito && entrou) {
       // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
       const linha = `${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init})`;
       sala.registrarLog(linha);
+      // Inimigo com mapa na mesa ganha peão oculto (ver pecasDosQueEntram).
+      const pecas = await porPecasDosQueEntram(mapa, [entrando]);
       sala.lembrarDesfazer({
         rotulo: `${entrando.name} entrou no combate (iniciativa ${item.init})`,
         textoLog: textoDesfeito([linha], ""),
@@ -195,9 +206,9 @@ export function RastreadorCombate({
         combate: feito,
         // NPC criado agora pra entrar: desfazer apaga a ficha junto.
         criados: criado ? [criado.id] : [],
+        pecas,
       });
     }
-    setIni("");
   }
 
   /** Põe de uma vez todo jogador que ainda não está na ordem, cada um com a
@@ -281,12 +292,18 @@ export function RastreadorCombate({
     });
     // Tirar da ordem não vai pro log, então desfazer também não grava nada lá.
     if (feito) {
+      const ficha = pvDe(saindo.slug);
+      // Inimigo que sai da ordem sai também do mapa da mesa (o jogador fica:
+      // ele continua ali mesmo fora do combate). Desfazer devolve o peão no
+      // mesmo lugar.
+      const tiradas = ficha?.is_npc && mapa ? await tirarPecasDasFichas(mapa.room_code, [ficha.slug], mapa.id) : [];
       sala.lembrarDesfazer({
-        rotulo: `${pvDe(saindo.slug)?.name ?? saindo.name} saiu da ordem`,
+        rotulo: `${ficha?.name ?? saindo.name} saiu da ordem`,
         textoLog: null,
         personagens: [],
         combate: feito,
         criados: [],
+        pecas: tiradas.length > 0 ? { criadas: [], tiradas } : undefined,
       });
     }
   }
@@ -538,7 +555,7 @@ export function RastreadorCombate({
             </button>
           )}
 
-          <ComecarEncontro sala={sala} />
+          <ComecarEncontro sala={sala} cenaNaMesa={mapa} />
 
           <div className="addcombatant">
             <select value={quem} onChange={(e) => setQuem(e.target.value)}>
@@ -620,13 +637,15 @@ export function RastreadorCombate({
  *  número e escolhe dano, metade — resistência ou passou no teste — ou cura;
  *  Enter = dano, que é o caso mais comum; Esc fecha) e as condições, com os
  *  mesmos chips e prazos da ficha. Aplicar dano fecha o painel; mexer em
- *  condição não, pra dar pra ligar mais de uma. */
-function AcoesNaLinha({
+ *  condição não, pra dar pra ligar mais de uma. Também é o miolo do cartão
+ *  que abre ao tocar num peão do mapa (CartaoDoPeao). */
+export function AcoesNaLinha({
   sala,
   personagem: p,
   naVez,
   onAplicar,
   onFechar,
+  focarAoAbrir = true,
 }: {
   sala: Sala;
   personagem: Personagem;
@@ -634,11 +653,14 @@ function AcoesNaLinha({
   naVez: boolean;
   onAplicar: (delta: number) => Promise<void>;
   onFechar: () => void;
+  /** Põe o cursor no campo de dano ao abrir. No mapa, não: o teclado do
+   *  celular subiria por cima do mapa a cada toque num peão. */
+  focarAoAbrir?: boolean;
 }) {
   // Na vez de quem tem ataque pra rolar, abrir a linha é pra atacar, não pra
   // tomar dano: sem o cursor no campo de PV, o teclado do celular não sobe
   // por cima dos botões de ataque.
-  const focarDano = !(naVez && lerAtaquesRolaveis(p.ataque ?? "").ataques.length > 0);
+  const focarDano = focarAoAbrir && !(naVez && lerAtaquesRolaveis(p.ataque ?? "").ataques.length > 0);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const n = lerValorPV(texto);

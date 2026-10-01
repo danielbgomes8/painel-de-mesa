@@ -679,7 +679,8 @@ button:focus-visible {
   background: var(--surface);
 }
 .initajuste input.num {
-  width: 84px;
+  /* 84px cortava o "quanto?" por 1px na fonte mono (medido a 375px). */
+  width: 90px;
   background: var(--surface2);
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -3160,4 +3161,42 @@ input.fj-score:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   touch-action: manipulation;
+}
+
+/* Cartão do peão: tocar num peão do mapa (sem arrastar) abre as ações dele
+   embaixo do mapa — as mesmas da linha da iniciativa (CartaoDoPeao.tsx). */
+.mapa-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  scroll-margin-bottom: 12px;
+}
+.mapa-cartao-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.mapa-cartao-nome {
+  font-family: var(--f-display);
+  font-size: 16px;
+  color: var(--ink);
+}
+.mapa-cartao .hpmini,
+.mapa-cartao-ca {
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.mapa-cartao .hpmini.crit {
+  color: var(--danger);
+}
+.mapa-cartao-vez {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.mapa-cartao .mapa-ferr {
+  margin: 0;
 }

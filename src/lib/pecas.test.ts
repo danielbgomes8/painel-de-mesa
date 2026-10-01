@@ -12,11 +12,13 @@ import {
   montarPecasNaTela,
   nomeDaPeca,
   normalizarPeca,
+  pecasDosQueEntram,
   pecaVisivel,
   podeMoverPeca,
   posicoesDosIcones,
   posicoesIniciais,
   regiaoEmTornoDe,
+  tamanhoPeloTipo,
   type Peca,
   type PecaNaTela,
 } from "./pecas";
@@ -430,5 +432,62 @@ describe("pôr o grupo onde o Mestre tocou", () => {
 
   it("a região é um quadrado em volta do ponto, do tamanho pedido", () => {
     expect(regiaoEmTornoDe(cena, [500, 400], 4)).toEqual({ x: 500 - 200, y: 400 - 200, w: 400, h: 400 });
+  });
+});
+
+describe("inimigo que entra na iniciativa ganha peão", () => {
+  const cenaComCamera = { ...cena, camera: { x: 1000, y: 500, w: 800, h: 600 } };
+  const goblin = { slug: "goblin", is_npc: true, cls: "Fada pequena" };
+  const ogro = { slug: "ogro", is_npc: true, cls: "Gigante grande" };
+  const tiberio = { slug: "tiberio", is_npc: false, cls: "Paladino" };
+
+  it("o tamanho vem do tipo da ficha, como o catálogo escreve", () => {
+    expect(tamanhoPeloTipo("Fada pequena")).toBe(1);
+    expect(tamanhoPeloTipo("Humanoide médio ou pequeno")).toBe(1);
+    expect(tamanhoPeloTipo("Fera miúda")).toBe(1);
+    expect(tamanhoPeloTipo("Fera grande")).toBe(2);
+    expect(tamanhoPeloTipo("Dragão enorme")).toBe(3);
+    expect(tamanhoPeloTipo("Dragão imenso")).toBe(4);
+    expect(tamanhoPeloTipo("Large dragon")).toBe(2);
+    // texto livre do Mestre, sem tamanho: um quadradinho
+    expect(tamanhoPeloTipo("")).toBe(1);
+    expect(tamanhoPeloTipo(undefined)).toBe(1);
+    expect(tamanhoPeloTipo("Grandalhão")).toBe(1);
+  });
+
+  it("só inimigo ganha peão, oculto, e no pedaço que a mesa está vendo", () => {
+    const novas = pecasDosQueEntram({ cena: cenaComCamera, fichas: [goblin, tiberio], existentes: [] });
+    expect(novas).toHaveLength(1);
+    expect(novas[0]).toMatchObject({ slug: "goblin", nome: "", oculto: true, tamanho: 1 });
+    expect(novas[0].x).toBeGreaterThanOrEqual(1000);
+    expect(novas[0].x).toBeLessThanOrEqual(1800);
+    expect(novas[0].y).toBeGreaterThanOrEqual(500);
+    expect(novas[0].y).toBeLessThanOrEqual(1100);
+  });
+
+  it("quem já tem peão nesta cena não ganha outro (nem se vier repetido)", () => {
+    const existentes = [{ slug: "goblin", x: 1450, y: 750 }];
+    expect(pecasDosQueEntram({ cena: cenaComCamera, fichas: [goblin], existentes })).toEqual([]);
+    expect(pecasDosQueEntram({ cena: cenaComCamera, fichas: [ogro, ogro], existentes: [] })).toHaveLength(1);
+  });
+
+  it("não cai em cima de peão que já está no mapa", () => {
+    const existentes = [{ slug: "tiberio", x: 1450, y: 850 }, { slug: null, x: 1550, y: 850 }];
+    const novas = pecasDosQueEntram({ cena: cenaComCamera, fichas: [goblin, { ...goblin, slug: "goblin-2" }], existentes });
+    for (const n of novas) {
+      expect(existentes.some((e) => Math.hypot(n.x - e.x, n.y - e.y) < 60)).toBe(false);
+    }
+  });
+
+  it("monstro grande encaixa no cruzamento das linhas, como ao arrastar", () => {
+    const [p] = pecasDosQueEntram({ cena: cenaComCamera, fichas: [ogro], existentes: [] });
+    expect(p.tamanho).toBe(2);
+    expect(p.x % 100).toBe(0);
+    expect(p.y % 100).toBe(0);
+  });
+
+  it("sem câmera (a mesa vê o mapa todo), entra no meio do mapa", () => {
+    const [p] = pecasDosQueEntram({ cena: { ...cena, camera: null }, fichas: [goblin], existentes: [] });
+    expect([p.x, p.y]).toEqual([1550, 1050]);
   });
 });

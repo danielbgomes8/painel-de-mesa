@@ -71,6 +71,11 @@ describe("desfazer: o que guardar", () => {
     expect(mudouAlgo(acao({ combate: { antes: combateAntes, depois: combateAntes } }))).toBe(false);
   });
 
+  it("peão posto ou tirado do mapa junto com a ordem também conta", () => {
+    expect(mudouAlgo(acao({ pecas: { criadas: ["p1"], tiradas: [] } }))).toBe(true);
+    expect(mudouAlgo(acao({ pecas: { criadas: [], tiradas: [] } }))).toBe(false);
+  });
+
   it("a pilha guarda as mais novas no topo e esquece as mais velhas", () => {
     let pilha: AcaoDesfazivel[] = [];
     for (let i = 0; i < MAX_DESFAZER + 3; i++) pilha = empilhar(pilha, acao({ id: `a${i}` }));
@@ -158,5 +163,10 @@ describe("desfazer: detalhes de escrita", () => {
     expect(lerPilhaGuardada('{"a":1}')).toEqual([]);
     const boa = acao({ id: "ok" });
     expect(lerPilhaGuardada(JSON.stringify([boa, { id: 3 }]))).toEqual([boa]);
+    // Com peões: vale; peões tortos descartam a ação; pilha de antes dos peões (sem o campo) continua valendo.
+    const comPecas = acao({ id: "p", pecas: { criadas: ["x"], tiradas: [] } });
+    expect(lerPilhaGuardada(JSON.stringify([comPecas]))).toEqual([comPecas]);
+    expect(lerPilhaGuardada(JSON.stringify([{ ...boa, pecas: { criadas: "x" } }]))).toEqual([]);
+    expect(lerPilhaGuardada(JSON.stringify([{ ...boa, pecas: null }]))).toEqual([]);
   });
 });
