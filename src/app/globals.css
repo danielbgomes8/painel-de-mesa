@@ -86,6 +86,20 @@ h3 {
   font-family: var(--f-mono);
 }
 
+/* Sem as setinhas de subir/descer nos campos de número: no notebook o Chrome
+   guarda ~15px pra elas dentro de cada campo (mesmo escondidas) e o
+   placeholder saía cortado ("iniciativ", "quant"); no celular nem existem.
+   Ninguém ajusta PV de 1 em 1 numa setinha de 8px. */
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 button {
   font-family: inherit;
   touch-action: manipulation;

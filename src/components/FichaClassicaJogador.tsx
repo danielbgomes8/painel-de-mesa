@@ -1,7 +1,9 @@
 "use client";
 
 import type { Atributo, NivelProficiencia, Pericia, Personagem } from "@/lib/tipos";
-import { NOME_CLASSE, habilidadesDoNivel } from "@/lib/classesSrd";
+import { NOME_CLASSE } from "@/lib/classesNomes";
+import { useCatalogoClasses } from "@/hooks/useCatalogoClasses";
+import { AvisoCatalogo } from "@/components/FichaClasse";
 import {
   ataqueMagia,
   bonusPericia,
@@ -103,6 +105,8 @@ export function FichaClassicaJogador({
   const proficiencias = p.proficiencias ?? { saves: [], pericias: {} };
   const classes = p.classes ?? [];
   const modificadores = p.modificadores ?? [];
+  // O que cada classe ganha por nível baixa à parte (ver useCatalogoClasses).
+  const catalogoClasses = useCatalogoClasses();
 
   const nivel = nivelTotal(classes);
   const prof = bonusProficiencia(nivel);
@@ -181,7 +185,7 @@ export function FichaClassicaJogador({
 
       {classes.map((c, i) => {
         if (c.nivel >= 20) return null;
-        const novas = habilidadesDoNivel(c.classe, c.nivel + 1);
+        const novas = catalogoClasses.catalogo?.habilidadesDoNivel(c.classe, c.nivel + 1) ?? null;
         const pv = classes.length === 1 ? pvAoSubir(p.hd_die, modCon) : null;
         return (
           <div key={i} className="fj-proximo">
@@ -193,7 +197,9 @@ export function FichaClassicaJogador({
                 </h4>
               }
             >
-              {novas.length === 0 ? (
+              {novas === null ? (
+                <AvisoCatalogo falhou={catalogoClasses.falhou} tentarDeNovo={catalogoClasses.tentarDeNovo} />
+              ) : novas.length === 0 ? (
                 <p className="fc-sub">Sem característica nova de classe nesse nível — confira o livro.</p>
               ) : (
                 novas.map((h) => (

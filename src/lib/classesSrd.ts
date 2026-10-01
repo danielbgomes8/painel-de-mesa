@@ -1,4 +1,8 @@
 import type { CampoModificavel, ClasseBase } from "./tipos";
+import { NOME_CLASSE } from "./classesNomes";
+
+// O rótulo das classes mora à parte (vai na abertura do app; este arquivo, não).
+export { NOME_CLASSE };
 
 /**
  * Catálogo de habilidades de classe por nível — conferido contra o SRD 2024
@@ -1116,22 +1120,6 @@ export const HABILIDADES_CLASSE: HabilidadeClasse[] = [
 export function habilidadesAte(classe: ClasseBase, nivel: number): HabilidadeClasse[] {
   return HABILIDADES_CLASSE.filter((h) => h.classe === classe && h.nivel <= nivel).sort((a, b) => a.nivel - b.nivel);
 }
-
-/** Nome de cada classe base, em ordem alfabética (é a ordem dos seletores). */
-export const NOME_CLASSE: Record<ClasseBase, string> = {
-  barbaro: "Bárbaro",
-  bardo: "Bardo",
-  bruxo: "Bruxo",
-  clerigo: "Clérigo",
-  druida: "Druida",
-  feiticeiro: "Feiticeiro",
-  guerreiro: "Guerreiro",
-  ladino: "Ladino",
-  mago: "Mago",
-  monge: "Monge",
-  paladino: "Paladino",
-  patrulheiro: "Patrulheiro",
-};
 
 /** O que a classe ganha exatamente neste nível — pro card "próximo nível". */
 export function habilidadesDoNivel(classe: ClasseBase, nivel: number): HabilidadeClasse[] {

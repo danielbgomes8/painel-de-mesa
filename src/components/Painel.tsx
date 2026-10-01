@@ -29,11 +29,22 @@ import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { EncontrosPreparados } from "@/components/EncontrosPreparados";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
-import { PainelMapa } from "@/components/PainelMapa";
+import { PainelMapa } from "@/components/MapaSobDemanda";
 import { Telao } from "@/components/Telao";
 import { BASTIAO_ATIVO, BarraAbas, type Aba } from "@/components/BarraAbas";
 import { EscolherCampanha } from "@/components/EscolherCampanha";
 import { BarraDesfazer } from "@/components/BarraDesfazer";
+
+/** Roda `fazer` quando o navegador estiver à toa (ou em 2 s, onde não há
+ *  requestIdleCallback, como no Safari antigo). Devolve como cancelar. */
+function quandoSobrarTempo(fazer: () => void): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(fazer, { timeout: 5000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(fazer, 2000);
+  return () => window.clearTimeout(id);
+}
 
 export function Painel() {
   const codigo = useCodigoSala();
@@ -117,6 +128,17 @@ function PainelSala({ codigo }: { codigo: string }) {
   // O Mestre sempre vê a aba (é onde ele prepara, e onde descobre que falta a
   // migration); o jogador só quando há um mapa na mesa.
   const temMapa = souMestre || Boolean(cenas.naMesa);
+
+  // O que ficou fora da abertura do app baixa no tempo livre, depois que a
+  // tela já está na mão: as habilidades de classe sempre (a ficha tem de abrir
+  // sem internet, e o service worker só guarda o que já foi baixado) e o mapa
+  // pra quem tem mapa — o Mestre, ou todo mundo quando há um na mesa. Falha
+  // calada: sem internet, a tela que precisa avisa na hora.
+  useEffect(() => quandoSobrarTempo(() => void import("@/lib/classesSrd").catch(() => {})), []);
+  useEffect(() => {
+    if (!temMapa) return;
+    return quandoSobrarTempo(() => void import("@/components/PainelMapa").catch(() => {}));
+  }, [temMapa]);
   // Último mapa que esta pessoa viu (abriu a aba ou dispensou o aviso): o aviso
   // "tem um mapa na mesa" só aparece pra um mapa que ela ainda não viu.
   const [mapaVisto, setMapaVisto] = useState<string | null>(null);

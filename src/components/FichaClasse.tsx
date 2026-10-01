@@ -10,7 +10,8 @@ import type {
   Personagem,
   TipoConjurador,
 } from "@/lib/tipos";
-import { NOME_CLASSE, habilidadesMulticlasse } from "@/lib/classesSrd";
+import { NOME_CLASSE } from "@/lib/classesNomes";
+import { useCatalogoClasses } from "@/hooks/useCatalogoClasses";
 import { bonusProficiencia, espacosDeMagia, nivelTotal, PREFIXO_ESPACO_MAGIA } from "@/lib/regras";
 import { CampoNumero } from "@/components/CampoNumero";
 import { BotaoRemover } from "@/components/BotaoRemover";
@@ -35,6 +36,21 @@ const TIPOS_CONJURADOR: { valor: TipoConjurador; nome: string }[] = [
 
 const CLASSES_BASE = (Object.keys(NOME_CLASSE) as ClasseBase[]).map((valor) => ({ valor, nome: NOME_CLASSE[valor] }));
 
+
+/** Enquanto as habilidades de classe não chegam (baixam à parte, ver
+ *  useCatalogoClasses): "carregando", ou — sem internet e sem ter baixado
+ *  antes — o aviso com "tentar de novo". */
+export function AvisoCatalogo({ falhou, tentarDeNovo }: { falhou: boolean; tentarDeNovo: () => void }) {
+  if (!falhou) return <p className="fc-sub">Carregando as habilidades da classe…</p>;
+  return (
+    <p className="catcopiado falhou">
+      Não deu pra carregar as habilidades da classe — sem internet?{" "}
+      <button type="button" className="linkbtn" onClick={tentarDeNovo}>
+        tentar de novo
+      </button>
+    </p>
+  );
+}
 
 function sinal(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
@@ -61,7 +77,9 @@ export function FichaClasse({
   const nivel = nivelTotal(classes);
   const conjuradoras = classes.filter((c) => c.conjurador !== "nenhum" && c.atributo_conjuracao);
 
-  const habilidades = habilidadesMulticlasse(classes);
+  // O catálogo de habilidades baixa à parte (ver useCatalogoClasses); até lá, null.
+  const catalogoClasses = useCatalogoClasses();
+  const habilidades = catalogoClasses.catalogo?.habilidadesMulticlasse(classes) ?? null;
 
   function patchClasse(i: number, mudanca: Partial<ClassePersonagem>) {
     patch({
@@ -227,10 +245,14 @@ export function FichaClasse({
       </SecaoRecolhivel>
 
       {classes.map((c, indice) => {
-        const habilidadesDaClasse = habilidades.filter((h) => h.classeIndice === indice);
+        const habilidadesDaClasse = habilidades?.filter((h) => h.classeIndice === indice) ?? [];
         return (
           <SecaoRecolhivel abertoInicial={false} key={indice} titulo={<h4>Habilidades de {CLASSES_BASE.find((cb) => cb.valor === c.classe)?.nome}</h4>}>
-            {habilidadesDaClasse.length === 0 && <p className="empty-note">Nenhuma até o nível {c.nivel}.</p>}
+            {habilidades === null ? (
+              <AvisoCatalogo falhou={catalogoClasses.falhou} tentarDeNovo={catalogoClasses.tentarDeNovo} />
+            ) : (
+              habilidadesDaClasse.length === 0 && <p className="empty-note">Nenhuma até o nível {c.nivel}.</p>
+            )}
             {habilidadesDaClasse.map((h, i) => (
               <div key={i} className="fc-habilidade">
                 <div className="fc-itemhead">

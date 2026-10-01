@@ -2,7 +2,7 @@
 
 import type { Sala } from "@/hooks/useSala";
 import type { Cenas } from "@/hooks/useCenas";
-import { VisorDaMesa } from "@/components/PainelMapa";
+import { VisorDaMesa } from "@/components/MapaSobDemanda";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import {

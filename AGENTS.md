@@ -734,9 +734,30 @@ primeiros itens; os outros estão na lista do fim desta seção.
 6. ~~O backup diário nunca foi restaurado~~ — feito em 01/10/2026: script
    `restaurar-backup-bruto.mjs` + ensaio contra o banco de verdade, sem
    diferenças.
-7. Menores: 280 KB compactados de JS na primeira abertura (o de monstros
-   saiu dela em 26/09, carrega sob demanda; o de classes continua); nada confere sozinho se o banco
-   bate com `tipos.ts` (conferido à mão em 25/09: bate). O log **não**
+7. ~~Peso da primeira abertura~~ — feito em 01/10/2026: de **272 KB pra 250 KB**
+   compactados (medido no `next start`, pedidos de script até o evento `load`).
+   Saíram dela: o **mapa** inteiro (`components/MapaSobDemanda.tsx`, `next/dynamic`
+   do `PainelMapa` e do `VisorDaMesa` do telão; só baixa ao abrir a aba/telão com
+   mapa) e as **habilidades de classe** (`hooks/useCatalogoClasses.ts`, igual ao de
+   monstros; o rótulo `NOME_CLASSE` foi pra `lib/classesNomes.ts`, que é leve).
+   **Pré-carga no tempo livre** (`quandoSobrarTempo` no `Painel`): as classes
+   sempre e o mapa pra quem tem mapa (Mestre, ou todos com mapa na mesa) — a ficha
+   tem de abrir sem internet e o service worker só guarda o que já baixou. Sem
+   internet e sem a parte baixada, o mapa mostra "Não deu pra carregar o mapa…
+   tentar de novo" em vez de derrubar o app (conferido bloqueando os pedidos com
+   `serviceWorkers: "block"` — **o `page.route` do Playwright não pega o que o
+   service worker busca**, e sem bloquear ele o teste passa por engano). O resto
+   da abertura é React (~70 KB), supabase-js (~64 KB) e o Next (~46 KB): o próximo
+   corte seria trocar o `supabase-js` pelos pacotes separados (postgrest/realtime/
+   storage, sem o de login que o app não usa) — mexe no `ehFalhaDeRede`, então só
+   com o robô e o teste de queda de rede.
+   **De passagem:** campo `type="number"` não tem mais as setinhas de subir/descer
+   (`globals.css`): no notebook o Chrome guarda ~15 px pra elas em cada campo e
+   cortava "iniciativa" e "quanto?" — a medida por `measureText` NÃO pega isso
+   (dava "cabe"); só a foto mostrou. Pra medir de verdade, compare o
+   `scrollWidth` com um texto longo no notebook e no celular.
+   Ainda aberto deste item: nada confere sozinho se o banco bate com `tipos.ts`
+   (conferido à mão em 25/09: bate). O log **não**
    precisa de limpeza: 135 linhas na Salamina em duas semanas e o app só lê
    as 40 últimas.
 
