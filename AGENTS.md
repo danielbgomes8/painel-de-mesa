@@ -739,6 +739,11 @@ primeiros itens; os outros estão na lista do fim desta seção.
    no conflito, gravar a linha inteira, esquecer o peão e pular a conferência da
    fila — os quatro quebram teste. (O último só quebrou depois do caso de TEXTO:
    número tem a segunda trava do próprio UPDATE, `camposConferiveis`; texto não.)
+   **O Vercel roda o `verificar` com NODE_ENV=production**: em produção o React
+   não tem `act` e o teste do hook quebrava SÓ lá (o 1º deploy dele falhou e a
+   trava segurou o site na versão anterior). O `vitest.config.ts` força
+   `env: { NODE_ENV: "test" }`. Pra simular o Vercel aqui:
+   `NODE_ENV=production CI=1 VERCEL=1 bash -c "npm run verificar && npm run build"`.
 5. ~~Trava no apagar sala~~ — feito em 01/10/2026 (`0020`, rodada e conferida).
    **A lista de salas é pública**: `GET /rest/v1/rooms?select=code` com a
    chave `anon` devolve todos os códigos (conferido). Então "código difícil de
