@@ -131,7 +131,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   botão pra abrir; a linha editável de "Bônus de resistência" some (os blocos
   da folha cobrem). O Mestre vê o cartão resumido de sempre, com o "+ ver ficha
   completa" (que abre a mesma folha). A 375px o cartão do jogador tem ~3.600px
-  (o do Mestre, ~1.800px): é uma ficha inteira, as seções recolhem. **O arranjo
+  numa ficha enxuta e **5.030px na do Tibério** (o do Mestre, ~1.800px): é uma
+  ficha inteira, as seções recolhem. Medido em 01/10/2026: com as quatro seções
+  de `FichaClasse` abertas o Tibério dava 6.170px (só "Classe e conjuração" tinha
+  1.572px), e a ficha completa, recolhida, ficava empurrada lá pra baixo. Hoje
+  "Classe e conjuração", "Espaços de magia" (é só o botão de gerar) e "Habilidades
+  de <classe>" abrem **recolhidas**; "Modificadores" abre aberta porque é onde se
+  liga/desliga bônus durante a luta; e "Classe e conjuração" abre aberta quando o
+  personagem não tem classe (a folha manda cadastrar ali). Seção nova de
+  configuração nasce recolhida. **O arranjo
   da folha é o da folha de papel** (o Daniel pediu o arranjo, não o visual de
   papel: a paleta é a do app): faixa de identidade ("Classe · Nível ·
   Proficiência"), card recolhido "Próximo nível · Paladino 2" (o que a classe
@@ -640,6 +648,10 @@ primeiros itens; os outros estão na lista do fim desta seção.
   mas era atualização de conserto, sem mudança de uso. `npm audit --omit=dev`
   = 0. Sobra um alerta moderado no **Vitest** (ferramenta de teste, não vai
   pro site); a correção é o Vitest 5, versão grande — decisão pra depois.
+  Em 01/10/2026 o `npm audit` (completo) deu 3: o do Vitest (conta duas vezes,
+  `vitest` + `@vitest/mocker`, mesmo aviso) e um **alto** no `brace-expansion`
+  (usado pelo lint, só desenvolvimento); o `npm audit fix` resolveu esse
+  (1.1.18 → 1.1.21 e 5.0.9 → 5.0.12, só no lockfile). Ficou só o do Vitest.
 - **Robô de atualizações** (`.github/dependabot.yml`): toda segunda, 06:00 de
   Brasília, UM pull request com todas as atualizações pequenas (`minor` +
   `patch`) do npm; ações dos workflows uma vez por mês. Versão **grande** fica

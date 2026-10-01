@@ -121,7 +121,11 @@ export function FichaClasse({
 
   return (
     <div className="fichaclasse">
-      <SecaoRecolhivel titulo={<h4>Classe e conjuração</h4>}>
+      {/* Configuração e consulta abrem recolhidas (a ficha do Tibério passava de
+          6.000px com tudo aberto); "Modificadores" fica aberta porque é onde se
+          liga/desliga bônus durante a luta. Sem classe cadastrada, abre: a
+          ficha de cima manda cadastrar aqui. */}
+      <SecaoRecolhivel abertoInicial={classes.length === 0} titulo={<h4>Classe e conjuração</h4>}>
         {classes.length > 0 && (
           <p className="fc-sub">
             Nível total {nivel} · proficiência {sinal(bonusProficiencia(nivel))}
@@ -183,7 +187,7 @@ export function FichaClasse({
       </SecaoRecolhivel>
 
       {conjuradoras.length === 1 && editavel && (
-        <SecaoRecolhivel titulo={<h4>Espaços de magia</h4>}>
+        <SecaoRecolhivel abertoInicial={false} titulo={<h4>Espaços de magia</h4>}>
           <button type="button" className="btn" onClick={gerarEspacos}>
             gerar espaços de magia (nível {conjuradoras[0].nivel} de {CLASSES_BASE.find((cb) => cb.valor === conjuradoras[0].classe)?.nome})
           </button>
@@ -191,7 +195,7 @@ export function FichaClasse({
         </SecaoRecolhivel>
       )}
       {conjuradoras.length > 1 && (
-        <SecaoRecolhivel titulo={<h4>Espaços de magia</h4>}>
+        <SecaoRecolhivel abertoInicial={false} titulo={<h4>Espaços de magia</h4>}>
           <p className="fc-sub">
             Mais de uma classe conjurando ao mesmo tempo ainda não calcula sozinho — cadastre os espaços à mão em Recursos, como sempre foi.
           </p>
@@ -225,7 +229,7 @@ export function FichaClasse({
       {classes.map((c, indice) => {
         const habilidadesDaClasse = habilidades.filter((h) => h.classeIndice === indice);
         return (
-          <SecaoRecolhivel key={indice} titulo={<h4>Habilidades de {CLASSES_BASE.find((cb) => cb.valor === c.classe)?.nome}</h4>}>
+          <SecaoRecolhivel abertoInicial={false} key={indice} titulo={<h4>Habilidades de {CLASSES_BASE.find((cb) => cb.valor === c.classe)?.nome}</h4>}>
             {habilidadesDaClasse.length === 0 && <p className="empty-note">Nenhuma até o nível {c.nivel}.</p>}
             {habilidadesDaClasse.map((h, i) => (
               <div key={i} className="fc-habilidade">
