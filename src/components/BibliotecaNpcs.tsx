@@ -9,6 +9,7 @@ import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
 import type { MonstroCatalogo } from "@/lib/monstrosSrd";
+import { FichaClassicaMonstro } from "@/components/FichaClassicaMonstro";
 
 /** Prep de mesa: NPCs/monstros que podem aparecer ou não, com ficha básica e
  *  notas de tática, prontos pra puxar no rastreador de combate quando
@@ -49,6 +50,8 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
   // São 331 monstros: a lista inteira de uma vez dava metros de rolagem.
   const [faixa, setFaixa] = useState<number | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
+  // Monstro com a ficha clássica aberta (nome do livro); um por vez.
+  const [fichaAberta, setFichaAberta] = useState<string | null>(null);
 
   const procurando = busca.trim().length > 0;
   const achados = !catalogo
@@ -63,13 +66,17 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
   // ("fera" = 91) ficam na linha compacta (~50px em vez de ~125px).
   const detalhado = procurando && achados.length <= MAX_DETALHADOS;
 
-  async function copiar(m: MonstroCatalogo) {
-    const deuCerto = await sala.criarModeloNpc(m);
+  async function copiar(m: MonstroCatalogo): Promise<boolean> {
+    // Nome do livro (inglês) é o que fica pro personagem — só a classe/tipo,
+    // as notas e o resto continuam em português (pedido do Daniel, 30/09/2026:
+    // "Ursopar" não agradou, ele quer "Owlbear" mesmo).
+    const deuCerto = await sala.criarModeloNpc({ ...m, name: m.en });
     setAviso(
       deuCerto
-        ? { texto: `✓ ${m.name} copiado pra sua biblioteca, lá em cima.`, falhou: false }
-        : { texto: `Não deu pra copiar ${m.name}. Confira a conexão e toque de novo.`, falhou: true },
+        ? { texto: `✓ ${m.en} copiado pra sua biblioteca, lá em cima.`, falhou: false }
+        : { texto: `Não deu pra copiar ${m.en}. Confira a conexão e toque de novo.`, falhou: true },
     );
+    return deuCerto;
   }
 
   return (
@@ -130,19 +137,35 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
 
       <div className="catresultados">
         {achados.map((m) => (
-          <button key={m.name} type="button" className="catitem" onClick={() => copiar(m)}>
-            <span className="catnome">
-              {m.name}
-              {m.en !== m.name && <span className="caten"> · {m.en}</span>}
-            </span>
-            <span className="catstats">
-              ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · {m.speed}m · inic.{" "}
-              {m.init_mod >= 0 ? "+" : ""}
-              {m.init_mod} · {m.cls}
-            </span>
-            {detalhado && m.ataque ? <span className="catataque">⚔ {m.ataque}</span> : null}
-            {detalhado && m.notes ? <span className="catnota">{m.notes}</span> : null}
-          </button>
+          <div key={m.name} className="catgrupo">
+            <div className="catentrada">
+              <button type="button" className="catitem" onClick={() => copiar(m)}>
+                <span className="catnome">
+                  {m.en}
+                  {m.en !== m.name && <span className="caten"> · {m.name}</span>}
+                </span>
+                <span className="catstats">
+                  ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · {m.speed}m · inic.{" "}
+                  {m.init_mod >= 0 ? "+" : ""}
+                  {m.init_mod} · {m.cls}
+                </span>
+                {detalhado && m.ataque ? <span className="catataque">⚔ {m.ataque}</span> : null}
+                {detalhado && m.notes ? <span className="catnota">{m.notes}</span> : null}
+              </button>
+              <button
+                type="button"
+                className="catficha"
+                aria-expanded={fichaAberta === m.en}
+                aria-label={`${fichaAberta === m.en ? "Fechar" : "Ver"} a ficha de ${m.en}`}
+                onClick={() => setFichaAberta(fichaAberta === m.en ? null : m.en)}
+              >
+                {fichaAberta === m.en ? "fechar" : "ficha"}
+              </button>
+            </div>
+            {fichaAberta === m.en && catalogo ? (
+              <FichaClassicaMonstro monstro={m} nd={catalogo.ndTexto(m.nd)} onCopiar={() => copiar(m)} />
+            ) : null}
+          </div>
         ))}
       </div>
 

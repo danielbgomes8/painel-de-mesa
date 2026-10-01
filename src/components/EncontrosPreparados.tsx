@@ -238,10 +238,10 @@ function EscolherMonstro({
 
       <div className="catresultados">
         {achados.map((m) => (
-          <button key={m.name} type="button" className="catitem" onClick={() => aoEscolher(fichaDeMonstro(m))}>
+          <button key={m.name} type="button" className="catitem" onClick={() => aoEscolher(fichaDeMonstro({ ...m, name: m.en }))}>
             <span className="catnome">
-              {m.name}
-              {m.en !== m.name && <span className="caten"> · {m.en}</span>}
+              {m.en}
+              {m.en !== m.name && <span className="caten"> · {m.name}</span>}
             </span>
             <span className="catstats">
               ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · inic. {m.init_mod >= 0 ? "+" : ""}

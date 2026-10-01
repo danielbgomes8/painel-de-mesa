@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { CURADOS_EN, TOTAL_SRD_2024, nomeEmPortugues, tamanhoReal } from "../../scripts/gerar-monstros-srd.mjs";
+import { CURADOS_EN, TOTAL_SRD_2024, idiomas, nomeEmPortugues, tamanhoReal } from "../../scripts/gerar-monstros-srd.mjs";
 import { FAIXAS_ND, MONSTROS_CURADOS, MONSTROS_SRD, buscarMonstros, monstrosDaFaixa, ndTexto } from "./monstrosSrd";
 import { MONSTROS_GERADOS } from "./monstrosSrdGerados";
+import { ESTATISTICAS_MONSTROS } from "./monstrosSrdEstatisticas";
 import { DICAS_TATICA } from "./monstrosDicas";
 
 /** Os três do SRD que não atacam (só se movem ou gritam). */
@@ -136,6 +137,82 @@ describe("gerador do catálogo (scripts/gerar-monstros-srd.mjs)", () => {
     expect(nomeEmPortugues("Black Dragon Wyrmling")).toBe("Dragão preto filhote");
     expect(nomeEmPortugues("Dragon Turtle")).toBe("Tartaruga-dragão");
     expect(nomeEmPortugues("Monstro inventado")).toBeNull();
+  });
+});
+
+describe("estatísticas da ficha clássica (monstrosSrdEstatisticas.ts)", () => {
+  const pega = (en: string) => MONSTROS_SRD.find((m) => m.en === en)!;
+
+  it("uma entrada por monstro do catálogo, sem sobra nem falta (a chave é o nome em inglês)", () => {
+    const chaves = Object.keys(ESTATISTICAS_MONSTROS).sort();
+    expect(chaves).toEqual(MONSTROS_SRD.map((m) => m.en).sort());
+    expect(chaves).toHaveLength(TOTAL_SRD_2024);
+  });
+
+  // Guarda de edição: o Owlbear foi conferido contra a fonte (open5e, srd-2024).
+  it("os números do Owlbear batem com a fonte", () => {
+    const o = pega("Owlbear");
+    expect(o.atributos).toEqual({ for: 20, des: 12, con: 17, int: 3, sab: 12, car: 7 });
+    expect(o.pericias).toBe("Percepção +5");
+    expect(o.sentidos).toBe("visão no escuro 18m");
+    expect(o.idiomas).toBe("nenhum");
+    expect(o.xp).toBe(700);
+    expect(o.pp).toBe(15);
+  });
+
+  it("atributos entre 1 e 30, XP inteiro e percepção passiva coerente com a Sabedoria", () => {
+    for (const m of MONSTROS_SRD) {
+      for (const [k, v] of Object.entries(m.atributos)) {
+        expect(Number.isInteger(v) && v >= 1 && v <= 30, `${m.en} ${k}=${v}`).toBe(true);
+      }
+      expect(Number.isInteger(m.xp) && m.xp >= 0, `${m.en} xp`).toBe(true);
+      // 10 + mod de Sabedoria (+ perícia): nunca abaixo de 10 + mod, e a Percepção
+      // listada, quando existe, é exatamente o que entra.
+      const modSab = Math.floor((m.atributos.sab - 10) / 2);
+      expect(m.pp, `${m.en} percepção passiva`).toBeGreaterThanOrEqual(10 + modSab);
+      const percepcao = m.pericias.match(/Percepção ([+−-]\d+)/);
+      if (percepcao) expect(m.pp, `${m.en} pp bate com Percepção`).toBe(10 + Number(percepcao[1].replace("−", "-")));
+    }
+  });
+
+  it("XP do catálogo é o mesmo que a nota automática dos gerados anuncia", () => {
+    for (const g of MONSTROS_GERADOS) {
+      const m = pega(g.en);
+      expect(m.notes, g.en).toContain(`(${m.xp.toLocaleString("pt-BR")} XP)`);
+    }
+  });
+
+  it("nenhum texto da ficha clássica deixa inglês vazar (a mesa lê em português)", () => {
+    const ingles = /telepathy|understands|can't|\bft\b|\bplus\b|\bother language|\bany language|\bAll\b/i;
+    for (const m of MONSTROS_SRD) {
+      for (const campo of [m.pericias, m.sentidos, m.idiomas]) expect(campo, m.en).not.toMatch(ingles);
+      expect(m.idiomas, `${m.en} sem idioma`).not.toBe("");
+    }
+  });
+
+  it("perícias e sentidos seguem o formato que a ficha espera", () => {
+    for (const m of MONSTROS_SRD) {
+      if (m.pericias) expect(m.pericias, m.en).toMatch(/^[A-Za-zÀ-ÿ ]+ [+−-]\d+(, [A-Za-zÀ-ÿ ]+ [+−-]\d+)*$/);
+      if (m.sentidos) {
+        expect(m.sentidos, m.en).toMatch(
+          /^(visão no escuro|visão cega|sentido sísmico|visão verdadeira) \d+(\.\d)?m(, (visão no escuro|visão cega|sentido sísmico|visão verdadeira) \d+(\.\d)?m)*$/,
+        );
+      }
+    }
+  });
+
+  it("idiomas: os moldes mais esquisitos da fonte viram português", () => {
+    expect(idiomas("")).toBe("nenhum");
+    expect(idiomas("All; telepathy 120 ft.")).toBe("todos, telepatia 36m");
+    expect(idiomas("Understands Common plus one other language but can't speak")).toBe(
+      "Entende Comum e mais um idioma à escolha mas não fala",
+    );
+    expect(idiomas("Celestial; understands Common and Primordial (Auran) but can't speak them")).toBe(
+      "Celestial; entende Comum, Primordial (aurano) mas não os fala",
+    );
+    expect(idiomas("Primordial (Auran, Terran)")).toBe("Primordial (aurano, terrano)");
+    expect(idiomas("Common (can't speak in wolf form)")).toBe("Comum (não fala em forma de lobo)");
+    expect(() => idiomas("Klingon")).toThrow(/sem tradução/);
   });
 });
 

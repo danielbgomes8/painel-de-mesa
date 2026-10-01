@@ -1,11 +1,29 @@
-import type { NovoModeloNpc } from "./tipos";
+import type { Atributos, NovoModeloNpc } from "./tipos";
 import { MONSTROS_GERADOS } from "./monstrosSrdGerados";
+import { ESTATISTICAS_MONSTROS } from "./monstrosSrdEstatisticas";
 import { DICAS_TATICA } from "./monstrosDicas";
 
 /** Monstro do catálogo: a ficha que vai pra biblioteca/encontro (só os
  *  campos de `NovoModeloNpc` são copiados), mais o nível de desafio e o nome
  *  no SRD em inglês — pra achar pelo nome do livro ("owlbear"). */
 export type MonstroCatalogo = Required<NovoModeloNpc> & { nd: number; en: string };
+
+/** O que a ficha clássica (statblock) mostra além do que o combate precisa:
+ *  os seis atributos (valor, não modificador), perícias/sentidos/idiomas já em
+ *  português, XP e percepção passiva. Saem do SRD pelo gerador, nunca à mão
+ *  (ver monstrosSrdEstatisticas.ts). `pericias` vazio = nenhuma listada. */
+export type EstatisticasMonstro = {
+  atributos: Atributos;
+  pericias: string;
+  sentidos: string;
+  idiomas: string;
+  xp: number;
+  pp: number;
+};
+
+/** Monstro do catálogo com a ficha clássica junto — é o que `MONSTROS_SRD`
+ *  entrega. Continua valendo como `MonstroCatalogo` onde só o combate importa. */
+export type MonstroCompleto = MonstroCatalogo & EstatisticasMonstro;
 
 /**
  * Os 331 monstros do SRD 5.2 = esta lista CURADA (escrita à mão, com dica de
@@ -93,10 +111,19 @@ function comDica(m: MonstroCatalogo): MonstroCatalogo {
   return dica ? { ...m, notes: `${dica} ${m.notes}` } : m;
 }
 
+/** Junta a ficha clássica (curado ou gerado, a chave é o nome em inglês). Falta
+ *  de entrada é erro de propósito: um monstro sem estatísticas apareceria como
+ *  ficha pela metade, e o teste quebra antes disso chegar na mesa. */
+function comEstatisticas(m: MonstroCatalogo): MonstroCompleto {
+  const estatisticas = ESTATISTICAS_MONSTROS[m.en];
+  if (!estatisticas) throw new Error(`monstro sem estatísticas: ${m.en}`);
+  return { ...m, ...estatisticas };
+}
+
 /** O catálogo inteiro, do ND mais baixo pro mais alto. */
-export const MONSTROS_SRD: MonstroCatalogo[] = [...MONSTROS_CURADOS, ...MONSTROS_GERADOS.map(comDica)].sort(
-  (a, b) => a.nd - b.nd || a.name.localeCompare(b.name, "pt-BR"),
-);
+export const MONSTROS_SRD: MonstroCompleto[] = [...MONSTROS_CURADOS, ...MONSTROS_GERADOS.map(comDica)]
+  .map(comEstatisticas)
+  .sort((a, b) => a.nd - b.nd || a.name.localeCompare(b.name, "pt-BR"));
 
 /** Nível de desafio como se escreve: 1/8, 1/4, 1/2, 1, 2... */
 export function ndTexto(nd: number): string {
@@ -117,7 +144,7 @@ export const FAIXAS_ND = [
   { rotulo: "13+", min: 13, max: Infinity },
 ] as const;
 
-export function monstrosDaFaixa(faixa: (typeof FAIXAS_ND)[number]): MonstroCatalogo[] {
+export function monstrosDaFaixa(faixa: (typeof FAIXAS_ND)[number]): MonstroCompleto[] {
   return MONSTROS_SRD.filter((m) => m.nd >= faixa.min && m.nd <= faixa.max);
 }
 
@@ -131,7 +158,7 @@ function semAcento(texto: string): string {
  *  1/4") devolve os de exatamente esse nível de desafio — pra montar
  *  encontro. Termo vazio devolve lista vazia: o catálogo só aparece quando
  *  alguém procura. */
-export function buscarMonstros(termo: string): MonstroCatalogo[] {
+export function buscarMonstros(termo: string): MonstroCompleto[] {
   const alvo = semAcento(termo.trim());
   if (!alvo) return [];
   const nd = alvo.match(/^nd\s*(\d+(?:\/\d+)?)$/);

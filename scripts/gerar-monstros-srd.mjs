@@ -7,6 +7,10 @@
  * vêm da fonte sem ninguém digitar — é o que impede a volta dos números de
  * 2014 (ver AGENTS.md, "A mesa joga D&D 2024").
  *
+ * Gera também src/lib/monstrosSrdEstatisticas.ts: atributos, perícias,
+ * sentidos, idiomas, XP e percepção passiva das 331 (curadas incluídas),
+ * pra ficha clássica (statblock) — ver `estatisticasDaFonte`.
+ *
  *   node scripts/gerar-monstros-srd.mjs              (baixa da open5e)
  *   node scripts/gerar-monstros-srd.mjs dados.json   (usa uma cópia local)
  *
@@ -448,6 +452,197 @@ function notas(t) {
   return `${frases.join(". ")}.`;
 }
 
+// ─── Estatísticas da ficha clássica (statblock) ─────────────────────────────
+
+const PERICIAS_PT = {
+  acrobatics: "Acrobacia", animal_handling: "Lidar com Animais", arcana: "Arcanismo", athletics: "Atletismo",
+  deception: "Enganação", history: "História", insight: "Intuição", intimidation: "Intimidação",
+  investigation: "Investigação", medicine: "Medicina", nature: "Natureza", perception: "Percepção",
+  performance: "Atuação", persuasion: "Persuasão", religion: "Religião", sleight_of_hand: "Prestidigitação",
+  stealth: "Furtividade", survival: "Sobrevivência",
+};
+
+const SENTIDOS_PT = [
+  ["darkvision_range", "visão no escuro"],
+  ["blindsight_range", "visão cega"],
+  ["tremorsense_range", "sentido sísmico"],
+  ["truesight_range", "visão verdadeira"],
+];
+
+const DIALETOS = { Aquan: "aquano", Auran: "aurano", Ignan: "ígneo", Terran: "terrano" };
+const LINGUAS = {
+  Abyssal: "Abissal", Celestial: "Celestial", Common: "Comum", "Deep Speech": "Língua Profunda",
+  Draconic: "Dracônico", Druidic: "Druídico", Dwarvish: "Anão", Elvish: "Élfico", Giant: "Gigante",
+  Gnoll: "Gnoll", Goblin: "Goblin", Infernal: "Infernal", Orc: "Orc", Primordial: "Primordial",
+  Sahuagin: "Sahuagin", Sylvan: "Silvestre", "Thieves' cant": "Gíria de ladrões", Undercommon: "Submundano",
+  Worg: "Worg",
+};
+const FORMAS = { bear: "urso", boar: "javali", rat: "rato", tiger: "tigre", wolf: "lobo" };
+const NUM_EXTENSO = { one: "um", two: "dois", three: "três", four: "quatro", five: "cinco" };
+
+/** Três frases que a fonte escreve com explicação entre parênteses ou fora do
+ *  molde das outras — traduzidas inteiras, em vez de um parser a mais. */
+const IDIOMAS_ESPECIAIS = {
+  "Abyssal; telepathy 60 ft. (works only with creatures that understand Abyssal)":
+    "Abissal, telepatia 18m (só funciona com quem entende Abissal)",
+  "Otyugh; telepathy 120 ft. (doesn't allow the receiving creature to respond telepathically)":
+    "Otyugh, telepatia 36m (quem recebe não consegue responder por telepatia)",
+  "Understands commands given in any language but can't speak":
+    "Entende comandos em qualquer idioma, mas não fala",
+};
+
+function traduzLingua(token) {
+  const t = token.trim();
+  const m = t.match(/^([\w' ]+?)\s*\(([^)]+)\)$/);
+  if (m) {
+    const base = LINGUAS[m[1].trim()];
+    if (!base) throw new Error(`idioma sem tradução: "${m[1]}"`);
+    const dialetos = m[2].split(",").map((d) => {
+      const dialeto = DIALETOS[d.trim()];
+      if (!dialeto) throw new Error(`dialeto sem tradução: "${d}"`);
+      return dialeto;
+    });
+    return `${base} (${dialetos.join(", ")})`;
+  }
+  const traduzido = LINGUAS[t];
+  if (!traduzido) throw new Error(`idioma sem tradução: "${t}"`);
+  return traduzido;
+}
+
+/** Separa por vírgula sem quebrar dentro de parênteses: "Primordial (Auran,
+ *  Terran)" é UM idioma, não dois. */
+function partirForaParenteses(txt) {
+  const partes = [];
+  let atual = "";
+  let dentro = 0;
+  for (const c of txt) {
+    if (c === "(") dentro++;
+    if (c === ")") dentro--;
+    if (c === "," && dentro === 0) {
+      partes.push(atual.trim());
+      atual = "";
+    } else {
+      atual += c;
+    }
+  }
+  if (atual.trim()) partes.push(atual.trim());
+  return partes;
+}
+
+/** "A, B, And C" / "A and B" → [A, B, C] traduzidos (a fonte escreve "And" com
+ *  maiúscula no meio da frase em alguns monstros). */
+function partirLista(txt) {
+  return partirForaParenteses(txt.replace(/,?\s+[Aa]nd\s+/g, ", "))
+    .filter(Boolean)
+    .map(traduzLingua);
+}
+
+/** "Common plus one other language" / "Common and any three languages" —
+ *  soltos ou dentro de um "Understands ... but can't speak". */
+function traduzListaOuPadrao(txt) {
+  const mais = txt.match(/^Common plus (\w+) other languages?$/);
+  if (mais) {
+    const n = NUM_EXTENSO[mais[1]] ?? mais[1];
+    return `Comum e mais ${n} idioma${mais[1] === "one" ? "" : "s"} à escolha`;
+  }
+  const qualquer = txt.match(/^Common and any (\w+) languages$/);
+  if (qualquer) {
+    const n = NUM_EXTENSO[qualquer[1]] ?? qualquer[1];
+    return `Comum e mais ${n} idiomas à escolha`;
+  }
+  return partirLista(txt).join(", ");
+}
+
+/**
+ * Idiomas em português a partir do `languages.as_string` da fonte. São 70
+ * frases diferentes nas 331 criaturas, todas em meia dúzia de moldes (lista,
+ * "Understands X but can't speak", telepatia, "Common plus N other
+ * languages"...). Frase fora dos moldes dá erro de propósito, igual
+ * `ATAQUES[...]`: melhor quebrar o gerador do que deixar inglês na tela.
+ */
+export function idiomas(asString) {
+  const original = (asString ?? "").trim();
+  if (original === "") return "nenhum";
+  if (IDIOMAS_ESPECIAIS[original]) return IDIOMAS_ESPECIAIS[original];
+
+  let s = original;
+  let telepatia = "";
+  const mTel = s.match(/;\s*telepathy (\d+) ft\.$/);
+  if (mTel) {
+    telepatia = `, telepatia ${metros(Number(mTel[1]))}m`;
+    s = s.slice(0, mTel.index);
+  }
+
+  if (s === "All") return `todos${telepatia}`;
+
+  const mForma = s.match(/^Common \(can't speak in (\w+) form\)$/);
+  if (mForma) {
+    const forma = FORMAS[mForma[1]];
+    if (!forma) throw new Error(`forma sem tradução: "${mForma[1]}"`);
+    return `Comum (não fala em forma de ${forma})${telepatia}`;
+  }
+
+  let mEntende = s.match(/^Understands (.+?) but can't speak(?: them)?$/);
+  if (mEntende) return `Entende ${traduzListaOuPadrao(mEntende[1])} mas não fala${telepatia}`;
+
+  mEntende = s.match(/^(.+?);\s*understands (.+?) but can't speak them$/);
+  if (mEntende) {
+    const falado = partirForaParenteses(mEntende[1]).map(traduzLingua).join(", ");
+    return `${falado}; entende ${traduzListaOuPadrao(mEntende[2])} mas não os fala${telepatia}`;
+  }
+
+  return traduzListaOuPadrao(s) + telepatia;
+}
+
+/** "Percepção +5, Furtividade +3": só as perícias que a fonte lista pra
+ *  criatura (`skill_bonuses`), não as 18. Vazio se não tiver nenhuma. */
+function periciasTexto(t) {
+  return Object.entries(t.skill_bonuses ?? {})
+    .map(([chave, bonus]) => {
+      const nome = PERICIAS_PT[chave];
+      if (!nome) throw new Error(`${t.name}: perícia sem tradução: "${chave}"`);
+      return `${nome} ${comSinal(bonus)}`;
+    })
+    .join(", ");
+}
+
+/** "visão no escuro 18m, visão verdadeira 36m"; vazio se a criatura não tem
+ *  nenhum desses sentidos especiais (a percepção passiva vai em campo à parte). */
+function sentidosTexto(t) {
+  return SENTIDOS_PT.filter(([campo]) => t[campo])
+    .map(([campo, nome]) => `${nome} ${metros(t[campo])}m`)
+    .join(", ");
+}
+
+/**
+ * Erros da fonte (open5e) nos atributos, achados pelo teste de faixa (1 a 30)
+ * e conferidos numa segunda fonte. O Octopus vem com Constituição 0 e
+ * Carisma -3 (o valor virou o modificador); o certo é CON 11 e CAR 4 —
+ * D&D Beyond, 30/09/2026, e o PV da própria fonte (1d6, sem bônus de CON).
+ */
+const CORRECOES_ATRIBUTOS = {
+  Octopus: { constitution: 11, charisma: 4 },
+};
+
+/**
+ * Tudo que a ficha clássica (statblock) mostra além do que o catálogo já
+ * guarda pro combate: os seis atributos, perícias, sentidos, idiomas, XP e
+ * percepção passiva. Os números saem da fonte sem ninguém digitar; as ações
+ * e características em texto corrido NÃO entram aqui (são prosa em inglês, e
+ * traduzir à mão 331 monstros é um projeto à parte, com conferência).
+ */
+export function estatisticasDaFonte(t) {
+  const a = { ...t.ability_scores, ...CORRECOES_ATRIBUTOS[t.name] };
+  return {
+    atributos: { for: a.strength, des: a.dexterity, con: a.constitution, int: a.intelligence, sab: a.wisdom, car: a.charisma },
+    pericias: periciasTexto(t),
+    sentidos: sentidosTexto(t),
+    idiomas: idiomas(t.languages?.as_string),
+    xp: t.experience_points,
+    pp: t.passive_perception,
+  };
+}
+
 /** `name` à parte pra dar pra comparar os curados (que não estão em NOMES). */
 export function monstroDaFonte(t, name = nomeEmPortugues(t.name)) {
   if (!name) throw new Error(`criatura sem tradução: "${t.name}"`);
@@ -482,6 +677,11 @@ const TS = (m) =>
   `ac: ${m.ac}, hp_max: ${m.hp_max}, speed: ${m.speed}, init_mod: ${m.init_mod}, ` +
   `ataque: ${JSON.stringify(m.ataque)}, notes: ${JSON.stringify(m.notes)} },`;
 
+const TS_ESTATISTICAS = (e) =>
+  `{ atributos: { for: ${e.atributos.for}, des: ${e.atributos.des}, con: ${e.atributos.con}, int: ${e.atributos.int}, ` +
+  `sab: ${e.atributos.sab}, car: ${e.atributos.car} }, pericias: ${JSON.stringify(e.pericias)}, ` +
+  `sentidos: ${JSON.stringify(e.sentidos)}, idiomas: ${JSON.stringify(e.idiomas)}, xp: ${e.xp}, pp: ${e.pp} }`;
+
 async function main() {
   const arquivo = process.argv[2];
   const fonte = arquivo ? JSON.parse(await readFile(arquivo, "utf-8")) : await baixar();
@@ -509,6 +709,24 @@ export const MONSTROS_GERADOS: MonstroCatalogo[] = [
   const destino = fileURLToPath(new URL("../src/lib/monstrosSrdGerados.ts", import.meta.url));
   await writeFile(destino, `${cabecalho}${gerados.map(TS).join("\n")}\n];\n`, "utf-8");
   console.log(`${gerados.length} monstros gerados em ${destino}`);
+
+  // Estatísticas da ficha clássica: TODAS as 331, curadas e geradas — as
+  // curadas são escritas à mão em monstrosSrd.ts e não têm esses campos.
+  // Chave = nome em inglês, ordenado pra o diff não pular de lugar.
+  const estatisticas = [...fonte]
+    .sort((a, b) => a.name.localeCompare(b.name, "en"))
+    .map((t) => `  ${JSON.stringify(t.name)}: ${TS_ESTATISTICAS(estatisticasDaFonte(t))},`);
+  const cabecalhoEstatisticas = `// GERADO por scripts/gerar-monstros-srd.mjs a partir do SRD 5.2 (D&D 2024,
+// CC-BY-4.0, Wizards of the Coast), via open5e. NÃO EDITE À MÃO — rode o
+// gerador de novo. Uma entrada por criatura do SRD (curada ou gerada),
+// chave = nome em inglês; monstrosSrd.ts junta isto ao catálogo.
+import type { EstatisticasMonstro } from "./monstrosSrd";
+
+export const ESTATISTICAS_MONSTROS: Record<string, EstatisticasMonstro> = {
+`;
+  const destinoEstatisticas = fileURLToPath(new URL("../src/lib/monstrosSrdEstatisticas.ts", import.meta.url));
+  await writeFile(destinoEstatisticas, `${cabecalhoEstatisticas}${estatisticas.join("\n")}\n};\n`, "utf-8");
+  console.log(`${estatisticas.length} fichas de estatísticas em ${destinoEstatisticas}`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

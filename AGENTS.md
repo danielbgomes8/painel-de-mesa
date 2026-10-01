@@ -442,9 +442,44 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     achou a aranha. Três criaturas não atacam (Mosca gigante, Cavalo-marinho,
     Fungo gritador) e ficam com `ataque` vazio.
   - **Carrega sob demanda** (`useCatalogoMonstros`, `import()` dinâmico): o
-    catálogo é um pedaço de 17,6 KB compactado que só baixa quando a
+    catálogo é um pedaço de ~31 KB compactado (era 17,6 antes das
+    estatísticas, medido no build de 01/10/2026) que só baixa quando a
     biblioteca ou a montagem de encontro aparece — nunca na abertura do app.
     Sem internet e sem ter baixado antes, a tela diz e oferece tentar de novo.
+  - **Nome do monstro é o do livro, em inglês** (pedido do Daniel, 30/09/2026
+    — "Ursopar" não agradou; o do catálogo era "Urso-coruja"). Só o nome: tipo,
+    notas, ataque e o resto continuam em português. Nos dados nada mudou (`name`
+    segue em português, `en` é o do livro, e a busca casa os dois): quem troca é
+    a tela — `BibliotecaNpcs`/`EncontrosPreparados` mostram `m.en` grande e
+    `m.name` pequeno, e o que vai pra biblioteca/encontro/combate é `m.en`.
+    **Monstro novo que sai do catálogo passa `name: m.en`**, senão o português
+    volta pra ordem de iniciativa.
+  - **Estatísticas da ficha clássica** (`monstrosSrdEstatisticas.ts`, 01/10/2026,
+    **gerado** por `estatisticasDaFonte` no mesmo script — não editar à mão):
+    os seis atributos (valor, não modificador), perícias, sentidos, idiomas, XP e
+    percepção passiva das **331** (curados também; chave = nome em inglês),
+    juntados em `MONSTROS_SRD` por `comEstatisticas`.
+  - **Ficha clássica na tela** (`FichaClassicaMonstro.tsx`, 01/10/2026): na
+    busca do catálogo (aba Mestre → Biblioteca de NPCs), cada resultado tem um
+    botão "ficha" no canto que abre a ficha embaixo da linha (uma por vez), com
+    "copiar pra minha biblioteca" dentro — só confirma "copiado" depois que o
+    banco aceitar. O componente só importa **tipo** do catálogo (valor dele
+    traria os 31 KB pra abertura do app). Ainda não existe na montagem de
+    encontro (`EncontrosPreparados`), só na biblioteca.
+    **Lição medida a 375px:** o botão ao lado da linha tirava 56px de largura e
+    as estatísticas quebravam em 3 linhas — linha compacta média de 62 → 82px e
+    a faixa maior de ~3.900 → 4.700px. Sobreposto no canto (`position:
+    absolute`, com o `::after` pro alvo de toque de ~36px) deu 3.993px contra
+    3.950px sem o botão. Botão novo em linha de lista: sobrepor, não somar.
+  - O que **não** entra na ficha: ações e características em texto corrido — é prosa em
+    inglês, e traduzir 331 à mão com conferência é projeto à parte (como as dicas
+    de tática); `ataque` e `notes` continuam sendo o resumo. Idiomas: 70 frases
+    diferentes na fonte em meia dúzia de moldes, traduzidas por `idiomas()`, que
+    **dá erro em frase nova** de propósito (rodar o gerador acusa na hora).
+    **Erro da fonte achado pelo teste de faixa (1–30): o Octopus vem com CON 0 e
+    CAR −3** — corrigido em `CORRECOES_ATRIBUTOS` (CON 11, CAR 4, conferido no
+    D&D Beyond). Se a open5e consertar, a correção vira inofensiva, mas dá pra
+    tirar.
   - **Medido a 375px:** "ver todos" abre por **faixa de ND** (8 faixas, a maior
     com 54, ~3.900px), com a **linha compacta** (~62px: nome, ND, CA, PV, tipo);
     ataque e notas só aparecem quando a busca devolve até 8. Com as 5 faixas

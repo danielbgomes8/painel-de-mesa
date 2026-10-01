@@ -2054,6 +2054,143 @@ body:has(.telao) {
   color: var(--dim);
   line-height: 1.5;
 }
+/* Cada resultado do catálogo: o botão de copiar (a linha de sempre) + um
+   botão "ficha" POR CIMA, no canto. Não pode ser filho do botão de copiar
+   (botão dentro de botão não existe), e ao lado ou embaixo ele engordava a
+   linha: ao lado tirava 56px de largura e as estatísticas quebravam em 3
+   linhas (média de 62 → 82px a 375px, a faixa maior de 3.900 → 4.700px);
+   embaixo somava ~30px em cada uma. Sobreposto não ocupa nada: só o nome
+   ganha um respiro na direita pra não passar por baixo dele. */
+.catgrupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.catentrada {
+  position: relative;
+}
+.catentrada .catnome {
+  padding-right: 56px;
+}
+.catficha {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 48px;
+  height: 26px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+/* Alvo de toque de ~36px sem aumentar o botão (mesmo truque do .minilink). */
+.catficha::after {
+  content: "";
+  position: absolute;
+  inset: -5px -4px;
+}
+.catficha:hover,
+.catficha[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.catficha:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* Ficha clássica de monstro (FichaClassicaMonstro) — a estrutura do livro na
+   paleta do app: nome, tipo, CA/PV/deslocamento, seis atributos, ataques. */
+.sbficha {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.sbnome {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 21px;
+  color: var(--accent);
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+.sbnomept {
+  font-family: var(--f-body);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-left: 8px;
+}
+.sbtipo {
+  margin: 2px 0 0;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sbregra {
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  margin: 9px 0;
+}
+.sblinha {
+  margin: 3px 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.sblinha b {
+  margin-right: 4px;
+  font-family: var(--f-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.sbatrib {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+.sbatrib > div {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 2px;
+}
+.sbatrib .k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+.sbatrib .v {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.sbsec {
+  margin: 4px 0 0;
+  font-family: var(--f-display);
+  font-size: 15px;
+  color: var(--accent);
+}
+.sbacao {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.sbfine {
+  margin: 10px 0;
+  font-size: 11px;
+  color: var(--dim);
+}
 /* Ataque na ficha do NPC — o Mestre lê isto no turno do bicho, então o texto
    quebra linha em vez de sumir pra dentro de um campo de uma linha só. */
 .ataquebloco textarea {
