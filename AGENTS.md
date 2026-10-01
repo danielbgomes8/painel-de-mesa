@@ -660,7 +660,12 @@ primeiros itens; os outros estão na lista do fim desta seção.
   Em 01/10/2026 o `npm audit` (completo) deu 3: o do Vitest (conta duas vezes,
   `vitest` + `@vitest/mocker`, mesmo aviso) e um **alto** no `brace-expansion`
   (usado pelo lint, só desenvolvimento); o `npm audit fix` resolveu esse
-  (1.1.18 → 1.1.21 e 5.0.9 → 5.0.12, só no lockfile). Ficou só o do Vitest.
+  (1.1.18 → 1.1.21 e 5.0.9 → 5.0.12, só no lockfile). Ficou só o do Vitest —
+  **resolvido em 01/10/2026 com o Vitest 3.2.7 → 4.1.11** (`npm audit` completo
+  = 0). Não foi pro 5: o 5.0.3 tinha um dia e meio (dentro dos 3 dias de espera)
+  e o 5 exige Node 22.12+, e não se sabe o Node do projeto no Vercel; o 4.1.11 roda
+  do Node 20 em diante e já tinha 6 semanas. Nada mudou no uso: os 457 testes
+  passaram sem mexer em teste nenhum, e um defeito plantado continua acusando.
 - **Robô de atualizações** (`.github/dependabot.yml`): toda segunda, 06:00 de
   Brasília, UM pull request com todas as atualizações pequenas (`minor` +
   `patch`) do npm; ações dos workflows uma vez por mês. Versão **grande** fica
