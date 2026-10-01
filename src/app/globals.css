@@ -2191,6 +2191,60 @@ body:has(.telao) {
   font-size: 11px;
   color: var(--dim);
 }
+/* Dentro de outro cartão (a linha da biblioteca): sem moldura própria. */
+.sbficha.embutida {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+.sbficha.embutida .sbfine {
+  margin-bottom: 0;
+}
+/* Cabeçalho da linha da biblioteca: abre/fecha a ficha. A linha inteira é o
+   alvo de toque (mais de 36px de altura), igual o cabeçalho da ficha completa. */
+.npclibtopo {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.npclibtopo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.npclibseta {
+  flex: none;
+  width: 14px;
+  padding-top: 1px;
+  color: var(--dim);
+}
+.npclibtitulo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.npclibnome {
+  font-size: 14px;
+  font-weight: 600;
+}
+.npclibacoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 /* Ataque na ficha do NPC — o Mestre lê isto no turno do bicho, então o texto
    quebra linha em vez de sumir pra dentro de um campo de uma linha só. */
 .ataquebloco textarea {

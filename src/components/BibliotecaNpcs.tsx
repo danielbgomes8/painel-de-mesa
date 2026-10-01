@@ -8,13 +8,18 @@ import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
-import type { MonstroCatalogo } from "@/lib/monstrosSrd";
-import { FichaClassicaMonstro } from "@/components/FichaClassicaMonstro";
+import type { MonstroCatalogo, MonstroCompleto } from "@/lib/monstrosSrd";
+import { FichaClassicaMonstro, dadosDoMonstro, type DadosFichaMonstro } from "@/components/FichaClassicaMonstro";
+
+type Catalogo = typeof import("@/lib/monstrosSrd");
 
 /** Prep de mesa: NPCs/monstros que podem aparecer ou não, com ficha básica e
  *  notas de tática, prontos pra puxar no rastreador de combate quando
  *  entrarem em cena de verdade. Só o Mestre vê. */
 export function BibliotecaNpcs({ sala }: { sala: Sala }) {
+  // Uma carga só do catálogo: a busca embaixo e a ficha de cada monstro da
+  // biblioteca (que procura os atributos dele ali, pelo nome) usam a mesma.
+  const carga = useCatalogoMonstros();
   return (
     <div className="combat">
       <div className="combat-head">
@@ -29,13 +34,13 @@ export function BibliotecaNpcs({ sala }: { sala: Sala }) {
 
       <div className="npclib">
         {sala.modelosNpc.map((m) => (
-          <LinhaModelo key={m.id} modelo={m} sala={sala} />
+          <LinhaModelo key={m.id} modelo={m} sala={sala} catalogo={carga.catalogo} />
         ))}
       </div>
 
       <FormNovoModelo sala={sala} />
 
-      <CatalogoSrd sala={sala} />
+      <CatalogoSrd sala={sala} carga={carga} />
     </div>
   );
 }
@@ -43,8 +48,8 @@ export function BibliotecaNpcs({ sala }: { sala: Sala }) {
 /** Acima disso a busca mostra a linha compacta (ver `detalhado`). */
 const MAX_DETALHADOS = 8;
 
-function CatalogoSrd({ sala }: { sala: Sala }) {
-  const { catalogo, falhou, tentarDeNovo } = useCatalogoMonstros();
+function CatalogoSrd({ sala, carga }: { sala: Sala; carga: ReturnType<typeof useCatalogoMonstros> }) {
+  const { catalogo, falhou, tentarDeNovo } = carga;
   const [busca, setBusca] = useState("");
   // Faixa de ND aberta no "ver todos" (índice em FAIXAS_ND); null = fechado.
   // São 331 monstros: a lista inteira de uma vez dava metros de rolagem.
@@ -163,7 +168,7 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
               </button>
             </div>
             {fichaAberta === m.en && catalogo ? (
-              <FichaClassicaMonstro monstro={m} nd={catalogo.ndTexto(m.nd)} onCopiar={() => copiar(m)} />
+              <FichaClassicaMonstro dados={dadosDoMonstro(m, catalogo.ndTexto(m.nd))} onCopiar={() => copiar(m)} />
             ) : null}
           </div>
         ))}
@@ -177,60 +182,142 @@ function CatalogoSrd({ sala }: { sala: Sala }) {
   );
 }
 
-function LinhaModelo({ modelo: m, sala }: { modelo: ModeloNpc; sala: Sala }) {
+/** O monstro do SRD de onde esta linha veio, achado pelo nome: o do livro (como
+ *  é copiado) ou o em português (cópias antigas). Renomeou pra outra coisa, ou
+ *  é um NPC cadastrado à mão: sem catálogo, a ficha mostra só o que ele tem. */
+function achaNoCatalogo(catalogo: Catalogo | null, nome: string): MonstroCompleto | undefined {
+  if (!catalogo) return undefined;
+  const alvo = nome.trim().toLowerCase();
+  return catalogo.MONSTROS_SRD.find((c) => c.en.toLowerCase() === alvo || c.name.toLowerCase() === alvo);
+}
+
+function LinhaModelo({ modelo: m, sala, catalogo }: { modelo: ModeloNpc; sala: Sala; catalogo: Catalogo | null }) {
   const patch = (mudanca: Partial<ModeloNpc>) => sala.atualizarModeloNpc(m.id, mudanca);
+  // A linha abre como ficha, pra ler no turno do bicho; o formulário de campos
+  // fica atrás de "editar" (mesmo jeito da ficha completa do jogador).
+  const [editando, setEditando] = useState(false);
+  // Recolhida por padrão: aberta, cada ficha tem ~660px a 375px, e uma
+  // biblioteca de 15 monstros viraria 10 mil px de rolagem.
+  const [aberta, setAberta] = useState(false);
+
+  const doSrd = achaNoCatalogo(catalogo, m.name);
+  // Os números são os da biblioteca (o Mestre pode ter ajustado); do catálogo
+  // vêm só os atributos, perícias, sentidos, idiomas e XP.
+  const dados: DadosFichaMonstro = {
+    nome: m.name,
+    nomePt: doSrd && doSrd.name.toLowerCase() !== m.name.trim().toLowerCase() ? doSrd.name : undefined,
+    cls: m.cls,
+    ac: m.ac,
+    hp_max: m.hp_max,
+    speed: m.speed,
+    init_mod: m.init_mod,
+    ataque: m.ataque,
+    notes: m.notes,
+    estatisticas: doSrd,
+    nd: doSrd && catalogo ? catalogo.ndTexto(doSrd.nd) : undefined,
+  };
+
+  const nomePt = dados.nomePt;
+  const resumo = [
+    dados.nd ? `ND ${dados.nd}` : null,
+    `CA ${m.ac}`,
+    `${m.hp_max} PV`,
+    `inic. ${m.init_mod >= 0 ? "+" : ""}${m.init_mod}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="npclibrow">
-      <div className="npclibhead">
-        <CampoTexto valor={m.name} maxLength={40} placeholder="nome" onCommit={(v) => patch({ name: v })} />
-        <BotaoRemover
-          aria={`remover ${m.name} da biblioteca`}
-          confirmar={`Remover "${m.name}" da biblioteca?`}
-          onConfirmar={() => sala.removerModeloNpc(m.id)}
-        />
-      </div>
-      <div className="npclibstats">
-        <label>
-          classe/tipo
-          <CampoTexto valor={m.cls} maxLength={60} placeholder="ex.: morto-vivo médio" onCommit={(v) => patch({ cls: v })} />
-        </label>
-        <label>
-          PV
-          <CampoNumero className="campnum" valor={m.hp_max} onCommit={(n) => patch({ hp_max: Math.max(0, n) })} />
-        </label>
-        <label>
-          CA
-          <CampoNumero className="campnum" valor={m.ac} onCommit={(n) => patch({ ac: Math.max(0, n) })} />
-        </label>
-        <label>
-          desl. (m)
-          <CampoNumero className="campnum" valor={m.speed} onCommit={(n) => patch({ speed: Math.max(0, n) })} />
-        </label>
-        <label>
-          iniciativa
-          <CampoNumero className="campnum" valor={m.init_mod} onCommit={(n) => patch({ init_mod: n })} />
-        </label>
-      </div>
-      <div className="npclibataque">
-        <span className="sectitle">Ataque</span>
-        <div className="notesbox">
-          <CampoTextoAdiado
-            valor={m.ataque}
-            maxLength={200}
-            onSalvar={(texto) => patch({ ataque: texto })}
-            placeholder="ex.: Cimitarra +4, 1d6+2 cortante"
-          />
+      <button
+        type="button"
+        className="npclibtopo"
+        aria-expanded={aberta}
+        onClick={() => {
+          if (aberta) setEditando(false);
+          setAberta((v) => !v);
+        }}
+      >
+        <span className="npclibseta" aria-hidden="true">
+          {aberta ? "▾" : "▸"}
+        </span>
+        <span className="npclibtitulo">
+          <span className="npclibnome">
+            {m.name || "(sem nome)"}
+            {nomePt && <span className="caten"> · {nomePt}</span>}
+          </span>
+          {!aberta && <span className="catstats">{resumo}</span>}
+        </span>
+      </button>
+      {!aberta ? null : editando ? (
+        <>
+          <div className="npclibhead">
+            <CampoTexto valor={m.name} maxLength={40} placeholder="nome" onCommit={(v) => patch({ name: v })} />
+            <BotaoRemover
+              aria={`remover ${m.name} da biblioteca`}
+              confirmar={`Remover "${m.name}" da biblioteca?`}
+              onConfirmar={() => sala.removerModeloNpc(m.id)}
+            />
+          </div>
+          <div className="npclibstats">
+            <label>
+              classe/tipo
+              <CampoTexto valor={m.cls} maxLength={60} placeholder="ex.: morto-vivo médio" onCommit={(v) => patch({ cls: v })} />
+            </label>
+            <label>
+              PV
+              <CampoNumero className="campnum" valor={m.hp_max} onCommit={(n) => patch({ hp_max: Math.max(0, n) })} />
+            </label>
+            <label>
+              CA
+              <CampoNumero className="campnum" valor={m.ac} onCommit={(n) => patch({ ac: Math.max(0, n) })} />
+            </label>
+            <label>
+              desl. (m)
+              <CampoNumero className="campnum" valor={m.speed} onCommit={(n) => patch({ speed: Math.max(0, n) })} />
+            </label>
+            <label>
+              iniciativa
+              <CampoNumero className="campnum" valor={m.init_mod} onCommit={(n) => patch({ init_mod: n })} />
+            </label>
+          </div>
+          <div className="npclibataque">
+            <span className="sectitle">Ataque</span>
+            <div className="notesbox">
+              <CampoTextoAdiado
+                valor={m.ataque}
+                maxLength={200}
+                onSalvar={(texto) => patch({ ataque: texto })}
+                placeholder="ex.: Cimitarra +4, 1d6+2 cortante"
+              />
+            </div>
+          </div>
+          <div className="notesbox">
+            <CampoTextoAdiado
+              valor={m.notes}
+              maxLength={500}
+              onSalvar={(texto) => patch({ notes: texto })}
+              placeholder="tática, resistências, gatilho de fuga…"
+            />
+          </div>
+        </>
+      ) : (
+        <FichaClassicaMonstro dados={dados} embutida semNome />
+      )}
+      {aberta && (
+        <div className="npclibacoes">
+          <button type="button" className="btn" aria-pressed={editando} onClick={() => setEditando((v) => !v)}>
+            {editando ? "✓ concluir edição" : "✎ editar"}
+          </button>
+          {!editando && (
+            <BotaoRemover
+              aria={`remover ${m.name} da biblioteca`}
+              confirmar={`Remover "${m.name}" da biblioteca?`}
+              onConfirmar={() => sala.removerModeloNpc(m.id)}
+            />
+          )}
         </div>
-      </div>
-      <div className="notesbox">
-        <CampoTextoAdiado
-          valor={m.notes}
-          maxLength={500}
-          onSalvar={(texto) => patch({ notes: texto })}
-          placeholder="tática, resistências, gatilho de fuga…"
-        />
-      </div>
+      )}
     </div>
   );
 }

@@ -466,6 +466,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     banco aceitar. O componente só importa **tipo** do catálogo (valor dele
     traria os 31 KB pra abertura do app). Ainda não existe na montagem de
     encontro (`EncontrosPreparados`), só na biblioteca.
+    **A linha da biblioteca (monstro já copiado) também é a ficha**: abre
+    recolhida (nome + "ND · CA · PV · inic.", 67px a 375px; aberta tem ~660px,
+    e 15 monstros abertos dariam 10 mil px), ao toque abre a ficha, e
+    "✎ editar" volta ao formulário de campos de antes. Sem migration: o monstro
+    copiado leva o nome do livro, então atributos/perícias/sentidos/idiomas/XP
+    saem do catálogo **pelo nome** (`achaNoCatalogo`, casa inglês ou
+    português); os números da linha (CA, PV, ataque, notas) são sempre os da
+    biblioteca, que o Mestre pode ter editado. Renomeou ou é NPC cadastrado à
+    mão: a ficha mostra só o que ele tem, sem atributo inventado. O catálogo é
+    carregado uma vez em `BibliotecaNpcs` e dividido entre a busca e as linhas.
     **Lição medida a 375px:** o botão ao lado da linha tirava 56px de largura e
     as estatísticas quebravam em 3 linhas — linha compacta média de 62 → 82px e
     a faixa maior de ~3.900 → 4.700px. Sobreposto no canto (`position:
