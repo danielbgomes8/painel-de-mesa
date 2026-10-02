@@ -119,10 +119,26 @@ function PainelSala({ codigo }: { codigo: string }) {
     // não pode desfazer o que o Mestre fez antes de passar o celular.
     sala.esquecerDesfazer();
   }
-  function abrirTelao() {
+  // O telão é uma página à parte (`?telao=1`), feita pra outro aparelho ou pra uma
+  // aba arrastada pra TV. O link leva a sala, então abre a campanha certa em qualquer lugar.
+  const [telaoAberto, setTelaoAberto] = useState(false);
+  const [linkCopiado, setLinkCopiado] = useState<"" | "sim" | "nao">("");
+  function linkDoTelao() {
     const params = new URLSearchParams(window.location.search);
+    params.set("sala", codigo);
     params.set("telao", "1");
-    window.open(`${window.location.pathname}?${params.toString()}`, "_blank");
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  }
+  function abrirTelao() {
+    window.open(linkDoTelao(), "_blank");
+  }
+  async function copiarLinkDoTelao() {
+    try {
+      await navigator.clipboard.writeText(linkDoTelao());
+      setLinkCopiado("sim");
+    } catch {
+      setLinkCopiado("nao");
+    }
   }
   // O arquivo vem de uma leitura nova do banco (não do que está na tela), pra
   // levar o log inteiro e o Bastião — ver BackupSala.
@@ -273,7 +289,12 @@ function PainelSala({ codigo }: { codigo: string }) {
           </span>
           {souMestre && (
             <>
-              <button className="linkbtn" type="button" onClick={abrirTelao}>
+              <button
+                className="linkbtn"
+                type="button"
+                aria-expanded={telaoAberto}
+                onClick={() => setTelaoAberto((v) => !v)}
+              >
                 📺 modo telão
               </button>
               <button className="linkbtn" type="button" onClick={baixarBackup} disabled={baixandoBackup}>
@@ -294,6 +315,38 @@ function PainelSala({ codigo }: { codigo: string }) {
           </button>
         </div>
       </div>
+
+      {souMestre && telaoAberto && (
+        <section className="combat" aria-label="Modo telão">
+          <div className="combat-head">
+            <h2>📺 Modo telão</h2>
+          </div>
+          <p className="bkpexplica">
+            O telão é uma tela só pra mesa olhar: de quem é a vez, os próximos e o mapa. Ele
+            não ocupa este painel e não tem controle nenhum — tudo o que você faz aqui aparece lá
+            na hora. O ideal é abrir num <b>outro aparelho</b> (TV, tablet, notebook): copie o link e
+            abra lá. Com um aparelho só, abra em aba nova e arraste a aba pra TV ou projetor.
+          </p>
+          <div className="whoami">
+            <button className="linkbtn" type="button" onClick={copiarLinkDoTelao}>
+              🔗 copiar link do telão
+            </button>
+            <button className="linkbtn" type="button" onClick={abrirTelao}>
+              ↗ abrir em aba nova
+            </button>
+            <span aria-live="polite">
+              {linkCopiado === "sim"
+                ? "Link copiado."
+                : linkCopiado === "nao"
+                  ? "Não deu pra copiar — segure o link abaixo e copie."
+                  : ""}
+            </span>
+          </div>
+          <p className="bkpexplica" style={{ wordBreak: "break-all" }}>
+            {linkDoTelao()}
+          </p>
+        </section>
+      )}
 
       {trocandoCampanha && (
         <section className="combat" aria-label="Trocar de campanha">
