@@ -145,7 +145,7 @@ export function MagiasPersonagem({
                       {magia.nivel > 0 && (
                         <button
                           type="button"
-                          className="chip"
+                          className="chip alvo"
                           aria-pressed={magia.preparada}
                           disabled={!editavel}
                           onClick={() => alterar(indice, { preparada: !magia.preparada })}

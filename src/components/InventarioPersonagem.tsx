@@ -176,7 +176,7 @@ export function InventarioPersonagem({
                   {item.peso > 0 && <span>{formatarKg(pesoDoItem(item))}</span>}
                   <button
                     type="button"
-                    className="chip"
+                    className="chip alvo"
                     aria-pressed={item.equipado}
                     disabled={!editavel}
                     onClick={() => mudarItem(i, { equipado: !item.equipado })}
@@ -186,7 +186,7 @@ export function InventarioPersonagem({
                   {item.magico && (
                     <button
                       type="button"
-                      className="chip"
+                      className="chip alvo"
                       aria-pressed={item.sintonia === 2}
                       disabled={!editavel}
                       onClick={() => alternarSintonia(i)}
