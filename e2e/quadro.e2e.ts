@@ -181,3 +181,40 @@ test("quadro: foto, revelação em três estados, ligação, anotação, sessão
   expect(errosAna).toEqual([]);
   await ctx.close();
 });
+
+test("quadro no celular: arrastar um cartão até uma coluna que está fora da tela, à esquerda", async ({ browser }) => {
+  await limparSala();
+  for (const [i, coluna] of ["Aliados", "Suspeitos", "Locais", "Vilões"].entries()) {
+    const r = await rest("quadro_cartoes", {
+      method: "POST",
+      body: JSON.stringify({ room_code: SALA, tipo: "npc", titulo: `Cartão ${i}`, revelacao: "revelado", coluna }),
+    });
+    if (!r.ok) throw new Error(`não criou o cartão: HTTP ${r.status} ${await r.text()}`);
+  }
+  const ctx = await browser.newContext({ viewport: { width: 375, height: 700 }, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.addInitScript(() => localStorage.setItem("mesa-quadro-visao", "colunas"));
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Campanha", exact: true }).click();
+  const lista = page.locator(".qd-colunas");
+  await expect(lista.locator(".qd-coluna")).toHaveCount(4);
+  // Quatro colunas largas num celular: a lista rola de lado. Vai até o fim (Vilões).
+  await lista.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+  await expect.poll(() => lista.evaluate((el) => el.scrollLeft)).toBeGreaterThan(300);
+
+  // Pega o "Cartão 3" (Vilões) e segura o dedo na borda esquerda até chegar na primeira coluna (Suspeitos).
+  const alca = (await page.getByRole("button", { name: "Arrastar Cartão 3 para outra coluna" }).boundingBox())!;
+  await page.mouse.move(alca.x + alca.width / 2, alca.y + alca.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(alca.x - 40, alca.y + 10, { steps: 4 });
+  const caixa = (await lista.boundingBox())!;
+  await page.mouse.move(caixa.x + 20, alca.y + 10, { steps: 6 });
+  await expect.poll(() => lista.evaluate((el) => el.scrollLeft), { timeout: 8000 }).toBeLessThan(5);
+  // Já na primeira coluna: solta sobre "Suspeitos".
+  const alvo = (await page.locator('[data-coluna="Suspeitos"]').boundingBox())!;
+  await page.mouse.move(alvo.x + alvo.width / 2, alvo.y + 40, { steps: 6 });
+  await expect(page.locator('[data-coluna="Suspeitos"][data-alvo]')).toHaveCount(1);
+  await page.mouse.up();
+  await expect.poll(async () => (await cartoesDoBanco())[3].coluna).toBe("Suspeitos");
+  await ctx.close();
+});

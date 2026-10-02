@@ -3978,3 +3978,9 @@ input.fj-score:focus-visible {
   color: var(--ink);
   padding: 6px 10px;
 }
+
+/* Durante o arrasto o encaixe de rolagem atrapalha: ele puxa a lista de volta pro ponto
+   de encaixe a cada pedacinho que a rolagem automática anda. */
+.qd-colunas[data-arrastando] {
+  scroll-snap-type: none;
+}

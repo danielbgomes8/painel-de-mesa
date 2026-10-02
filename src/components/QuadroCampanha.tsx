@@ -242,7 +242,7 @@ export function QuadroCampanha({
               )}
             </div>
           )}
-        <div className="qd-colunas" ref={listaRef}>
+        <div className="qd-colunas" ref={listaRef} data-arrastando={arrasto.ativo || undefined}>
           {(arrasto.ativo ? comSemColuna(colunasDaTela) : colunasDaTela).map((col) => (
             <section
               key={col.nome}
