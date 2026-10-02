@@ -83,6 +83,13 @@ export function QuadroCampanha({
   const [criando, setCriando] = useState(false);
   const listaRef = useRef<HTMLDivElement>(null);
   const arrasto = useArrastoDeColuna(quadro, souMestre && vista === "colunas", listaRef);
+  const ligando = useArrastoDeLigacao();
+  const [pendente, setPendente] = useState<{ de: string; para: string } | null>(null);
+  const [feito, setFeito] = useState<string | null>(null);
+  // Soltou a alça em cima de outro cartão: pergunta o tipo da ligação.
+  useEffect(() => {
+    if (ligando.solto) queueMicrotask(() => setPendente(ligando.solto));
+  }, [ligando.solto]);
 
   // A escolha de vista é do aparelho; lida depois da hidratação, sem setState em efeito.
   useEffect(() => {
@@ -178,7 +185,17 @@ export function QuadroCampanha({
       {vista === "galeria" ? (
         <div className="qd-grade">
           {lista.map((v) => (
-            <MiniaturaDoCartao key={v.cartao.id} visto={v} quadro={quadro} quem={quem} nomeDoAutor={nomeDoAutor} aoAbrir={() => setAberto(v.cartao.id)} />
+            <MiniaturaDoCartao
+              key={v.cartao.id}
+              visto={v}
+              quadro={quadro}
+              quem={quem}
+              nomeDoAutor={nomeDoAutor}
+              aoAbrir={() => setAberto(v.cartao.id)}
+              alcaLigar={podeEditarCartao(v.cartao, quem) ? (e) => ligando.comecar(e, v.cartao) : undefined}
+              alvoDeLigacao={ligando.sobre === v.cartao.id}
+              origemDeLigacao={ligando.de === v.cartao.id}
+            />
           ))}
         </div>
       ) : (
@@ -204,6 +221,9 @@ export function QuadroCampanha({
                   aoAbrir={() => setAberto(v.cartao.id)}
                   alca={souMestre && v.cartao.dono === null ? (e) => arrasto.comecar(e, v.cartao) : undefined}
                   arrastando={arrasto.id === v.cartao.id}
+                  alcaLigar={podeEditarCartao(v.cartao, quem) ? (e) => ligando.comecar(e, v.cartao) : undefined}
+                  alvoDeLigacao={ligando.sobre === v.cartao.id}
+                  origemDeLigacao={ligando.de === v.cartao.id}
                 />
               ))}
             </section>
@@ -215,6 +235,35 @@ export function QuadroCampanha({
             </section>
           )}
         </div>
+      )}
+      {ligando.fantasma && (
+        <div className="qd-fantasma qd-fantasma--ligacao" style={{ left: ligando.fantasma.x, top: ligando.fantasma.y }}>
+          🔗 {ligando.fantasma.titulo} → {ligando.sobre ? "solte" : "arraste até outro cartão"}
+        </div>
+      )}
+      {feito && (
+        <p className="qd-aviso" role="status" aria-live="polite">
+          {feito}
+        </p>
+      )}
+      {pendente && (
+        <FolhaDeLigacao
+          de={visiveis.find((v) => v.cartao.id === pendente.de) ?? null}
+          para={visiveis.find((v) => v.cartao.id === pendente.para) ?? null}
+          aoCancelar={() => {
+            setPendente(null);
+            ligando.limpar();
+          }}
+          aoConfirmar={async (rotulo) => {
+            const de = visiveis.find((v) => v.cartao.id === pendente.de);
+            const para = visiveis.find((v) => v.cartao.id === pendente.para);
+            setPendente(null);
+            ligando.limpar();
+            if (!de || !para) return;
+            const ok = await quadro.ligar(de.cartao.id, para.cartao.id, rotulo);
+            setFeito(ok ? `Ligado: ${tituloVisto(de)} → ${rotulo.trim() || "ligado a"} → ${tituloVisto(para)}` : null);
+          }}
+        />
       )}
       {arrasto.fantasma && (
         <div className="qd-fantasma" style={{ left: arrasto.fantasma.x, top: arrasto.fantasma.y }}>
@@ -259,6 +308,9 @@ function MiniaturaDoCartao({
   alca,
   arrastando,
   nomeDoAutor,
+  alcaLigar,
+  alvoDeLigacao,
+  origemDeLigacao,
 }: {
   visto: CartaoVisto;
   quadro: Quadro;
@@ -268,6 +320,10 @@ function MiniaturaDoCartao({
   /** Só na vista em colunas e só pro Mestre: a alça de arrastar. */
   alca?: (e: React.PointerEvent<HTMLSpanElement>) => void;
   arrastando?: boolean;
+  /** A alça 🔗: arrastar até outro cartão pra ligar os dois. */
+  alcaLigar?: (e: React.PointerEvent<HTMLSpanElement>) => void;
+  alvoDeLigacao?: boolean;
+  origemDeLigacao?: boolean;
 }) {
   const { cartao: c, visao } = visto;
   const silhueta = visao === "silhueta";
@@ -275,7 +331,24 @@ function MiniaturaDoCartao({
   const estado = estadoDoCartao(c, quem);
   const titulo = silhueta ? TITULO_DA_SILHUETA : c.titulo || "Sem nome";
   return (
-    <div className="qd-cartaobloco" data-arrastando={arrastando || undefined}>
+    <div
+      className="qd-cartaobloco"
+      data-cartao-id={c.id}
+      data-arrastando={arrastando || origemDeLigacao || undefined}
+      data-alvo-ligacao={alvoDeLigacao || undefined}
+    >
+      {alcaLigar && (
+        <span
+          className="qd-alca qd-alca--ligar"
+          data-com-colunas={alca ? "" : undefined}
+          onPointerDown={alcaLigar}
+          role="button"
+          aria-label={`Ligar ${titulo} a outro cartão`}
+          title="Arrastar até outro cartão para ligar"
+        >
+          🔗
+        </span>
+      )}
       {alca && (
         <span className="qd-alca" onPointerDown={alca} role="button" aria-label={`Arrastar ${titulo} para outra coluna`} title="Arrastar para outra coluna">
           ⠿
@@ -299,6 +372,127 @@ function MiniaturaDoCartao({
       )}
       {!silhueta && c.subtitulo && <span className="qd-sub">{c.subtitulo}</span>}
     </button>
+    </div>
+  );
+}
+
+// ── Arrastar pra ligar ──────────────────────────────────────────────────
+
+/** Arrastar pela alça 🔗 até outro cartão. Soltar em cima de um cartão devolve
+ *  `solto` ({ de, para }); a tela então pergunta o tipo da ligação. */
+function useArrastoDeLigacao() {
+  const [estado, setEstado] = useState<{ de: string; titulo: string; x: number; y: number; sobre: string | null } | null>(null);
+  const [solto, setSolto] = useState<{ de: string; para: string } | null>(null);
+  const deRef = useRef<string | null>(null);
+
+  const comecar = (e: React.PointerEvent<HTMLSpanElement>, c: Cartao) => {
+    e.preventDefault();
+    deRef.current = c.id;
+    setSolto(null);
+    setEstado({ de: c.id, titulo: c.titulo || "Sem nome", x: e.clientX, y: e.clientY, sobre: null });
+  };
+
+  const ativo = estado !== null;
+  useEffect(() => {
+    if (!ativo) return;
+    const cartaoEm = (x: number, y: number): string | null => {
+      const id = (document.elementFromPoint(x, y)?.closest("[data-cartao-id]") as HTMLElement | null)?.dataset.cartaoId ?? null;
+      return id && id !== deRef.current ? id : null;
+    };
+    function mover(e: PointerEvent) {
+      setEstado((a) => (a ? { ...a, x: e.clientX, y: e.clientY, sobre: cartaoEm(e.clientX, e.clientY) } : a));
+    }
+    function soltar(e: PointerEvent) {
+      const de = deRef.current;
+      const para = cartaoEm(e.clientX, e.clientY);
+      deRef.current = null;
+      setEstado(null);
+      if (de && para) setSolto({ de, para });
+    }
+    function cancelar() {
+      deRef.current = null;
+      setEstado(null);
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") cancelar();
+    }
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+    window.addEventListener("pointercancel", cancelar);
+    window.addEventListener("keydown", tecla);
+    return () => {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      window.removeEventListener("pointercancel", cancelar);
+      window.removeEventListener("keydown", tecla);
+    };
+  }, [ativo]);
+
+  return {
+    comecar,
+    de: estado?.de ?? null,
+    sobre: estado?.sobre ?? null,
+    solto,
+    limpar: () => setSolto(null),
+    fantasma: estado ? { x: estado.x, y: estado.y, titulo: estado.titulo } : null,
+  };
+}
+
+/** "Barão Vael → ? → Culto": escolhe (ou digita) o tipo da ligação. */
+function FolhaDeLigacao({
+  de,
+  para,
+  aoConfirmar,
+  aoCancelar,
+}: {
+  de: CartaoVisto | null;
+  para: CartaoVisto | null;
+  aoConfirmar: (rotulo: string) => void;
+  aoCancelar: () => void;
+}) {
+  const [rotulo, setRotulo] = useState("");
+  useEffect(() => {
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") aoCancelar();
+    }
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [aoCancelar]);
+  if (!de || !para) return null;
+  return (
+    <div className="qd-fundo" role="presentation" onClick={aoCancelar}>
+      <div className="qd-folha qd-folhaligacao" role="dialog" aria-modal="true" aria-label="Ligar cartões" onClick={(e) => e.stopPropagation()}>
+        <h3 className="qd-titulo">
+          {tituloVisto(de)} <span className="qd-seta">→</span> {tituloVisto(para)}
+        </h3>
+        <p className="qd-formdica">Que ligação é essa?</p>
+        <div className="qd-sugestoes">
+          {ROTULOS_SUGERIDOS.map((r) => (
+            <button key={r} type="button" className="chip" aria-pressed={rotulo === r} onClick={() => setRotulo(r)}>
+              {r}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          aria-label="Tipo da ligação"
+          placeholder="ou escreva: traiu, deve a…"
+          maxLength={LIMITE_ROTULO_LIGACAO}
+          value={rotulo}
+          onChange={(e) => setRotulo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") aoConfirmar(rotulo);
+          }}
+        />
+        <div className="qd-linha">
+          <button type="button" className="btn primary" onClick={() => aoConfirmar(rotulo)}>
+            Ligar
+          </button>
+          <button type="button" className="btn ghost" onClick={aoCancelar}>
+            cancelar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

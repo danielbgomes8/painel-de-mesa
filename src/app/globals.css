@@ -3927,3 +3927,36 @@ input.fj-score:focus-visible {
   padding: 0 10px;
   overflow-wrap: anywhere;
 }
+
+.qd-alca--ligar[data-com-colunas] {
+  top: 48px;
+}
+.qd-cartaobloco[data-alvo-ligacao] .qd-cartao {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+.qd-fantasma--ligacao {
+  background: var(--surface2);
+  color: var(--ink);
+  border: 1px solid var(--accent);
+  max-width: 260px;
+}
+.qd-folhaligacao {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: none;
+}
+.qd-seta {
+  color: var(--accent);
+}
+.qd-folhaligacao input[type="text"] {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 14px;
+  min-height: 38px;
+  padding: 6px 10px;
+}

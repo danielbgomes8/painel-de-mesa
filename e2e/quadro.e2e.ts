@@ -20,6 +20,12 @@ async function cartoesDoBanco(): Promise<Linha[]> {
   return (await r.json()) as Linha[];
 }
 
+async function ligacoesDoBanco(): Promise<{ de: string; para: string; rotulo: string }[]> {
+  const r = await rest(`quadro_ligacoes?select=de,para,rotulo&room_code=eq.${SALA}&order=created_at`);
+  if (!r.ok) throw new Error(`não leu as ligações: HTTP ${r.status}`);
+  return (await r.json()) as { de: string; para: string; rotulo: string }[];
+}
+
 test("quadro: foto, revelação em três estados, ligação, anotação, sessão e destaque em tela cheia", async ({ browser, page }) => {
   const erros = coletarErros(page);
   await criarFicha("ana-robo", "Ana Robô");
@@ -90,6 +96,31 @@ test("quadro: foto, revelação em três estados, ligação, anotação, sessão
   await ana.locator(".qd-cartao", { hasText: "Barão Vael" }).click();
   await expect(ana.locator(".qd-ligacao")).toContainText("Culto do Raio", { timeout: 15_000 });
   await ana.getByRole("button", { name: "Fechar o cartão" }).click();
+
+  // Ligar arrastando: da alça 🔗 do Barão até o cartão do Culto, e escolhe o tipo.
+  expect(await ligacoesDoBanco()).toHaveLength(1);
+  const alca = page.getByRole("button", { name: "Ligar Barão Vael a outro cartão" });
+  const alvo = page.locator(".qd-cartao", { hasText: "Culto do Raio" });
+  const a = (await alca.boundingBox())!;
+  const t = (await alvo.boundingBox())!;
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2, { steps: 8 });
+  await expect(page.locator("[data-alvo-ligacao]")).toContainText("Culto do Raio");
+  await page.mouse.up();
+  await page.locator(".qd-folhaligacao").getByRole("button", { name: "mora em" }).click();
+  await page.locator(".qd-folhaligacao").getByRole("button", { name: "Ligar", exact: true }).click();
+  await expect(page.getByText("Ligado: Barão Vael → mora em → Culto do Raio")).toBeVisible();
+  const ligacoes = await ligacoesDoBanco();
+  expect(ligacoes).toHaveLength(2);
+  expect(ligacoes[1].rotulo).toBe("mora em");
+  // Soltar no vazio não liga nada.
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(5, 5, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator(".qd-folhaligacao")).toHaveCount(0);
+  expect(await ligacoesDoBanco()).toHaveLength(2);
 
   // Mostrar à mesa agora: tela cheia no jogador, e o Mestre não vê a própria.
   await page.locator(".qd-cartao", { hasText: "Barão Vael" }).click();
