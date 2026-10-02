@@ -1233,7 +1233,16 @@ Decisões que não estão no código à primeira vista:
   Mestre desenha e anota, e fica gravado na cena** (como as paredes; ao contrário
   do ping e da régua, que somem). Uma tabela só, `cena_marcas`: `tipo` `traco`
   (`pontos`, lista de [x, y] em px da imagem; a linha reta tem dois) ou `nota`
-  (`x`, `y`, `texto` de até 140). Quatro modos: livre, linha, nota, apagar; seis cores;
+  (`x`, `y`, `texto` de até 140). Seis modos: livre, linha, círculo, retângulo, nota,
+  apagar; seis cores. **Círculo e retângulo (02/10/2026, sem migration) são `traco`
+  fechado**: o retângulo guarda cinco pontos (o quinto repete o primeiro) e o círculo
+  um polígono de 64 lados (`circuloDe`/`retanguloDe` em `lib/marcas.ts`) — assim
+  lista, borracha (pega pela BORDA, não pelo meio), backup e desenho já funcionavam.
+  O círculo se arrasta do centro até a borda; o retângulo, de canto a canto; a prévia
+  acompanha o dedo (`CenaMapa` refaz os pontos a partir da `origem` a cada movimento —
+  no círculo `pontos[0]` NÃO é o centro). Toque sem arrasto não vira forma. Não dá pra
+  saber depois que um traço era "um círculo": se um dia precisar editar a forma, aí
+  sim vira tipo novo (e migration);
   e **cada marca tem `visivel`** — "🔒 só eu vejo" é preparo de sessão: o Mestre vê
   tracejado e apagado, a mesa e o telão não veem (esconde NA TELA, como a névoa e as
   paredes). O traço livre é simplificado antes de gravar (`simplificarDesenho`, o
@@ -1251,7 +1260,7 @@ Decisões que não estão no código à primeira vista:
   Entrou em `TABELAS_COM_SALA` do backup, na ordem de restauração e no robô de
   esquema. O robô (`desenhos e notas`) confere traço, linha, toque que não desenha,
   nota escondida × liberada, o que o jogador e o telão veem, a liberação ao vivo e a
-  borracha. **Fora daqui:** formas (círculo/retângulo), mexer num desenho depois de
+  borracha. **Fora daqui:** mexer num desenho depois de
   gravado e mover o alfinete (apaga e refaz).
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
@@ -1285,6 +1294,14 @@ Decisões que não estão no código à primeira vista:
   **Já achou um erro de verdade:** com a tabela dos peões ainda não criada o
   console mostra um 404 (o app trata, mas o robô falha de propósito). Com a 0019
   rodada, os 4 cenários passam (~20 s).
+- **O robô oscila (medido em 02/10/2026):** numa rodada completa, de vez em quando UM
+  cenário falha por esperar um evento do tempo real que demora mais de 20 s (peão não
+  aparece, ícone de condição não chega no celular simulado) — e não é sempre o mesmo.
+  Conferido no commit ANTES das marcas (`c65a15d`): 1 de 2 rodadas falhou assim, então
+  não é regressão de código novo. **Antes de investigar, rode o cenário que falhou
+  sozinho** (`npm run e2e -- -g "<trecho do nome>"`): se passa, é isso. E **nunca rode
+  duas execuções do robô ao mesmo tempo**: dividem a sala `ci-teste` e uma apaga os
+  dados da outra no meio do teste (derrubou o cenário das marcas duas vezes).
 - **Trava no apagar sala** (`0020_sem_apagar_sala.sql`, **rodada pelo Daniel em
   01/10/2026 e conferida**: `DELETE rooms` com a chave pública devolve 401
   "permission denied", enquanto criar/garantir sala e apagar ficha seguem

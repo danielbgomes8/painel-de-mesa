@@ -67,7 +67,9 @@ import {
 } from "@/lib/visao";
 import {
   acharMarcaNoPonto,
+  circuloDe,
   linhaReta,
+  retanguloDe,
   marcasVisiveis,
   simplificarDesenho,
   TOQUE_NA_MARCA_PX,
@@ -266,8 +268,9 @@ export function CenaMapa({
   /** Modo apagar com o dedo descendo: as paredes por onde ele passa saem (borracha). */
   const apagandoParedes = useRef<Set<string> | null>(null);
   const portaToque = useRef<{ id: string; x: number; y: number } | null>(null);
-  /** Traço de marca sendo desenhado (px do mapa): livre guarda o caminho do dedo, reta só as pontas. */
-  const marcaViva = useRef<{ pontos: Ponto[]; reta: boolean; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
+  /** Traço de marca sendo desenhado (px do mapa): livre guarda o caminho do dedo; as outras formas
+   *  guardam a `origem` e refazem os pontos a cada movimento (linha, círculo do centro à borda, retângulo de canto a canto). */
+  const marcaViva = useRef<{ origem: Ponto; pontos: Ponto[]; forma: "livre" | "linha" | "circulo" | "retangulo"; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
   /** Borracha de marcas com o dedo descendo: as marcas por onde ele passa saem. */
   const apagandoMarcas = useRef<Set<string> | null>(null);
 
@@ -761,12 +764,18 @@ export function CenaMapa({
       }
       if (p.modoMarca === "nota") {
         // Só no soltar, se o dedo não andou (ver aoSoltar): arrastar com a nota ligada não põe nada.
-        marcaViva.current = { pontos: [], reta: false, telaA: pos, telaB: pos };
+        marcaViva.current = { origem: [0, 0], pontos: [], forma: "livre", telaA: pos, telaB: pos };
         return;
       }
       if (!p.aoCriarTraco) return;
       const dentro: Ponto = [Math.min(p.cena.largura, Math.max(0, ponto[0])), Math.min(p.cena.altura, Math.max(0, ponto[1]))];
-      marcaViva.current = { pontos: [dentro], reta: p.modoMarca === "linha", telaA: pos, telaB: pos };
+      marcaViva.current = {
+        origem: dentro,
+        pontos: [dentro],
+        forma: p.modoMarca === "linha" || p.modoMarca === "circulo" || p.modoMarca === "retangulo" ? p.modoMarca : "livre",
+        telaA: pos,
+        telaB: pos,
+      };
       pedirQuadro();
       return;
     }
@@ -914,7 +923,9 @@ export function CenaMapa({
       if (mv.pontos.length > 0) {
         const [mx, my] = noMapa(agora);
         const ponto: Ponto = [Math.min(p.cena.largura, Math.max(0, mx)), Math.min(p.cena.altura, Math.max(0, my))];
-        if (mv.reta) mv.pontos = [mv.pontos[0], ponto];
+        if (mv.forma === "linha") mv.pontos = [mv.origem, ponto];
+        else if (mv.forma === "circulo") mv.pontos = circuloDe(mv.origem, ponto) ?? [mv.origem];
+        else if (mv.forma === "retangulo") mv.pontos = retanguloDe(mv.origem, ponto) ?? [mv.origem];
         else {
           const ultimo = mv.pontos[mv.pontos.length - 1];
           // Um ponto a cada ~1,5 px de tela (e um teto, pra um rabisco sem fim não pesar).
@@ -1066,7 +1077,15 @@ export function CenaMapa({
               p.aoEscolherNota?.([Math.min(p.cena.largura, Math.max(0, mx)), Math.min(p.cena.altura, Math.max(0, my))]);
             }
           } else if (arrastou) {
-            const pontos = mv.reta ? linhaReta(mv.pontos[0], mv.pontos[mv.pontos.length - 1]) : simplificarDesenho(mv.pontos, vistaRef.current.escala);
+            // Círculo e retângulo já saem prontos da prévia; sem o arrasto ter dado forma (raio ou lado zero), nada.
+            const pontos =
+              mv.forma === "linha"
+                ? linhaReta(mv.origem, mv.pontos[mv.pontos.length - 1])
+                : mv.forma === "livre"
+                  ? simplificarDesenho(mv.pontos, vistaRef.current.escala)
+                  : mv.pontos.length > 2
+                    ? mv.pontos
+                    : null;
             if (pontos) p.aoCriarTraco?.(pontos);
           }
         }

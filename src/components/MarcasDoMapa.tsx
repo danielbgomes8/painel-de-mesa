@@ -8,6 +8,8 @@ import type { Marcas } from "@/hooks/useMarcas";
 const MODOS: [ModoMarca, string][] = [
   ["livre", "✏️ livre"],
   ["linha", "╱ linha"],
+  ["circulo", "◯ círculo"],
+  ["retangulo", "▭ retângulo"],
   ["nota", "📌 nota"],
   ["apagar", "apagar"],
 ];

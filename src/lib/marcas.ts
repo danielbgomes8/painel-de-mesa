@@ -35,7 +35,7 @@ export type NovaMarca =
   | { tipo: "nota"; cor: string; x: number; y: number; texto: string; visivel: boolean };
 
 /** O que o Mestre faz com a ferramenta de marcas. */
-export type ModoMarca = "livre" | "linha" | "nota" | "apagar";
+export type ModoMarca = "livre" | "linha" | "circulo" | "retangulo" | "nota" | "apagar";
 
 /** Por cena. Cada marca é redesenhada a cada quadro; passar disso pesa no celular. */
 export const MARCAS_MAXIMAS = 300;
@@ -133,6 +133,31 @@ export function simplificarDesenho(caminho: readonly Ponto[], escala: number, ma
 /** A linha reta entre dois pontos (null se for um toque, sem comprimento). */
 export function linhaReta(a: Ponto, b: Ponto): Ponto[] | null {
   return a[0] === b[0] && a[1] === b[1] ? null : [a, b];
+}
+
+/** Lados do polígono que faz as vezes de círculo: 64 passa por redondo até com
+ *  zoom no celular, e fica longe do limite de 400 pontos do banco. */
+export const LADOS_DO_CIRCULO = 64;
+
+/** Círculo do `centro` até a `borda` (o raio é a distância entre os dois), como um
+ *  traço fechado: o último ponto repete o primeiro. Raio zero não é círculo (null). */
+export function circuloDe(centro: Ponto, borda: Ponto): Ponto[] | null {
+  const raio = Math.hypot(borda[0] - centro[0], borda[1] - centro[1]);
+  if (raio === 0) return null;
+  const pontos: Ponto[] = [];
+  for (let i = 0; i < LADOS_DO_CIRCULO; i++) {
+    const ang = (i / LADOS_DO_CIRCULO) * Math.PI * 2;
+    pontos.push([centro[0] + raio * Math.cos(ang), centro[1] + raio * Math.sin(ang)]);
+  }
+  pontos.push([pontos[0][0], pontos[0][1]]);
+  return pontos;
+}
+
+/** Retângulo de um canto `a` ao oposto `b`, como um traço fechado (cinco pontos).
+ *  Sem largura ou sem altura é uma linha, não um retângulo (null). */
+export function retanguloDe(a: Ponto, b: Ponto): Ponto[] | null {
+  if (a[0] === b[0] || a[1] === b[1]) return null;
+  return [a, [b[0], a[1]], b, [a[0], b[1]], [a[0], a[1]]];
 }
 
 /** A distância (px da imagem) do ponto até a marca: ao traço mais perto dos

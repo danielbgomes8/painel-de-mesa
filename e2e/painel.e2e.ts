@@ -716,10 +716,51 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
   const reta = (await marcasDoBanco())[1];
   expect(reta.pontos).toHaveLength(2);
 
-  // Um toque simples não é desenho.
+  // Um toque simples não é desenho (nem linha, nem forma).
+  await arrastar([600, 100], [600, 100]);
+  await modo("◯ círculo").click();
+  await arrastar([600, 100], [600, 100]);
+  await modo("▭ retângulo").click();
   await arrastar([600, 100], [600, 100]);
   await page.waitForTimeout(400);
   expect((await marcasDoBanco()).length).toBe(2);
+
+  // Círculo: do centro até a borda (raio 60), guardado como um traço fechado.
+  await modo("◯ círculo").click();
+  await arrastar([600, 250], [660, 250]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(3);
+  const circulo = (await marcasDoBanco())[2];
+  expect(circulo.tipo).toBe("traco");
+  expect(circulo.pontos.length).toBeGreaterThan(40);
+  expect(circulo.pontos[circulo.pontos.length - 1]).toEqual(circulo.pontos[0]);
+  // O centro real é o meio entre pontos opostos (o toque tem frações de pixel); todos a um raio dele.
+  const oposto = circulo.pontos[circulo.pontos.length >> 1];
+  const [cx, cy] = [(circulo.pontos[0][0] + oposto[0]) / 2, (circulo.pontos[0][1] + oposto[1]) / 2];
+  expect(Math.hypot(cx - 600, cy - 250)).toBeLessThan(3);
+  const raio = Math.hypot(circulo.pontos[0][0] - cx, circulo.pontos[0][1] - cy);
+  for (const [x, y] of circulo.pontos) expect(Math.hypot(x - cx, y - cy)).toBeCloseTo(raio, 3);
+  expect(raio).toBeGreaterThan(50);
+  expect(raio).toBeLessThan(70);
+
+  // Retângulo: de um canto ao oposto, cinco pontos (fecha no começo).
+  await modo("▭ retângulo").click();
+  await arrastar([150, 400], [350, 520]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(4);
+  const retangulo = (await marcasDoBanco())[3];
+  expect(retangulo.pontos).toHaveLength(5);
+  expect(retangulo.pontos[4]).toEqual(retangulo.pontos[0]);
+  expect(Math.abs(retangulo.pontos[2][0] - retangulo.pontos[0][0])).toBeGreaterThan(180);
+  expect(Math.abs(retangulo.pontos[2][1] - retangulo.pontos[0][1])).toBeGreaterThan(100);
+
+  // Borracha na borda do círculo e no lado do retângulo apaga os dois (o meio deles não conta).
+  await modo("apagar").click();
+  await arrastar([600, 250], [600, 250]);
+  await page.waitForTimeout(400);
+  expect((await marcasDoBanco()).length).toBe(4);
+  await arrastar([660, 250], [660, 250]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(3);
+  await arrastar([250, 400], [250, 400]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(2);
 
   // Nota escondida da mesa (a primeira) e nota liberada (a segunda).
   await modo("📌 nota").click();

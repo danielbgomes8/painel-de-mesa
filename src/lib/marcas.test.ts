@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   acharMarcaNoPonto,
+  circuloDe,
+  LADOS_DO_CIRCULO,
+  retanguloDe,
   linhaReta,
   marcasVisiveis,
   normalizarMarca,
@@ -10,7 +13,7 @@ import {
   type Marca,
 } from "./marcas";
 
-function traco(id: string, pontos: [number, number][], extra: Partial<Marca> = {}): Marca {
+function traco(id: string, pontos: Marca["pontos"], extra: Partial<Marca> = {}): Marca {
   return { id, cena_id: "c", room_code: "s", tipo: "traco", cor: "#f0c24b", pontos, x: 0, y: 0, texto: "", visivel: true, created_at: id, ...extra };
 }
 function nota(id: string, x: number, y: number, extra: Partial<Marca> = {}): Marca {
@@ -113,5 +116,36 @@ describe("textoDaNota", () => {
   it("tira espaço das pontas e corta em 140", () => {
     expect(textoDaNota("  oi  ")).toBe("oi");
     expect(textoDaNota("y".repeat(300))).toHaveLength(140);
+  });
+});
+
+describe("circuloDe", () => {
+  it("todos os pontos ficam a um raio do centro, e o traço fecha", () => {
+    const c = circuloDe([100, 100], [130, 140])!; // raio 50
+    expect(c).toHaveLength(LADOS_DO_CIRCULO + 1);
+    for (const [x, y] of c) expect(Math.hypot(x - 100, y - 100)).toBeCloseTo(50, 6);
+    expect(c[c.length - 1]).toEqual(c[0]);
+  });
+  it("cabe no limite de pontos do banco", () => {
+    expect(circuloDe([0, 0], [1, 0])!.length).toBeLessThanOrEqual(400);
+  });
+  it("raio zero (um toque) não é círculo", () => {
+    expect(circuloDe([5, 5], [5, 5])).toBeNull();
+  });
+  it("a borracha acha o círculo pela borda, não pelo meio", () => {
+    const m = traco("c", circuloDe([100, 100], [150, 100])!);
+    expect(acharMarcaNoPonto([m], [150, 100], 8)?.id).toBe("c");
+    expect(acharMarcaNoPonto([m], [100, 100], 8)).toBeNull();
+  });
+});
+
+describe("retanguloDe", () => {
+  it("dá os quatro cantos e fecha, não importa a direção do arrasto", () => {
+    expect(retanguloDe([10, 20], [50, 80])).toEqual([[10, 20], [50, 20], [50, 80], [10, 80], [10, 20]]);
+    expect(retanguloDe([50, 80], [10, 20])).toEqual([[50, 80], [10, 80], [10, 20], [50, 20], [50, 80]]);
+  });
+  it("sem largura ou sem altura não é retângulo", () => {
+    expect(retanguloDe([10, 20], [10, 80])).toBeNull();
+    expect(retanguloDe([10, 20], [50, 20])).toBeNull();
   });
 });
