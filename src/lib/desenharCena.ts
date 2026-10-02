@@ -16,7 +16,7 @@ import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
 import { iconesVisiveis, posicoesDosIcones, type PecaNaTela } from "./pecas";
 import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type ModoRegua, type ReguaNaTela } from "./regua";
 import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type FormaNoMapa, type ModeloArea } from "./area";
-import { notasNumeradas, type Marca } from "./marcas";
+import { alcasDaMarca, caixaDosPontos, notasNumeradas, type Marca } from "./marcas";
 import type { Parede } from "./paredes";
 import type { Mascara } from "./visao";
 
@@ -207,6 +207,39 @@ export function desenharVisaoDosInimigos(ctx: CanvasRenderingContext2D, poligono
   }
 }
 
+/** O desenho selecionado pro Mestre editar: caixa tracejada e as duas alças (redimensionar no canto
+ *  de baixo à direita, girar acima do topo). Largura e tamanho das alças fixos na tela. */
+export function desenharSelecaoDeMarca(ctx: CanvasRenderingContext2D, pontos: readonly Ponto[], escala: number): void {
+  if (pontos.length < 2) return;
+  const c = caixaDosPontos(pontos);
+  const folga = 6 / escala;
+  const alcas = alcasDaMarca(pontos, escala);
+  ctx.save();
+  ctx.lineWidth = 1.5 / escala;
+  ctx.setLineDash([6 / escala, 4 / escala]);
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.strokeRect(c.x1 - folga, c.y1 - folga, c.x2 - c.x1 + 2 * folga, c.y2 - c.y1 + 2 * folga);
+  ctx.setLineDash([]);
+  // Haste da alça de girar.
+  ctx.beginPath();
+  ctx.moveTo(alcas.giro[0], c.y1 - folga);
+  ctx.lineTo(alcas.giro[0], alcas.giro[1]);
+  ctx.stroke();
+  const lado = 9 / escala;
+  ctx.fillStyle = "#fff";
+  ctx.strokeStyle = "rgba(0,0,0,0.8)";
+  ctx.lineWidth = 1.5 / escala;
+  ctx.beginPath();
+  ctx.rect(alcas.escala[0] - lado, alcas.escala[1] - lado, lado * 2, lado * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(alcas.giro[0], alcas.giro[1], lado, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** Desenhos e notas do Mestre: traços (livres ou retos) e alfinetes numerados.
  *  Entram `marcas` já filtradas pra quem olha. Ficam por baixo da névoa (o que
  *  está num canto ainda escondido da mesa continua escondido) e, no Mestre,
@@ -283,6 +316,8 @@ export type EntradaDeDesenho = {
   /** Desenhos e notas (já filtrados pra quem olha) e o traço em andamento. */
   marcas?: readonly Marca[];
   previaMarca?: { pontos: readonly Ponto[]; cor: string } | null;
+  /** Só o Mestre: o desenho selecionado pra editar (pontos já com o arrasto em andamento). */
+  selecaoMarca?: readonly Ponto[] | null;
   /** Só pro Mestre: as paredes e portas, a parede em construção e a visão dos inimigos. */
   paredes?: readonly Parede[];
   previaParede?: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | { tipo: "curva"; pontos: readonly Ponto[] } | null;
@@ -330,6 +365,7 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
   if (e.mestre) {
     if (e.visaoDosInimigos && e.visaoDosInimigos.length > 0) desenharVisaoDosInimigos(ctx, e.visaoDosInimigos, vista.escala);
     if ((e.paredes && e.paredes.length > 0) || e.previaParede) desenharParedes(ctx, e.paredes ?? [], vista.escala, e.previaParede ?? null);
+    if (e.selecaoMarca) desenharSelecaoDeMarca(ctx, e.selecaoMarca, vista.escala);
   }
 
   if (e.pecas && e.pecas.length > 0) {

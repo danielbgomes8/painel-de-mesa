@@ -6,7 +6,7 @@ import type { Sala } from "@/hooks/useSala";
 import { useNevoa } from "@/hooks/useNevoa";
 import { useParedes } from "@/hooks/useParedes";
 import { useMarcas } from "@/hooks/useMarcas";
-import { ControlesDeMarca, ListaDeNotas, NovaNota, resumoDasMarcas } from "@/components/MarcasDoMapa";
+import { ControlesDeMarca, EditorDeDesenho, ListaDeNotas, NovaNota, resumoDasMarcas } from "@/components/MarcasDoMapa";
 import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
@@ -332,6 +332,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const [modoMarca, setModoMarca] = useState<ModoMarca>("livre");
   const [corMarca, setCorMarca] = useState<string>(COR_MARCA_PADRAO);
   const [marcaParaMesa, setMarcaParaMesa] = useState(true);
+  /** Modo editar: o desenho selecionado (só vale enquanto existir e o modo estiver ligado). */
+  const [idSelecionado, setIdSelecionado] = useState<string | null>(null);
   /** Onde o Mestre tocou com o modo nota: espera o texto. */
   const [notaPendente, setNotaPendente] = useState<Ponto | null>(null);
   /** Nota que espera um toque no mapa pra mudar de lugar. */
@@ -468,6 +470,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const podeQuadradinhos = cena ? gradeUsavel(cena) : false;
   // Sem grade, "quadradinhos" não existe: cai no pincel em vez de ficar sem ferramenta.
   const ferramentaAtiva: Ferramenta = ferramenta === "quadradinhos" && !podeQuadradinhos ? "pincel" : ferramenta;
+  const desenhoSelecionado = ferramentaAtiva === "marca" && modoMarca === "editar" ? (desenhos.marcas.find((m) => m.tipo === "traco" && m.id === idSelecionado) ?? null) : null;
   /** Trocar de ferramenta desiste de "onde eu toco". */
   function escolherFerramenta(f: Ferramenta) {
     setColocando(null);
@@ -615,6 +618,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                   aoMudarModo={(m) => {
                     setModoMarca(m);
                     setNotaPendente(null);
+                    setIdSelecionado(null);
                   }}
                   cor={corMarca}
                   aoMudarCor={setCorMarca}
@@ -687,6 +691,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 aoCriarTraco={(pontos) => void desenhos.adicionar({ tipo: "traco", cor: corMarca, pontos, visivel: marcaParaMesa })}
                 aoEscolherNota={setNotaPendente}
                 aoApagarMarca={(id) => void desenhos.remover(id)}
+                marcaSelecionada={desenhoSelecionado?.id ?? null}
+                aoSelecionarMarca={setIdSelecionado}
+                aoTransformarMarca={(id, pontos) => void desenhos.atualizar(id, { pontos })}
                 aoAlternarPorta={(id) => void muros.alternarPorta(id)}
                 verVisaoDosInimigos={verInimigos}
                 visaoPronta={!muros.carregando && !banco.carregando}
@@ -697,6 +704,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 aoTocarPeca={setPecaSelecionada}
                 aoAbrirPeca={setCartao}
               />
+              <EditorDeDesenho marca={desenhoSelecionado} edicao={desenhos} aoFechar={() => setIdSelecionado(null)} />
               {notaPendente && ferramentaAtiva === "marca" && (
                 <NovaNota
                   ponto={notaPendente}
@@ -740,6 +748,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     : ferramentaAtiva === "marca"
                       ? modoMarca === "apagar"
                         ? "Toque num desenho ou numa nota pra apagá-lo, ou passe o dedo por cima de vários (borracha)."
+                        : modoMarca === "editar"
+                          ? "Toque num desenho e arraste pra mover. A caixa branca tem duas alças: o quadradinho do canto de baixo redimensiona e a bolinha de cima gira. Cor e 🔒 só eu vejo mudam nos botões. Notas se editam na lista embaixo do mapa."
                         : modoMarca === "nota"
                           ? "Toque no ponto do mapa e escreva a nota: aparece uma bolinha numerada ali e o texto na lista embaixo do mapa. 🔒 só eu vejo deixa a nota escondida da mesa até você liberar."
                           : modoMarca === "linha"

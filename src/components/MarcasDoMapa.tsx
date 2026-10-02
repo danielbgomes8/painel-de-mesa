@@ -11,6 +11,7 @@ const MODOS: [ModoMarca, string][] = [
   ["circulo", "◯ círculo"],
   ["retangulo", "▭ retângulo"],
   ["nota", "📌 nota"],
+  ["editar", "✋ editar"],
   ["apagar", "apagar"],
 ];
 
@@ -39,7 +40,7 @@ export function ControlesDeMarca({
           </button>
         ))}
       </div>
-      {modo !== "apagar" && (
+      {modo !== "apagar" && modo !== "editar" && (
         <div className="mapa-ferr" role="group" aria-label="Cor e quem vê">
           {CORES_MARCA.map((c) => (
             <button
@@ -58,6 +59,45 @@ export function ControlesDeMarca({
         </div>
       )}
     </>
+  );
+}
+
+/** Modo editar: o que dá pra mudar no desenho selecionado (a cor e se a mesa vê; mover, redimensionar e
+ *  girar são no mapa, pela caixa e pelas alças). Cada mudança grava só a coluna que mudou. */
+export function EditorDeDesenho({ marca, edicao, aoFechar }: { marca: Marca | null; edicao: Marcas; aoFechar: () => void }) {
+  // Fica ABAIXO do mapa e só existe com um desenho selecionado: se aparecesse acima, empurraria o mapa
+  // pra baixo no meio do toque e o desenho pularia debaixo do dedo.
+  if (!marca) return null;
+  return (
+    <div className="mapa-ferr" role="group" aria-label="Editar o desenho selecionado">
+      {CORES_MARCA.map((c) => (
+        <button
+          key={c}
+          type="button"
+          className="mapa-cor-botao"
+          style={{ background: c }}
+          aria-pressed={marca.cor === c}
+          aria-label={`Mudar a cor do desenho para ${c}`}
+          onClick={() => void edicao.atualizar(marca.id, { cor: c })}
+        />
+      ))}
+      <button type="button" className="chip alvo" aria-pressed={marca.visivel} onClick={() => void edicao.atualizar(marca.id, { visivel: !marca.visivel })}>
+        {marca.visivel ? "👁 a mesa vê" : "🔒 só eu vejo"}
+      </button>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          void edicao.remover(marca.id);
+          aoFechar();
+        }}
+      >
+        apagar desenho
+      </button>
+      <button type="button" className="btn" onClick={aoFechar}>
+        pronto
+      </button>
+    </div>
   );
 }
 

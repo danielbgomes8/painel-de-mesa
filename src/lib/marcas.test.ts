@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  acharAlca,
   acharMarcaNoPonto,
+  alcasDaMarca,
+  caixaDosPontos,
+  escalarPontos,
+  fatorPermitido,
+  girarPontos,
+  manterNoMapa,
+  moverPontos,
+  TAMANHO_MINIMO_DO_DESENHO_PX,
   circuloDe,
   LADOS_DO_CIRCULO,
   retanguloDe,
@@ -147,5 +156,54 @@ describe("retanguloDe", () => {
   it("sem largura ou sem altura não é retângulo", () => {
     expect(retanguloDe([10, 20], [10, 80])).toBeNull();
     expect(retanguloDe([10, 20], [50, 20])).toBeNull();
+  });
+});
+
+describe("editar um desenho", () => {
+  const quadrado: Marca["pontos"] = [[100, 100], [200, 100], [200, 200], [100, 200], [100, 100]];
+
+  it("mover desloca todos os pontos e não mexe no original", () => {
+    expect(moverPontos(quadrado, 10, -5)[0]).toEqual([110, 95]);
+    expect(quadrado[0]).toEqual([100, 100]);
+  });
+  it("escalar em torno do centro dobra o tamanho sem sair do lugar", () => {
+    const c = caixaDosPontos(escalarPontos(quadrado, [150, 150], 2));
+    expect(c).toEqual({ x1: 50, y1: 50, x2: 250, y2: 250 });
+  });
+  it("girar 90° leva o canto de cima à esquerda pro canto de cima à direita", () => {
+    const [x, y] = girarPontos([[100, 100]], [150, 150], Math.PI / 2)[0];
+    expect(Math.round(x)).toBe(200);
+    expect(Math.round(y)).toBe(100);
+  });
+  it("girar e voltar devolve os pontos de origem", () => {
+    const volta = girarPontos(girarPontos(quadrado, [150, 150], 0.7), [150, 150], -0.7);
+    volta.forEach(([x, y], i) => {
+      expect(x).toBeCloseTo(quadrado[i][0], 6);
+      expect(y).toBeCloseTo(quadrado[i][1], 6);
+    });
+  });
+  it("manterNoMapa empurra de volta o que saiu e arredonda", () => {
+    const fora = manterNoMapa(moverPontos(quadrado, 900, -300), 1000, 800);
+    expect(caixaDosPontos(fora)).toEqual({ x1: 900, y1: 0, x2: 1000, y2: 100 });
+    expect(manterNoMapa([[0.123456, 1], [10, 2]], 100, 100)[0]).toEqual([0.12, 1]);
+  });
+  it("manterNoMapa encolhe o desenho que é maior que a imagem", () => {
+    const c = caixaDosPontos(manterNoMapa([[0, 0], [2000, 500]], 1000, 800));
+    expect(c.x2 - c.x1).toBeCloseTo(1000, 6);
+    expect(c.x1).toBeGreaterThanOrEqual(0);
+    expect(c.y2).toBeLessThanOrEqual(800);
+  });
+  it("não deixa encolher abaixo do mínimo", () => {
+    expect(fatorPermitido(quadrado, 0.001) * 100).toBeCloseTo(TAMANHO_MINIMO_DO_DESENHO_PX, 6);
+    expect(fatorPermitido(quadrado, 1.5)).toBe(1.5);
+  });
+  it("as alças ficam no canto de baixo à direita e acima do topo, e a mais perto ganha", () => {
+    const a = alcasDaMarca(quadrado, 1);
+    expect(a.escala).toEqual([200, 200]);
+    expect(a.giro[0]).toBe(150);
+    expect(a.giro[1]).toBeLessThan(100);
+    expect(acharAlca(quadrado, 1, [203, 198], 10)).toBe("escala");
+    expect(acharAlca(quadrado, 1, [150, a.giro[1] + 2], 10)).toBe("giro");
+    expect(acharAlca(quadrado, 1, [150, 150], 10)).toBeNull();
   });
 });

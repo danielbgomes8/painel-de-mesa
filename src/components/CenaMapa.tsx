@@ -66,12 +66,21 @@ import {
   type Mascara,
 } from "@/lib/visao";
 import {
+  acharAlca,
   acharMarcaNoPonto,
+  caixaDosPontos,
+  centroDaCaixa,
   circuloDe,
+  escalarPontos,
+  fatorPermitido,
+  girarPontos,
   linhaReta,
+  manterNoMapa,
+  moverPontos,
   retanguloDe,
   marcasVisiveis,
   simplificarDesenho,
+  TOQUE_NA_ALCA_PX,
   TOQUE_NA_MARCA_PX,
   TRACO_MINIMO_PX,
   type Marca,
@@ -143,6 +152,11 @@ type Props = {
   /** Mestre tocou num ponto com o modo nota: abre o campo do texto. */
   aoEscolherNota?: (ponto: Ponto) => void;
   aoApagarMarca?: (id: string) => void;
+  /** Modo editar: o desenho selecionado, como selecionar (null = nenhum) e o que fazer quando o Mestre
+   *  termina de mover, redimensionar ou girar (os novos pontos, já dentro do mapa). */
+  marcaSelecionada?: string | null;
+  aoSelecionarMarca?: (id: string | null) => void;
+  aoTransformarMarca?: (id: string, pontos: Ponto[]) => void;
   /** Mestre: mostrar o que cada inimigo enxerga (não abre névoa pra mesa). */
   verVisaoDosInimigos?: boolean;
   /** Paredes e peões já foram lidos do banco. Enquanto não, a visão automática
@@ -215,6 +229,9 @@ export function CenaMapa({
   aoCriarTraco,
   aoEscolherNota,
   aoApagarMarca,
+  marcaSelecionada,
+  aoSelecionarMarca,
+  aoTransformarMarca,
   aoAlternarPorta,
   verVisaoDosInimigos = false,
   visaoPronta = true,
@@ -273,10 +290,23 @@ export function CenaMapa({
   const marcaViva = useRef<{ origem: Ponto; pontos: Ponto[]; forma: "livre" | "linha" | "circulo" | "retangulo"; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
   /** Borracha de marcas com o dedo descendo: as marcas por onde ele passa saem. */
   const apagandoMarcas = useRef<Set<string> | null>(null);
+  /** Modo editar: o desenho que o dedo está movendo, redimensionando ou girando (pontos já com o gesto aplicado). */
+  const editandoMarca = useRef<{
+    id: string;
+    gesto: "mover" | "escala" | "giro";
+    inicio: Ponto;
+    original: Ponto[];
+    centro: Ponto;
+    distanciaInicial: number;
+    anguloInicial: number;
+    pontos: Ponto[];
+    telaA: { x: number; y: number };
+    telaB: { x: number; y: number };
+  } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -408,7 +438,14 @@ export function CenaMapa({
             ? { tipo: "curva", pontos: paredeViva.current.pontos }
             : { tipo: p.modoParede === "comodo" ? "comodo" : p.modoParede === "porta" ? "porta" : "parede", a: paredeViva.current.a, b: paredeViva.current.b },
       visaoDosInimigos: p.mestre ? visaoDosInimigosRef.current : undefined,
-      marcas: p.marcas ? marcasVisiveis(p.marcas, p.mestre) : undefined,
+      // Editando um desenho, ele aparece já com o gesto aplicado (os pontos novos só vão ao banco ao soltar).
+      marcas: p.marcas
+        ? marcasVisiveis(p.marcas, p.mestre).map((m) => (editandoMarca.current?.id === m.id ? { ...m, pontos: editandoMarca.current.pontos } : m))
+        : undefined,
+      selecaoMarca:
+        p.mestre && p.ferramenta === "marca" && p.modoMarca === "editar"
+          ? (editandoMarca.current?.pontos ?? p.marcas?.find((m) => m.tipo === "traco" && m.id === p.marcaSelecionada)?.pontos ?? null)
+          : null,
       previaMarca: p.mestre && marcaViva.current ? { pontos: marcaViva.current.pontos, cor: p.corMarca } : null,
     });
     const agora = performance.now();
@@ -544,7 +581,7 @@ export function CenaMapa({
   // Desenhos e notas chegaram, mudaram ou saíram (do Mestre ou de outro aparelho).
   useEffect(() => {
     pedirQuadro();
-  }, [marcas, pedirQuadro]);
+  }, [marcas, marcaSelecionada, modoMarca, ferramenta, pedirQuadro]);
 
   // O relógio de guardar a memória não pode sobreviver ao componente.
   useEffect(() => {
@@ -677,6 +714,7 @@ export function CenaMapa({
       areaViva.current = null;
       paredeViva.current = null;
       apagandoParedes.current = null;
+      editandoMarca.current = null;
       portaToque.current = null;
       pintura.current = null;
       previaRef.current = null;
@@ -753,7 +791,36 @@ export function CenaMapa({
 
     // Marcas (Mestre): arrastar risca; no modo nota, tocar escolhe o ponto; no modo
     // apagar, tocar numa marca a tira (e passar o dedo por outras, também).
-    if (p.ferramenta === "marca" && p.mestre) {
+    if (p.ferramenta === "marca" && p.mestre && p.modoMarca === "editar") {
+      // Editar: tocar num desenho o seleciona e já o arrasta; as alças da caixa redimensionam e giram.
+      // Tocar no vazio solta a seleção (e o dedo segue arrastando o mapa).
+      const ponto = noMapa(pos);
+      const escala = vistaRef.current.escala;
+      const tracos = (p.marcas ?? []).filter((m) => m.tipo === "traco");
+      const sel = tracos.find((m) => m.id === p.marcaSelecionada) ?? null;
+      const alca = sel ? acharAlca(sel.pontos, escala, ponto, TOQUE_NA_ALCA_PX / escala) : null;
+      const alvo = alca ? sel : acharMarcaNoPonto(tracos, ponto, (TOQUE_NA_MARCA_PX * 1.5) / escala);
+      if (alvo) {
+        const centro = centroDaCaixa(caixaDosPontos(alvo.pontos));
+        editandoMarca.current = {
+          id: alvo.id,
+          gesto: alca === "escala" ? "escala" : alca === "giro" ? "giro" : "mover",
+          inicio: ponto,
+          original: alvo.pontos,
+          centro,
+          distanciaInicial: Math.max(1e-6, Math.hypot(ponto[0] - centro[0], ponto[1] - centro[1])),
+          anguloInicial: Math.atan2(ponto[1] - centro[1], ponto[0] - centro[0]),
+          pontos: alvo.pontos,
+          telaA: pos,
+          telaB: pos,
+        };
+        semArrastar.current = true;
+        if (p.marcaSelecionada !== alvo.id) p.aoSelecionarMarca?.(alvo.id);
+        pedirQuadro();
+        return;
+      }
+      p.aoSelecionarMarca?.(null);
+    } else if (p.ferramenta === "marca" && p.mestre) {
       const ponto = noMapa(pos);
       const escala = vistaRef.current.escala;
       semArrastar.current = true;
@@ -920,6 +987,22 @@ export function CenaMapa({
       return;
     }
 
+    // Editando um desenho: mover, redimensionar (em torno do centro) ou girar.
+    const em = editandoMarca.current;
+    if (em) {
+      const [mx, my] = noMapa(agora);
+      em.telaB = agora;
+      let novos: Ponto[];
+      if (em.gesto === "mover") novos = moverPontos(em.original, mx - em.inicio[0], my - em.inicio[1]);
+      else if (em.gesto === "escala") {
+        const fator = fatorPermitido(em.original, Math.hypot(mx - em.centro[0], my - em.centro[1]) / em.distanciaInicial);
+        novos = escalarPontos(em.original, em.centro, fator);
+      } else novos = girarPontos(em.original, em.centro, Math.atan2(my - em.centro[1], mx - em.centro[0]) - em.anguloInicial);
+      em.pontos = manterNoMapa(novos, p.cena.largura, p.cena.altura);
+      pedirQuadro();
+      return;
+    }
+
     // Arrastando um traço de marca (a nota só espera o soltar).
     const mv = marcaViva.current;
     if (mv) {
@@ -1068,6 +1151,14 @@ export function CenaMapa({
       semArrastar.current = false;
       apagandoParedes.current = null;
       apagandoMarcas.current = null;
+      const em = editandoMarca.current;
+      if (em) {
+        editandoMarca.current = null;
+        // Um toque sem arrastar só seleciona; arrastou de verdade, grava os pontos novos.
+        if (!cancelado && Math.hypot(em.telaB.x - em.telaA.x, em.telaB.y - em.telaA.y) >= 3) propsRef.current.aoTransformarMarca?.(em.id, em.pontos);
+        pedirQuadro();
+        return;
+      }
       const mv = marcaViva.current;
       if (mv) {
         marcaViva.current = null;

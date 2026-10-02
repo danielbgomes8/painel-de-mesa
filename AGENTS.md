@@ -1289,7 +1289,19 @@ Decisões que não estão no código à primeira vista:
   na lista da seção "Desenhos e notas" cada nota tem "editar" (o texto), "mover" (espera
   um toque no mapa, que reaproveita a ferramenta "colocar" dos peões, e prende o
   alfinete dentro da imagem), "👁/🔒" e "apagar". Só a nota muda de lugar ou de texto;
-  **desenho (traço, círculo, retângulo) ainda não se edita: apaga e refaz.**
+  **Desenho se edita desde 02/10/2026 (sem migration), no modo "✋ editar"**: tocar num traço, círculo
+  ou retângulo o seleciona e já o arrasta (mover); a caixa branca tem duas alças, o quadradinho do
+  canto de baixo à direita (redimensiona, em torno do centro) e a bolinha acima do topo (gira). Cor,
+  "👁 a mesa vê / 🔒 só eu vejo" e "apagar desenho" são botões. **Tudo é conta sobre os mesmos pontos**
+  (`moverPontos`/`escalarPontos`/`girarPontos`/`manterNoMapa` em `lib/marcas.ts`, testadas): o círculo é
+  um polígono de 64 lados e o retângulo, cinco pontos, então escalam e giram sem tipo novo nem migration.
+  O gesto só aparece na tela enquanto o dedo está na tela (`editandoMarca` em `CenaMapa`); os pontos vão
+  ao banco UMA vez, ao soltar (`marcas.atualizar(id, { pontos })`, só a coluna), e um toque sem arrastar
+  (menos de 3 px) só seleciona. `manterNoMapa` empurra o desenho de volta pra dentro da imagem (e encolhe
+  se for maior que ela); o lado mínimo é 12 px. Nota não entra aqui: ela se edita na lista embaixo do mapa.
+  **O painel de edição fica ABAIXO do mapa e só existe com um desenho selecionado.** A primeira versão o
+  punha acima: ao selecionar, o mapa descia ~44 px no meio do toque e o "toque" virava um arrasto que
+  empurrava o desenho — o robô pegou (`e2e/editarDesenho.e2e.ts` confere que o mapa não muda de lugar).
 - **Aura no peão** (02/10/2026, migration `0023_aura_peao.sql`, rodada e conferida;
   `raioDaAuraPx`/`auraValida` em `lib/pecas.ts`, `ControleDeAura` em `CartaoDoPeao.tsx`,
   halo em `desenharPecas`). É a **emanação** do D&D 2024: área que parte de uma criatura,

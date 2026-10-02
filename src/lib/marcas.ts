@@ -35,7 +35,7 @@ export type NovaMarca =
   | { tipo: "nota"; cor: string; x: number; y: number; texto: string; visivel: boolean };
 
 /** O que o Mestre faz com a ferramenta de marcas. */
-export type ModoMarca = "livre" | "linha" | "circulo" | "retangulo" | "nota" | "apagar";
+export type ModoMarca = "livre" | "linha" | "circulo" | "retangulo" | "nota" | "editar" | "apagar";
 
 /** Por cena. Cada marca é redesenhada a cada quadro; passar disso pesa no celular. */
 export const MARCAS_MAXIMAS = 300;
@@ -194,4 +194,116 @@ export function notasNumeradas(marcas: readonly Marca[]): { numero: number; marc
     .filter((m) => m.tipo === "nota")
     .sort((a, b) => (a.created_at === b.created_at ? 0 : a.created_at < b.created_at ? -1 : 1))
     .map((marca, i) => ({ numero: i + 1, marca }));
+}
+
+// ---------------------------------------------------------------------------
+// Editar um desenho que já existe (mover, redimensionar, girar). Tudo vira uma
+// conta nos mesmos pontos do traço: o círculo é um polígono de 64 lados e o
+// retângulo, cinco pontos, então escalar e girar funcionam nos dois sem tipo novo.
+// ---------------------------------------------------------------------------
+
+/** O menor desenho que se pode encolher até (px da imagem, lado maior da caixa). */
+export const TAMANHO_MINIMO_DO_DESENHO_PX = 12;
+/** Quanto (px da TELA) a alça de girar fica acima do topo da caixa. */
+export const DISTANCIA_DA_ALCA_DE_GIRAR_PX = 30;
+/** Quanto perto (px da TELA) o dedo precisa estar de uma alça pra pegá-la. */
+export const TOQUE_NA_ALCA_PX = 20;
+
+export type Caixa = { x1: number; y1: number; x2: number; y2: number };
+
+/** A caixa que envolve os pontos (eixos alinhados com o mapa). */
+export function caixaDosPontos(pontos: readonly Ponto[]): Caixa {
+  let x1 = Infinity;
+  let y1 = Infinity;
+  let x2 = -Infinity;
+  let y2 = -Infinity;
+  for (const [x, y] of pontos) {
+    if (x < x1) x1 = x;
+    if (x > x2) x2 = x;
+    if (y < y1) y1 = y;
+    if (y > y2) y2 = y;
+  }
+  return { x1, y1, x2, y2 };
+}
+
+export function centroDaCaixa(c: Caixa): Ponto {
+  return [(c.x1 + c.x2) / 2, (c.y1 + c.y2) / 2];
+}
+
+const arredondar = (n: number) => Math.round(n * 100) / 100;
+
+export function moverPontos(pontos: readonly Ponto[], dx: number, dy: number): Ponto[] {
+  return pontos.map(([x, y]) => [x + dx, y + dy]);
+}
+
+/** Aumenta ou diminui em torno de `centro`, com a mesma proporção nos dois eixos. */
+export function escalarPontos(pontos: readonly Ponto[], centro: Ponto, fator: number): Ponto[] {
+  return pontos.map(([x, y]) => [centro[0] + (x - centro[0]) * fator, centro[1] + (y - centro[1]) * fator]);
+}
+
+/** Gira `angulo` radianos (positivo = sentido horário na tela) em torno de `centro`. */
+export function girarPontos(pontos: readonly Ponto[], centro: Ponto, angulo: number): Ponto[] {
+  const c = Math.cos(angulo);
+  const s = Math.sin(angulo);
+  return pontos.map(([x, y]) => {
+    const dx = x - centro[0];
+    const dy = y - centro[1];
+    return [centro[0] + dx * c - dy * s, centro[1] + dx * s + dy * c];
+  });
+}
+
+/** Deixa o desenho todo dentro da imagem: se for maior que ela, encolhe até caber;
+ *  se só estiver pra fora, empurra de volta. Arredonda pra 2 casas (o banco guarda JSON). */
+export function manterNoMapa(pontos: readonly Ponto[], largura: number, altura: number): Ponto[] {
+  let atual: Ponto[] = pontos.map(([x, y]) => [x, y]);
+  const caixa = caixaDosPontos(atual);
+  const w = caixa.x2 - caixa.x1;
+  const h = caixa.y2 - caixa.y1;
+  if (w > largura || h > altura) {
+    const fator = Math.min(largura / Math.max(w, 1e-9), altura / Math.max(h, 1e-9));
+    atual = escalarPontos(atual, centroDaCaixa(caixa), fator);
+  }
+  const c = caixaDosPontos(atual);
+  let dx = 0;
+  let dy = 0;
+  if (c.x1 < 0) dx = -c.x1;
+  else if (c.x2 > largura) dx = largura - c.x2;
+  if (c.y1 < 0) dy = -c.y1;
+  else if (c.y2 > altura) dy = altura - c.y2;
+  return moverPontos(atual, dx, dy).map(([x, y]) => [arredondar(Math.min(largura, Math.max(0, x))), arredondar(Math.min(altura, Math.max(0, y)))]);
+}
+
+/** O fator de escala que não deixa o desenho ficar menor que o mínimo. */
+export function fatorPermitido(pontos: readonly Ponto[], fator: number): number {
+  const c = caixaDosPontos(pontos);
+  const lado = Math.max(c.x2 - c.x1, c.y2 - c.y1);
+  if (lado <= 0) return 1;
+  return Math.max(fator, TAMANHO_MINIMO_DO_DESENHO_PX / lado);
+}
+
+export type AlcaDeMarca = "escala" | "giro";
+
+/** Onde ficam as alças do desenho selecionado (px da imagem): a de redimensionar no canto de
+ *  baixo à direita da caixa e a de girar acima do meio do topo. */
+export function alcasDaMarca(pontos: readonly Ponto[], escala: number): Record<AlcaDeMarca, Ponto> {
+  const c = caixaDosPontos(pontos);
+  return {
+    escala: [c.x2, c.y2],
+    giro: [(c.x1 + c.x2) / 2, c.y1 - DISTANCIA_DA_ALCA_DE_GIRAR_PX / escala],
+  };
+}
+
+/** A alça sob o dedo (a mais perto, dentro de `raio` px da imagem), ou null. */
+export function acharAlca(pontos: readonly Ponto[], escala: number, ponto: Ponto, raio: number): AlcaDeMarca | null {
+  const alcas = alcasDaMarca(pontos, escala);
+  let melhor: AlcaDeMarca | null = null;
+  let menor = raio;
+  for (const nome of ["escala", "giro"] as const) {
+    const d = Math.hypot(ponto[0] - alcas[nome][0], ponto[1] - alcas[nome][1]);
+    if (d <= menor) {
+      melhor = nome;
+      menor = d;
+    }
+  }
+  return melhor;
 }
