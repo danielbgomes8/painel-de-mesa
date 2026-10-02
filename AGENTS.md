@@ -1206,9 +1206,10 @@ Decisões que não estão no código à primeira vista:
     tela de verdade em 02/10/2026** (robô provisório contra o banco, na sala `ci-teste`,
     depois apagado): colar JSON em bloco ```json, escala 600×400 → 900×600, 2 frestas
     fechadas, 5 paredes + 1 porta gravadas numa escrita só, "↩ desfazer parede" tirou
-    tudo, sem erro no console. **Ainda não medido**: a altura a 375px (fechado, é um
-    botão) e um arquivo vindo de IA de verdade; não há robô fixo para isso, só
-    `ImportarParedes.test.ts` com banco de mentira. Não há botão "detectar" dentro do app
+    tudo, sem erro no console. **Altura medida a 375px no mesmo dia**: fechada 51 px,
+    aberta e vazia 579 px, com a resposta colada 625 px; botões de 36 a 38 px, nada passa
+    da largura da tela. **Ainda não testado**: um arquivo vindo de IA de verdade; não há
+    robô fixo para isso, só `ImportarParedes.test.ts` com banco de mentira. Não há botão "detectar" dentro do app
     porque isso pediria rota de servidor e chave paga — decisão do Daniel.
   - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
     Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
