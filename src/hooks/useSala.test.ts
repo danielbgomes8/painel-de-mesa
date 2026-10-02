@@ -146,7 +146,7 @@ describe("useSala: desfazer", () => {
   it("devolve o peão que saiu do mapa junto com o inimigo, no mesmo lugar", async () => {
     const goblin = { slug: "goblin", name: "Goblin", init: 12 };
     bd.semear("combat_state", [{ room_code: SALA, order_json: [goblin], version: 3 }]);
-    const peca: Peca = { id: "p1", cena_id: "c1", room_code: SALA, slug: "goblin", nome: "", x: 150, y: 250, tamanho: 1, cor: null, oculto: true, created_at: "2026-10-01T20:00:00Z" };
+    const peca: Peca = { id: "p1", cena_id: "c1", room_code: SALA, slug: "goblin", nome: "", x: 150, y: 250, tamanho: 1, cor: null, oculto: true, aura: null, created_at: "2026-10-01T20:00:00Z" };
     const { result } = await abrir();
     await act(async () => {
       const feito = await result.current.definirCombate({ order: [] });

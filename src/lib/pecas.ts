@@ -9,6 +9,7 @@
  * - o telão e os celulares tratam quem olha como jogador;
  * - peão sob a névoa não aparece pra mesa, a não ser o do próprio jogador.
  */
+import { metrosParaPx } from "./area";
 import { celulaNoPonto, gradeUsavel, ladoDeReferencia, type Cena, type Ponto, type Regiao } from "./cenas";
 import { corDoJogador } from "./ping";
 import { CONDICOES, ICONE_CONDICAO, ICONE_EXAUSTAO, condicoesAtivas } from "./condicoes";
@@ -31,8 +32,24 @@ export type Peca = {
   cor: string | null;
   /** Escondido da mesa; só o Mestre vê. */
   oculto: boolean;
+  /** Aura (emanação): raio em metros a partir da borda do espaço dele; null = sem aura. */
+  aura: number | null;
   created_at: string;
 };
+
+/** Raio máximo de uma aura (o banco também cobra isto): passa de qualquer magia do SRD. */
+export const AURA_MAXIMA_M = 120;
+/** Raios prontos, em metros: 1,5 / 3 / 4,5 (a de 15 pés de Guardiões Espirituais) / 6 / 9. */
+export const AURAS_PRONTAS_M = [1.5, 3, 4.5, 6, 9] as const;
+
+/** A aura que o app aceita: número positivo até o máximo, com no máximo uma casa
+ *  decimal (o resto vira ruído de digitação). Qualquer outra coisa = sem aura. */
+export function auraValida(v: unknown): number | null {
+  const n = typeof v === "string" ? Number(v) : v;
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0 || n > AURA_MAXIMA_M) return null;
+  const arredondado = Math.round(n * 10) / 10;
+  return arredondado > 0 ? arredondado : null;
+}
 
 export type NovaPeca = Pick<Peca, "slug" | "nome" | "x" | "y"> & Partial<Pick<Peca, "tamanho" | "cor" | "oculto">>;
 
@@ -77,6 +94,10 @@ export type PecaNaTela = {
   observa: boolean;
   /** É o peão de um inimigo: só o Mestre pode pedir pra ver o que ele enxerga. */
   inimigo: boolean;
+  /** Aura em metros (null = sem) e o raio dela em px da imagem, já contado a partir da
+   *  BORDA do espaço da criatura (o D&D mede a emanação dali, não do centro). */
+  aura: number | null;
+  auraPx: number;
 };
 
 export const COR_PECA_INIMIGO = "#c0443a";
@@ -106,6 +127,7 @@ export function normalizarPeca(linha: unknown): Peca | null {
     tamanho: (tam >= 1 && tam <= 4 ? tam : 1) as TamanhoPeca,
     cor: typeof o.cor === "string" && COR_VALIDA.test(o.cor) ? o.cor : null,
     oculto: o.oculto === true,
+    aura: auraValida(o.aura),
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };
 }
@@ -344,9 +366,20 @@ export function nomeDaPeca(peca: Pick<Peca, "slug" | "nome">, ficha: FichaParaPe
 }
 
 /** Tudo que o canvas precisa saber de cada peão, do ponto de vista de `visao`. */
+/** Raio da aura em px da imagem: a borda do espaço da criatura (metade do lado × o
+ *  tamanho) mais a distância da aura. Sem aura, 0. */
+export function raioDaAuraPx(
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura" | "metros">,
+  tamanho: TamanhoPeca,
+  aura: number | null,
+): number {
+  if (aura === null) return 0;
+  return (tamanho * ladoDeReferencia(cena)) / 2 + metrosParaPx(cena, aura);
+}
+
 export function montarPecasNaTela(entrada: {
   pecas: readonly Peca[];
-  cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura">;
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura" | "metros">;
   fichas: readonly FichaParaPeca[];
   /** Slug de quem tem a vez na iniciativa (ou null). */
   vezDe: string | null;
@@ -377,6 +410,8 @@ export function montarPecasNaTela(entrada: {
       icones: iconesDaPeca(ficha),
       observa: Boolean(ficha) && !ficha?.is_npc,
       inimigo: Boolean(ficha?.is_npc),
+      aura: p.aura,
+      auraPx: raioDaAuraPx(cena, p.tamanho, p.aura),
     };
   });
 }

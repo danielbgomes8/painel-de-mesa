@@ -175,6 +175,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       tamanho: true,
       cor: true,
       oculto: true,
+      aura: true,
       created_at: true,
     }),
   },

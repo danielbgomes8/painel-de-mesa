@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
-import { estaCaido } from "@/lib/regras";
+import { AURA_MAXIMA_M, AURAS_PRONTAS_M, auraValida } from "@/lib/pecas";
+import { estaCaido, formatarMetros } from "@/lib/regras";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
 import { AcoesNaLinha, avancarTurno } from "@/components/RastreadorCombate";
 
@@ -26,6 +27,8 @@ export function CartaoDoPeao({
   naOrdem,
   oculto,
   aoAlternarOculto,
+  aura = null,
+  aoMudarAura,
   aoFechar,
 }: {
   sala: Sala;
@@ -39,6 +42,9 @@ export function CartaoDoPeao({
   oculto?: boolean;
   /** Só pro Mestre: mostra/esconde o peão pra mesa. */
   aoAlternarOculto?: () => void;
+  /** Aura (emanação) do peão em metros (null = sem) e como ligar, mudar ou desligar. */
+  aura?: number | null;
+  aoMudarAura?: (metros: number | null) => void;
   aoFechar: () => void;
 }) {
   const [retorno, setRetorno] = useState<string | null>(null);
@@ -111,6 +117,7 @@ export function CartaoDoPeao({
           )}
         </div>
       )}
+      {aoMudarAura && <ControleDeAura nome={p.name} aura={aura} aoMudar={aoMudarAura} />}
       <AcoesNaLinha
         key={aplicacoes}
         sala={sala}
@@ -128,6 +135,72 @@ export function CartaoDoPeao({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Aura (emanação): a área em volta do peão que anda junto com ele e fica ligada até
+ *  alguém desligar (Aura de Proteção, Guardiões Espirituais...). Raios prontos em
+ *  metros e um campo pro resto; a mesa inteira vê o halo. */
+function ControleDeAura({ nome, aura, aoMudar }: { nome: string; aura: number | null; aoMudar: (metros: number | null) => void }) {
+  const [outro, setOutro] = useState("");
+  const [recusou, setRecusou] = useState(false);
+
+  function aplicarOutro() {
+    // "4,5" e "4.5" valem igual (teclado do celular em português).
+    const valor = auraValida(outro.replace(",", "."));
+    if (valor === null) {
+      setRecusou(true);
+      return;
+    }
+    setRecusou(false);
+    setOutro("");
+    aoMudar(valor);
+  }
+
+  return (
+    <div className="mapa-aura" role="group" aria-label={`Aura de ${nome}`}>
+      <span className="mapa-aura-titulo">Aura</span>
+      {AURAS_PRONTAS_M.map((m) => (
+        <button
+          key={m}
+          type="button"
+          className="chip alvo"
+          aria-pressed={aura === m}
+          aria-label={`Aura de ${formatarMetros(m)}`}
+          onClick={() => aoMudar(aura === m ? null : m)}
+        >
+          {m.toLocaleString("pt-BR")}
+        </button>
+      ))}
+      <input
+        type="text"
+        inputMode="decimal"
+        className="mapa-aura-campo"
+        aria-label="Outro raio da aura, em metros"
+        placeholder="outro (m)"
+        maxLength={5}
+        value={outro}
+        autoComplete="off"
+        onChange={(e) => {
+          setOutro(e.target.value);
+          setRecusou(false);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") aplicarOutro();
+        }}
+      />
+      <button type="button" className="chip alvo" disabled={!outro.trim()} onClick={aplicarOutro}>
+        ligar
+      </button>
+      {aura !== null && (
+        <button type="button" className="chip alvo" aria-label={`Desligar a aura de ${nome}`} onClick={() => aoMudar(null)}>
+          desligar
+        </button>
+      )}
+      <span className={recusou ? "mapa-aura-aviso erro" : "mapa-aura-aviso"} role="status">
+        {recusou ? `Use um raio de 0,1 a ${AURA_MAXIMA_M} m.` : aura !== null ? `Aura de ${formatarMetros(aura)} ligada: a mesa vê e ela anda com o peão.` : ""}
+      </span>
     </div>
   );
 }

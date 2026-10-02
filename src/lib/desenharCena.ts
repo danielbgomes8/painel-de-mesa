@@ -341,6 +341,13 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
 
 const COR_VEZ = "#f0c24b";
 
+/** "#rrggbb" + transparência → "rgba(...)". Cor fora do padrão vira cinza. */
+function corComAlfa(hex: string, alfa: number): string {
+  const m = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(hex);
+  if (!m) return `rgba(138,151,168,${alfa})`;
+  return `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alfa})`;
+}
+
 /** Os peões, em coordenadas do mapa (crescem com o zoom, como a miniatura numa
  *  mesa de verdade). A mesa não vê peão oculto nem peão sob a névoa — só o
  *  Mestre, e cada jogador o dele. */
@@ -352,6 +359,26 @@ function desenharPecas(
   arrasto: { id: string; x: number; y: number } | null,
   escala: number,
 ): void {
+  // Auras primeiro, por baixo de todos os peões. Só aparece a aura de quem o peão
+  // aparece: peão oculto ou sob a névoa não entrega a posição pela aura.
+  for (const p of pecas) {
+    if (p.aura === null || p.auraPx <= 0) continue;
+    const x = arrasto?.id === p.id ? arrasto.x : p.x;
+    const y = arrasto?.id === p.id ? arrasto.y : p.y;
+    if (!mestre && !p.semNevoa && (p.oculto || coberta(x, y))) continue;
+    ctx.save();
+    ctx.globalAlpha = mestre && p.oculto ? 0.5 : 1;
+    ctx.beginPath();
+    ctx.arc(x, y, p.auraPx, 0, Math.PI * 2);
+    ctx.fillStyle = corComAlfa(p.cor, 0.16);
+    ctx.fill();
+    // Contorno com largura fixa na tela, em qualquer zoom.
+    ctx.lineWidth = 2 / escala;
+    ctx.setLineDash([8 / escala, 6 / escala]);
+    ctx.strokeStyle = corComAlfa(p.cor, 0.85);
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const p of pecas) {
     const x = arrasto?.id === p.id ? arrasto.x : p.x;
     const y = arrasto?.id === p.id ? arrasto.y : p.y;

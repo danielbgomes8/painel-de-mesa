@@ -3352,3 +3352,52 @@ input.fj-score:focus-visible {
   flex: 1 1 100%;
   min-width: 0;
 }
+
+/* Aura (emanação) no cartão do peão: raios prontos, "outro" e desligar. */
+.mapa-aura {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+}
+.mapa-aura-titulo {
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 2px;
+}
+.mapa-aura-campo {
+  width: 92px;
+  min-width: 0;
+}
+.mapa-aura-aviso {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 0;
+}
+.mapa-aura-aviso:empty {
+  display: none;
+}
+.mapa-aura-aviso.erro {
+  color: var(--danger);
+}
+
+/* Campos de texto das marcas e da aura: o mesmo desenho do campo de busca do catálogo. */
+.mapa-aura-campo,
+.mapa-nota-nova input,
+.mapa-nota-edicao input {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+}
+.mapa-aura-campo:focus-visible,
+.mapa-nota-nova input:focus-visible,
+.mapa-nota-edicao input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

@@ -1049,8 +1049,9 @@ Decisões que não estão no código à primeira vista:
   por cima das outras (achado na foto). A figura é desenhada em coordenadas do
   mapa (cobre o que cobre de verdade em qualquer zoom), abaixo de pings e réguas
   e acima dos peões; não esconde nem revela nada, então vale também sobre névoa.
-  **Fora daqui:** a emanação de 2024 (a área acompanha uma criatura) — ela se mexe
-  com o peão e fica pra depois — e contar quem está dentro (revelaria peão oculto).
+  **Fora daqui:** contar quem está dentro (revelaria peão oculto). A emanação de 2024
+  (a área que acompanha uma criatura) veio depois, como aura no peão: ver "Aura no
+  peão" abaixo.
   A etiqueta da régua foi extraída pra `desenharEtiqueta` e as duas usam a mesma.
   O robô marca as quatro formas e confere pelo `fillText` que Mestre e jogador
   veem "Mestre: Cone · 9 m" etc.; **a barra de tamanhos muda de altura conforme a
@@ -1267,6 +1268,31 @@ Decisões que não estão no código à primeira vista:
   um toque no mapa, que reaproveita a ferramenta "colocar" dos peões, e prende o
   alfinete dentro da imagem), "👁/🔒" e "apagar". Só a nota muda de lugar ou de texto;
   **desenho (traço, círculo, retângulo) ainda não se edita: apaga e refaz.**
+- **Aura no peão** (02/10/2026, migration `0023_aura_peao.sql`, rodada e conferida;
+  `raioDaAuraPx`/`auraValida` em `lib/pecas.ts`, `ControleDeAura` em `CartaoDoPeao.tsx`,
+  halo em `desenharPecas`). É a **emanação** do D&D 2024: área que parte de uma criatura,
+  se estende em volta dela e anda junto. Decisões do Daniel: **liga o Mestre (em qualquer
+  peão) e o jogador (no próprio peão — o app não sabe quem tem magia de aura, então todo
+  jogador pode), e fica ligada até desligar** (não some sozinha, ao contrário do ping, da
+  régua e da área de magia). Uma coluna só, `cena_pecas.aura` (metros, 0,1 a 120, nulo =
+  sem; o banco também cobra): ligar, mudar e desligar é um `update` só dessa coluna e chega
+  nos outros aparelhos pelo canal que já existia. **O raio é contado a partir da BORDA do
+  espaço da criatura** (`tamanho × lado / 2` + a distância, como o D&D mede), não do centro:
+  3 m num peão médio de 30 px/quadrado dão 15 + 60 = 75 px. Desenhada por **baixo de todos
+  os peões**, translúcida, na cor do peão, com contorno tracejado de largura fixa na tela, e
+  acompanha o peão até durante o arrasto. **Segue a visibilidade do peão**: peão oculto ou
+  sob a névoa não mostra a aura pra mesa (entregaria a posição); o Mestre vê a de peão
+  oculto mais apagada. Raios prontos de 1,5 / 3 / 4,5 / 6 / 9 m (4,5 m = os 15 pés de
+  Guardiões Espirituais), campo "outro (m)" que aceita vírgula e tocar de novo no raio
+  ligado desliga. Círculo (a forma 2024 numa grade desenha-se redonda), não o quadrado da
+  régua em grade. O robô (`aura.e2e.ts`) espia `arc()` no canvas — cada quadro começa no
+  `fillRect(0,0)` do fundo — pra ler os raios DESENHADOS no Mestre e no jogador, e confere a
+  de peão oculto, o mover, "outro" com vírgula, o limite e desligar. **Esse cenário espera o
+  tempo real com `ver()`, que dispara o "voltei pra aba" (releitura do app) enquanto espera:**
+  o evento do Supabase chegou a demorar mais de 20 s, o robô oscila por isso (ver acima). E
+  uma lição de teste: **raios de teste iguais mascaram o que se quer provar** — a aura de 6 m do
+  jogador tinha o mesmo raio da armadilha oculta (135) e a checagem seria vazia; use valores
+  distintos.
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).

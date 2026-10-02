@@ -8,6 +8,8 @@ import {
   encaixarNaGrade,
   iconesDaPeca,
   iconesVisiveis,
+  AURA_MAXIMA_M,
+  auraValida,
   iniciais,
   montarPecasNaTela,
   nomeDaPeca,
@@ -17,6 +19,7 @@ import {
   podeMoverPeca,
   posicoesDosIcones,
   posicoesIniciais,
+  raioDaAuraPx,
   regiaoEmTornoDe,
   tamanhoPeloTipo,
   type Peca,
@@ -24,13 +27,14 @@ import {
 } from "./pecas";
 import { corDoJogador } from "./ping";
 
-const cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura"> = {
+const cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura" | "metros"> = {
   grade_ligada: true,
   grade_px: 100,
   grade_dx: 0,
   grade_dy: 0,
   largura: 3000,
   altura: 2000,
+  metros: 1.5,
 };
 
 function peca(extra: Partial<Peca> = {}): Peca {
@@ -45,6 +49,7 @@ function peca(extra: Partial<Peca> = {}): Peca {
     tamanho: 1,
     cor: null,
     oculto: false,
+    aura: null,
     created_at: "",
     ...extra,
   };
@@ -153,6 +158,8 @@ describe("clicar num peão", () => {
     selecionada: false,
     podeMover: true,
     deslocamento: null,
+    aura: null,
+    auraPx: 0,
     semNevoa: true,
     icones: [],
     observa: true,
@@ -489,5 +496,47 @@ describe("inimigo que entra na iniciativa ganha peão", () => {
   it("sem câmera (a mesa vê o mapa todo), entra no meio do mapa", () => {
     const [p] = pecasDosQueEntram({ cena: { ...cena, camera: null }, fichas: [goblin], existentes: [] });
     expect([p.x, p.y]).toEqual([1550, 1050]);
+  });
+});
+
+describe("aura (emanação) no peão", () => {
+  it("só aceita raio positivo até o máximo, com uma casa decimal; o resto é 'sem aura'", () => {
+    expect(auraValida(4.5)).toBe(4.5);
+    expect(auraValida("3")).toBe(3);
+    expect(auraValida(1.26)).toBe(1.3);
+    expect(auraValida(AURA_MAXIMA_M)).toBe(AURA_MAXIMA_M);
+    for (const ruim of [0, -2, AURA_MAXIMA_M + 1, NaN, Infinity, null, undefined, "abc", 0.04, {}]) expect(auraValida(ruim)).toBeNull();
+  });
+
+  it("lê a aura do banco (numeric vem como texto) e ignora lixo", () => {
+    const base = { id: "p", cena_id: "c", x: 1, y: 1 };
+    expect(normalizarPeca({ ...base, aura: "4.5" })?.aura).toBe(4.5);
+    expect(normalizarPeca({ ...base, aura: null })?.aura).toBeNull();
+    expect(normalizarPeca({ ...base })?.aura).toBeNull();
+    expect(normalizarPeca({ ...base, aura: -3 })?.aura).toBeNull();
+  });
+
+  it("o raio conta da BORDA do espaço da criatura: lado/2 + a distância da aura", () => {
+    // quadradinho de 100 px = 1,5 m. Peão médio: borda a 50 px; aura de 3 m = 200 px.
+    expect(raioDaAuraPx(cena, 1, 3)).toBe(250);
+    // Grande (2×2): borda a 100 px do centro.
+    expect(raioDaAuraPx(cena, 2, 3)).toBe(300);
+    expect(raioDaAuraPx(cena, 1, null)).toBe(0);
+    // O valor do quadradinho em metros é da cena: 3 m por quadrado, a mesma aura vale metade.
+    expect(raioDaAuraPx({ ...cena, metros: 3 }, 1, 3)).toBe(150);
+  });
+
+  it("vai pro peão na tela com o raio em px, pra mesa e pro Mestre", () => {
+    const [a] = montarPecasNaTela({
+      pecas: [peca({ id: "a", slug: "tiberio", aura: 4.5 })],
+      cena,
+      fichas: [{ slug: "tiberio", name: "Tibério Vaz", is_npc: false, revealed: true, speed: 9 }],
+      vezDe: null,
+      slugsDosJogadores: ["tiberio"],
+      visao: { mestre: false, meuSlug: null },
+      selecionadaId: null,
+    });
+    expect(a.aura).toBe(4.5);
+    expect(a.auraPx).toBe(50 + 300);
   });
 });

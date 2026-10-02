@@ -149,6 +149,8 @@ export function VisorDaMesa({
               souMestre={false}
               vez={aberto.vez}
               naOrdem={aberto.naOrdem}
+              aura={aberto.peca.aura}
+              aoMudarAura={(m) => void banco.atualizar(aberto.peca.id, { aura: m })}
               aoFechar={() => setCartao(null)}
             />
           )}
@@ -713,6 +715,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                   naOrdem={aberto.naOrdem}
                   oculto={aberto.peca.oculto}
                   aoAlternarOculto={() => void banco.atualizar(aberto.peca.id, { oculto: !aberto.peca.oculto })}
+                  aura={aberto.peca.aura}
+                  aoMudarAura={(m) => void banco.atualizar(aberto.peca.id, { aura: m })}
                   aoFechar={() => setCartao(null)}
                 />
               )}

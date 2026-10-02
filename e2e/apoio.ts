@@ -92,11 +92,11 @@ export async function combateDoBanco(): Promise<{ turn: number; round: number; o
   return ((await r.json()) as { turn: number; round: number; order_json: { slug: string }[] }[])[0];
 }
 
-export type LinhaPeca = { id: string; slug: string | null; nome: string; oculto: boolean; tamanho: number; x: number; y: number };
+export type LinhaPeca = { id: string; slug: string | null; nome: string; oculto: boolean; tamanho: number; x: number; y: number; aura: number | null };
 
 /** Os peões da sala, lidos do banco (o canvas não dá pra conferir pelo DOM). */
 export async function pecasDoBanco(): Promise<LinhaPeca[]> {
-  const r = await rest(`cena_pecas?select=id,slug,nome,oculto,tamanho,x,y&room_code=eq.${SALA}&order=created_at`);
+  const r = await rest(`cena_pecas?select=id,slug,nome,oculto,tamanho,x,y,aura&room_code=eq.${SALA}&order=created_at`);
   if (!r.ok) throw new Error(`não leu os peões: HTTP ${r.status}`);
   return (await r.json()) as LinhaPeca[];
 }

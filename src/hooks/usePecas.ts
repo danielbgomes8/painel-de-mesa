@@ -17,7 +17,7 @@ export type Pecas = {
   aviso: string | null;
   adicionar: (novas: NovaPeca[]) => Promise<boolean>;
   /** Só as colunas que mudaram (nunca a linha inteira: ver AGENTS.md). */
-  atualizar: (id: string, mudanca: Partial<Pick<Peca, "x" | "y" | "tamanho" | "oculto" | "nome" | "cor">>) => Promise<boolean>;
+  atualizar: (id: string, mudanca: Partial<Pick<Peca, "x" | "y" | "tamanho" | "oculto" | "nome" | "cor" | "aura">>) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
   removerTodas: () => Promise<boolean>;
 };
