@@ -518,8 +518,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
     botão "ficha" no canto que abre a ficha embaixo da linha (uma por vez), com
     "copiar pra minha biblioteca" dentro — só confirma "copiado" depois que o
     banco aceitar. O componente só importa **tipo** do catálogo (valor dele
-    traria os 31 KB pra abertura do app). Ainda não existe na montagem de
-    encontro (`EncontrosPreparados`), só na biblioteca.
+    traria os 31 KB pra abertura do app). A montagem de encontro
+    (`EncontrosPreparados`) tem o mesmo botão "ficha" (02/10/2026), sem o
+    "copiar": lá tocar na linha adiciona ao grupo e a ficha serve só pra olhar
+    o bicho antes. Conferido a 375px: o botão fica no canto e a linha não engorda.
     **A linha da biblioteca (monstro já copiado) também é a ficha**: abre
     recolhida (nome + "ND · CA · PV · inic.", 67px a 375px; aberta tem ~660px,
     e 15 monstros abertos dariam 10 mil px), ao toque abre a ficha, e

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Encontro, FichaMonstro, GrupoEncontro, ItemIniciativa } from "@/lib/tipos";
 import { d20 } from "@/lib/dados";
+import { FichaClassicaMonstro, dadosDoMonstro } from "@/components/FichaClassicaMonstro";
 import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
 import { textoDesfeito } from "@/lib/desfazer";
 import type { Cena } from "@/lib/cenas";
@@ -193,6 +194,9 @@ function EscolherMonstro({
 }) {
   const { catalogo, falhou, tentarDeNovo } = useCatalogoMonstros();
   const [busca, setBusca] = useState("");
+  // Monstro com a ficha clássica aberta (nome do livro); um por vez. Serve pra
+  // olhar o bicho antes de pôr no grupo: tocar na linha é que adiciona.
+  const [fichaAberta, setFichaAberta] = useState<string | null>(null);
   const achados = busca.trim() && catalogo ? catalogo.buscarMonstros(busca) : [];
 
   return (
@@ -240,16 +244,32 @@ function EscolherMonstro({
 
       <div className="catresultados">
         {achados.map((m) => (
-          <button key={m.name} type="button" className="catitem" onClick={() => aoEscolher(fichaDeMonstro({ ...m, name: m.en }))}>
-            <span className="catnome">
-              {m.en}
-              {m.en !== m.name && <span className="caten"> · {m.name}</span>}
-            </span>
-            <span className="catstats">
-              ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · inic. {m.init_mod >= 0 ? "+" : ""}
-              {m.init_mod} · {m.cls}
-            </span>
-          </button>
+          <div key={m.name} className="catgrupo">
+            <div className="catentrada">
+              <button type="button" className="catitem" onClick={() => aoEscolher(fichaDeMonstro({ ...m, name: m.en }))}>
+                <span className="catnome">
+                  {m.en}
+                  {m.en !== m.name && <span className="caten"> · {m.name}</span>}
+                </span>
+                <span className="catstats">
+                  ND {catalogo?.ndTexto(m.nd)} · CA {m.ac} · {m.hp_max} PV · inic. {m.init_mod >= 0 ? "+" : ""}
+                  {m.init_mod} · {m.cls}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="catficha"
+                aria-expanded={fichaAberta === m.en}
+                aria-label={`${fichaAberta === m.en ? "Fechar" : "Ver"} a ficha de ${m.en}`}
+                onClick={() => setFichaAberta(fichaAberta === m.en ? null : m.en)}
+              >
+                {fichaAberta === m.en ? "fechar" : "ficha"}
+              </button>
+            </div>
+            {fichaAberta === m.en && catalogo ? (
+              <FichaClassicaMonstro dados={dadosDoMonstro(m, catalogo.ndTexto(m.nd))} />
+            ) : null}
+          </div>
         ))}
       </div>
     </div>
