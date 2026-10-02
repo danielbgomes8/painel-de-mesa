@@ -4108,3 +4108,42 @@ input.fj-score:focus-visible {
     font-size: clamp(12px, 1.4vw, 20px);
   }
 }
+
+/* Aviso "tem versão nova" (AvisoVersaoNova): mesmo desenho do aviso de mapa. */
+.versaobanner {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  font-size: 14px;
+}
+.versaobanner-texto {
+  flex: 1;
+  min-width: 0;
+}
+.versaobanner-texto b {
+  font-family: var(--f-display);
+  color: var(--accent);
+}
+.versaobanner-atualizar {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  border-radius: 9px;
+  padding: 8px 14px;
+  min-height: 36px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.versaobanner-atualizar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

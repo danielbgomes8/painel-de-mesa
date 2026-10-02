@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCenas } from "@/hooks/useCenas";
 import { useQuadro } from "@/hooks/useQuadro";
+import { useVersaoNova } from "@/hooks/useVersaoNova";
+import { AvisoVersaoNova } from "@/components/AvisoVersaoNova";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
 import { useIdentidade } from "@/hooks/useIdentidade";
 import { useModoTelao } from "@/hooks/useModoTelao";
@@ -103,6 +105,9 @@ function PainelSala({ codigo }: { codigo: string }) {
   // O quadro também tem canal próprio. No telão ninguém tem identidade: ele
   // vê só o que a mesa inteira vê.
   const quadro = useQuadro(codigo, telao ? null : identidade);
+  // Saiu uma versão nova depois de abrir? O telão (que ninguém toca) recarrega sozinho; nos
+  // celulares aparece um aviso e a pessoa decide a hora (não no meio de um combate).
+  const versaoNova = useVersaoNova(telao);
   const rotulo = rotuloDaSala(codigo);
 
   function entrar(id: Identidade) {
@@ -314,6 +319,8 @@ function PainelSala({ codigo }: { codigo: string }) {
           </button>
         </div>
       )}
+
+      <AvisoVersaoNova aparecer={versaoNova} comFilaPendente={sala.esperando > 0} />
 
       {sala.semInternet && (
         <div className="avisosemrede" role="status">
