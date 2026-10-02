@@ -332,6 +332,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const [marcaParaMesa, setMarcaParaMesa] = useState(true);
   /** Onde o Mestre tocou com o modo nota: espera o texto. */
   const [notaPendente, setNotaPendente] = useState<Ponto | null>(null);
+  /** Nota que espera um toque no mapa pra mudar de lugar. */
+  const [movendoNota, setMovendoNota] = useState<string | null>(null);
   const [verInimigos, setVerInimigos] = useState(false);
   /** Esperando o Mestre tocar no mapa pra dizer onde o grupo (ou os inimigos) entra. */
   const [colocando, setColocando] = useState<"grupo" | "inimigos" | null>(null);
@@ -389,6 +391,13 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
 
   /** O Mestre tocou no mapa: o grupo (ou os inimigos) entra em volta desse ponto. */
   function colocarOnde(ponto: Ponto) {
+    if (movendoNota) {
+      // Fora da imagem não vale: o alfinete fica preso na borda.
+      const [x, y] = cena ? [Math.min(cena.largura, Math.max(0, ponto[0])), Math.min(cena.altura, Math.max(0, ponto[1]))] : ponto;
+      void desenhos.atualizar(movendoNota, { x, y });
+      setMovendoNota(null);
+      return;
+    }
     if (!cena || !colocando) return;
     const regiao = regiaoEmTornoDe(cena, ponto);
     if (colocando === "grupo") porOGrupo(regiao);
@@ -457,6 +466,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   function escolherFerramenta(f: Ferramenta) {
     setColocando(null);
     setNotaPendente(null);
+    setMovendoNota(null);
     setFerramenta(f);
   }
   const avisos = [cenas.aviso, nevoa.aviso].filter((a): a is string => Boolean(a));
@@ -648,7 +658,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 imagemUrl={cenas.urlDaImagem(cena)}
                 regras={nevoa.regras}
                 mestre
-                ferramenta={colocando ? "colocar" : ferramentaAtiva}
+                ferramenta={colocando || movendoNota ? "colocar" : ferramentaAtiva}
                 modoNevoa={modo}
                 pincel={pincel}
                 aoPintar={(nova) => void nevoa.adicionar(nova)}
@@ -891,7 +901,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                       {resumoDasMarcas(desenhos.marcas)}. Risque e anote com a ferramenta ✏️ desenhar. O que fica em 🔒 só eu vejo aparece
                       tracejado pra você e não aparece pra mesa, nem no telão. Os jogadores só enxergam desenho e nota onde a névoa já abriu.
                     </p>
-                    <ListaDeNotas marcas={desenhos.marcas} edicao={desenhos} />
+                    <ListaDeNotas marcas={desenhos.marcas} edicao={desenhos} movendoId={movendoNota} aoMover={setMovendoNota} />
+                    {movendoNota && <p className="fc-sub">Toque no mapa no lugar novo da nota. Abra o mapa acima se ele estiver fora da tela.</p>}
                     <div className="mapa-ferr">
                       <button
                         type="button"

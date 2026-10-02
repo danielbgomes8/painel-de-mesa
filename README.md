@@ -250,8 +250,10 @@ movimento.
   `SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/restaurar-backup-bruto.mjs backup/sala.json`
   (sem mais nada, só **simula**; acrescente `--executar` pra valer). É seguro
   rodar por cima de uma sala que já tem dados: o que existe fica, o que falta
-  volta. As **imagens dos mapas** não estão na cópia (ficam no Storage): guarde
-  o arquivo original de cada mapa.
+  volta. As **imagens dos mapas** (que ficam no Storage) também vão na cópia
+  diária, em `backup/mapas/`, e o mesmo comando as devolve ao Storage sem
+  sobrescrever as que já estão lá. Mesmo assim, guarde o arquivo original de
+  cada mapa: o app reduz a imagem ao subir.
 
 ### Robô de tela
 

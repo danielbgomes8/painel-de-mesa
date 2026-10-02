@@ -16,12 +16,15 @@
  * como estava", apague antes as linhas da sala (as tabelas filhas, ou a sala
  * inteira no SQL Editor) e rode este script.
  *
- * As imagens dos mapas NÃO estão no backup (ficam no Storage): a cena volta,
- * mas sem a imagem, até alguém subir de novo o arquivo original.
+ * As imagens dos mapas ficam no Storage, não no banco: o backup as guarda em
+ * `mapas/` ao lado do .json (`backup/mapas/...`) e este script as devolve ao
+ * bucket (sem sobrescrever o que já está lá). Sem essa pasta, a cena volta sem
+ * a imagem, até alguém subir de novo o arquivo original.
  */
 import { readFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { TABELAS_COM_SALA } from "./backup-salas.mjs";
+import { BUCKET_DOS_MAPAS, TABELAS_COM_SALA, caminhoSeguroDaImagem } from "./backup-salas.mjs";
 
 /** Colunas que o banco gera sozinho e RECUSA receber (`generated always`). */
 export const COLUNAS_GERADAS = { cena_nevoa: ["seq"] };
@@ -102,6 +105,41 @@ export async function restaurar({ dados, url, chave, executar, buscar = fetch, a
   return feitas;
 }
 
+/** Devolve ao Storage as imagens dos mapas que o backup guardou em `<pasta>/mapas/`.
+ *  Nunca sobrescreve (`x-upsert: false`): imagem que já está lá fica como está.
+ *  `executar: false` só confere o que existe na pasta. */
+export async function restaurarImagens({ dados, pasta, url, chave, executar, buscar = fetch, ler = (arquivo) => readFile(arquivo) }) {
+  const resultado = { enviadas: 0, jaExistiam: 0, semArquivo: [] };
+  for (const cena of dados.cenas ?? []) {
+    const caminho = caminhoSeguroDaImagem(cena.imagem);
+    if (!caminho) continue;
+    let conteudo;
+    try {
+      conteudo = await ler(`${pasta}/mapas/${caminho}`);
+    } catch {
+      resultado.semArquivo.push(caminho);
+      continue;
+    }
+    if (!executar) {
+      resultado.enviadas++;
+      continue;
+    }
+    const r = await buscar(`${url}/storage/v1/object/${BUCKET_DOS_MAPAS}/${caminho.split("/").map(encodeURIComponent).join("/")}`, {
+      method: "POST",
+      headers: { apikey: chave, Authorization: `Bearer ${chave}`, "Content-Type": "image/jpeg", "x-upsert": "false" },
+      body: conteudo,
+    });
+    if (r.ok) resultado.enviadas++;
+    else {
+      const texto = await r.text();
+      // O Storage responde 400/409 "Duplicate" quando o arquivo já existe.
+      if ((r.status === 400 || r.status === 409) && /duplicate|already exists/i.test(texto)) resultado.jaExistiam++;
+      else throw new Error(`imagem ${caminho}: HTTP ${r.status} ${texto.slice(0, 200)}`);
+    }
+  }
+  return resultado;
+}
+
 async function principal() {
   const args = process.argv.slice(2);
   const executar = args.includes("--executar");
@@ -119,6 +157,13 @@ async function principal() {
     executar,
     aoAndar: (tabela, n) => console.log(`  ${tabela}: ${n} linha(s)`),
   });
+  const imagens = await restaurarImagens({ dados, pasta: dirname(arquivo), url, chave, executar });
+  if (imagens.enviadas + imagens.jaExistiam + imagens.semArquivo.length > 0) {
+    console.log(
+      `  imagens de mapas: ${imagens.enviadas} ${executar ? "enviada(s)" : "a enviar"}, ${imagens.jaExistiam} já estava(m) lá` +
+        (imagens.semArquivo.length ? `, ${imagens.semArquivo.length} sem arquivo em ${dirname(arquivo)}/mapas/ (suba de novo o original)` : ""),
+    );
+  }
   console.log(feitas.length === 0 ? "nada pra restaurar" : `${executar ? "restaurado" : "restauraria"}: ${feitas.map(([t, n]) => `${t}=${n}`).join(", ")}`);
 }
 

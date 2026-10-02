@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TABELAS_COM_SALA, TABELAS_FORA_DO_BACKUP, copiarSalas, lerTudo } from "../../scripts/backup-salas.mjs";
+import { TABELAS_COM_SALA, TABELAS_FORA_DO_BACKUP, caminhoSeguroDaImagem, copiarImagens, copiarSalas, lerTudo } from "../../scripts/backup-salas.mjs";
 
 /** Resposta de mentira do PostgREST: `paginas` em ordem, uma por pedido. */
 function bancoDeMentira(respostas: Record<string, unknown[][] | { status: number }>) {
@@ -71,5 +71,61 @@ describe("backup bruto das salas", () => {
     // uma sala não vaza pra outra: cada pedido leva o room_code da própria sala
     const deB = pedidos.filter((p) => p.caminho.includes("room_code=eq.b"));
     expect(deB).toHaveLength(TABELAS_COM_SALA.length);
+  });
+});
+
+describe("backup das imagens dos mapas", () => {
+  const resposta = (status: number, texto = "") => ({ ok: status >= 200 && status < 300, status, arrayBuffer: async () => new TextEncoder().encode(texto).buffer });
+  const comCenas = (...imagens: (string | null)[]) => [{ codigo: "a", dados: { cenas: imagens.map((imagem) => ({ imagem })) } }];
+
+  it("só aceita caminho que cabe numa pasta local (o banco é aberto: nada de sair da pasta)", () => {
+    expect(caminhoSeguroDaImagem("sala/cena.jpg")).toBe("sala/cena.jpg");
+    for (const ruim of ["../x.jpg", "/etc/passwd", "a/../../b", "a//b", "a\\b", "", null, 7]) {
+      expect(caminhoSeguroDaImagem(ruim as string)).toBeNull();
+    }
+  });
+
+  it("baixa cada imagem pelo endereço público e grava em <pasta>/mapas/<caminho>", async () => {
+    const gravados: Record<string, string> = {};
+    const pedidos: string[] = [];
+    const r = await copiarImagens({
+      url: "https://x.supabase.co",
+      copias: comCenas("sala/um.jpg", null, "sala/dois jpg"),
+      pasta: "backup",
+      buscar: (async (e: string) => {
+        pedidos.push(e);
+        return resposta(200, e.includes("um") ? "UM" : "DOIS");
+      }) as never,
+      gravar: async (arquivo: string, conteudo: Buffer) => {
+        gravados[arquivo] = conteudo.toString();
+      },
+    });
+    expect(r).toEqual({ baixadas: 2, faltando: [] });
+    expect(pedidos).toEqual([
+      "https://x.supabase.co/storage/v1/object/public/mapas/sala/um.jpg",
+      "https://x.supabase.co/storage/v1/object/public/mapas/sala/dois%20jpg",
+    ]);
+    expect(gravados).toEqual({ "backup/mapas/sala/um.jpg": "UM", "backup/mapas/sala/dois jpg": "DOIS" });
+  });
+
+  it("a mesma imagem em duas cenas é baixada uma vez só", async () => {
+    let n = 0;
+    await copiarImagens({ url: "https://x", copias: comCenas("a.jpg", "a.jpg"), pasta: "b", buscar: (async () => (n++, resposta(200, "x"))) as never, gravar: async () => {} });
+    expect(n).toBe(1);
+  });
+
+  it("imagem que o Storage não tem vira aviso; erro de servidor derruba o backup", async () => {
+    const avisos: string[] = [];
+    const r = await copiarImagens({ url: "https://x", copias: comCenas("sumiu.jpg"), pasta: "b", buscar: (async () => resposta(404)) as never, gravar: async () => {}, aviso: (m: string) => avisos.push(m) });
+    expect(r).toEqual({ baixadas: 0, faltando: ["sumiu.jpg"] });
+    expect(avisos[0]).toContain("sumiu.jpg");
+    await expect(copiarImagens({ url: "https://x", copias: comCenas("a.jpg"), pasta: "b", buscar: (async () => resposta(503)) as never, gravar: async () => {} })).rejects.toThrow(/HTTP 503/);
+  });
+
+  it("caminho suspeito no banco não vira arquivo fora da pasta", async () => {
+    let gravou = false;
+    const r = await copiarImagens({ url: "https://x", copias: comCenas("../../fora.jpg"), pasta: "b", buscar: (async () => resposta(200, "x")) as never, gravar: async () => void (gravou = true), aviso: () => {} });
+    expect(gravou).toBe(false);
+    expect(r.baixadas).toBe(0);
   });
 });

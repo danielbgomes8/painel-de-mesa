@@ -8,7 +8,8 @@
  *   SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/backup-salas.mjs [pasta]
  *
  * Grava um arquivo por sala (`<pasta>/<codigo>.json`, padrão `backup/`) com
- * uma lista de linhas por tabela. É uma cópia BRUTA do banco: serve de rede de
+ * uma lista de linhas por tabela, e copia a IMAGEM de cada mapa (o Storage) pra
+ * `<pasta>/mapas/<caminho no bucket>`. É uma cópia BRUTA do banco: serve de rede de
  * segurança se o projeto do Supabase se perder (o plano gratuito não faz
  * backup nenhum). O backup que o app sabe restaurar sozinho é o botão
  * "backup" do Mestre — este aqui é o plano B, reinserível por REST.
@@ -22,6 +23,7 @@
  * migrations e falha o `npm run verificar` se faltar alguma.
  */
 import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Tabelas das migrations que NÃO entram na cópia: não são dado da campanha.
@@ -104,6 +106,56 @@ export async function copiarSalas({ url, chave, buscar = fetch }) {
   return copias;
 }
 
+/** Bucket das imagens dos mapas (migration 0018): público, lido por link. */
+export const BUCKET_DOS_MAPAS = "mapas";
+
+/** O caminho da imagem, só se for seguro de gravar numa pasta local (vem do banco,
+ *  que é aberto): nada de `..`, de caminho absoluto ou de barra invertida. */
+export function caminhoSeguroDaImagem(imagem) {
+  if (typeof imagem !== "string" || !imagem) return null;
+  if (imagem.startsWith("/") || imagem.includes("\\") || imagem.includes("\0")) return null;
+  const partes = imagem.split("/");
+  if (partes.some((p) => p === "" || p === "." || p === "..")) return null;
+  return partes.join("/");
+}
+
+/** Baixa a imagem de cada mapa de cada sala pra `<pasta>/mapas/...`. Erro de rede
+ *  ou do servidor derruba o backup (como o resto); imagem que o banco cita mas o
+ *  Storage não tem (404) vira aviso, não falha: não adianta o backup ficar
+ *  vermelho todo dia por causa de um arquivo que já não existe. */
+export async function copiarImagens({ url, copias, pasta, buscar = fetch, gravar = gravarArquivo, aviso = console.warn }) {
+  let baixadas = 0;
+  const faltando = [];
+  const vistas = new Set();
+  for (const { dados } of copias) {
+    for (const cena of dados.cenas ?? []) {
+      if (!cena.imagem || vistas.has(cena.imagem)) continue;
+      vistas.add(cena.imagem);
+      const caminho = caminhoSeguroDaImagem(cena.imagem);
+      if (!caminho) {
+        aviso(`imagem ignorada (caminho suspeito): ${JSON.stringify(cena.imagem)}`);
+        continue;
+      }
+      const endereco = `${url}/storage/v1/object/public/${BUCKET_DOS_MAPAS}/${caminho.split("/").map(encodeURIComponent).join("/")}`;
+      const r = await buscar(endereco);
+      if (r.status === 404 || r.status === 400) {
+        faltando.push(caminho);
+        aviso(`imagem de mapa que o banco cita mas o Storage não tem: ${caminho}`);
+        continue;
+      }
+      if (!r.ok) throw new Error(`imagem ${caminho}: HTTP ${r.status}`);
+      await gravar(`${pasta}/mapas/${caminho}`, Buffer.from(await r.arrayBuffer()));
+      baixadas++;
+    }
+  }
+  return { baixadas, faltando };
+}
+
+async function gravarArquivo(arquivo, conteudo) {
+  await mkdir(dirname(arquivo), { recursive: true });
+  await writeFile(arquivo, conteudo);
+}
+
 async function principal() {
   const url = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const chave = process.env.SUPABASE_ANON_KEY ?? "";
@@ -122,6 +174,8 @@ async function principal() {
       .join(", ");
     console.log(`${codigo}: ${resumo || "(vazia)"}`);
   }
+  const imagens = await copiarImagens({ url, copias, pasta });
+  console.log(`imagens de mapas: ${imagens.baixadas} copiada(s)${imagens.faltando.length ? `, ${imagens.faltando.length} que o Storage não tem` : ""}`);
   console.log(`${copias.length} sala(s) copiada(s) em ${pasta}/`);
 }
 

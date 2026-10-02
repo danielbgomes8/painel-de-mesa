@@ -5,7 +5,8 @@
 # resultado por 90 dias e, de brinde, mantém o projeto com movimento.
 #
 # Onde achar a cópia: GitHub → Actions → "Backup diário" → a execução do dia →
-# "Artifacts" no fim da página (arquivo .zip com um .json por sala).
+# "Artifacts" no fim da página (arquivo .zip com um .json por sala e, em
+# mapas/, as imagens dos mapas).
 # Se o job ficar vermelho (banco pausado, chave trocada...), o GitHub manda
 # e-mail — olhar o log da execução.
 #

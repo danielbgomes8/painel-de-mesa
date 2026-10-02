@@ -893,9 +893,9 @@ Decisões que não estão no código à primeira vista:
   NPC nunca aparece). O telão e os celulares enquadram a `camera` que o Mestre
   definiu ("levar a mesa pra esta visão"); jogador pode dar zoom e voltar com
   "voltar à visão da mesa".
-- **Backup:** `cenas` e `cena_nevoa` entram no backup DIÁRIO bruto, mas **não a
-  imagem** (fica no Storage) e **não** no botão "backup" do Mestre. O Mestre
-  deve guardar o arquivo original do mapa.
+- **Backup:** `cenas` e `cena_nevoa` entram no backup DIÁRIO bruto (a imagem também,
+  desde 02/10/2026) e **não** no botão "backup" do Mestre. O Mestre ainda deve guardar
+  o arquivo original do mapa (o app reduz a imagem ao subir).
 - **Lint:** o projeto proíbe `setState` dentro de efeito (`react-hooks/set-state-in-effect`).
   Os hooks derivam o valor (estado guarda a cena a que pertence) em vez de
   zerar no efeito; ver `useNevoa`.
@@ -1260,8 +1260,11 @@ Decisões que não estão no código à primeira vista:
   Entrou em `TABELAS_COM_SALA` do backup, na ordem de restauração e no robô de
   esquema. O robô (`desenhos e notas`) confere traço, linha, toque que não desenha,
   nota escondida × liberada, o que o jogador e o telão veem, a liberação ao vivo e a
-  borracha. **Fora daqui:** mexer num desenho depois de
-  gravado e mover o alfinete (apaga e refaz).
+  borracha, a edição do texto e o mover do alfinete. **Notas se editam (02/10/2026):**
+  na lista da seção "Desenhos e notas" cada nota tem "editar" (o texto), "mover" (espera
+  um toque no mapa, que reaproveita a ferramenta "colocar" dos peões, e prende o
+  alfinete dentro da imagem), "👁/🔒" e "apagar". Só a nota muda de lugar ou de texto;
+  **desenho (traço, círculo, retângulo) ainda não se edita: apaga e refaz.**
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).
@@ -1320,7 +1323,8 @@ Decisões que não estão no código à primeira vista:
   duplica). Tira a coluna `seq` da névoa (o banco recusa) e insere a névoa na
   ordem do `seq`. Ordem: sala, o resto, cenas, névoa, peões (chave estrangeira).
   `restaurarBackupBruto.test.ts` confere que **toda** tabela do backup é
-  restaurada. As imagens dos mapas NÃO estão no backup. **Ensaiado em 01/10/2026
+  restaurada. (Desde 02/10/2026 as imagens dos mapas TAMBÉM estão no backup: ver
+  "Imagens dos mapas no backup" logo abaixo.) **Ensaiado em 01/10/2026
   contra o banco de verdade**, numa sala fictícia `ensaio-backup` com dados em
   todas as 14 tabelas: backup pelo script, sala APAGADA inteira (como se o banco
   tivesse se perdido), simulação (não gravou nada), restauração, comparação
@@ -1331,6 +1335,28 @@ Decisões que não estão no código à primeira vista:
   backup/sala.json --executar`.
 - **`rm -rf .next/dev` com o servidor de teste rodando o corrompe** ("Internal
   Server Error", `routes-manifest.json` sumiu): pare o servidor antes de limpar.
+
+### Imagens dos mapas no backup (02/10/2026, sem migration)
+
+- **O backup diário baixa a imagem de cada mapa** (`copiarImagens` em
+  `scripts/backup-salas.mjs`): o bucket `mapas` é público, então vai por
+  `/storage/v1/object/public/mapas/<caminho>` e grava em `backup/mapas/<caminho>`, dentro
+  do mesmo artifact de 90 dias do workflow. Erro de rede ou 5xx **derruba** o backup
+  (como o resto); 404/400 de uma imagem que a cena cita e o Storage não tem vira só aviso
+  — senão o backup ficaria vermelho todo dia por um arquivo que já não existe. O
+  `cenas.imagem` vem de um banco aberto: `caminhoSeguroDaImagem` recusa `..`, caminho
+  absoluto, `//` e barra invertida (nada de gravar fora da pasta). A mesma imagem em duas
+  cenas é baixada uma vez.
+- **O restaurador as devolve** (`restaurarImagens` em `scripts/restaurar-backup-bruto.mjs`):
+  procura `mapas/` ao lado do `.json` e sobe com `x-upsert: false`; "Duplicate" (400/409)
+  conta como "já estava lá". Sem `--executar` só conta o que existe na pasta. Imagem sem
+  arquivo é dita no fim ("suba de novo o original").
+- **Ensaiado contra o banco de verdade:** imagem de teste subida, backup (bytes iguais),
+  apagada do Storage, restaurada (enviada como nova), restaurada de novo (já estava lá),
+  tudo limpo no fim. **Armadilha do ensaio:** o endereço PÚBLICO segue devolvendo 200
+  por um tempo depois de apagar o objeto (cache do Storage), então não prova nada sobre
+  "apagou/voltou" — olhe o resultado do upload (aceito como novo = tinha sumido) ou a
+  listagem `POST /storage/v1/object/list/mapas`.
 
 ## Próximos passos (combinados em 17/09/2026)
 

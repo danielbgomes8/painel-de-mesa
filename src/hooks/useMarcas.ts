@@ -17,8 +17,8 @@ export type Marcas = {
   indisponivel: boolean;
   aviso: string | null;
   adicionar: (nova: NovaMarca) => Promise<boolean>;
-  /** Muda só o que foi pedido (texto da nota, se a mesa vê): nunca a linha inteira. */
-  atualizar: (id: string, patch: Partial<Pick<Marca, "texto" | "visivel" | "cor">>) => Promise<boolean>;
+  /** Muda só o que foi pedido (texto, lugar, se a mesa vê): nunca a linha inteira. */
+  atualizar: (id: string, patch: Partial<Pick<Marca, "texto" | "visivel" | "cor" | "x" | "y">>) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
   removerTodas: () => Promise<boolean>;
 };

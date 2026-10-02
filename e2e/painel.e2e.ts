@@ -803,6 +803,31 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
   await expect(paginaTelao.locator(".mapa-notas--telao")).toContainText("armadilha na ponte");
   await expect(paginaTelao.locator(".mapa-notas--telao")).not.toContainText("segredo");
 
+  // Editar o texto da nota 2: salva no banco e chega ao vivo no celular.
+  await page.getByRole("button", { name: "Editar o texto da nota 2" }).click();
+  await page.getByLabel("Texto da nota 2").fill("armadilha na ponte (CD 14)");
+  await page.getByLabel("Texto da nota 2").press("Enter");
+  await expect.poll(async () => (await marcasDoBanco()).find((m) => m.tipo === "nota" && m.visivel)?.texto).toBe("armadilha na ponte (CD 14)");
+  await expect(paginaJogador.locator(".mapa-notas")).toContainText("(CD 14)");
+  // Texto vazio não salva (o botão fica desligado) e Esc desiste.
+  await page.getByRole("button", { name: "Editar o texto da nota 2" }).click();
+  await page.getByLabel("Texto da nota 2").fill("   ");
+  await expect(page.getByRole("button", { name: "salvar" })).toBeDisabled();
+  await page.getByLabel("Texto da nota 2").press("Escape");
+  expect((await marcasDoBanco()).find((m) => m.tipo === "nota" && m.visivel)?.texto).toBe("armadilha na ponte (CD 14)");
+
+  // Mover o alfinete: "mover" espera um toque no mapa e o alfinete vai pro ponto tocado.
+  await page.getByRole("button", { name: "Mover a nota 2" }).click();
+  await expect(page.getByText("Toque no mapa no lugar novo da nota")).toBeVisible();
+  await arrastar([300, 450], [300, 450]);
+  await expect
+    .poll(async () => {
+      const n = (await marcasDoBanco()).find((m) => m.tipo === "nota" && m.visivel)!;
+      return Math.hypot(Number(n.x) - 300, Number(n.y) - 450) < 4;
+    })
+    .toBe(true);
+  await expect(page.getByText("Toque no mapa no lugar novo da nota")).toHaveCount(0);
+
   // Ao vivo: o Mestre libera a nota escondida e ela aparece no celular, agora como nº 1 e 2.
   await page.getByRole("button", { name: "Esconder da mesa a nota 2" }).waitFor();
   await page.getByRole("button", { name: "Mostrar pra mesa a nota 1" }).click();

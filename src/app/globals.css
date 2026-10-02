@@ -3341,3 +3341,14 @@ input.fj-score:focus-visible {
   border-color: rgba(245, 240, 230, 0.35);
   font-size: clamp(15px, 1.6vw, 24px);
 }
+.mapa-nota-edicao {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mapa-nota-edicao input {
+  flex: 1 1 100%;
+  min-width: 0;
+}
