@@ -169,6 +169,14 @@ test("quadro: foto, revelação em três estados, ligação, anotação, sessão
   await expect.poll(async () => (await cartoesDoBanco())[1].coluna).toBe("Vilões");
   await expect(page.locator('[data-coluna="Vilões"] .qd-cartao')).toContainText("Culto do Raio");
 
+  // Coluna nova pelo botão: nasce vazia, e um cartão arrastado pra ela grava o nome.
+  await page.getByRole("button", { name: "＋ nova coluna" }).click();
+  await page.getByLabel("Nome da nova coluna").fill("Aliados");
+  await page.getByRole("button", { name: "criar", exact: true }).click();
+  await expect(page.locator('[data-coluna="Aliados"]')).toContainText("arraste um cartão para cá");
+  await arrastar("Arrastar Barão Vael para outra coluna", page.locator('[data-coluna="Aliados"]'));
+  await expect.poll(async () => (await cartoesDoBanco())[0].coluna).toBe("Aliados");
+
   expect(erros).toEqual([]);
   expect(errosAna).toEqual([]);
   await ctx.close();

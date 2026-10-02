@@ -3960,3 +3960,21 @@ input.fj-score:focus-visible {
   min-height: 38px;
   padding: 6px 10px;
 }
+
+.qd-novacoluna {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.qd-novacoluna input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: 36px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  padding: 6px 10px;
+}

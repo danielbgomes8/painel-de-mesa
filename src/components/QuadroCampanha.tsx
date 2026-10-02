@@ -25,6 +25,8 @@ import {
   TIPOS_DE_CARTAO,
   TITULO_DA_SILHUETA,
   agruparPorColuna,
+  colunasEmUso,
+  comColunasVazias,
   cartoesVisiveis,
   emojiDoTipo,
   filtrarPorTipo,
@@ -84,6 +86,8 @@ export function QuadroCampanha({
   const listaRef = useRef<HTMLDivElement>(null);
   const arrasto = useArrastoDeColuna(quadro, quem !== null && vista === "colunas", listaRef);
   const ligando = useArrastoDeLigacao();
+  const [vazias, setVazias] = useState<string[]>([]);
+  const [nomeNovaColuna, setNomeNovaColuna] = useState<string | null>(null);
   const [pendente, setPendente] = useState<{ de: string; para: string } | null>(null);
   const [feito, setFeito] = useState<string | null>(null);
   // Soltou a alça em cima de outro cartão: pergunta o tipo da ligação.
@@ -105,11 +109,18 @@ export function QuadroCampanha({
     }
   }
 
+  function criarColuna() {
+    const nome = (nomeNovaColuna ?? "").trim().slice(0, LIMITE_COLUNA);
+    if (nome) setVazias((a) => (a.includes(nome) ? a : [...a, nome]));
+    setNomeNovaColuna(null);
+  }
+
   const visiveis = useMemo(() => cartoesVisiveis(quadro.cartoes, quem), [quadro.cartoes, quem]);
   const tiposPresentes = useMemo(() => new Set(visiveis.map((v) => v.cartao.tipo)), [visiveis]);
   // Se o tipo filtrado deixou de existir (cartão apagado ou escondido), volta pra "todos".
   const tipoAtivo = tipo && tiposPresentes.has(tipo) ? tipo : null;
   const lista = filtrarPorTipo(visiveis, tipoAtivo);
+  const colunasDaTela = comColunasVazias(agruparPorColuna(lista), vazias);
   const aVer = visiveis.find((v) => v.cartao.id === aberto) ?? null;
 
   if (quadro.indisponivel) {
@@ -199,8 +210,40 @@ export function QuadroCampanha({
           ))}
         </div>
       ) : (
+        <>
+          {quem && (
+            <div className="qd-novacoluna">
+              {nomeNovaColuna === null ? (
+                <button type="button" className="btn" onClick={() => setNomeNovaColuna("")}>
+                  ＋ nova coluna
+                </button>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    aria-label="Nome da nova coluna"
+                    placeholder="nome da coluna"
+                    maxLength={LIMITE_COLUNA}
+                    autoFocus
+                    value={nomeNovaColuna}
+                    onChange={(e) => setNomeNovaColuna(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") criarColuna();
+                      if (e.key === "Escape") setNomeNovaColuna(null);
+                    }}
+                  />
+                  <button type="button" className="btn primary" disabled={!nomeNovaColuna.trim()} onClick={criarColuna}>
+                    criar
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setNomeNovaColuna(null)}>
+                    cancelar
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         <div className="qd-colunas" ref={listaRef}>
-          {(arrasto.ativo ? comSemColuna(agruparPorColuna(lista)) : agruparPorColuna(lista)).map((col) => (
+          {(arrasto.ativo ? comSemColuna(colunasDaTela) : colunasDaTela).map((col) => (
             <section
               key={col.nome}
               className="qd-coluna"
@@ -211,6 +254,7 @@ export function QuadroCampanha({
               <h3 className="qd-colunatitulo">
                 {col.nome} <span>{col.cartoes.length}</span>
               </h3>
+              {col.cartoes.length === 0 && <p className="qd-formdica">arraste um cartão para cá</p>}
               {col.cartoes.map((v) => (
                 <MiniaturaDoCartao
                   key={v.cartao.id}
@@ -235,6 +279,7 @@ export function QuadroCampanha({
             </section>
           )}
         </div>
+        </>
       )}
       {ligando.fantasma && (
         <div className="qd-fantasma qd-fantasma--ligacao" style={{ left: ligando.fantasma.x, top: ligando.fantasma.y }}>
@@ -277,6 +322,7 @@ export function QuadroCampanha({
           quadro={quadro}
           quem={quem}
           vistos={visiveis}
+          colunas={colunasEmUso(visiveis)}
           sessoes={sessoes}
           nomeDoAutor={nomeDoAutor}
           aoAbrirOutro={setAberto}
@@ -711,6 +757,7 @@ function FolhaDoCartao({
   quadro,
   quem,
   vistos,
+  colunas,
   sessoes,
   nomeDoAutor,
   aoAbrirOutro,
@@ -720,6 +767,8 @@ function FolhaDoCartao({
   quadro: Quadro;
   quem: Identidade | null;
   vistos: CartaoVisto[];
+  /** Colunas já usadas nos cartões, pra escolher com um toque. */
+  colunas: string[];
   sessoes: EntradaDiario[];
   nomeDoAutor: (autor: string) => string;
   aoAbrirOutro: (id: string) => void;
@@ -842,6 +891,8 @@ function FolhaDoCartao({
                 </button>
               )}
             </div>
+
+            <CampoDeColuna cartao={c} quadro={quadro} existentes={colunas} />
 
             {c.dono === null ? (
               <ControlesDoMestre cartao={c} quadro={quadro} aoMostrar={() => void mostrar()} />
@@ -1078,6 +1129,24 @@ function AnotacoesDoCartao({
   );
 }
 
+/** Em que coluna o cartão fica na vista em colunas: um toque numa já usada, ou escreve uma nova. */
+function CampoDeColuna({ cartao: c, quadro, existentes }: { cartao: Cartao; quadro: Quadro; existentes: string[] }) {
+  const opcoes = [...new Set([...existentes, ...COLUNAS_SUGERIDAS])];
+  return (
+    <div className="qd-coluna-campo">
+      <p className="qd-rotulo">Coluna (na vista em colunas)</p>
+      <CampoTexto valor={c.coluna} maxLength={LIMITE_COLUNA} placeholder="ex.: Suspeitos" onCommit={(v) => void quadro.atualizar(c.id, { coluna: v.trim() })} />
+      <div className="qd-sugestoes">
+        {opcoes.map((nome) => (
+          <button key={nome} type="button" className="chip" aria-pressed={c.coluna === nome} onClick={() => void quadro.atualizar(c.id, { coluna: c.coluna === nome ? "" : nome })}>
+            {nome}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ControlesDoMestre({ cartao: c, quadro, aoMostrar }: { cartao: Cartao; quadro: Quadro; aoMostrar: () => void }) {
   return (
     <>
@@ -1101,17 +1170,6 @@ function ControlesDoMestre({ cartao: c, quadro, aoMostrar }: { cartao: Cartao; q
         📣 Mostrar à mesa agora
       </button>
 
-      <div className="qd-coluna-campo">
-        <p className="qd-rotulo">Coluna (na vista em colunas)</p>
-        <CampoTexto valor={c.coluna} maxLength={LIMITE_COLUNA} placeholder="ex.: Suspeitos" onCommit={(v) => void quadro.atualizar(c.id, { coluna: v.trim() })} />
-        <div className="qd-sugestoes">
-          {COLUNAS_SUGERIDAS.map((nome) => (
-            <button key={nome} type="button" className="chip" aria-pressed={c.coluna === nome} onClick={() => void quadro.atualizar(c.id, { coluna: c.coluna === nome ? "" : nome })}>
-              {nome}
-            </button>
-          ))}
-        </div>
-      </div>
     </>
   );
 }

@@ -271,3 +271,22 @@ describe("sessões e cartões", () => {
     expect(alternarCartaoNaSessao(undefined, "a")).toEqual(["a"]);
   });
 });
+
+import { colunasEmUso, comColunasVazias } from "./quadro";
+
+describe("colunas vazias e em uso", () => {
+  const vistos = cartoesVisiveis([cartao({ id: "a", coluna: "Suspeitos", revelacao: "revelado" }), cartao({ id: "b", revelacao: "revelado" })], ANA);
+  it("a coluna nova aparece vazia, no lugar certo, sem tirar 'Sem coluna'", () => {
+    const cols = comColunasVazias(agruparPorColuna(vistos), ["Aliados", "Conhecidos"]);
+    expect(cols.map((c) => c.valor)).toEqual(["Conhecidos", "Suspeitos", "Aliados", ""]);
+    expect(cols.find((c) => c.valor === "Aliados")?.cartoes).toEqual([]);
+    expect(cols.find((c) => c.valor === "Suspeitos")?.cartoes).toHaveLength(1);
+  });
+  it("não duplica coluna que já existe (nem com outra caixa) e ignora vazio", () => {
+    const cols = comColunasVazias(agruparPorColuna(vistos), ["suspeitos", "  ", ""]);
+    expect(cols.map((c) => c.valor)).toEqual(["Suspeitos", ""]);
+  });
+  it("lista os nomes em uso", () => {
+    expect(colunasEmUso(vistos)).toEqual(["Suspeitos"]);
+  });
+});

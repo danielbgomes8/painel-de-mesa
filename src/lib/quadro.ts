@@ -182,6 +182,23 @@ export function agruparPorColuna(lista: CartaoVisto[]): ColunaDoQuadro[] {
   return ordenarColunas([...mapa.keys()]).map((valor) => ({ nome: valor || SEM_COLUNA, valor, cartoes: mapa.get(valor) ?? [] }));
 }
 
+/** Colunas que a pessoa criou e ainda não têm cartão: ficam na tela (só neste aparelho,
+ *  até um cartão ser solto nelas) junto das que vêm dos cartões. */
+export function comColunasVazias(colunas: ColunaDoQuadro[], vazias: string[]): ColunaDoQuadro[] {
+  const existentes = new Set(colunas.map((c) => c.valor.trim().toLowerCase()));
+  const novas = [...new Set(vazias.map((v) => v.trim()).filter(Boolean))].filter((v) => !existentes.has(v.toLowerCase()));
+  if (novas.length === 0) return colunas;
+  const todas = [...colunas.filter((c) => c.valor !== ""), ...novas.map((valor) => ({ nome: valor, valor, cartoes: [] as CartaoVisto[] }))];
+  const ordem = ordenarColunas([...todas.map((c) => c.valor), ...(colunas.some((c) => c.valor === "") ? [""] : [])]);
+  const porValor = new Map([...colunas, ...todas].map((c) => [c.valor, c]));
+  return ordem.map((v) => porValor.get(v)!).filter(Boolean);
+}
+
+/** Nomes de coluna já usados nos cartões (sem repetir, sem vazio). */
+export function colunasEmUso(vistos: CartaoVisto[]): string[] {
+  return ordenarColunas([...new Set(vistos.map((v) => v.cartao.coluna.trim()).filter(Boolean))]);
+}
+
 /** Filtro por tipo; `null` = todos. */
 export function filtrarPorTipo(lista: CartaoVisto[], tipo: TipoCartao | null): CartaoVisto[] {
   return tipo ? lista.filter((v) => v.cartao.tipo === tipo) : lista;
