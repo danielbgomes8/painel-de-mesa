@@ -3490,8 +3490,9 @@ input.fj-score:focus-visible {
   display: block;
 }
 .qd-foto[data-silhueta] img {
-  filter: brightness(0.26) blur(5px) grayscale(1);
-  transform: scale(1.08);
+  /* Silhueta de verdade: dá pra sentir que há alguém, mas não reconhecer quem. */
+  filter: brightness(0.14) blur(12px) grayscale(1);
+  transform: scale(1.15);
 }
 .qd-semfoto {
   display: flex;
@@ -3738,7 +3739,12 @@ input.fj-score:focus-visible {
   box-shadow: 0 0 40px rgba(217, 154, 78, 0.35);
 }
 .qd-destaque-foto[data-silhueta] img {
-  filter: brightness(0.26) blur(5px) grayscale(1);
+  /* O desfoque acompanha a altura da foto (58vh), senão numa TV ela fica nítida demais. */
+  filter: brightness(0.14) blur(3.6vh) grayscale(1);
+}
+.qd-destaque-foto[data-silhueta] {
+  overflow: hidden;
+  border-radius: 12px;
 }
 .qd-destaque-titulo {
   margin: 0;
