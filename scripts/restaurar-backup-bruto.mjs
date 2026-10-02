@@ -30,7 +30,7 @@ const TAMANHO_LOTE = 200;
 
 /** Ordem de inserção: a sala primeiro; cenas antes da névoa, dos peões e das paredes delas
  *  (chave estrangeira). O resto vem na ordem do backup. */
-const COM_CHAVE_ESTRANGEIRA = ["cenas", "cena_nevoa", "cena_pecas", "cena_paredes"];
+const COM_CHAVE_ESTRANGEIRA = ["cenas", "cena_nevoa", "cena_pecas", "cena_paredes", "cena_marcas"];
 
 export function ordemDeRestauracao() {
   const resto = TABELAS_COM_SALA.filter((t) => !COM_CHAVE_ESTRANGEIRA.includes(t));

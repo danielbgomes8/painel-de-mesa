@@ -18,6 +18,7 @@ import {
   paredesDoBanco,
   pecasDoBanco,
   pngDeTeste,
+  marcasDoBanco,
   porNaIniciativa,
 } from "./apoio";
 
@@ -651,3 +652,136 @@ test("visão: se as paredes demoram a chegar, a memória não ganha o que estava
   expect(erros).toEqual([]);
 });
 
+
+test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a borracha apaga", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("jogador-robo", "Jogador Robô");
+
+  // O canvas não tem texto no DOM: o robô escuta o que é DESENHADO nele (o número do alfinete).
+  const espiar = () => {
+    const w = window as unknown as { __textos: string[] };
+    w.__textos = [];
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (...args: Parameters<typeof original>) {
+      w.__textos.push(String(args[0]));
+      return original.apply(this, args);
+    };
+  };
+  const textosDe = (p: typeof page) => p.evaluate(() => (window as unknown as { __textos: string[] }).__textos);
+
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-marcas.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  // Sem névoa por cima: o que se confere aqui é o desenho, não a névoa.
+  await mudarCena((await cenaDoBanco()).id, { nevoa_ligada: false });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+
+  const arrastar = async (de: [number, number], para: [number, number]) => {
+    const canvas = page.locator(".cena-canvas");
+    await canvas.scrollIntoViewIfNeeded();
+    const c = (await canvas.boundingBox())!;
+    const escala = Math.min(c.width / (900 * 1.06), c.height / (600 * 1.06));
+    const p = (ix: number, iy: number) => ({ x: c.x + c.width / 2 + (ix - 450) * escala, y: c.y + c.height / 2 + (iy - 300) * escala });
+    const a = p(...de);
+    const b = p(...para);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, b.y, { steps: 10 });
+    await page.mouse.up();
+  };
+  const modo = (nome: string) => page.getByRole("group", { name: "O que marcar" }).getByRole("button", { name: nome });
+
+  await page.getByRole("button", { name: "✏️ desenhar" }).click();
+
+  // Traço livre: acompanha o movimento (uma diagonal vira um traço de poucos pontos).
+  await modo("✏️ livre").click();
+  await arrastar([100, 100], [300, 200]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(1);
+  let [traco] = await marcasDoBanco();
+  expect(traco.tipo).toBe("traco");
+  expect(traco.visivel).toBe(true);
+  expect(traco.pontos.length).toBeGreaterThanOrEqual(2);
+  expect(Math.hypot(traco.pontos[0][0] - 100, traco.pontos[0][1] - 100)).toBeLessThan(15);
+
+  // Linha reta: só as duas pontas.
+  await modo("╱ linha").click();
+  await arrastar([100, 300], [400, 300]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(2);
+  const reta = (await marcasDoBanco())[1];
+  expect(reta.pontos).toHaveLength(2);
+
+  // Um toque simples não é desenho.
+  await arrastar([600, 100], [600, 100]);
+  await page.waitForTimeout(400);
+  expect((await marcasDoBanco()).length).toBe(2);
+
+  // Nota escondida da mesa (a primeira) e nota liberada (a segunda).
+  await modo("📌 nota").click();
+  await page.getByRole("button", { name: "👁 a mesa vê" }).click(); // vira "só eu vejo"
+  await arrastar([500, 150], [500, 150]);
+  await page.getByLabel("Texto da nota").fill("segredo do mestre");
+  await page.getByRole("button", { name: "pôr nota" }).click();
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(3);
+  await page.getByRole("button", { name: "🔒 só eu vejo" }).click(); // volta pra "a mesa vê"
+  await arrastar([700, 400], [700, 400]);
+  await page.getByLabel("Texto da nota").fill("armadilha na ponte");
+  await page.getByLabel("Texto da nota").press("Enter");
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(4);
+  const notas = (await marcasDoBanco()).filter((m) => m.tipo === "nota");
+  expect(notas.map((n) => [n.texto, n.visivel])).toEqual([["segredo do mestre", false], ["armadilha na ponte", true]]);
+
+  // Mestre: as duas notas na lista, numeradas 1 e 2.
+  await page.locator(".fc-sechead", { hasText: "Desenhos e notas" }).click();
+  await expect(page.locator(".mapa-notas .mapa-nota")).toHaveCount(2);
+
+  // Jogador: só a nota liberada, e ela é a nº 1 (sem buraco onde há nota escondida).
+  const jogador = await browser.newContext();
+  const paginaJogador = await jogador.newPage();
+  const errosJogador = coletarErros(paginaJogador);
+  await paginaJogador.addInitScript(espiar);
+  await comoJogador(paginaJogador, "jogador-robo");
+  await paginaJogador.goto(`/?sala=${SALA}`);
+  await paginaJogador.getByRole("button", { name: "ver o mapa" }).click();
+  await expect(paginaJogador.locator(".cena-canvas")).toBeVisible();
+  await expect(paginaJogador.locator(".mapa-notas .mapa-nota")).toHaveCount(1);
+  await expect(paginaJogador.locator(".mapa-notas")).toContainText("armadilha na ponte");
+  await expect(paginaJogador.locator(".mapa-notas")).not.toContainText("segredo");
+  await expect.poll(async () => (await textosDe(paginaJogador)).includes("1")).toBe(true);
+  expect(await textosDe(paginaJogador)).not.toContain("2");
+
+  // Telão: a lista cobre o canto do mapa, só com a nota liberada.
+  const telao = await browser.newContext();
+  const paginaTelao = await telao.newPage();
+  await paginaTelao.goto(`/?sala=${SALA}&telao=1`);
+  await expect(paginaTelao.locator(".mapa-notas--telao")).toContainText("armadilha na ponte");
+  await expect(paginaTelao.locator(".mapa-notas--telao")).not.toContainText("segredo");
+
+  // Ao vivo: o Mestre libera a nota escondida e ela aparece no celular, agora como nº 1 e 2.
+  await page.getByRole("button", { name: "Esconder da mesa a nota 2" }).waitFor();
+  await page.getByRole("button", { name: "Mostrar pra mesa a nota 1" }).click();
+  await expect(paginaJogador.locator(".mapa-notas .mapa-nota")).toHaveCount(2);
+  await expect(paginaJogador.locator(".mapa-notas")).toContainText("segredo do mestre");
+
+  // Borracha: tocar no traço livre o apaga (e só ele).
+  await modo("apagar").click();
+  await arrastar([200, 150], [200, 150]);
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(3);
+  expect((await marcasDoBanco()).some((m) => m.id === traco.id)).toBe(false);
+
+  // Apagar a nota pela lista.
+  await page.getByRole("button", { name: "Apagar a nota 1" }).click();
+  await expect.poll(async () => (await marcasDoBanco()).length).toBe(2);
+  await expect(paginaJogador.locator(".mapa-notas .mapa-nota")).toHaveCount(1);
+
+  traco = (await marcasDoBanco())[0];
+  await jogador.close();
+  await telao.close();
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
+});

@@ -46,7 +46,7 @@ async function limparImagens(): Promise<void> {
 export async function limparSala(): Promise<void> {
   if (!bancoConfigurado) return;
   await limparImagens();
-  for (const tabela of ["cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates"]) {
+  for (const tabela of ["cena_marcas", "cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates"]) {
     // Tabela que ainda não existe (migration por rodar) não é erro aqui.
     await rest(`${tabela}?room_code=eq.${SALA}`, { method: "DELETE" });
   }
@@ -123,6 +123,13 @@ export async function mudarCena(id: string, patch: Record<string, unknown>): Pro
 export async function criarPeca(cenaId: string, slug: string, x: number, y: number, extra: Record<string, unknown> = {}): Promise<void> {
   const r = await rest("cena_pecas", { method: "POST", body: JSON.stringify({ cena_id: cenaId, room_code: SALA, slug, nome: "", x, y, ...extra }) });
   if (!r.ok) throw new Error(`não criou o peão: HTTP ${r.status} ${await r.text()}`);
+}
+
+export type LinhaMarca = { id: string; tipo: string; cor: string; pontos: [number, number][]; x: number | null; y: number | null; texto: string; visivel: boolean };
+export async function marcasDoBanco(): Promise<LinhaMarca[]> {
+  const r = await rest(`cena_marcas?select=id,tipo,cor,pontos,x,y,texto,visivel&room_code=eq.${SALA}&order=created_at`);
+  if (!r.ok) throw new Error(`não leu as marcas: HTTP ${r.status}`);
+  return (await r.json()) as LinhaMarca[];
 }
 
 export type LinhaParede = { id: string; tipo: string; x1: number; y1: number; x2: number; y2: number; aberta: boolean };

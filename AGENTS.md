@@ -591,7 +591,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0019` e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0022` (a 0020 é a trava de apagar sala) e o `seed.sql`
   já rodadas — o banco tem `rooms` mais treze filhas (as dez de antes, `cenas`,
   `cena_nevoa` e `cena_pecas`), todas com `on delete cascade` ligado em `rooms`,
   fora a `erros`, e o bucket de imagens `mapas`. (A 0020, que tira do `anon` o
@@ -846,7 +846,7 @@ O Daniel pediu "algo como o Roll20 faz pra mapa". Quatro etapas combinadas; a
 **1 está construída** (cena + grade + névoa ao vivo + telão + celular), a **2
 está completa** (ping, peões, régua e condições como ícone no peão), a **3 está
 construída** (paredes, portas e visão automática; migration `0021`) e a **4 está
-começada** (modelos de magia prontos; faltam desenhos e notas no mapa). Prioridade dita pelo Daniel em 01/10: **o ping é
+completa** (modelos de magia, desenhos e notas no mapa; migration `0022`). Prioridade dita pelo Daniel em 01/10: **o ping é
 essencial; peão é "bom ter"** (a mesa não vai usar muito):
 
 1. **Cena** — subir o mapa, grade, zoom/arrastar, névoa ao vivo, vários mapas,
@@ -1227,6 +1227,32 @@ Decisões que não estão no código à primeira vista:
       apagada. Conferido que ele FALHA com o toque no peão desligado.
     - De passagem: o campo "quanto?" da linha da iniciativa cortava o texto por 1 px
       a 375px (precisava 63, cabia 62); `.initajuste input.num` foi de 84 pra 90 px.
+- **Desenhos e notas** (02/10/2026, migration `0022_marcas.sql`, rodada e conferida;
+  `lib/marcas.ts`, `hooks/useMarcas.ts`, `MarcasDoMapa.tsx`, `desenharMarcas` em
+  `lib/desenharCena.ts`, ferramenta "✏️ desenhar"). Combinado com o Daniel: **só o
+  Mestre desenha e anota, e fica gravado na cena** (como as paredes; ao contrário
+  do ping e da régua, que somem). Uma tabela só, `cena_marcas`: `tipo` `traco`
+  (`pontos`, lista de [x, y] em px da imagem; a linha reta tem dois) ou `nota`
+  (`x`, `y`, `texto` de até 140). Quatro modos: livre, linha, nota, apagar; seis cores;
+  e **cada marca tem `visivel`** — "🔒 só eu vejo" é preparo de sessão: o Mestre vê
+  tracejado e apagado, a mesa e o telão não veem (esconde NA TELA, como a névoa e as
+  paredes). O traço livre é simplificado antes de gravar (`simplificarDesenho`, o
+  mesmo Douglas-Peucker das paredes, tolerância de 1 px da TELA, então desenhar com
+  zoom guarda mais detalhe; teto de 400 pontos que o banco também cobra). Ficam
+  **por baixo da névoa**: o que está num canto ainda coberto continua coberto pra
+  mesa. A nota é uma bolinha numerada no mapa e o TEXTO vai numa lista (DOM) embaixo
+  do mapa: texto longo não cabe no canvas do celular. A numeração é pelo que **cada
+  um enxerga** (`notasNumeradas` recebe marcas já filtradas): a mesa vê 1, 2, 3 sem
+  buraco onde há nota escondida, então liberar uma nota renumera as da mesa. No telão
+  a lista é um cartão sobre o canto do mapa (cor fixa: a do tema herdada sumia sobre
+  o mapa escuro — achado na foto). Um toque simples não é desenho (mínimo de 6 px
+  de arrasto); a nota só nasce ao SOLTAR sem arrastar. Limite de 300 marcas por cena.
+  Tabela ausente é tolerada (a ferramenta some e a seção diz "falta rodar a 0022").
+  Entrou em `TABELAS_COM_SALA` do backup, na ordem de restauração e no robô de
+  esquema. O robô (`desenhos e notas`) confere traço, linha, toque que não desenha,
+  nota escondida × liberada, o que o jogador e o telão veem, a liberação ao vivo e a
+  borracha. **Fora daqui:** formas (círculo/retângulo), mexer num desenho depois de
+  gravado e mover o alfinete (apaga e refaz).
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).

@@ -16,6 +16,7 @@ import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
 import { iconesVisiveis, posicoesDosIcones, type PecaNaTela } from "./pecas";
 import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type ModoRegua, type ReguaNaTela } from "./regua";
 import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type ModeloArea } from "./area";
+import { notasNumeradas, type Marca } from "./marcas";
 import type { Parede } from "./paredes";
 import type { Mascara } from "./visao";
 
@@ -206,6 +207,61 @@ export function desenharVisaoDosInimigos(ctx: CanvasRenderingContext2D, poligono
   }
 }
 
+/** Desenhos e notas do Mestre: traços (livres ou retos) e alfinetes numerados.
+ *  Entram `marcas` já filtradas pra quem olha. Ficam por baixo da névoa (o que
+ *  está num canto ainda escondido da mesa continua escondido) e, no Mestre,
+ *  a marca que a mesa não vê aparece tracejada e mais apagada. `previa` é o
+ *  traço em andamento. A largura é fixa na tela, em qualquer zoom. */
+export function desenharMarcas(
+  ctx: CanvasRenderingContext2D,
+  marcas: readonly Marca[],
+  escala: number,
+  previa: { pontos: readonly Ponto[]; cor: string } | null,
+): void {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const tracar = (pontos: readonly Ponto[], cor: string, tracejada: boolean, alfa: number) => {
+    ctx.globalAlpha = alfa;
+    ctx.setLineDash(tracejada ? [9 / escala, 7 / escala] : []);
+    ctx.beginPath();
+    ctx.moveTo(pontos[0][0], pontos[0][1]);
+    for (let i = 1; i < pontos.length; i++) ctx.lineTo(pontos[i][0], pontos[i][1]);
+    ctx.lineWidth = 6.5 / escala;
+    ctx.strokeStyle = "rgba(0,0,0,0.65)";
+    ctx.stroke();
+    ctx.lineWidth = 3.5 / escala;
+    ctx.strokeStyle = cor;
+    ctx.stroke();
+  };
+  for (const m of marcas) {
+    if (m.tipo === "traco" && m.pontos.length >= 2) tracar(m.pontos, m.cor, !m.visivel, m.visivel ? 1 : 0.6);
+  }
+  if (previa && previa.pontos.length >= 2) tracar(previa.pontos, previa.cor, false, 0.9);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  // Alfinetes: bolinha com o número (o texto fica na lista embaixo do mapa).
+  const r = 11 / escala;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${13 / escala}px system-ui, sans-serif`;
+  for (const { numero, marca: m } of notasNumeradas(marcas)) {
+    ctx.globalAlpha = m.visivel ? 1 : 0.6;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = m.cor;
+    ctx.fill();
+    ctx.setLineDash(m.visivel ? [] : [4 / escala, 3 / escala]);
+    ctx.lineWidth = 2 / escala;
+    ctx.strokeStyle = "rgba(0,0,0,0.8)";
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#16120d";
+    ctx.fillText(String(numero), m.x, m.y + 0.5 / escala);
+  }
+  ctx.globalAlpha = 1;
+}
+
 export type EntradaDeDesenho = {
   cena: Cena;
   imagem: CanvasImageSource | null;
@@ -224,6 +280,9 @@ export type EntradaDeDesenho = {
   pecaCoberta?: (x: number, y: number) => boolean;
   /** Peão sendo arrastado: desenhado nesta posição em vez da gravada. */
   arrasto?: { id: string; x: number; y: number } | null;
+  /** Desenhos e notas (já filtrados pra quem olha) e o traço em andamento. */
+  marcas?: readonly Marca[];
+  previaMarca?: { pontos: readonly Ponto[]; cor: string } | null;
   /** Só pro Mestre: as paredes e portas, a parede em construção e a visão dos inimigos. */
   paredes?: readonly Parede[];
   previaParede?: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | { tipo: "curva"; pontos: readonly Ponto[] } | null;
@@ -251,6 +310,8 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
   if (gradeUsavel(cena) && cena.grade_px * vista.escala >= 7) {
     desenharGrade(ctx, cena, vista.escala);
   }
+
+  if ((e.marcas && e.marcas.length > 0) || e.previaMarca) desenharMarcas(ctx, e.marcas ?? [], vista.escala, e.previaMarca ?? null);
 
   if (e.nevoa) {
     ctx.globalAlpha = e.mestre ? 0.55 : 1;

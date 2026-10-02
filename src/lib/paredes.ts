@@ -159,7 +159,7 @@ export const TRECHOS_MAXIMOS_DO_TRACO = 60;
 
 /** Tira os pontos que quase não mudam o desenho (Douglas-Peucker): fica quem
  *  se afasta mais que `tolerancia` da reta entre os vizinhos que ficaram. */
-function simplificarTraco(pontos: readonly Ponto[], tolerancia: number): Ponto[] {
+export function simplificarTraco(pontos: readonly Ponto[], tolerancia: number): Ponto[] {
   if (pontos.length <= 2) return [...pontos];
   const fica = new Array<boolean>(pontos.length).fill(false);
   fica[0] = fica[pontos.length - 1] = true;

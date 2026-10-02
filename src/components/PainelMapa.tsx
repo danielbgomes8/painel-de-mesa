@@ -5,6 +5,9 @@ import type { Cenas } from "@/hooks/useCenas";
 import type { Sala } from "@/hooks/useSala";
 import { useNevoa } from "@/hooks/useNevoa";
 import { useParedes } from "@/hooks/useParedes";
+import { useMarcas } from "@/hooks/useMarcas";
+import { ControlesDeMarca, ListaDeNotas, NovaNota, resumoDasMarcas } from "@/components/MarcasDoMapa";
+import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { montarPecasNaTela, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
@@ -74,6 +77,7 @@ export function VisorDaMesa({
   const banco = usePecas(cena.id, codigo);
   // As paredes não aparecem pra mesa: só decidem o que a visão automática alcança.
   const muros = useParedes(cena.id, codigo);
+  const desenhos = useMarcas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
   // O que o toque faz no mapa: mexer, medir (régua) ou marcar uma área de magia.
   const [uso, setUso] = useState<"mover" | "regua" | "area">("mover");
@@ -127,13 +131,16 @@ export function VisorDaMesa({
         areas={ping.areas}
         aoAreaar={quem ? ping.enviarArea : undefined}
         paredes={muros.paredes}
+        marcas={desenhos.marcas}
         visaoPronta={!muros.carregando && !banco.carregando}
         pecas={pecas}
         aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
         aoAbrirPeca={telao ? undefined : setCartao}
       />
+      {telao && <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />}
       {!telao && (
         <>
+          <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} />
           {aberto && aberto.ficha.slug === meuSlug && (
             <CartaoDoPeao
               key={aberto.peca.id}
@@ -319,6 +326,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const banco = usePecas(cena?.id ?? null, codigo);
   const muros = useParedes(cena?.id ?? null, codigo);
   const [modoParede, setModoParede] = useState<ModoParede>("parede");
+  const desenhos = useMarcas(cena?.id ?? null, codigo);
+  const [modoMarca, setModoMarca] = useState<ModoMarca>("livre");
+  const [corMarca, setCorMarca] = useState<string>(COR_MARCA_PADRAO);
+  const [marcaParaMesa, setMarcaParaMesa] = useState(true);
+  /** Onde o Mestre tocou com o modo nota: espera o texto. */
+  const [notaPendente, setNotaPendente] = useState<Ponto | null>(null);
   const [verInimigos, setVerInimigos] = useState(false);
   /** Esperando o Mestre tocar no mapa pra dizer onde o grupo (ou os inimigos) entra. */
   const [colocando, setColocando] = useState<"grupo" | "inimigos" | null>(null);
@@ -443,6 +456,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   /** Trocar de ferramenta desiste de "onde eu toco". */
   function escolherFerramenta(f: Ferramenta) {
     setColocando(null);
+    setNotaPendente(null);
     setFerramenta(f);
   }
   const avisos = [cenas.aviso, nevoa.aviso].filter((a): a is string => Boolean(a));
@@ -555,6 +569,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "area"} onClick={() => escolherFerramenta("area")}>
                   ✨ área
                 </button>
+                {!desenhos.indisponivel && (
+                  <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "marca"} onClick={() => escolherFerramenta("marca")}>
+                    ✏️ desenhar
+                  </button>
+                )}
                 {!muros.indisponivel && (
                   <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "parede"} onClick={() => escolherFerramenta("parede")}>
                     🧱 paredes
@@ -574,6 +593,20 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
 
               {ferramentaAtiva === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
 
+              {ferramentaAtiva === "marca" && (
+                <ControlesDeMarca
+                  modo={modoMarca}
+                  aoMudarModo={(m) => {
+                    setModoMarca(m);
+                    setNotaPendente(null);
+                  }}
+                  cor={corMarca}
+                  aoMudarCor={setCorMarca}
+                  paraMesa={marcaParaMesa}
+                  aoMudarParaMesa={setMarcaParaMesa}
+                />
+              )}
+
               {ferramentaAtiva === "regua" && (
                 <div className="mapa-ferr" role="group" aria-label="Como medir">
                   <button type="button" className="chip alvo" aria-pressed={modoRegua === "grade"} onClick={() => setModoRegua("grade")}>
@@ -585,7 +618,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 </div>
               )}
 
-              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && ferramentaAtiva !== "area" && ferramentaAtiva !== "parede" && (
+              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && ferramentaAtiva !== "area" && ferramentaAtiva !== "parede" && ferramentaAtiva !== "marca" && (
                 <div className="mapa-ferr" role="group" aria-label="Opções da névoa">
                   <button type="button" className="chip alvo" aria-pressed={modo === "revelar"} onClick={() => setModo("revelar")}>
                     revelar
@@ -632,6 +665,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 modoParede={modoParede}
                 aoCriarParedes={(novas) => void muros.adicionar(novas)}
                 aoApagarParede={(id) => void muros.remover(id)}
+                marcas={desenhos.marcas}
+                modoMarca={modoMarca}
+                corMarca={corMarca}
+                aoCriarTraco={(pontos) => void desenhos.adicionar({ tipo: "traco", cor: corMarca, pontos, visivel: marcaParaMesa })}
+                aoEscolherNota={setNotaPendente}
+                aoApagarMarca={(id) => void desenhos.remover(id)}
                 aoAlternarPorta={(id) => void muros.alternarPorta(id)}
                 verVisaoDosInimigos={verInimigos}
                 visaoPronta={!muros.carregando && !banco.carregando}
@@ -642,6 +681,18 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 aoTocarPeca={setPecaSelecionada}
                 aoAbrirPeca={setCartao}
               />
+              {notaPendente && ferramentaAtiva === "marca" && (
+                <NovaNota
+                  ponto={notaPendente}
+                  aoPor={(texto) => desenhos.adicionar({ tipo: "nota", cor: corMarca, x: notaPendente[0], y: notaPendente[1], texto, visivel: marcaParaMesa })}
+                  aoCancelar={() => setNotaPendente(null)}
+                />
+              )}
+              {desenhos.aviso && (
+                <p className="mapa-erro" role="alert">
+                  {desenhos.aviso}
+                </p>
+              )}
               {aberto && (
                 <CartaoDoPeao
                   key={aberto.peca.id}
@@ -668,6 +719,14 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         : modoParede === "comodo"
                           ? "Arraste de um canto ao canto oposto: saem as quatro paredes do cômodo."
                           : `Arraste de um ponto a outro pra desenhar ${modoParede === "porta" ? "uma porta" : "uma parede"}. As pontas encaixam nos cantos do quadradinho e nas pontas de outras paredes, pra não ficar fresta.`
+                    : ferramentaAtiva === "marca"
+                      ? modoMarca === "apagar"
+                        ? "Toque num desenho ou numa nota pra apagá-lo, ou passe o dedo por cima de vários (borracha)."
+                        : modoMarca === "nota"
+                          ? "Toque no ponto do mapa e escreva a nota: aparece uma bolinha numerada ali e o texto na lista embaixo do mapa. 🔒 só eu vejo deixa a nota escondida da mesa até você liberar."
+                          : modoMarca === "linha"
+                            ? "Arraste de um ponto a outro pra traçar uma linha reta (rota, alcance, setas). Com dois dedos você mexe no mapa sem riscar."
+                            : "Passe o dedo pra riscar o mapa (uma rota, um círculo em volta de algo). Com dois dedos você mexe no mapa sem riscar. O desenho fica gravado no mapa e a mesa vê na hora, a menos que esteja em 🔒 só eu vejo."
                     : ferramentaAtiva === "area"
                       ? "Escolha a forma e o tamanho e arraste no mapa: a origem encaixa no canto do quadradinho e a mesa vê a figura por alguns segundos, com o seu nome. Esfera: toque onde cai o centro. Cone, cubo e linha: arraste pra onde apontam."
                       : ferramentaAtiva === "regua"
@@ -808,6 +867,50 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         tirar todos os peões
                       </button>
                     )}
+                  </>
+                )}
+              </SecaoRecolhivel>
+
+              <SecaoRecolhivel
+                abertoInicial={false}
+                titulo={<h4>Desenhos e notas</h4>}
+                cabecalhoExtra={<span className="fc-sub">{desenhos.indisponivel ? "ainda não ligados" : `${desenhos.marcas.length} no mapa`}</span>}
+              >
+                {desenhos.indisponivel ? (
+                  <p className="fc-sub">
+                    Falta rodar a migration 0022_marcas.sql no SQL Editor do Supabase pra ligar os desenhos e as notas. O resto do mapa
+                    funciona sem eles.
+                  </p>
+                ) : (
+                  <>
+                    <p className="fc-sub">
+                      {resumoDasMarcas(desenhos.marcas)}. Risque e anote com a ferramenta ✏️ desenhar. O que fica em 🔒 só eu vejo aparece
+                      tracejado pra você e não aparece pra mesa, nem no telão. Os jogadores só enxergam desenho e nota onde a névoa já abriu.
+                    </p>
+                    <ListaDeNotas marcas={desenhos.marcas} edicao={desenhos} />
+                    <div className="mapa-ferr">
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={desenhos.marcas.length === 0}
+                        onClick={() => {
+                          const ultima = [...desenhos.marcas].reverse().find((m) => m.created_at !== "");
+                          if (ultima) void desenhos.remover(ultima.id);
+                        }}
+                      >
+                        ↩ desfazer a última
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={desenhos.marcas.length === 0}
+                        onClick={() => {
+                          if (confirm("Apagar todos os desenhos e notas deste mapa?")) void desenhos.removerTodas();
+                        }}
+                      >
+                        apagar tudo
+                      </button>
+                    </div>
                   </>
                 )}
               </SecaoRecolhivel>
