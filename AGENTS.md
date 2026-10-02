@@ -1202,10 +1202,13 @@ Decisões que não estão no código à primeira vista:
     arquivo** (`soldarPontas`): só estica a parede na direção dela ou acrescenta um
     trechinho. A primeira versão puxava a ponta até a ponta vizinha, e isso entortava
     a parede e **abria o "T" de outra parede no meio dela** — visto rodando o arquivo
-    real, não nos testes. Os trechinhos contam no limite de 400. **Não conferido na
-    tela de verdade**: esta máquina não tem `.env.local`, então a tela só tem teste
-    com banco de mentira (`ImportarParedes.test.ts`) e não há robô; a altura a 375px
-    não foi medida (fechado, é um botão). Não há botão "detectar" dentro do app
+    real, não nos testes. Os trechinhos contam no limite de 400. **Conferido na
+    tela de verdade em 02/10/2026** (robô provisório contra o banco, na sala `ci-teste`,
+    depois apagado): colar JSON em bloco ```json, escala 600×400 → 900×600, 2 frestas
+    fechadas, 5 paredes + 1 porta gravadas numa escrita só, "↩ desfazer parede" tirou
+    tudo, sem erro no console. **Ainda não medido**: a altura a 375px (fechado, é um
+    botão) e um arquivo vindo de IA de verdade; não há robô fixo para isso, só
+    `ImportarParedes.test.ts` com banco de mentira. Não há botão "detectar" dentro do app
     porque isso pediria rota de servidor e chave paga — decisão do Daniel.
   - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
     Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
