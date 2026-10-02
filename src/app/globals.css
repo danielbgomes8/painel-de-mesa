@@ -3491,8 +3491,8 @@ input.fj-score:focus-visible {
 }
 .qd-foto[data-silhueta] img {
   /* Borrada, não escura: dá pra ver que há uma figura, mas não reconhecer quem. */
-  filter: brightness(0.9) blur(16px) grayscale(1);
-  transform: scale(1.2);
+  filter: brightness(0.9) blur(6px) grayscale(1);
+  transform: scale(1.15);
 }
 .qd-semfoto {
   display: flex;
@@ -3740,8 +3740,8 @@ input.fj-score:focus-visible {
 }
 .qd-destaque-foto[data-silhueta] img {
   /* O desfoque acompanha a altura da foto (58vh); em pixels fixos, numa TV ela ficaria nítida demais. */
-  filter: brightness(0.9) blur(6vh) grayscale(1);
-  transform: scale(1.2);
+  filter: brightness(0.9) blur(1.6vh) grayscale(1);
+  transform: scale(1.1);
 }
 .qd-destaque-foto[data-silhueta] {
   overflow: hidden;
