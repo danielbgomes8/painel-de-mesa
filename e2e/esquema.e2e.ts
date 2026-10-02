@@ -12,6 +12,7 @@ import type { Cena, RegraNevoa } from "../src/lib/cenas";
 import type { Peca } from "../src/lib/pecas";
 import type { Parede } from "../src/lib/paredes";
 import type { Marca } from "../src/lib/marcas";
+import type { Cartao } from "../src/lib/quadro";
 import type { LinhaBastiao, LinhaCombate } from "../src/hooks/useSala";
 import { SALA, bancoConfigurado, criarFicha, limparSala, rest } from "./apoio";
 
@@ -186,6 +187,24 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
   {
     tabela: "cena_marcas",
     colunas: colunas<Marca>({ id: true, cena_id: true, room_code: true, tipo: true, cor: true, pontos: true, x: true, y: true, texto: true, visivel: true, created_at: true }),
+  },
+  {
+    tabela: "quadro_cartoes",
+    colunas: colunas<Cartao>({
+      id: true,
+      room_code: true,
+      tipo: true,
+      titulo: true,
+      subtitulo: true,
+      foto: true,
+      texto: true,
+      segredo: true,
+      revelacao: true,
+      dono: true,
+      coluna: true,
+      destaque_em: true,
+      created_at: true,
+    }),
   },
   // Relato de erro dos aparelhos (lib/relatarErro.ts monta a linha à mão).
   {

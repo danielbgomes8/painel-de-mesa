@@ -9,12 +9,23 @@ import { BotaoRemover } from "@/components/BotaoRemover";
 
 /** Resumo por sessão, escrito pelo Mestre, visível pra todo mundo — pra
  *  lembrar "onde paramos" na próxima mesa. */
-export function DiarioCampanha({ sala, souMestre }: { sala: Sala; souMestre: boolean }) {
+export function DiarioCampanha({
+  sala,
+  souMestre,
+  semCabecalho = false,
+}: {
+  sala: Sala;
+  souMestre: boolean;
+  /** Dentro da aba Campanha o título já está lá em cima. */
+  semCabecalho?: boolean;
+}) {
   return (
-    <div className="combat">
-      <div className="combat-head">
-        <h2>Diário da campanha</h2>
-      </div>
+    <div className={semCabecalho ? undefined : "combat"}>
+      {!semCabecalho && (
+        <div className="combat-head">
+          <h2>Diário da campanha</h2>
+        </div>
+      )}
 
       {sala.diario.length === 0 && (
         <p className="empty-note">

@@ -36,7 +36,7 @@ test.afterAll(limparSala);
 test("o Mestre entra, vê as abas e não aparece erro na tela", async ({ page }) => {
   const erros = coletarErros(page);
   await entrarComoMestre(page);
-  for (const aba of ["Diário", "Combate", "Mapa", "Fichas", "Mestre"]) {
+  for (const aba of ["Campanha", "Combate", "Mapa", "Fichas", "Mestre"]) {
     await expect(page.getByRole("button", { name: aba, exact: true })).toBeVisible();
   }
   expect(erros).toEqual([]);

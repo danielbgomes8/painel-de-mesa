@@ -11,7 +11,7 @@ export const BASTIAO_ATIVO: boolean = false;
  *  jogador quando há um mapa na mesa) e "Mestre" só pro Mestre. */
 function montarAbas(souMestre: boolean, temMapa: boolean): { id: Aba; rotulo: string }[] {
   return [
-    { id: "diario", rotulo: "Diário" },
+    { id: "diario", rotulo: "Campanha" },
     ...(BASTIAO_ATIVO ? [{ id: "bastiao" as const, rotulo: "Bastião" }] : []),
     { id: "combate", rotulo: "Combate" },
     ...(temMapa ? [{ id: "mapa" as const, rotulo: "Mapa" }] : []),

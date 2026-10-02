@@ -51,6 +51,9 @@ export const TABELAS_COM_SALA = [
   "cena_paredes",
   // Desenhos e notas do mapa (0022).
   "cena_marcas",
+  // Quadro da Campanha (0024). A foto de cada cartão fica no Storage e vai na
+  // cópia das imagens, ao lado das dos mapas.
+  "quadro_cartoes",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em
@@ -128,12 +131,17 @@ export async function copiarImagens({ url, copias, pasta, buscar = fetch, gravar
   const faltando = [];
   const vistas = new Set();
   for (const { dados } of copias) {
-    for (const cena of dados.cenas ?? []) {
-      if (!cena.imagem || vistas.has(cena.imagem)) continue;
-      vistas.add(cena.imagem);
-      const caminho = caminhoSeguroDaImagem(cena.imagem);
+    // A imagem de cada mapa e a foto de cada cartão do Quadro: mesmo bucket.
+    const citadas = [
+      ...(dados.cenas ?? []).map((cena) => cena.imagem),
+      ...(dados.quadro_cartoes ?? []).map((cartao) => cartao.foto),
+    ];
+    for (const citada of citadas) {
+      if (!citada || vistas.has(citada)) continue;
+      vistas.add(citada);
+      const caminho = caminhoSeguroDaImagem(citada);
       if (!caminho) {
-        aviso(`imagem ignorada (caminho suspeito): ${JSON.stringify(cena.imagem)}`);
+        aviso(`imagem ignorada (caminho suspeito): ${JSON.stringify(citada)}`);
         continue;
       }
       const endereco = `${url}/storage/v1/object/public/${BUCKET_DOS_MAPAS}/${caminho.split("/").map(encodeURIComponent).join("/")}`;

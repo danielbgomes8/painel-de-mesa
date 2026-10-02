@@ -110,8 +110,10 @@ export async function restaurar({ dados, url, chave, executar, buscar = fetch, a
  *  `executar: false` só confere o que existe na pasta. */
 export async function restaurarImagens({ dados, pasta, url, chave, executar, buscar = fetch, ler = (arquivo) => readFile(arquivo) }) {
   const resultado = { enviadas: 0, jaExistiam: 0, semArquivo: [] };
-  for (const cena of dados.cenas ?? []) {
-    const caminho = caminhoSeguroDaImagem(cena.imagem);
+  // Imagem de cada mapa e foto de cada cartão do Quadro: mesmo bucket, mesma pasta.
+  const citadas = [...(dados.cenas ?? []).map((cena) => cena.imagem), ...(dados.quadro_cartoes ?? []).map((cartao) => cartao.foto)];
+  for (const citada of citadas) {
+    const caminho = caminhoSeguroDaImagem(citada);
     if (!caminho) continue;
     let conteudo;
     try {

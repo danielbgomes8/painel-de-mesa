@@ -53,7 +53,7 @@ function paraJpeg(canvas: HTMLCanvasElement, qualidade: number): Promise<Blob | 
 
 /** Devolve o JPEG reduzido e o tamanho final. Lança `ErroDeImagem`, com a
  *  mensagem em português pronta pra tela. */
-export async function prepararImagem(arquivo: File): Promise<ImagemPronta> {
+export async function prepararImagem(arquivo: File, ladoMaximo: number = LADO_MAXIMO_IMAGEM): Promise<ImagemPronta> {
   if (!arquivo.type.startsWith("image/")) throw new ErroDeImagem("Esse arquivo não é uma imagem.");
 
   let origem: Fonte;
@@ -65,7 +65,7 @@ export async function prepararImagem(arquivo: File): Promise<ImagemPronta> {
 
   try {
     if (!origem.largura || !origem.altura) throw new Error("Imagem sem tamanho.");
-    let lado = LADO_MAXIMO_IMAGEM;
+    let lado = ladoMaximo;
     // Até três tentativas: qualidade normal, qualidade menor, e imagem menor.
     for (let tentativa = 0; tentativa < 3; tentativa++) {
       const { largura, altura } = tamanhoReduzido(origem.largura, origem.altura, lado);

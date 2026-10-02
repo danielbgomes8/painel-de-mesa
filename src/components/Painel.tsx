@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCenas } from "@/hooks/useCenas";
+import { useQuadro } from "@/hooks/useQuadro";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
 import { useIdentidade } from "@/hooks/useIdentidade";
 import { useModoTelao } from "@/hooks/useModoTelao";
@@ -27,7 +28,8 @@ import { BannerMapaNaMesa } from "@/components/BannerMapaNaMesa";
 import { LogCombate } from "@/components/LogCombate";
 import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { EncontrosPreparados } from "@/components/EncontrosPreparados";
-import { DiarioCampanha } from "@/components/DiarioCampanha";
+import { AbaCampanha } from "@/components/AbaCampanha";
+import { DestaqueDoCartao } from "@/components/QuadroCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { PainelMapa } from "@/components/MapaSobDemanda";
 import { Telao } from "@/components/Telao";
@@ -98,6 +100,9 @@ function PainelSala({ codigo }: { codigo: string }) {
   const cenas = useCenas(codigo);
   const identidade = useIdentidade(codigo);
   const telao = useModoTelao();
+  // O quadro também tem canal próprio. No telão ninguém tem identidade: ele
+  // vê só o que a mesa inteira vê.
+  const quadro = useQuadro(codigo, telao ? null : identidade);
   const rotulo = rotuloDaSala(codigo);
 
   function entrar(id: Identidade) {
@@ -218,7 +223,19 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
 
   if (telao) {
-    return <Telao sala={sala} rotulo={rotulo} cenas={cenas} codigo={codigo} />;
+    return (
+      <>
+        <Telao sala={sala} rotulo={rotulo} cenas={cenas} codigo={codigo} />
+        {quadro.destaque && (
+          <DestaqueDoCartao
+            cartao={quadro.destaque}
+            url={quadro.urlDaFoto(quadro.destaque)}
+            aoFechar={quadro.dispensarDestaque}
+            fecharSozinhoEmMs={30000}
+          />
+        )}
+      </>
+    );
   }
 
   if (!identidade) {
@@ -321,7 +338,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
-      {abaEfetiva === "diario" && <DiarioCampanha sala={sala} souMestre={souMestre} />}
+      {abaEfetiva === "diario" && <AbaCampanha sala={sala} quadro={quadro} identidade={identidade} />}
 
       {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} />}
 
@@ -381,6 +398,10 @@ function PainelSala({ codigo }: { codigo: string }) {
       {/* No fim do conteúdo e presa no rodapé (sticky): sempre ao alcance do
           polegar, sem cobrir o topo da ordem de iniciativa. */}
       {(abaEfetiva === "combate" || abaEfetiva === "fichas") && <BarraDesfazer sala={sala} />}
+
+      {quadro.destaque && (
+        <DestaqueDoCartao cartao={quadro.destaque} url={quadro.urlDaFoto(quadro.destaque)} aoFechar={quadro.dispensarDestaque} />
+      )}
     </>
   );
 }
