@@ -208,13 +208,20 @@ export function filtrarPorTipo(lista: CartaoVisto[], tipo: TipoCartao | null): C
 
 /** O cartão que acabou de ser mostrado à mesa? Compara com o que este aparelho
  *  já tinha: só conta se o `destaque_em` MUDOU (não depende do relógio do
- *  aparelho) e se a pessoa tem mesmo o que ver — silhueta não vira tela cheia. */
+ *  aparelho) e se a pessoa enxerga o cartão. Em silhueta vira tela cheia também,
+ *  mas só a foto escura e "???" (ver `destaqueEmSilhueta`). */
 export function virouDestaque(antes: Cartao | undefined, depois: Cartao, quem: Identidade | null): boolean {
   if (!depois.destaque_em) return false;
   // O banco devolve o horário em outro formato que o do aparelho que escreveu:
   // compara o instante, não o texto.
   if (antes?.destaque_em && Date.parse(antes.destaque_em) === Date.parse(depois.destaque_em)) return false;
-  return visaoDoCartao(depois, quem) === "completo";
+  return visaoDoCartao(depois, quem) !== null;
+}
+
+/** O destaque de um cartão da mesa que está em silhueta: a tela cheia mostra a
+ *  foto escura e "???", sem nome, tipo nem texto. Cartão pessoal nunca é silhueta. */
+export function destaqueEmSilhueta(c: Cartao): boolean {
+  return c.dono === null && c.revelacao === "silhueta";
 }
 
 // ── Foto ────────────────────────────────────────────────────────────────

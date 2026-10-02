@@ -51,8 +51,9 @@ export type Quadro = {
   trocarFoto: (id: string, arquivo: File) => Promise<ResultadoFoto>;
   tirarFoto: (id: string) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
-  /** Revela o cartão e manda a foto em tela cheia pra mesa. */
-  mostrarAMesa: (id: string) => Promise<boolean>;
+  /** Manda o cartão em tela cheia pra mesa. Por padrão revela; com `comoSilhueta`
+   *  deixa o cartão em silhueta e a mesa vê só a foto escura e "???". */
+  mostrarAMesa: (id: string, comoSilhueta?: boolean) => Promise<boolean>;
   ligar: (de: string, para: string, rotulo: string) => Promise<boolean>;
   desligar: (id: string) => Promise<boolean>;
   anotar: (cartaoId: string, autor: string, texto: string) => Promise<boolean>;
@@ -331,16 +332,16 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
     return true;
   }, []);
 
-  const mostrarAMesa = useCallback<Quadro["mostrarAMesa"]>(async (id) => {
+  const mostrarAMesa = useCallback<Quadro["mostrarAMesa"]>(async (id, comoSilhueta = false) => {
     const antes = ref.current;
     const agora = new Date().toISOString();
     // Revelar e destacar numa escrita só: ninguém recebe o destaque de um
     // cartão que ainda estaria escondido pra ele.
-    const mudanca = { revelacao: "revelado" as const, destaque_em: agora };
+    const mudanca = { revelacao: comoSilhueta ? ("silhueta" as const) : ("revelado" as const), destaque_em: agora };
     setCartoes((atual) => atual.map((c) => (c.id === id ? { ...c, ...mudanca } : c)));
     const { error } = await supabase.from("quadro_cartoes").update(mudanca).eq("id", id);
     if (error) {
-      relatarErro("mostrarCartaoAMesa", error);
+      relatarErro(comoSilhueta ? "mostrarSilhuetaAMesa" : "mostrarCartaoAMesa", error);
       setCartoes(antes);
       setAviso(AVISO_NAO_SALVOU);
       return false;

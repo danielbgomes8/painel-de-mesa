@@ -3737,6 +3737,9 @@ input.fj-score:focus-visible {
   border-radius: 12px;
   box-shadow: 0 0 40px rgba(217, 154, 78, 0.35);
 }
+.qd-destaque-foto[data-silhueta] img {
+  filter: brightness(0.26) blur(5px) grayscale(1);
+}
 .qd-destaque-titulo {
   margin: 0;
   font-family: var(--f-display);

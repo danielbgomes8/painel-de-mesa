@@ -24,6 +24,7 @@ import {
   LIMITE_TITULO,
   TIPOS_DE_CARTAO,
   TITULO_DA_SILHUETA,
+  destaqueEmSilhueta,
   agruparPorColuna,
   colunasEmUso,
   comColunasVazias,
@@ -827,10 +828,16 @@ function FolhaDoCartao({
     setEnviandoFoto(false);
     if (!r.ok) setMensagem(r.erro);
   }
-  async function mostrar() {
+  async function mostrar(comoSilhueta = false) {
     setMensagem(null);
-    const ok = await quadro.mostrarAMesa(c.id);
-    setMensagem(ok ? "Enviado: a mesa está vendo o cartão em tela cheia." : "Não deu pra enviar. Tente de novo.");
+    const ok = await quadro.mostrarAMesa(c.id, comoSilhueta);
+    setMensagem(
+      ok
+        ? comoSilhueta
+          ? "Enviado: a mesa está vendo só a silhueta, em tela cheia."
+          : "Enviado: a mesa está vendo o cartão em tela cheia."
+        : "Não deu pra enviar. Tente de novo.",
+    );
   }
 
   const titulo = silhueta ? TITULO_DA_SILHUETA : c.titulo || "Sem nome";
@@ -925,7 +932,7 @@ function FolhaDoCartao({
             <CampoDeColuna cartao={c} quadro={quadro} existentes={colunas} />
 
             {c.dono === null ? (
-              <ControlesDoMestre cartao={c} quadro={quadro} aoMostrar={() => void mostrar()} />
+              <ControlesDoMestre cartao={c} quadro={quadro} aoMostrar={() => void mostrar()} aoMostrarSilhueta={() => void mostrar(true)} />
             ) : (
               <div className="qd-revelacao" role="group" aria-label="Quem vê este cartão">
                 <button
@@ -1177,7 +1184,17 @@ function CampoDeColuna({ cartao: c, quadro, existentes }: { cartao: Cartao; quad
   );
 }
 
-function ControlesDoMestre({ cartao: c, quadro, aoMostrar }: { cartao: Cartao; quadro: Quadro; aoMostrar: () => void }) {
+function ControlesDoMestre({
+  cartao: c,
+  quadro,
+  aoMostrar,
+  aoMostrarSilhueta,
+}: {
+  cartao: Cartao;
+  quadro: Quadro;
+  aoMostrar: () => void;
+  aoMostrarSilhueta: () => void;
+}) {
   return (
     <>
       <div className="qd-revelacao" role="group" aria-label="O que a mesa vê">
@@ -1199,6 +1216,11 @@ function ControlesDoMestre({ cartao: c, quadro, aoMostrar }: { cartao: Cartao; q
       <button type="button" className="btn primary qd-mostrar" onClick={aoMostrar}>
         📣 Mostrar à mesa agora
       </button>
+      {c.revelacao !== "revelado" && (
+        <button type="button" className="btn qd-mostrar" onClick={aoMostrarSilhueta} title="A mesa vê só a foto escura e ???; o texto continua escondido">
+          🌫️ Mostrar só a silhueta
+        </button>
+      )}
 
     </>
   );
@@ -1241,22 +1263,36 @@ export function DestaqueDoCartao({
     return () => window.removeEventListener("keydown", tecla);
   }, [aoFechar]);
 
+  // Silhueta: nada do cartão vaza — nem no nome lido pelo leitor de tela.
+  const silhueta = destaqueEmSilhueta(cartao);
   return (
-    <div className="qd-destaque" role="dialog" aria-modal="true" aria-label={`O Mestre mostrou: ${cartao.titulo}`} onClick={aoFechar}>
-      <p className="qd-destaque-aviso">📣 O Mestre mostrou à mesa</p>
+    <div
+      className="qd-destaque"
+      role="dialog"
+      aria-modal="true"
+      aria-label={silhueta ? "O Mestre mostrou uma silhueta" : `O Mestre mostrou: ${cartao.titulo}`}
+      onClick={aoFechar}
+    >
+      <p className="qd-destaque-aviso">{silhueta ? "🌫️ O Mestre mostrou uma silhueta" : "📣 O Mestre mostrou à mesa"}</p>
       <div className="qd-destaque-corpo">
         {url && (
-          <div className="qd-destaque-foto">
-            <img src={url} alt={cartao.titulo} />
+          <div className="qd-destaque-foto" data-silhueta={silhueta || undefined}>
+            <img src={url} alt={silhueta ? "" : cartao.titulo} />
           </div>
         )}
         <div className="qd-destaque-textos">
-          <p className="qd-tiporotulo">
-            {emojiDoTipo(cartao.tipo)} {rotuloDoTipo(cartao.tipo)}
-          </p>
-          <h2 className="qd-destaque-titulo">{cartao.titulo || "Sem nome"}</h2>
-          {cartao.subtitulo && <p className="qd-subtitulo">{cartao.subtitulo}</p>}
-          {cartao.texto && <p className="qd-destaque-texto">{cartao.texto}</p>}
+          {silhueta ? (
+            <h2 className="qd-destaque-titulo">{TITULO_DA_SILHUETA}</h2>
+          ) : (
+            <>
+              <p className="qd-tiporotulo">
+                {emojiDoTipo(cartao.tipo)} {rotuloDoTipo(cartao.tipo)}
+              </p>
+              <h2 className="qd-destaque-titulo">{cartao.titulo || "Sem nome"}</h2>
+              {cartao.subtitulo && <p className="qd-subtitulo">{cartao.subtitulo}</p>}
+              {cartao.texto && <p className="qd-destaque-texto">{cartao.texto}</p>}
+            </>
+          )}
         </div>
       </div>
       {!fecharSozinhoEmMs && <p className="qd-destaque-fechar">toque para fechar</p>}

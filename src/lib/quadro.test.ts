@@ -8,6 +8,7 @@ import {
   podeEditarCartao,
   podeVerSegredo,
   virouDestaque,
+  destaqueEmSilhueta,
   visaoDoCartao,
   type Cartao,
 } from "./quadro";
@@ -147,12 +148,28 @@ describe("virouDestaque", () => {
     const igual = cartao({ revelacao: "revelado", destaque_em: "2026-10-02T11:00:00Z" });
     expect(virouDestaque(igual, { ...igual, titulo: "Outro" }, ANA)).toBe(false);
   });
-  it("não avisa quando o cartão não tem destaque nem quando a pessoa só veria a silhueta", () => {
+  it("não avisa quando o cartão não tem destaque", () => {
     expect(virouDestaque(antes, cartao({ revelacao: "revelado" }), ANA)).toBe(false);
-    expect(virouDestaque(antes, cartao({ revelacao: "silhueta", destaque_em: "x" }), ANA)).toBe(false);
+  });
+  it("silhueta mostrada pelo Mestre avisa jogador e telão; cartão escondido não avisa ninguém", () => {
+    const silhueta = cartao({ revelacao: "silhueta", destaque_em: "2026-10-02T11:00:00Z" });
+    expect(virouDestaque(antes, silhueta, ANA)).toBe(true);
+    expect(virouDestaque(antes, silhueta, null)).toBe(true);
+    expect(virouDestaque(antes, cartao({ revelacao: "escondido", destaque_em: "x" }), null)).toBe(false);
+  });
+  it("destaque de cartão pessoal de outro jogador não vaza", () => {
+    expect(virouDestaque(antes, cartao({ dono: "bia", revelacao: "escondido", destaque_em: "x" }), ANA)).toBe(false);
   });
   it("cartão que chega já com destaque (ainda não existia aqui) conta", () => {
     expect(virouDestaque(undefined, cartao({ revelacao: "revelado", destaque_em: "x" }), ANA)).toBe(true);
+  });
+});
+
+describe("destaqueEmSilhueta", () => {
+  it("só cartão da mesa em silhueta; revelado e pessoal mostram inteiro", () => {
+    expect(destaqueEmSilhueta(cartao({ revelacao: "silhueta" }))).toBe(true);
+    expect(destaqueEmSilhueta(cartao({ revelacao: "revelado" }))).toBe(false);
+    expect(destaqueEmSilhueta(cartao({ dono: "ana", revelacao: "silhueta" }))).toBe(false);
   });
 });
 

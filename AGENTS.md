@@ -1428,6 +1428,10 @@ da aba continua `"diario"` (`BarraAbas.tsx`); só o rótulo mudou.
   outro formato) e abre a foto em tela cheia (`DestaqueDoCartao`). **Releitura da sala não dispara**
   (senão quem acorda o celular leva o cartão de minutos atrás) e o aparelho do Mestre não vê o próprio.
   O telão também recebe (fecha sozinho em 30 s); **só foi testado em celular, não no telão de verdade**.
+  **🌫️ Mostrar só a silhueta** (02/10/2026, sem migration): mesmo caminho, mas deixa o cartão em
+  `silhueta` (em vez de `revelado`) e grava `destaque_em`; jogador e telão veem a foto escura e "???"
+  em tela cheia, sem nome, tipo nem texto (`destaqueEmSilhueta`; o rótulo de acessibilidade também não
+  vaza). O botão some quando o cartão já está revelado (não há o que esconder). Só vale pra cartão da mesa.
 - **Colunas**: não existe tabela de colunas — `coluna` é um texto no cartão, e a coluna vazia só existe no
   aparelho de quem a criou, até um cartão cair nela. Ordem: as sugeridas (`COLUNAS_SUGERIDAS`) primeiro,
   depois alfabética, "Sem coluna" por último (então uma coluna nova pode aparecer no meio).

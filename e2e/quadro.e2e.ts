@@ -313,7 +313,7 @@ test("ligar arrastando: a página rola sozinha quando o cartão de destino está
   await ctx.close();
 });
 
-test("telão: o cartão mostrado pelo Mestre aparece em tela cheia, silhueta não, e some sozinho", async ({ browser, page }) => {
+test("telão: o cartão mostrado pelo Mestre aparece em tela cheia (silhueta só a foto escura e ???) e some sozinho", async ({ browser, page }) => {
   test.setTimeout(120_000);
   await limparSala();
   const sombra = await criarCartaoNoBanco("A Sombra Secreta", { revelacao: "silhueta" });
@@ -325,10 +325,16 @@ test("telão: o cartão mostrado pelo Mestre aparece em tela cheia, silhueta nã
   await telao.goto(`/?sala=${SALA}&telao=1`);
   await expect(telao.locator(".telao")).toBeVisible();
 
-  // Silhueta não vira tela cheia nem no telão (não há o que mostrar).
+  // Silhueta mostrada pelo Mestre vira tela cheia no telão, mas só a foto escura e "???":
+  // nem o nome, nem o tipo, nem o texto do cartão vazam (nem no rótulo de acessibilidade).
   await rest(`quadro_cartoes?id=eq.${sombra}`, { method: "PATCH", body: JSON.stringify({ destaque_em: new Date().toISOString() }) });
-  await telao.waitForTimeout(2500);
-  await expect(telao.locator(".qd-destaque")).toHaveCount(0);
+  const sombraNaTv = telao.locator(".qd-destaque");
+  await expect(sombraNaTv).toContainText("???", { timeout: 15_000 });
+  await expect(sombraNaTv).not.toContainText("Sombra Secreta");
+  await expect(sombraNaTv).not.toContainText("Vilão");
+  expect(await sombraNaTv.getAttribute("aria-label")).not.toContain("Sombra");
+  await sombraNaTv.click();
+  await expect(sombraNaTv).toHaveCount(0);
 
   // O Mestre cria um cartão com foto e manda pra mesa.
   await entrarComoMestre(page);
