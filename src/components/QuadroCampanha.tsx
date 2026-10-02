@@ -82,7 +82,7 @@ export function QuadroCampanha({
   const [tipo, setTipo] = useState<TipoCartao | null>(null);
   const [criando, setCriando] = useState(false);
   const listaRef = useRef<HTMLDivElement>(null);
-  const arrasto = useArrastoDeColuna(quadro, souMestre && vista === "colunas", listaRef);
+  const arrasto = useArrastoDeColuna(quadro, quem !== null && vista === "colunas", listaRef);
   const ligando = useArrastoDeLigacao();
   const [pendente, setPendente] = useState<{ de: string; para: string } | null>(null);
   const [feito, setFeito] = useState<string | null>(null);
@@ -219,7 +219,7 @@ export function QuadroCampanha({
                   quem={quem}
                   nomeDoAutor={nomeDoAutor}
                   aoAbrir={() => setAberto(v.cartao.id)}
-                  alca={souMestre && v.cartao.dono === null ? (e) => arrasto.comecar(e, v.cartao) : undefined}
+                  alca={podeEditarCartao(v.cartao, quem) ? (e) => arrasto.comecar(e, v.cartao) : undefined}
                   arrastando={arrasto.id === v.cartao.id}
                   alcaLigar={podeEditarCartao(v.cartao, quem) ? (e) => ligando.comecar(e, v.cartao) : undefined}
                   alvoDeLigacao={ligando.sobre === v.cartao.id}
@@ -512,6 +512,7 @@ function comSemColuna(colunas: ReturnType<typeof agruparPorColuna>) {
 function useArrastoDeColuna(quadro: Quadro, habilitado: boolean, listaRef: React.RefObject<HTMLDivElement | null>) {
   const [estado, setEstado] = useState<{ id: string; titulo: string; x: number; y: number; sobre: string | null } | null>(null);
   const idRef = useRef<string | null>(null);
+  const posRef = useRef({ x: 0, y: 0 });
   const quadroRef = useRef(quadro);
   useEffect(() => {
     quadroRef.current = quadro;
@@ -521,6 +522,13 @@ function useArrastoDeColuna(quadro: Quadro, habilitado: boolean, listaRef: React
     if (!habilitado) return;
     e.preventDefault();
     idRef.current = c.id;
+    posRef.current = { x: e.clientX, y: e.clientY };
+    // Uma batidinha avisa que o cartão "pegou" (celulares sem vibração não ligam).
+    try {
+      navigator.vibrate?.(15);
+    } catch {
+      // sem vibração: o cartão acompanhando o dedo já mostra
+    }
     setEstado({ id: c.id, titulo: c.titulo || "Sem nome", x: e.clientX, y: e.clientY, sobre: null });
   };
 
@@ -532,15 +540,44 @@ function useArrastoDeColuna(quadro: Quadro, habilitado: boolean, listaRef: React
       return alvo ? alvo.dataset.coluna ?? "" : null;
     }
     function mover(e: PointerEvent) {
-      // Perto da borda do quadro, rola de lado pra alcançar outra coluna.
-      const lista = listaRef.current;
-      if (lista) {
-        const r = lista.getBoundingClientRect();
-        if (e.clientX < r.left + 36) lista.scrollLeft -= 14;
-        else if (e.clientX > r.right - 36) lista.scrollLeft += 14;
-      }
+      posRef.current = { x: e.clientX, y: e.clientY };
       setEstado((a) => (a ? { ...a, x: e.clientX, y: e.clientY, sobre: colunaEm(e.clientX, e.clientY) } : a));
     }
+    // Perto da borda, o quadro rola sozinho (de lado e pra baixo/cima), mesmo com o
+    // dedo parado: no celular não dá pra "rolar com outro dedo" no meio do arrasto.
+    const BORDA = 56;
+    const velocidade = (dentro: number) => Math.round(4 + 16 * Math.min(1, Math.max(0, dentro / BORDA)));
+    let quadro = 0;
+    function rolar() {
+      const { x, y } = posRef.current;
+      const lista = listaRef.current;
+      let rolou = false;
+      if (lista) {
+        const r = lista.getBoundingClientRect();
+        if (x < r.left + BORDA && lista.scrollLeft > 0) {
+          lista.scrollLeft -= velocidade(r.left + BORDA - x);
+          rolou = true;
+        } else if (x > r.right - BORDA && lista.scrollLeft < lista.scrollWidth - lista.clientWidth) {
+          lista.scrollLeft += velocidade(x - (r.right - BORDA));
+          rolou = true;
+        }
+      }
+      const altura = window.innerHeight;
+      if (y < BORDA + 40 && window.scrollY > 0) {
+        window.scrollBy(0, -velocidade(BORDA + 40 - y));
+        rolou = true;
+      } else if (y > altura - BORDA && window.scrollY < document.documentElement.scrollHeight - altura) {
+        window.scrollBy(0, velocidade(y - (altura - BORDA)));
+        rolou = true;
+      }
+      // O que está sob o dedo mudou porque o quadro andou.
+      if (rolou) {
+        const sobre = colunaEm(x, y);
+        setEstado((a) => (a && a.sobre !== sobre ? { ...a, sobre } : a));
+      }
+      quadro = requestAnimationFrame(rolar);
+    }
+    quadro = requestAnimationFrame(rolar);
     function soltar(e: PointerEvent) {
       const id = idRef.current;
       idRef.current = null;
@@ -569,6 +606,7 @@ function useArrastoDeColuna(quadro: Quadro, habilitado: boolean, listaRef: React
     window.addEventListener("pointercancel", cancelar);
     window.addEventListener("keydown", tecla);
     return () => {
+      cancelAnimationFrame(quadro);
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
       window.removeEventListener("pointercancel", cancelar);

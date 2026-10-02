@@ -149,7 +149,25 @@ test("quadro: foto, revelação em três estados, ligação, anotação, sessão
   await page.getByRole("button", { name: "Fechar o cartão" }).click();
   await page.getByRole("button", { name: "☰ Colunas" }).click();
   await expect(page.locator('[data-coluna="Suspeitos"] .qd-cartao')).toContainText("Barão Vael");
-  expect((await cartoesDoBanco())[0].coluna).toBe("Suspeitos");
+  await expect.poll(async () => (await cartoesDoBanco())[0].coluna).toBe("Suspeitos");
+
+  // Arrastar pela alça: o Culto (sem coluna) vai pra "Suspeitos"; depois pra uma coluna nova.
+  const arrastar = async (alcaNome: string, destino: ReturnType<typeof page.locator>) => {
+    const origem = (await page.getByRole("button", { name: alcaNome }).boundingBox())!;
+    await page.mouse.move(origem.x + origem.width / 2, origem.y + origem.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(origem.x + 5, origem.y + 5, { steps: 2 });
+    const alvo = (await destino.boundingBox())!;
+    await page.mouse.move(alvo.x + alvo.width / 2, alvo.y + 30, { steps: 8 });
+    await expect(page.locator("[data-alvo]")).toHaveCount(1);
+    await page.mouse.up();
+  };
+  await arrastar("Arrastar Culto do Raio para outra coluna", page.locator('[data-coluna="Suspeitos"]'));
+  await expect.poll(async () => (await cartoesDoBanco())[1].coluna).toBe("Suspeitos");
+  page.once("dialog", (d) => void d.accept("Vilões"));
+  await arrastar("Arrastar Culto do Raio para outra coluna", page.locator('[data-coluna="__nova__"]'));
+  await expect.poll(async () => (await cartoesDoBanco())[1].coluna).toBe("Vilões");
+  await expect(page.locator('[data-coluna="Vilões"] .qd-cartao')).toContainText("Culto do Raio");
 
   expect(erros).toEqual([]);
   expect(errosAna).toEqual([]);
