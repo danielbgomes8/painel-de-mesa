@@ -784,7 +784,13 @@ primeiros itens; os outros estão na lista do fim desta seção.
    da abertura é React (~70 KB), supabase-js (~64 KB) e o Next (~46 KB): o próximo
    corte seria trocar o `supabase-js` pelos pacotes separados (postgrest/realtime/
    storage, sem o de login que o app não usa) — mexe no `ehFalhaDeRede`, então só
-   com o robô e o teste de queda de rede.
+   com o robô e o teste de queda de rede. **Medido em 02/10/2026 e decidido NÃO fazer:** no site
+   publicado, celular de 375 px, cache desligado e CPU 4× mais lenta, a tela de entrada aparece em
+   **2,5 s no 4G rápido (9 Mbps, 170 ms) e 6,3 s no 4G lento (1,6 Mbps, 560 ms)**, com 493 KB e 11
+   scripts no total. Tirar uns 25 KB seria ~5%: de 0,1 a 0,15 s, só na primeira visita (nas seguintes o
+   service worker já resolve). Não compensa o risco no tratamento de queda de rede; reabrir só se a mesa
+   reclamar de lentidão. Banco na mesma data: 507 linhas no total (157 de log) e 0,6 MB de imagens no
+   Storage, contra 500 MB e 1 GB do plano gratuito — **podar o `combat_log` não tem motivo**.
    **De passagem:** campo `type="number"` não tem mais as setinhas de subir/descer
    (`globals.css`): no notebook o Chrome guarda ~15 px pra elas em cada campo e
    cortava "iniciativa" e "quanto?" — a medida por `measureText` NÃO pega isso
