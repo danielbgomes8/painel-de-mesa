@@ -44,27 +44,19 @@ const espiar = () => {
     return arco.apply(this, args);
   };
 };
-/** Os arcos do último quadro COMPLETO (o de agora pode estar pela metade). */
+/** Os arcos do ÚLTIMO quadro desenhado. O desenho de um quadro é síncrono, então o último
+ *  nunca está pela metade quando o robô lê — e quando a tela fica parada depois de uma
+ *  mudança ele é justamente o que mostra a mudança (ler o penúltimo mostraria o quadro velho). */
 const ultimoQuadro = (p: Page) =>
   p.evaluate(() => {
     const q = (window as unknown as { __quadros: number[][][] }).__quadros;
-    return q.length >= 2 ? q[q.length - 2] : [];
+    return q[q.length - 1] ?? [];
   });
 const temRaio = (arcos: number[][], raio: number) => arcos.some((a) => Math.abs(a[2] - raio) < 0.6);
 
-/** Espera o que uma tela DESENHA. O tempo real do Supabase às vezes demora mais de 20 s (o
- *  robô já oscila por isso: ver AGENTS.md); então, enquanto espera, dispara o mesmo "voltei pra
- *  aba" que o app trata relendo tudo do banco. O que se confere é a aura gravada, lida e desenhada. */
+/** Espera o que uma tela DESENHA (o canvas não tem DOM). */
 async function ver(pagina: Page, cond: (arcos: number[][]) => boolean, esperado = true) {
-  await expect
-    .poll(
-      async () => {
-        await pagina.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-        return cond(await ultimoQuadro(pagina));
-      },
-      { timeout: 30_000, intervals: [1000] },
-    )
-    .toBe(esperado);
+  await expect.poll(async () => cond(await ultimoQuadro(pagina)), { timeout: 30_000, intervals: [500] }).toBe(esperado);
 }
 
 async function tocarNoMapa(page: Page, ix: number, iy: number) {

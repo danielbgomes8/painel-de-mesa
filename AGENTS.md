@@ -1049,9 +1049,21 @@ Decisões que não estão no código à primeira vista:
   por cima das outras (achado na foto). A figura é desenhada em coordenadas do
   mapa (cobre o que cobre de verdade em qualquer zoom), abaixo de pings e réguas
   e acima dos peões; não esconde nem revela nada, então vale também sobre névoa.
-  **Fora daqui:** contar quem está dentro (revelaria peão oculto). A emanação de 2024
-  (a área que acompanha uma criatura) veio depois, como aura no peão: ver "Aura no
-  peão" abaixo.
+  A emanação de 2024 (a área que acompanha uma criatura) veio depois, como aura no peão
+  (ver "Aura no peão" abaixo), e a **contagem de criaturas na área** também: abaixo.
+  **Contagem na área** (02/10/2026, sem migration; `areaToca`/`contagemNaArea`/
+  `rotuloDaContagem` em `lib/area.ts`, linha a mais na etiqueta em `desenharAreas`): a
+  etiqueta diz "2 criaturas" (ou "1 criatura", "ninguém"). **Regra combinada com o Daniel:
+  só conta quem a MESA enxerga** — peão oculto e peão sob a névoa NÃO entram no número, e o
+  número é o mesmo em todo aparelho (cada um conta com os dados da própria tela, então um
+  número diferente entre aparelhos entregaria alguém). **O Mestre, e só ele, vê à parte
+  "(+1 oculto)"** (`rotuloDaContagem(…, mestre)`; a mesa nunca vê o "+" nem a palavra
+  "oculto" — o robô confere). Entra quem tem QUALQUER PARTE do espaço dentro da área (regra do
+  D&D): o círculo do espaço da criatura (`PecaNaTela.espacoPx` = metade do lado × tamanho, não
+  o diâmetro desenhado, que é 12% menor) é testado contra o círculo da esfera ou o polígono de
+  cone/cubo/linha (dentro, ou a distância ao lado ≤ raio). Vale também na prévia enquanto se
+  arrasta, pra quem conjura ver quantos pega antes de soltar. Sem nenhum peão no mapa a linha
+  não aparece (nada de "ninguém" em mapa sem peões).
   A etiqueta da régua foi extraída pra `desenharEtiqueta` e as duas usam a mesma.
   O robô marca as quatro formas e confere pelo `fillText` que Mestre e jogador
   veem "Mestre: Cone · 9 m" etc.; **a barra de tamanhos muda de altura conforme a
@@ -1287,10 +1299,7 @@ Decisões que não estão no código à primeira vista:
   ligado desliga. Círculo (a forma 2024 numa grade desenha-se redonda), não o quadrado da
   régua em grade. O robô (`aura.e2e.ts`) espia `arc()` no canvas — cada quadro começa no
   `fillRect(0,0)` do fundo — pra ler os raios DESENHADOS no Mestre e no jogador, e confere a
-  de peão oculto, o mover, "outro" com vírgula, o limite e desligar. **Esse cenário espera o
-  tempo real com `ver()`, que dispara o "voltei pra aba" (releitura do app) enquanto espera:**
-  o evento do Supabase chegou a demorar mais de 20 s, o robô oscila por isso (ver acima). E
-  uma lição de teste: **raios de teste iguais mascaram o que se quer provar** — a aura de 6 m do
+  de peão oculto, o mover, "outro" com vírgula, o limite e desligar. Lição de teste: **raios de teste iguais mascaram o que se quer provar** — a aura de 6 m do
   jogador tinha o mesmo raio da armadilha oculta (135) e a checagem seria vazia; use valores
   distintos.
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
@@ -1325,14 +1334,26 @@ Decisões que não estão no código à primeira vista:
   **Já achou um erro de verdade:** com a tabela dos peões ainda não criada o
   console mostra um 404 (o app trata, mas o robô falha de propósito). Com a 0019
   rodada, os 4 cenários passam (~20 s).
-- **O robô oscila (medido em 02/10/2026):** numa rodada completa, de vez em quando UM
-  cenário falha por esperar um evento do tempo real que demora mais de 20 s (peão não
-  aparece, ícone de condição não chega no celular simulado) — e não é sempre o mesmo.
-  Conferido no commit ANTES das marcas (`c65a15d`): 1 de 2 rodadas falhou assim, então
-  não é regressão de código novo. **Antes de investigar, rode o cenário que falhou
-  sozinho** (`npm run e2e -- -g "<trecho do nome>"`): se passa, é isso. E **nunca rode
-  duas execuções do robô ao mesmo tempo**: dividem a sala `ci-teste` e uma apaga os
-  dados da outra no meio do teste (derrubou o cenário das marcas duas vezes).
+- **Por que o robô falhava "sozinho" (02/10/2026): duas causas, nenhuma era o Supabase.**
+  (1) **Duas execuções do robô ao mesmo tempo.** Todas usam a MESMA sala `ci-teste` do MESMO
+  banco e cada uma começa e termina apagando tudo dela: ficha "duplicada" que não devia
+  existir, cena que sumiu na hora de criar o peão, peão que some no meio. **O GitHub roda o
+  robô a cada push (`e2e.yml`, ~5 min)**, então rodar o robô AQUI logo depois de um push (ou
+  dois `npm run e2e` juntos) derruba os dois lados. Prova: as janelas de execução do GitHub de
+  02/10 (`gh run list --workflow e2e.yml`) cobrem as rodadas locais que falharam, e 4 rodadas
+  seguidas passaram começando 2 s depois de uma janela acabar; as 3 falhas do GitHub nesse
+  dia foram as janelas em que eu rodava o robô aqui. **Antes de rodar o robô: `gh run list
+  --workflow e2e.yml --limit 1` — se estiver "in_progress", espere. Depois de um push, não
+  rode o robô até a execução do GitHub acabar.**
+  (2) **Armadilha de quem ESPIA o canvas** (`aura.e2e.ts`, `ultimoQuadro`): eu lia o
+  PENÚLTIMO quadro achando que o último podia estar pela metade. Mas o desenho de um quadro
+  é síncrono, então o último está sempre completo — e com a tela parada depois de uma
+  mudança ele é justamente o que mostra a mudança; o penúltimo é o quadro velho. O teste
+  falhava 3 de 3 e passava "de vez em quando" (quando algo redesenhava). Medi o tempo real
+  direto com o supabase-js (insert/update de peão e nota, escutando
+  `postgres_changes`): eventos chegam em ~0,2 s, aura inclusive. **Se um cenário falhar,
+  rode-o sozinho com o GitHub parado antes de investigar**, e não atribua ao "tempo real"
+  sem medir como acima (gastei um diagnóstico e um remendo de teste nisso).
 - **Trava no apagar sala** (`0020_sem_apagar_sala.sql`, **rodada pelo Daniel em
   01/10/2026 e conferida**: `DELETE rooms` com a chave pública devolve 401
   "permission denied", enquanto criar/garantir sala e apagar ficha seguem

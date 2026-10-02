@@ -8,7 +8,9 @@ import {
   TAMANHOS_PRONTOS,
   TAMANHO_PADRAO,
   adicionarArea,
+  areaToca,
   areasAtivas,
+  contagemNaArea,
   cruzamentoMaisPerto,
   formaNoMapa,
   metrosParaPx,
@@ -16,6 +18,7 @@ import {
   opacidadeDaArea,
   quadradosDoTamanho,
   rotuloDaArea,
+  rotuloDaContagem,
   trocarForma,
   validarArea,
   type AreaNaTela,
@@ -241,5 +244,63 @@ describe("áreas na tela", () => {
     expect(opacidadeDaArea(AREA_DURACAO_MS - 1)).toBeLessThan(0.01);
     expect(opacidadeDaArea(AREA_DURACAO_MS)).toBeNull();
     expect(opacidadeDaArea(-1)).toBeNull();
+  });
+});
+
+describe("quem está dentro da área", () => {
+  const esfera: FormaNoMapa = { tipo: "circulo", centro: [300, 300], raio: 120 };
+  // Cubo de 100 px de lado, de (200,200) a (300,300).
+  const cubo: FormaNoMapa = { tipo: "poligono", pontos: [[200, 200], [300, 200], [300, 300], [200, 300]] };
+  const c = (x: number, y: number, raio = 15, naMesa = true) => ({ x, y, raio, naMesa });
+
+  it("na esfera: o centro dentro conta, e o espaço que só encosta na borda também", () => {
+    expect(areaToca(esfera, c(300, 300))).toBe(true);
+    expect(areaToca(esfera, c(300 + 120, 300, 0))).toBe(true); // o centro na borda
+    expect(areaToca(esfera, c(300 + 130, 300, 15))).toBe(true); // centro fora, mas o espaço (15) entra
+    expect(areaToca(esfera, c(300 + 136, 300, 15))).toBe(false);
+  });
+
+  it("no polígono: dentro conta; fora conta só se o espaço da criatura chega no lado", () => {
+    expect(areaToca(cubo, c(250, 250, 0))).toBe(true);
+    expect(areaToca(cubo, c(312, 250, 15))).toBe(true); // 12 px fora do lado, raio 15
+    expect(areaToca(cubo, c(320, 250, 15))).toBe(false);
+    // quina: a distância é até o canto, não até a reta do lado
+    expect(areaToca(cubo, c(310, 310, 15))).toBe(true); // ~14,1 do canto
+    expect(areaToca(cubo, c(315, 315, 15))).toBe(false); // ~21,2 do canto
+  });
+
+  it("funciona num cone (triângulo)", () => {
+    const cone: FormaNoMapa = { tipo: "poligono", pontos: [[0, 0], [200, 100], [200, -100]] };
+    expect(areaToca(cone, c(100, 0, 0))).toBe(true);
+    expect(areaToca(cone, c(100, 90, 0))).toBe(false);
+    expect(areaToca(cone, c(-30, 0, 0))).toBe(false);
+  });
+
+  it("separa as que a mesa vê das que ela não vê (oculto ou sob a névoa)", () => {
+    const r = contagemNaArea(esfera, [
+      c(300, 300), // mesa vê, dentro
+      c(320, 310), // mesa vê, dentro
+      c(280, 290, 15, false), // oculto, dentro
+      c(900, 900), // longe
+      c(900, 900, 15, false), // longe e oculto
+    ]);
+    expect(r).toEqual({ mesa: 2, ocultos: 1 });
+  });
+
+  it("sem ninguém por perto, zeros", () => {
+    expect(contagemNaArea(esfera, [])).toEqual({ mesa: 0, ocultos: 0 });
+  });
+});
+
+describe("a contagem em texto", () => {
+  it("fala no singular e no plural, e 'ninguém' quando a mesa não vê ninguém", () => {
+    expect(rotuloDaContagem({ mesa: 3, ocultos: 0 }, false)).toBe("3 criaturas");
+    expect(rotuloDaContagem({ mesa: 1, ocultos: 0 }, false)).toBe("1 criatura");
+    expect(rotuloDaContagem({ mesa: 0, ocultos: 0 }, false)).toBe("ninguém");
+  });
+  it("só o Mestre vê os ocultos; quem não é Mestre nunca vê o '+'", () => {
+    expect(rotuloDaContagem({ mesa: 2, ocultos: 1 }, true)).toBe("2 criaturas (+1 oculto)");
+    expect(rotuloDaContagem({ mesa: 0, ocultos: 3 }, true)).toBe("ninguém (+3 ocultos)");
+    for (const c of [{ mesa: 2, ocultos: 1 }, { mesa: 0, ocultos: 3 }]) expect(rotuloDaContagem(c, false)).not.toContain("+");
   });
 });

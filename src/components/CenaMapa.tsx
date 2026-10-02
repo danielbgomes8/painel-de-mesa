@@ -37,7 +37,7 @@ import {
   type PreviaDeRegua,
 } from "@/lib/desenharCena";
 import { REGUA_MINIMA_PX, medirRegua, type ModoRegua, type ReguaNaTela } from "@/lib/regua";
-import { MODELO_INICIAL, cruzamentoMaisPerto, type AreaNaTela, type ModeloArea } from "@/lib/area";
+import { MODELO_INICIAL, contagemNaArea, cruzamentoMaisPerto, rotuloDaContagem, type AreaNaTela, type FormaNoMapa, type ModeloArea } from "@/lib/area";
 import {
   ENCAIXE_NA_PONTA_PX,
   TOLERANCIA_DA_CURVA_PX,
@@ -416,8 +416,12 @@ export function CenaMapa({
     const previa: PreviaDeRegua | null = viva ? { a: viva.a, b: viva.b, modo: p.modoRegua, cor: p.corRegua, desloc: viva.desloc } : null;
     const vivaArea = areaViva.current;
     const previaArea: PreviaDeArea | null = vivaArea ? { modelo: p.modeloArea, o: vivaArea.o, d: vivaArea.d, cor: p.corRegua } : null;
+    // "Quantas criaturas pega": só conta quem a MESA enxerga (peão oculto ou sob a névoa não
+    // entra), igual pra todo mundo. O Mestre, e só ele, vê à parte quantas ocultas estão dentro.
+    const criaturas = (p.pecas ?? []).map((c) => ({ x: c.x, y: c.y, raio: c.espacoPx, naMesa: !c.oculto && !cobertaPorNevoa(c.x, c.y) }));
+    const contagem = criaturas.length > 0 ? (figura: FormaNoMapa) => rotuloDaContagem(contagemNaArea(figura, criaturas), p.mestre) : undefined;
     return (
-      desenharAreas(ctx, p.cena, p.areas ?? [], previaArea, vistaRef.current, w, h, dpr, agora) +
+      desenharAreas(ctx, p.cena, p.areas ?? [], previaArea, vistaRef.current, w, h, dpr, agora, contagem) +
       desenharPings(ctx, p.pings ?? [], vistaRef.current, w, h, dpr, agora) +
       desenharReguas(ctx, p.cena, p.reguas ?? [], previa, vistaRef.current, w, h, dpr, agora)
     );

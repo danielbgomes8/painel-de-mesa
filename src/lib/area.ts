@@ -133,6 +133,64 @@ export function formaNoMapa(
   };
 }
 
+// ── Quem está dentro ───────────────────────────────────────────────────────
+
+/** Uma criatura pra conta de "quem está na área": o centro, o raio do espaço dela
+ *  (px da imagem) e se a MESA a enxerga (não oculta e fora da névoa). */
+export type CriaturaParaArea = { x: number; y: number; raio: number; naMesa: boolean };
+
+function distanciaAoLado(px: number, py: number, a: Ponto, b: Ponto): number {
+  const sx = b[0] - a[0];
+  const sy = b[1] - a[1];
+  const quad = sx * sx + sy * sy;
+  const k = quad === 0 ? 0 : Math.max(0, Math.min(1, ((px - a[0]) * sx + (py - a[1]) * sy) / quad));
+  return Math.hypot(px - (a[0] + k * sx), py - (a[1] + k * sy));
+}
+
+function pontoNoPoligono(px: number, py: number, pontos: readonly Ponto[]): boolean {
+  let dentro = false;
+  for (let i = 0, j = pontos.length - 1; i < pontos.length; j = i++) {
+    const [xi, yi] = pontos[i];
+    const [xj, yj] = pontos[j];
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
+
+/** O espaço da criatura (um círculo de `raio` em volta do centro) toca a figura?
+ *  É a regra do D&D: está na área quem tem QUALQUER PARTE do espaço dentro dela. */
+export function areaToca(figura: FormaNoMapa, c: Pick<CriaturaParaArea, "x" | "y" | "raio">): boolean {
+  if (figura.tipo === "circulo") return Math.hypot(c.x - figura.centro[0], c.y - figura.centro[1]) <= figura.raio + c.raio;
+  const { pontos } = figura;
+  if (pontoNoPoligono(c.x, c.y, pontos)) return true;
+  for (let i = 0; i < pontos.length; i++) {
+    if (distanciaAoLado(c.x, c.y, pontos[i], pontos[(i + 1) % pontos.length]) <= c.raio) return true;
+  }
+  return false;
+}
+
+/** Quantas criaturas a área pega: `mesa` = as que a mesa enxerga (é o número que todo
+ *  mundo vê, pra não entregar peão oculto); `ocultos` = as que estão dentro mas a mesa
+ *  não enxerga (só o Mestre vê esse número). */
+export function contagemNaArea(figura: FormaNoMapa, criaturas: readonly CriaturaParaArea[]): { mesa: number; ocultos: number } {
+  let mesa = 0;
+  let ocultos = 0;
+  for (const c of criaturas) {
+    if (!areaToca(figura, c)) continue;
+    if (c.naMesa) mesa++;
+    else ocultos++;
+  }
+  return { mesa, ocultos };
+}
+
+/** A contagem em texto curto: "3 criaturas", "1 criatura", "ninguém". Pro Mestre, os
+ *  ocultos entram à parte: "2 criaturas (+1 oculto)". Quem não é Mestre nunca vê o `+`. */
+export function rotuloDaContagem(c: { mesa: number; ocultos: number }, mestre: boolean): string {
+  const base = c.mesa === 0 ? "ninguém" : `${c.mesa} ${c.mesa === 1 ? "criatura" : "criaturas"}`;
+  if (!mestre || c.ocultos === 0) return base;
+  return `${base} (+${c.ocultos} ${c.ocultos === 1 ? "oculto" : "ocultos"})`;
+}
+
 /** A figura em texto curto: "Cone · 9 m", "Esfera · raio 6 m", "Linha · 30 m × 1,5 m". */
 export function rotuloDaArea(a: { forma: FormaArea; metros: number; largura: number }): string {
   const m = formatarMetros(a.metros);

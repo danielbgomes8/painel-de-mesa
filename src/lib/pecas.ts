@@ -98,6 +98,10 @@ export type PecaNaTela = {
    *  BORDA do espaço da criatura (o D&D mede a emanação dali, não do centro). */
   aura: number | null;
   auraPx: number;
+  /** Raio do ESPAÇO da criatura (px da imagem): metade do lado × o tamanho. É o que
+   *  conta pra "está dentro da área" (qualquer parte do espaço dentro vale), não o
+   *  diâmetro desenhado, que é um pouco menor. */
+  espacoPx: number;
 };
 
 export const COR_PECA_INIMIGO = "#c0443a";
@@ -412,6 +416,7 @@ export function montarPecasNaTela(entrada: {
       inimigo: Boolean(ficha?.is_npc),
       aura: p.aura,
       auraPx: raioDaAuraPx(cena, p.tamanho, p.aura),
+      espacoPx: (p.tamanho * ladoDeReferencia(cena)) / 2,
     };
   });
 }

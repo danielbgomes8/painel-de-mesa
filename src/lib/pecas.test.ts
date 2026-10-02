@@ -160,6 +160,7 @@ describe("clicar num peão", () => {
     deslocamento: null,
     aura: null,
     auraPx: 0,
+    espacoPx: 40,
     semNevoa: true,
     icones: [],
     observa: true,

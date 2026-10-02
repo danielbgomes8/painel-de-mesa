@@ -15,7 +15,7 @@ import {
 import { animacaoDoPing, pontoNaBorda, type PingNaTela } from "./ping";
 import { iconesVisiveis, posicoesDosIcones, type PecaNaTela } from "./pecas";
 import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type ModoRegua, type ReguaNaTela } from "./regua";
-import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type ModeloArea } from "./area";
+import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type FormaNoMapa, type ModeloArea } from "./area";
 import { notasNumeradas, type Marca } from "./marcas";
 import type { Parede } from "./paredes";
 import type { Mascara } from "./visao";
@@ -644,6 +644,9 @@ export function desenharAreas(
   alturaTela: number,
   dpr: number,
   agora: number,
+  /** Texto da contagem de criaturas na figura (null = sem linha). Quem chama decide o que
+   *  mostrar, pra a área não entregar peão que a mesa não vê. */
+  contagem?: (figura: FormaNoMapa) => string | null,
 ): number {
   let vivas = 0;
   const desenhar = (a: { forma: ModeloArea["forma"]; o: Ponto; d: Ponto; metros: number; largura: number; cor: string; de?: string }, opacidade: number) => {
@@ -682,7 +685,8 @@ export function desenharAreas(
     const telaDos = pontos.map(([x, y]) => mapaParaTela(vista, x, y));
     const topo = Math.min(...telaDos.map((q) => q[1]));
     const meio = telaDos.reduce((soma, q) => soma + q[0], 0) / telaDos.length;
-    desenharEtiqueta(ctx, [(a.de ? `${a.de}: ` : "") + rotuloDaArea(a)], meio, topo - 8, larguraTela, alturaTela, a.cor);
+    const quantas = contagem?.(figura) ?? null;
+    desenharEtiqueta(ctx, [(a.de ? `${a.de}: ` : "") + rotuloDaArea(a), ...(quantas ? [quantas] : [])], meio, topo - 8, larguraTela, alturaTela, a.cor);
   };
   for (const a of areas) {
     const opacidade = opacidadeDaArea(agora - a.chegouEm);
