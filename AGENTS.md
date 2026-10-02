@@ -697,10 +697,12 @@ primeiros itens; os outros estão na lista do fim desta seção.
   tela passa nos 5 cenários — ele cobre o canal de transmissão do ping e da
   régua, que é o que mais depende da biblioteca. **Atualização do cliente do
   Supabase agora tem teste de verdade: rode `npm run e2e` antes de aceitar.**
-  **Os alertas de segurança do GitHub estão desligados** no repositório
-  (`vulnerability-alerts` = 404, `automated-security-fixes` = false). Ligar é
-  configuração de segurança da conta: é o Daniel quem liga (Settings →
-  Advanced Security → Dependabot alerts + security updates), não mexer por API.
+  **Os alertas de segurança do GitHub estão ligados** (o Daniel ligou em 02/10/2026,
+  conferido pela API: `vulnerability-alerts` = 204, `automated-security-fixes` =
+  `enabled: true`). É configuração de segurança da conta: quem liga/desliga é ele,
+  não mexer por API. Se chegar um pull request do Dependabot de segurança, vale o
+  mesmo caminho do robô de atualizações (acima): não fazer "Squash and merge" pelo
+  site, que o commit precisa ter o Daniel como autor.
 - **Telão segura a tela acesa** (`lib/telaAcesa.ts`, testado com navegador e
   documento falsos em `telaAcesa.test.ts`; `hooks/useTelaAcesa.ts`, usado só
   no `Telao`): pede a trava de tela (Screen Wake Lock) ao abrir e **de novo
