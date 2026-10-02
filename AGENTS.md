@@ -591,7 +591,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0022` (a 0020 é a trava de apagar sala) e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0025` (a 0020 é a trava de apagar sala) e o `seed.sql`
   já rodadas — o banco tem `rooms` mais treze filhas (as dez de antes, `cenas`,
   `cena_nevoa` e `cena_pecas`), todas com `on delete cascade` ligado em `rooms`,
   fora a `erros`, e o bucket de imagens `mapas`. (A 0020, que tira do `anon` o
@@ -1406,6 +1406,65 @@ Decisões que não estão no código à primeira vista:
   por um tempo depois de apagar o objeto (cache do Storage), então não prova nada sobre
   "apagou/voltou" — olhe o resultado do upload (aceito como novo = tinha sumido) ou a
   listagem `POST /storage/v1/object/list/mapas`.
+
+## Quadro da Campanha (02/10/2026, migrations `0024` e `0025`, rodadas)
+
+O Daniel achava o diário sem utilidade e pediu algo "como o Trello": o Mestre põe NPCs e vilões
+com foto, e decide o que os jogadores veem. A aba **Diário virou Campanha**: `AbaCampanha.tsx` tem
+dois botões, **🗂 Quadro** (novo) e **📖 Sessões** (o `DiarioCampanha` de antes, intacto). O id interno
+da aba continua `"diario"` (`BarraAbas.tsx`); só o rótulo mudou.
+
+- **Cartões** (`quadro_cartoes`; regras puras em `lib/quadro.ts`, testadas): tipo (NPC, Vilão, Local,
+  Facção, Item, Pista, Missão, Outro), nome, subtítulo, foto, texto que a mesa lê e **segredo só do
+  Mestre**. `revelacao`: `escondido` (só o Mestre), `silhueta` (a mesa vê a foto escura e "???",
+  sem texto) ou `revelado`. **Quem vê o quê está TODO em `visaoDoCartao`** — não reimplementar em
+  componente. Como a névoa do mapa, isso esconde NA TELA: o banco é aberto (README, "Segurança").
+- **Cartão da mesa × pessoal**: `dono` nulo = da mesa (o Mestre edita, `revelacao` vale). `dono` = slug
+  de um jogador = pessoal: **só ele vê, nem o Mestre**, até compartilhar (`revelacao = revelado`; aí a
+  mesa vê, mas só o dono edita). O "pessoal do Mestre" são os cartões da mesa que ficam escondidos.
+  Todo cartão pessoal mostra o nome do dono (miniatura e folha); sem isso ninguém sabia de quem era.
+- **📣 Mostrar à mesa agora**: revela e grava `destaque_em` numa escrita só. Cada aparelho compara o
+  `destaque_em` novo com o que já tinha (`virouDestaque`, por instante — o banco devolve o horário em
+  outro formato) e abre a foto em tela cheia (`DestaqueDoCartao`). **Releitura da sala não dispara**
+  (senão quem acorda o celular leva o cartão de minutos atrás) e o aparelho do Mestre não vê o próprio.
+  O telão também recebe (fecha sozinho em 30 s); **só foi testado em celular, não no telão de verdade**.
+- **Colunas**: não existe tabela de colunas — `coluna` é um texto no cartão, e a coluna vazia só existe no
+  aparelho de quem a criou, até um cartão cair nela. Ordem: as sugeridas (`COLUNAS_SUGERIDAS`) primeiro,
+  depois alfabética, "Sem coluna" por último (então uma coluna nova pode aparecer no meio).
+- **Arrastar** (alça `⠿` entre colunas, `🔗` pra ligar): `useArrastoDeColuna`/`useArrastoDeLigacao`, eventos
+  de ponteiro, com `touch-action: none` só na alça. A rolagem automática na borda (`rolarPelaBorda`, uma
+  função pros dois) roda por `requestAnimationFrame`: no celular não dá pra rolar com outro dedo. **O
+  `scroll-snap` da lista de colunas desfaz essa rolagem** (a lista ficava parada e não chegava na coluna da
+  esquerda); fica desligado durante o arrasto (`.qd-colunas[data-arrastando]`). Não tirar.
+- **Ligações** (`quadro_ligacoes`): "Barão → serve a → Culto". Só aparecem pra quem vê os DOIS cartões, e
+  se um lado está em silhueta o tipo da ligação some ("ligado a" / "?"). A vista **🕸 Mapa**
+  (`MapaDeLigacoes.tsx`, posições em `lib/grafo.ts`) é um SVG: simulação de forças determinística (todo
+  aparelho desenha igual; os ids são ordenados), arrastar círculo só muda a SUA tela. Os ouvintes do
+  arrasto do círculo são ligados no instante do toque (não num efeito): se o dedo levantar antes, o
+  círculo não pode ficar grudado. Nomes ficam numa camada própria sem captar toque, senão o nome de um
+  cartão tapa o círculo do vizinho. O desenho tem largura máxima (1,7×) — em tela larga ele passava de
+  1000 px de altura.
+- **Anotações** (`quadro_notas`): qualquer um anota num cartão que enxerga por inteiro, **todos leem**
+  (o Daniel confirmou: visível, não privada). Cada um apaga a sua; o Mestre apaga qualquer uma.
+- **Sessões**: `diario.cartoes` (lista de ids). O Mestre marca quem apareceu; no cartão aparece "Apareceu
+  em: Sessão N". Cada um só vê os cartões que já pode ver.
+- **Foto**: vai pro bucket `mapas` (já existia) em `<sala>/quadro/`, reduzida a 1200 px no aparelho
+  (`prepararImagem(arquivo, LADO_MAXIMO_FOTO)`). Trocar a foto muda o caminho (sufixo), senão o cache de
+  um ano do Storage mostraria a antiga. O backup diário e o restaurador levam as fotos dos cartões junto.
+- **Canal próprio** (`useQuadro`, fora do `useSala`) e tolerante à tabela ausente: o código pode ir ao ar
+  antes do SQL. **Exceção**: sem a `0025` ligações e anotações somem, mas marcar cartão numa sessão
+  falha (a coluna `diario.cartoes` não existe).
+- **Robô** (`e2e/quadro.e2e.ts`, 4 cenários contra o banco): foto carrega, os três estados, ligação que
+  não entrega cartão escondido, anotação, destaque, sessão, colunas arrastando (mouse), arrastar até coluna
+  fora da tela à esquerda, mapa de ligações, rolagem ao ligar. A limpeza do robô (`limparImagens` em
+  `apoio.ts`) agora apaga também `<sala>/quadro/`.
+- **Lições**: (1) **conferir `git log -1 --format=%ae` depois de commitar** — dois commits saíram com o
+  e-mail padrão do Mac e o Vercel bloqueou o deploy (o celular do Daniel seguia na versão antiga e ele
+  achou que "não apareceu"). Este checkout agora tem `user.email` local certo. (2) **Não rodar o robô aqui
+  enquanto o do GitHub roda** (`gh run list --workflow e2e.yml --limit 1` → `completed`): mesma sala, um
+  apaga o do outro (derrubou testes que pareciam defeito; um alerta de falha no GitHub teve essa causa).
+  (3) Teste que mede posição na tela: os ids são sorteados, então o desenho muda a cada rodada — arraste em
+  direção ao centro, e role até o elemento antes de apertar.
 
 ## Próximos passos (combinados em 17/09/2026)
 
