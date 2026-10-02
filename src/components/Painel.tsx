@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCenas } from "@/hooks/useCenas";
 import { useQuadro } from "@/hooks/useQuadro";
+import { useBau } from "@/hooks/useBau";
 import { useVersaoNova } from "@/hooks/useVersaoNova";
 import { AvisoVersaoNova } from "@/components/AvisoVersaoNova";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
@@ -105,6 +106,8 @@ function PainelSala({ codigo }: { codigo: string }) {
   // O quadro também tem canal próprio. No telão ninguém tem identidade: ele
   // vê só o que a mesa inteira vê.
   const quadro = useQuadro(codigo, telao ? null : identidade);
+  // O baú do grupo (itens e moedas ainda sem dono) também tem canal próprio.
+  const bau = useBau(codigo);
   // Saiu uma versão nova depois de abrir? O telão (que ninguém toca) recarrega sozinho; nos
   // celulares aparece um aviso e a pessoa decide a hora (não no meio de um combate).
   const versaoNova = useVersaoNova(telao);
@@ -398,7 +401,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
-      {abaEfetiva === "diario" && <AbaCampanha sala={sala} quadro={quadro} identidade={identidade} />}
+      {abaEfetiva === "diario" && <AbaCampanha sala={sala} quadro={quadro} bau={bau} identidade={identidade} />}
 
       {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} />}
 
@@ -441,7 +444,7 @@ function PainelSala({ codigo }: { codigo: string }) {
           <div className="grid">
             {souMestre
               ? sala.personagens.map((p) => (
-                  <FichaPersonagem key={p.id} personagem={p} souMestre ehMinha={false} sala={sala} />
+                  <FichaPersonagem key={p.id} personagem={p} souMestre ehMinha={false} sala={sala} bau={bau} />
                 ))
               : meuPersonagem && (
                   <FichaPersonagem
@@ -450,6 +453,7 @@ function PainelSala({ codigo }: { codigo: string }) {
                     souMestre={false}
                     ehMinha
                     sala={sala}
+                    bau={bau}
                   />
                 )}
           </div>

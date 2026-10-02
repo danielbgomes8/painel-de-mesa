@@ -82,6 +82,9 @@ const PERSONAGEM = colunas<Personagem>({
   save_wis: true,
   save_cha: true,
   items: true,
+  moedas: true,
+  inventario: true,
+  magias: true,
   created_at: true,
   updated_at: true,
 });

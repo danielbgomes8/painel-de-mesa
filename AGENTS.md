@@ -1522,6 +1522,46 @@ da aba continua `"diario"` (`BarraAbas.tsx`); só o rótulo mudou.
   (3) Teste que mede posição na tela: os ids são sorteados, então o desenho muda a cada rodada — arraste em
   direção ao centro, e role até o elemento antes de apertar.
 
+## Inventário, magias e baú do grupo (02/10/2026, migration `0026`)
+
+O Daniel pediu "o que falta pra ficar completo" e escolheu inventário + magias. Três peças:
+
+- **Inventário e moedas** (`InventarioPersonagem.tsx`, regras em `lib/inventario.ts`, testadas): colunas
+  `moedas`/`inventario` em `characters` (viajam no backup sozinhas). Peso em **kg** por unidade;
+  capacidade = Força × 7,5 kg (a tradução brasileira de "Força × 15 lb"); moeda pesa 0,01 kg; sintonia
+  máxima 3 (o botão recusa o 4º). Item comum repetido empilha; mágico nunca empilha.
+- **Magias** (`MagiasPersonagem.tsx`, regras em `lib/magias.ts`, testadas): coluna `magias`. **Espaço de
+  magia NÃO é campo novo** — continua sendo o recurso "Espaço de magia Nv. N" que a calculadora de classe
+  gera (`PREFIXO_ESPACO_MAGIA`); conjurar só gasta esse recurso e liga a concentração que a ficha já tinha
+  (`concentration`/`concentration_on`, e segurar outra larga a anterior e avisa). Truque não gasta;
+  ritual (só se a magia for ritual) não gasta; escolher espaço maior sobe o nível. O gasto vai pro log do
+  combate ("X conjura Y"). Magia não preparada fica esmaecida mas pode ser conjurada (conhecida × preparada
+  varia por classe; não travar a mesa).
+- **Catálogo do SRD 5.2** (339 magias): `scripts/gerar-magias-srd.mjs` baixa da open5e e grava
+  `lib/magiasSrdGerados.ts` (**não editar à mão**). Dados (nível, escola, tempo, alcance em metros, duração,
+  dano, salvaguarda, classes) vêm da fonte e são traduzidos por tabelas no gerador. **O texto das regras
+  está em português**: foi traduzido com a skill baoyu-translate (modo normal, estilo técnico, glossário em
+  `.baoyu-skills/baoyu-translate/EXTEND.md`, pés/milhas → metros) e vive em `scripts/magias-ptbr.json`;
+  `scripts/importar-traducao-magias.mjs` só aceita tradução em que toda magia e seção existem, os dados de
+  rolagem (8d6...) são idênticos e não sobrou pé/milha. O gerador recusa rodar se faltar magia no JSON.
+  O nome em português segue a tradução do livro de **2014**; 18 ficaram em inglês por falta de nome em que
+  se confie — pode divergir do livro de 2024. A fonte tem duas lacunas: Invisibilidade Maior vem sem texto
+  (`TEXTO_FALTANTE` no gerador) e Tsunami tem um "### U-Z Spells" solto do PDF (a tradução já tirou).
+  O catálogo é **lazy** (`useCatalogoMagias`, ~340 KB, só baixa ao abrir "+ magia"), busca-primeiro como o de monstros.
+- **Baú do grupo** (aba Campanha → 🎒 Baú; `useBau.ts`, `BauDoGrupo.tsx`): tabela `bau_itens`, uma linha por
+  item; **o dinheiro também é linha** (`moeda` preenchida, única por tipo e sala). Mexer na quantidade é
+  "troco só se ninguém mexeu antes" (`update ... where qtd = a que li`, repete até 6×): dois celulares
+  tirando a mesma poção não tiram a mesma unidade. Passar do baú pra ficha é DOIS passos (tira do baú, põe no
+  personagem); se o segundo falha, o primeiro é desfeito. **A escrita no personagem lê o inventário da cópia
+  em memória** (igual o resto da ficha): dois aparelhos mexendo no inventário da MESMA pessoa no mesmo segundo
+  ainda podem se atropelar. Qualquer um da mesa guarda/pega; o Mestre escolhe quem recebe. Não escreve no
+  log de combate (seria ruído); se a mesa quiser histórico de quem pegou o quê, é a próxima melhoria.
+- **Tolerante à migration ausente**: `normalizar*` aceitam coluna inexistente; o baú mostra "falta rodar a
+  0026" (`ehTabelaAusente`). Mesmo assim, **rode a 0026 antes do push**: sem ela, gravar inventário/magias falha.
+- Fora do escopo desta leva (decidido): limite de magias preparadas por classe, progressão/subida de nível,
+  histórico do baú, backup do baú dentro do botão "backup" do app (ele entra no backup bruto diário,
+  `TABELAS_COM_SALA`, como o Quadro).
+
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram

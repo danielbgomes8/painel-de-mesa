@@ -40,6 +40,48 @@ export type SecaoFicha = {
   itens?: ItemSecaoFicha[];
 };
 
+/** As cinco moedas do jogo: cobre, prata, electro, ouro e platina. */
+export type MoedaId = "pc" | "pp" | "pe" | "po" | "pl";
+
+export type Moedas = Record<MoedaId, number>;
+
+/** Sintonização de um item mágico: 0 = não precisa, 1 = precisa e não está
+ *  sintonizado, 2 = sintonizado (limite de três por personagem, ver
+ *  LIMITE_SINTONIA em inventario.ts). */
+export type Sintonia = 0 | 1 | 2;
+
+/** Um item do inventário do personagem (ver migration 0026). `peso` é em kg,
+ *  por unidade. Genérico de propósito, igual `ItemSecaoFicha`: o app soma
+ *  peso e conta sintonia, e o resto é texto do jogador. */
+export type ItemInventario = {
+  nome: string;
+  qtd: number;
+  peso: number;
+  descricao: string;
+  magico: boolean;
+  raridade: string;
+  equipado: boolean;
+  sintonia: Sintonia;
+};
+
+/** Uma magia na lista do personagem (ver migration 0026). Os campos de
+ *  consulta (escola, tempo, alcance...) vêm preenchidos quando a magia é
+ *  escolhida do catálogo do SRD, e ficam vazios numa magia cadastrada à mão.
+ *  `preparada` não vale pra truque (nível 0), que sempre pode ser conjurado. */
+export type MagiaPersonagem = {
+  nome: string;
+  nivel: number;
+  preparada: boolean;
+  concentracao: boolean;
+  ritual: boolean;
+  escola: string;
+  tempo: string;
+  alcance: string;
+  duracao: string;
+  componentes: string;
+  descricao: string;
+};
+
 export type Atributo = "for" | "des" | "con" | "int" | "sab" | "car";
 
 export type Atributos = Record<Atributo, number>;
@@ -195,6 +237,11 @@ export type Personagem = {
   save_wis: number;
   save_cha: number;
   items: ItemEquip[];
+  /** Moedas, inventário e magias do personagem (ver migration 0026). Só pra
+   *  personagem de jogador, igual ficha_secoes. */
+  moedas: Moedas;
+  inventario: ItemInventario[];
+  magias: MagiaPersonagem[];
   created_at: string;
   updated_at: string;
 };

@@ -57,6 +57,8 @@ export const TABELAS_COM_SALA = [
   // Ligações e anotações do Quadro (0025).
   "quadro_ligacoes",
   "quadro_notas",
+  // Baú do grupo (0026): itens e moedas que ainda não são de ninguém.
+  "bau_itens",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em

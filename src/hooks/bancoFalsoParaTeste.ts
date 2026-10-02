@@ -83,6 +83,9 @@ export function fichaPadrao(): Linha {
     save_wis: 0,
     save_cha: 0,
     items: [],
+    moedas: { pc: 0, pp: 0, pe: 0, po: 0, pl: 0 },
+    inventario: [],
+    magias: [],
   };
 }
 

@@ -28,6 +28,9 @@ import { BotaoRemover } from "@/components/BotaoRemover";
 import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
+import { MagiasPersonagem } from "@/components/MagiasPersonagem";
+import { InventarioPersonagem } from "@/components/InventarioPersonagem";
+import type { Bau } from "@/hooks/useBau";
 import { FichaClassicaJogador } from "@/components/FichaClassicaJogador";
 import { CondicoesDaFicha } from "@/components/ExplicacaoCondicao";
 import { ChipsCondicao, PrazosCondicao } from "@/components/CondicoesEditaveis";
@@ -64,11 +67,14 @@ export function FichaPersonagem({
   souMestre,
   ehMinha,
   sala,
+  bau,
 }: {
   personagem: Personagem;
   souMestre: boolean;
   ehMinha: boolean;
   sala: Sala;
+  /** O baú do grupo, pra "guardar no baú" a partir do inventário. */
+  bau?: Bau;
 }) {
   const patch = (mudanca: Partial<Personagem>) => sala.atualizarPersonagem(p.id, mudanca);
   // Permissão é da própria ficha, não de quem manda renderizar — ver
@@ -536,6 +542,8 @@ export function FichaPersonagem({
         {modoJogador && (
           <>
             <FichaClasse personagem={p} editavel={editavel} patch={patch} />
+            <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
+            <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} />
             <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
           </>
         )}
@@ -553,6 +561,8 @@ export function FichaPersonagem({
               <>
                 <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} />
                 <FichaClasse personagem={p} editavel={editavel} patch={patch} />
+                <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
+                <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} />
                 <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
               </>
             )}
