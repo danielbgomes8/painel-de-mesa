@@ -13,7 +13,9 @@ test.afterAll(limparSala);
 
 test("versão nova: o celular mostra o aviso, só quem toca recarrega; sem versão nova, nada aparece", async ({ browser }) => {
   test.setTimeout(60_000);
-  const ctx = await browser.newContext();
+  // Sem service worker: no build de produção ele atende `/versao` por conta própria e o
+  // `page.route` do Playwright não enxerga esse pedido (o aviso nunca aparecia no robô do GitHub).
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
   const page = await ctx.newPage();
   const erros = coletarErros(page);
   let versao: string | null = null; // o que o servidor "diz"
@@ -44,7 +46,7 @@ test("versão nova: o celular mostra o aviso, só quem toca recarrega; sem vers�
 
 test("versão nova no telão: recarrega sozinho, uma vez só", async ({ browser }) => {
   test.setTimeout(60_000);
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, serviceWorkers: "block" });
   const tv = await ctx.newPage();
   await tv.route("**/versao", (rota) => rota.fulfill({ json: { versao: "abc1234" }, headers: { "cache-control": "no-store" } }));
   await tv.addInitScript(() => ((window as unknown as { __versaoDeTeste: boolean }).__versaoDeTeste = true));
