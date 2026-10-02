@@ -293,6 +293,8 @@ export type EntradaDiario = {
   room_code: string;
   title: string;
   text: string;
+  /** Ids dos cartões do Quadro que apareceram nesta sessão. */
+  cartoes: string[];
   created_at: string;
 };
 

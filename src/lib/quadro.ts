@@ -170,7 +170,8 @@ export function ordenarColunas(nomes: string[]): string[] {
   });
 }
 
-export type ColunaDoQuadro = { nome: string; cartoes: CartaoVisto[] };
+/** `nome` é o que aparece na tela; `valor` é o que está gravado nos cartões ("" = sem coluna). */
+export type ColunaDoQuadro = { nome: string; valor: string; cartoes: CartaoVisto[] };
 
 export function agruparPorColuna(lista: CartaoVisto[]): ColunaDoQuadro[] {
   const mapa = new Map<string, CartaoVisto[]>();
@@ -178,7 +179,7 @@ export function agruparPorColuna(lista: CartaoVisto[]): ColunaDoQuadro[] {
     const nome = v.cartao.coluna.trim();
     mapa.set(nome, [...(mapa.get(nome) ?? []), v]);
   }
-  return ordenarColunas([...mapa.keys()]).map((nome) => ({ nome: nome || SEM_COLUNA, cartoes: mapa.get(nome) ?? [] }));
+  return ordenarColunas([...mapa.keys()]).map((valor) => ({ nome: valor || SEM_COLUNA, valor, cartoes: mapa.get(valor) ?? [] }));
 }
 
 /** Filtro por tipo; `null` = todos. */
@@ -205,4 +206,125 @@ export function virouDestaque(antes: Cartao | undefined, depois: Cartao, quem: I
  *  então o cache de um ano do Storage nunca mostra a antiga. */
 export function caminhoDaFoto(codigoSala: string, idCartao: string, sufixo: string): string {
   return `${codigoSala}/quadro/${idCartao}-${sufixo}.jpg`;
+}
+
+// ── Ligações entre cartões ──────────────────────────────────────────────
+
+export type Ligacao = { id: string; room_code: string; de: string; para: string; rotulo: string; created_at: string };
+
+export const LIMITE_ROTULO_LIGACAO = 40;
+/** Sugestões do campo de ligação ("Barão Vael → serve a → Culto"). */
+export const ROTULOS_SUGERIDOS = ["serve a", "mora em", "aliado de", "inimigo de", "dono de", "parente de"] as const;
+
+export function normalizarLigacao(linha: unknown): Ligacao | null {
+  if (!linha || typeof linha !== "object") return null;
+  const l = linha as Record<string, unknown>;
+  if (typeof l.id !== "string" || typeof l.de !== "string" || typeof l.para !== "string" || l.de === l.para) return null;
+  return {
+    id: l.id,
+    room_code: typeof l.room_code === "string" ? l.room_code : "",
+    de: l.de,
+    para: l.para,
+    rotulo: texto(l.rotulo, LIMITE_ROTULO_LIGACAO),
+    created_at: typeof l.created_at === "string" ? l.created_at : "",
+  };
+}
+
+export type LigacaoVista = {
+  ligacao: Ligacao;
+  /** O cartão do outro lado, do jeito que ESTA pessoa o enxerga. */
+  outro: CartaoVisto;
+  /** `saindo`: este cartão → outro ("serve a"); `chegando`: outro → este. */
+  sentido: "saindo" | "chegando";
+};
+
+/** As ligações de um cartão que esta pessoa pode ver: só entram se o cartão do
+ *  outro lado também aparece pra ela (senão a ligação entregaria que ele existe). */
+export function ligacoesDoCartao(id: string, ligacoes: Ligacao[], vistos: CartaoVisto[]): LigacaoVista[] {
+  const porId = new Map(vistos.map((v) => [v.cartao.id, v]));
+  const lista: LigacaoVista[] = [];
+  for (const ligacao of ligacoes) {
+    if (ligacao.de === id) {
+      const outro = porId.get(ligacao.para);
+      if (outro) lista.push({ ligacao, outro, sentido: "saindo" });
+    } else if (ligacao.para === id) {
+      const outro = porId.get(ligacao.de);
+      if (outro) lista.push({ ligacao, outro, sentido: "chegando" });
+    }
+  }
+  return lista;
+}
+
+/** Já existe essa ligação (mesmo sentido e mesmo rótulo)? Evita duplicar com toque duplo. */
+export function ligacaoJaExiste(ligacoes: Ligacao[], de: string, para: string, rotulo: string): boolean {
+  const r = rotulo.trim().toLowerCase();
+  return ligacoes.some((l) => l.de === de && l.para === para && l.rotulo.trim().toLowerCase() === r);
+}
+
+// ── Anotações nos cartões ───────────────────────────────────────────────
+
+export type NotaDoCartao = { id: string; room_code: string; cartao_id: string; autor: string; texto: string; created_at: string };
+
+export const LIMITE_NOTA = 300;
+/** `autor` de quem é o Mestre (os jogadores usam o slug da ficha). */
+export const AUTOR_MESTRE = "mestre";
+
+export function normalizarNota(linha: unknown): NotaDoCartao | null {
+  if (!linha || typeof linha !== "object") return null;
+  const l = linha as Record<string, unknown>;
+  if (typeof l.id !== "string" || typeof l.cartao_id !== "string" || typeof l.autor !== "string") return null;
+  return {
+    id: l.id,
+    room_code: typeof l.room_code === "string" ? l.room_code : "",
+    cartao_id: l.cartao_id,
+    autor: l.autor,
+    texto: texto(l.texto, LIMITE_NOTA),
+    created_at: typeof l.created_at === "string" ? l.created_at : "",
+  };
+}
+
+export function autorDaPessoa(quem: Identidade | null): string | null {
+  if (quem?.tipo === "mestre") return AUTOR_MESTRE;
+  if (quem?.tipo === "jogador") return quem.slug;
+  return null;
+}
+
+/** Todo mundo anota num cartão que enxerga por inteiro (silhueta não: não há o que comentar). */
+export function podeAnotar(visao: Visao, quem: Identidade | null): boolean {
+  return visao === "completo" && quem !== null;
+}
+
+/** Cada um apaga a própria anotação; o Mestre apaga qualquer uma. */
+export function podeApagarNota(n: NotaDoCartao, quem: Identidade | null): boolean {
+  if (quem?.tipo === "mestre") return true;
+  return autorDaPessoa(quem) === n.autor;
+}
+
+export function notasDoCartao(id: string, notas: NotaDoCartao[]): NotaDoCartao[] {
+  return notas.filter((n) => n.cartao_id === id).sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+// ── Sessões ─────────────────────────────────────────────────────────────
+
+/** Só o que o diário precisa saber de uma sessão. */
+export type SessaoComCartoes = { id: string; title: string; created_at: string; cartoes?: string[] | null };
+
+/** Os cartões de uma sessão que esta pessoa vê (cartão apagado ou escondido não aparece). */
+export function cartoesDaSessao(sessao: SessaoComCartoes, vistos: CartaoVisto[]): CartaoVisto[] {
+  const ids = Array.isArray(sessao.cartoes) ? sessao.cartoes : [];
+  const porId = new Map(vistos.map((v) => [v.cartao.id, v]));
+  return ids.map((id) => porId.get(id)).filter((v): v is CartaoVisto => Boolean(v));
+}
+
+/** As sessões em que um cartão apareceu, da mais recente pra mais antiga. */
+export function sessoesDoCartao(id: string, sessoes: SessaoComCartoes[]): SessaoComCartoes[] {
+  return sessoes
+    .filter((s) => Array.isArray(s.cartoes) && s.cartoes.includes(id))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Liga ou desliga um cartão numa sessão (a lista nova, sem repetir). */
+export function alternarCartaoNaSessao(atuais: string[] | null | undefined, id: string): string[] {
+  const lista = Array.isArray(atuais) ? atuais : [];
+  return lista.includes(id) ? lista.filter((x) => x !== id) : [...lista, id];
 }

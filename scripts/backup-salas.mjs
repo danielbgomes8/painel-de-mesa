@@ -54,6 +54,9 @@ export const TABELAS_COM_SALA = [
   // Quadro da Campanha (0024). A foto de cada cartão fica no Storage e vai na
   // cópia das imagens, ao lado das dos mapas.
   "quadro_cartoes",
+  // Ligações e anotações do Quadro (0025).
+  "quadro_ligacoes",
+  "quadro_notas",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em

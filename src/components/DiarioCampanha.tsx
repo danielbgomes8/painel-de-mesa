@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { EntradaDiario } from "@/lib/tipos";
+import { alternarCartaoNaSessao, cartoesDaSessao, emojiDoTipo, type CartaoVisto } from "@/lib/quadro";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
@@ -13,9 +14,14 @@ export function DiarioCampanha({
   sala,
   souMestre,
   semCabecalho = false,
+  cartoes = [],
+  aoAbrirCartao,
 }: {
   sala: Sala;
   souMestre: boolean;
+  /** Os cartões do Quadro que esta pessoa vê (pra marcar e mostrar em cada sessão). */
+  cartoes?: CartaoVisto[];
+  aoAbrirCartao?: (id: string) => void;
   /** Dentro da aba Campanha o título já está lá em cima. */
   semCabecalho?: boolean;
 }) {
@@ -35,7 +41,7 @@ export function DiarioCampanha({
 
       <div className="diariolist">
         {sala.diario.map((e) => (
-          <EntradaDiarioRow key={e.id} entrada={e} sala={sala} editavel={souMestre} />
+          <EntradaDiarioRow key={e.id} entrada={e} sala={sala} editavel={souMestre} cartoes={cartoes} aoAbrirCartao={aoAbrirCartao} />
         ))}
       </div>
 
@@ -48,10 +54,14 @@ function EntradaDiarioRow({
   entrada: e,
   sala,
   editavel,
+  cartoes,
+  aoAbrirCartao,
 }: {
   entrada: EntradaDiario;
   sala: Sala;
   editavel: boolean;
+  cartoes: CartaoVisto[];
+  aoAbrirCartao?: (id: string) => void;
 }) {
   const patch = (mudanca: Partial<EntradaDiario>) => sala.atualizarEntradaDiario(e.id, mudanca);
   return (
@@ -80,6 +90,64 @@ function EntradaDiarioRow({
         />
       ) : (
         <p>{e.text}</p>
+      )}
+      {aoAbrirCartao && (cartoes.length > 0 || cartoesDaSessao(e, cartoes).length > 0) && (
+        <CartoesDaSessao entrada={e} cartoes={cartoes} editavel={editavel} aoAbrir={aoAbrirCartao} aoMudar={(ids) => patch({ cartoes: ids })} />
+      )}
+    </div>
+  );
+}
+
+/** Quem apareceu nesta sessão: chips que abrem o cartão; o Mestre marca e desmarca. */
+function CartoesDaSessao({
+  entrada,
+  cartoes,
+  editavel,
+  aoAbrir,
+  aoMudar,
+}: {
+  entrada: EntradaDiario;
+  cartoes: CartaoVisto[];
+  editavel: boolean;
+  aoAbrir: (id: string) => void;
+  aoMudar: (ids: string[]) => void;
+}) {
+  const marcados = cartoesDaSessao(entrada, cartoes);
+  const livres = cartoes.filter((v) => v.visao === "completo" && !marcados.some((m) => m.cartao.id === v.cartao.id));
+  if (marcados.length === 0 && !editavel) return null;
+  return (
+    <div className="qd-sessaocartoes">
+      <span className="qd-rotulo">Apareceram:</span>
+      {marcados.map((v) => (
+        <span key={v.cartao.id} className="qd-chipcartao">
+          <button type="button" className="chip" onClick={() => aoAbrir(v.cartao.id)}>
+            {emojiDoTipo(v.cartao.tipo)} {v.visao === "silhueta" ? "???" : v.cartao.titulo || "Sem nome"}
+          </button>
+          {editavel && (
+            <button
+              type="button"
+              className="qd-tirar"
+              aria-label={`Tirar ${v.cartao.titulo} desta sessão`}
+              onClick={() => aoMudar(alternarCartaoNaSessao(entrada.cartoes, v.cartao.id))}
+            >
+              ✕
+            </button>
+          )}
+        </span>
+      ))}
+      {editavel && livres.length > 0 && (
+        <select
+          aria-label="Marcar um cartão nesta sessão"
+          value=""
+          onChange={(ev) => ev.target.value && aoMudar(alternarCartaoNaSessao(entrada.cartoes, ev.target.value))}
+        >
+          <option value="">＋ cartão…</option>
+          {livres.map((v) => (
+            <option key={v.cartao.id} value={v.cartao.id}>
+              {emojiDoTipo(v.cartao.tipo)} {v.cartao.titulo || "Sem nome"}
+            </option>
+          ))}
+        </select>
       )}
     </div>
   );

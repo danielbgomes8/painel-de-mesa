@@ -175,3 +175,99 @@ describe("normalizarCartao", () => {
     expect(normalizarCartao({ room_code: "s" })).toBeNull();
   });
 });
+
+import {
+  alternarCartaoNaSessao,
+  autorDaPessoa,
+  cartoesDaSessao,
+  ligacaoJaExiste,
+  ligacoesDoCartao,
+  normalizarLigacao,
+  normalizarNota,
+  notasDoCartao,
+  podeAnotar,
+  podeApagarNota,
+  sessoesDoCartao,
+  type Ligacao,
+  type NotaDoCartao,
+} from "./quadro";
+
+function lig(id: string, de: string, para: string, rotulo = "serve a"): Ligacao {
+  return { id, room_code: "s", de, para, rotulo, created_at: id };
+}
+
+describe("ligações", () => {
+  const todos = [
+    cartao({ id: "barao", revelacao: "revelado" }),
+    cartao({ id: "culto", revelacao: "revelado" }),
+    cartao({ id: "torre", revelacao: "escondido" }),
+  ];
+  const ligas = [lig("1", "barao", "culto"), lig("2", "barao", "torre", "mora em")];
+  it("mostra nos dois sentidos", () => {
+    const vistosAna = cartoesVisiveis(todos, ANA);
+    const doBarao = ligacoesDoCartao("barao", ligas, vistosAna);
+    expect(doBarao.map((l) => [l.outro.cartao.id, l.sentido])).toEqual([["culto", "saindo"]]);
+    const doCulto = ligacoesDoCartao("culto", ligas, vistosAna);
+    expect(doCulto.map((l) => [l.outro.cartao.id, l.sentido])).toEqual([["barao", "chegando"]]);
+  });
+  it("não entrega um cartão escondido pela ligação", () => {
+    expect(ligacoesDoCartao("barao", ligas, cartoesVisiveis(todos, ANA)).some((l) => l.outro.cartao.id === "torre")).toBe(false);
+    expect(ligacoesDoCartao("barao", ligas, cartoesVisiveis(todos, MESTRE))).toHaveLength(2);
+  });
+  it("detecta ligação repetida sem ligar pra maiúscula", () => {
+    expect(ligacaoJaExiste(ligas, "barao", "culto", " Serve A ")).toBe(true);
+    expect(ligacaoJaExiste(ligas, "culto", "barao", "serve a")).toBe(false);
+  });
+  it("normaliza e recusa ligação de um cartão com ele mesmo", () => {
+    expect(normalizarLigacao({ id: "x", de: "a", para: "b", rotulo: "y".repeat(90) })?.rotulo).toHaveLength(40);
+    expect(normalizarLigacao({ id: "x", de: "a", para: "a" })).toBeNull();
+  });
+});
+
+describe("anotações", () => {
+  const nota = (autor: string): NotaDoCartao => ({ id: "n", room_code: "s", cartao_id: "c1", autor, texto: "mente", created_at: "1" });
+  it("todos anotam no que veem por inteiro; silhueta e telão não", () => {
+    expect(podeAnotar("completo", ANA)).toBe(true);
+    expect(podeAnotar("completo", MESTRE)).toBe(true);
+    expect(podeAnotar("silhueta", ANA)).toBe(false);
+    expect(podeAnotar("completo", null)).toBe(false);
+  });
+  it("cada um apaga a sua; o Mestre apaga qualquer uma", () => {
+    expect(podeApagarNota(nota("ana"), ANA)).toBe(true);
+    expect(podeApagarNota(nota("ana"), BETO)).toBe(false);
+    expect(podeApagarNota(nota("ana"), MESTRE)).toBe(true);
+    expect(podeApagarNota(nota("mestre"), ANA)).toBe(false);
+  });
+  it("autor e ordem", () => {
+    expect(autorDaPessoa(MESTRE)).toBe("mestre");
+    expect(autorDaPessoa(ANA)).toBe("ana");
+    expect(autorDaPessoa(null)).toBeNull();
+    const a = { ...nota("ana"), id: "a", created_at: "2" };
+    const b = { ...nota("beto"), id: "b", created_at: "1" };
+    expect(notasDoCartao("c1", [a, b, { ...b, cartao_id: "outro" }]).map((n) => n.id)).toEqual(["b", "a"]);
+    expect(normalizarNota({ id: "a", cartao_id: "c", autor: "ana", texto: "x".repeat(400) })?.texto).toHaveLength(300);
+    expect(normalizarNota({ id: "a", cartao_id: "c" })).toBeNull();
+  });
+});
+
+describe("sessões e cartões", () => {
+  const sessoes = [
+    { id: "s1", title: "Sessão 1", created_at: "2026-09-01", cartoes: ["a", "b"] },
+    { id: "s2", title: "Sessão 2", created_at: "2026-09-08", cartoes: ["a"] },
+    { id: "s3", title: "Sessão 3", created_at: "2026-09-15" },
+  ];
+  it("sessões de um cartão, da mais nova pra mais velha", () => {
+    expect(sessoesDoCartao("a", sessoes).map((s) => s.id)).toEqual(["s2", "s1"]);
+    expect(sessoesDoCartao("zzz", sessoes)).toEqual([]);
+  });
+  it("só mostra os cartões da sessão que a pessoa vê", () => {
+    const vistos = cartoesVisiveis([cartao({ id: "a", revelacao: "revelado" }), cartao({ id: "b", revelacao: "escondido" })], ANA);
+    expect(cartoesDaSessao(sessoes[0], vistos).map((v) => v.cartao.id)).toEqual(["a"]);
+    expect(cartoesDaSessao(sessoes[2], vistos)).toEqual([]);
+  });
+  it("liga e desliga sem repetir; aceita lista ausente", () => {
+    expect(alternarCartaoNaSessao(["a"], "b")).toEqual(["a", "b"]);
+    expect(alternarCartaoNaSessao(["a", "b"], "a")).toEqual(["b"]);
+    expect(alternarCartaoNaSessao(undefined, "a")).toEqual(["a"]);
+  });
+});

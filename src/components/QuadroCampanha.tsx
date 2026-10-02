@@ -2,12 +2,23 @@
 
 /* eslint-disable @next/next/no-img-element -- as fotos vêm do Storage do Supabase, já reduzidas no envio */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Quadro } from "@/hooks/useQuadro";
 import type { Identidade } from "@/lib/identidade";
+import type { EntradaDiario } from "@/lib/tipos";
 import {
   COLUNAS_SUGERIDAS,
   LIMITE_COLUNA,
+  LIMITE_NOTA,
+  LIMITE_ROTULO_LIGACAO,
+  ROTULOS_SUGERIDOS,
+  SEM_COLUNA,
+  autorDaPessoa,
+  ligacoesDoCartao,
+  notasDoCartao,
+  podeAnotar,
+  podeApagarNota,
+  sessoesDoCartao,
   LIMITE_SUBTITULO,
   LIMITE_TEXTO,
   LIMITE_TITULO,
@@ -50,12 +61,28 @@ const ROTULO_REVELACAO: Record<Revelacao, { emoji: string; curto: string; ajuda:
  *  galeria ou colunas. O Mestre decide o que a mesa vê (escondido, silhueta,
  *  revelado); cada jogador tem os próprios cartões, que só ele vê até
  *  compartilhar. */
-export function QuadroCampanha({ quadro, quem }: { quadro: Quadro; quem: Identidade | null }) {
+export function QuadroCampanha({
+  quadro,
+  quem,
+  sessoes,
+  nomeDoAutor,
+  aberto,
+  setAberto,
+}: {
+  quadro: Quadro;
+  quem: Identidade | null;
+  sessoes: EntradaDiario[];
+  nomeDoAutor: (autor: string) => string;
+  /** O cartão aberto mora na aba (o diário de sessões também abre cartões). */
+  aberto: string | null;
+  setAberto: (id: string | null) => void;
+}) {
   const souMestre = quem?.tipo === "mestre";
   const [vista, setVista] = useState<ModoDeVista>("galeria");
   const [tipo, setTipo] = useState<TipoCartao | null>(null);
-  const [aberto, setAberto] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
+  const listaRef = useRef<HTMLDivElement>(null);
+  const arrasto = useArrastoDeColuna(quadro, souMestre && vista === "colunas", listaRef);
 
   // A escolha de vista é do aparelho; lida depois da hidratação, sem setState em efeito.
   useEffect(() => {
@@ -155,21 +182,57 @@ export function QuadroCampanha({ quadro, quem }: { quadro: Quadro; quem: Identid
           ))}
         </div>
       ) : (
-        <div className="qd-colunas">
-          {agruparPorColuna(lista).map((col) => (
-            <section key={col.nome} className="qd-coluna" aria-label={`Coluna ${col.nome}`}>
+        <div className="qd-colunas" ref={listaRef}>
+          {(arrasto.ativo ? comSemColuna(agruparPorColuna(lista)) : agruparPorColuna(lista)).map((col) => (
+            <section
+              key={col.nome}
+              className="qd-coluna"
+              data-coluna={col.valor}
+              data-alvo={arrasto.sobre === col.valor || undefined}
+              aria-label={`Coluna ${col.nome}`}
+            >
               <h3 className="qd-colunatitulo">
                 {col.nome} <span>{col.cartoes.length}</span>
               </h3>
               {col.cartoes.map((v) => (
-                <MiniaturaDoCartao key={v.cartao.id} visto={v} quadro={quadro} quem={quem} aoAbrir={() => setAberto(v.cartao.id)} />
+                <MiniaturaDoCartao
+                  key={v.cartao.id}
+                  visto={v}
+                  quadro={quadro}
+                  quem={quem}
+                  aoAbrir={() => setAberto(v.cartao.id)}
+                  alca={souMestre && v.cartao.dono === null ? (e) => arrasto.comecar(e, v.cartao) : undefined}
+                  arrastando={arrasto.id === v.cartao.id}
+                />
               ))}
             </section>
           ))}
+          {arrasto.ativo && (
+            <section className="qd-coluna qd-colunanova" data-coluna={COLUNA_NOVA} data-alvo={arrasto.sobre === COLUNA_NOVA || undefined}>
+              <h3 className="qd-colunatitulo">＋ nova coluna</h3>
+              <p className="qd-formdica">solte aqui</p>
+            </section>
+          )}
+        </div>
+      )}
+      {arrasto.fantasma && (
+        <div className="qd-fantasma" style={{ left: arrasto.fantasma.x, top: arrasto.fantasma.y }}>
+          {arrasto.fantasma.titulo}
         </div>
       )}
 
-      {aVer && <FolhaDoCartao visto={aVer} quadro={quadro} quem={quem} aoFechar={() => setAberto(null)} />}
+      {aVer && (
+        <FolhaDoCartao
+          visto={aVer}
+          quadro={quadro}
+          quem={quem}
+          vistos={visiveis}
+          sessoes={sessoes}
+          nomeDoAutor={nomeDoAutor}
+          aoAbrirOutro={setAberto}
+          aoFechar={() => setAberto(null)}
+        />
+      )}
     </div>
   );
 }
@@ -192,11 +255,16 @@ function MiniaturaDoCartao({
   quadro,
   quem,
   aoAbrir,
+  alca,
+  arrastando,
 }: {
   visto: CartaoVisto;
   quadro: Quadro;
   quem: Identidade | null;
   aoAbrir: () => void;
+  /** Só na vista em colunas e só pro Mestre: a alça de arrastar. */
+  alca?: (e: React.PointerEvent<HTMLSpanElement>) => void;
+  arrastando?: boolean;
 }) {
   const { cartao: c, visao } = visto;
   const silhueta = visao === "silhueta";
@@ -204,6 +272,12 @@ function MiniaturaDoCartao({
   const estado = estadoDoCartao(c, quem);
   const titulo = silhueta ? TITULO_DA_SILHUETA : c.titulo || "Sem nome";
   return (
+    <div className="qd-cartaobloco" data-arrastando={arrastando || undefined}>
+      {alca && (
+        <span className="qd-alca" onPointerDown={alca} role="button" aria-label={`Arrastar ${titulo} para outra coluna`} title="Arrastar para outra coluna">
+          ⠿
+        </span>
+      )}
     <button type="button" className="qd-cartao" data-revelacao={c.revelacao} data-dono={c.dono ? "pessoal" : "mesa"} onClick={aoAbrir}>
       <span className="qd-foto" data-silhueta={silhueta || undefined}>
         {url ? <img src={url} alt="" loading="lazy" /> : <span className="qd-semfoto">{emojiDoTipo(c.tipo)}</span>}
@@ -219,7 +293,96 @@ function MiniaturaDoCartao({
       <span className="qd-nome">{titulo}</span>
       {!silhueta && c.subtitulo && <span className="qd-sub">{c.subtitulo}</span>}
     </button>
+    </div>
   );
+}
+
+// ── Arrastar entre colunas ──────────────────────────────────────────────
+
+const COLUNA_NOVA = "__nova__";
+
+/** Na vista em colunas o Mestre mostra "Sem coluna" mesmo vazia, pra ter onde soltar. */
+function comSemColuna(colunas: ReturnType<typeof agruparPorColuna>) {
+  return colunas.some((c) => c.valor === "") ? colunas : [...colunas, { nome: SEM_COLUNA, valor: "", cartoes: [] }];
+}
+
+/** Arrastar pela alça (⠿) com o dedo ou o mouse: o cartão acompanha o ponteiro e a
+ *  coluna por baixo acende; soltar grava a coluna. Soltar em "nova coluna" pergunta o nome.
+ *  A alça tem `touch-action: none`, então arrastar nela não rola a página. */
+function useArrastoDeColuna(quadro: Quadro, habilitado: boolean, listaRef: React.RefObject<HTMLDivElement | null>) {
+  const [estado, setEstado] = useState<{ id: string; titulo: string; x: number; y: number; sobre: string | null } | null>(null);
+  const idRef = useRef<string | null>(null);
+  const quadroRef = useRef(quadro);
+  useEffect(() => {
+    quadroRef.current = quadro;
+  }, [quadro]);
+
+  const comecar = (e: React.PointerEvent<HTMLSpanElement>, c: Cartao) => {
+    if (!habilitado) return;
+    e.preventDefault();
+    idRef.current = c.id;
+    setEstado({ id: c.id, titulo: c.titulo || "Sem nome", x: e.clientX, y: e.clientY, sobre: null });
+  };
+
+  const ativo = estado !== null;
+  useEffect(() => {
+    if (!ativo) return;
+    function colunaEm(x: number, y: number): string | null {
+      const alvo = document.elementFromPoint(x, y)?.closest("[data-coluna]") as HTMLElement | null;
+      return alvo ? alvo.dataset.coluna ?? "" : null;
+    }
+    function mover(e: PointerEvent) {
+      // Perto da borda do quadro, rola de lado pra alcançar outra coluna.
+      const lista = listaRef.current;
+      if (lista) {
+        const r = lista.getBoundingClientRect();
+        if (e.clientX < r.left + 36) lista.scrollLeft -= 14;
+        else if (e.clientX > r.right - 36) lista.scrollLeft += 14;
+      }
+      setEstado((a) => (a ? { ...a, x: e.clientX, y: e.clientY, sobre: colunaEm(e.clientX, e.clientY) } : a));
+    }
+    function soltar(e: PointerEvent) {
+      const id = idRef.current;
+      idRef.current = null;
+      setEstado(null);
+      const destino = colunaEm(e.clientX, e.clientY);
+      if (!id || destino === null) return;
+      const cartao = quadroRef.current.cartoes.find((c) => c.id === id);
+      if (!cartao) return;
+      let coluna = destino;
+      if (destino === COLUNA_NOVA) {
+        const nome = window.prompt("Nome da nova coluna:", "")?.trim().slice(0, LIMITE_COLUNA);
+        if (!nome) return;
+        coluna = nome;
+      }
+      if (coluna !== cartao.coluna.trim()) void quadroRef.current.atualizar(id, { coluna });
+    }
+    function cancelar() {
+      idRef.current = null;
+      setEstado(null);
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") cancelar();
+    }
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+    window.addEventListener("pointercancel", cancelar);
+    window.addEventListener("keydown", tecla);
+    return () => {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      window.removeEventListener("pointercancel", cancelar);
+      window.removeEventListener("keydown", tecla);
+    };
+  }, [ativo, listaRef]);
+
+  return {
+    comecar,
+    ativo,
+    id: estado?.id ?? null,
+    sobre: estado?.sobre ?? null,
+    fantasma: estado ? { x: estado.x, y: estado.y, titulo: estado.titulo } : null,
+  };
 }
 
 // ── Cartão novo ─────────────────────────────────────────────────────────
@@ -309,11 +472,19 @@ function FolhaDoCartao({
   visto,
   quadro,
   quem,
+  vistos,
+  sessoes,
+  nomeDoAutor,
+  aoAbrirOutro,
   aoFechar,
 }: {
   visto: CartaoVisto;
   quadro: Quadro;
   quem: Identidade | null;
+  vistos: CartaoVisto[];
+  sessoes: EntradaDiario[];
+  nomeDoAutor: (autor: string) => string;
+  aoAbrirOutro: (id: string) => void;
   aoFechar: () => void;
 }) {
   const { cartao: c, visao } = visto;
@@ -473,11 +644,199 @@ function FolhaDoCartao({
           </div>
         )}
 
+        {!silhueta && (
+          <>
+            <SessoesDoCartao cartao={c} sessoes={sessoes} />
+            {!quadro.extrasIndisponiveis && (
+              <>
+                <LigacoesDoCartao cartao={c} quadro={quadro} vistos={vistos} editavel={editavel} aoAbrirOutro={aoAbrirOutro} />
+                <AnotacoesDoCartao cartao={c} visao={visao} quadro={quadro} quem={quem} nomeDoAutor={nomeDoAutor} />
+              </>
+            )}
+            {quadro.extrasIndisponiveis && quem?.tipo === "mestre" && (
+              <p className="qd-formdica">Ligações e anotações precisam da migration 0025 no Supabase.</p>
+            )}
+          </>
+        )}
+
         <p className="qd-aviso" role="status" aria-live="polite">
           {mensagem ?? quadro.aviso}
         </p>
       </div>
     </div>
+  );
+}
+
+function tituloVisto(v: CartaoVisto): string {
+  return v.visao === "silhueta" ? TITULO_DA_SILHUETA : v.cartao.titulo || "Sem nome";
+}
+
+/** "📖 Apareceu em: Sessão 1, Sessão 3" — a linha do tempo do cartão. */
+function SessoesDoCartao({ cartao, sessoes }: { cartao: Cartao; sessoes: EntradaDiario[] }) {
+  const doCartao = sessoesDoCartao(cartao.id, sessoes);
+  if (doCartao.length === 0) return null;
+  return (
+    <p className="qd-formdica qd-sessoes">
+      📖 Apareceu em:{" "}
+      {doCartao.map((s) => `${s.title || "Sessão"} (${new Date(s.created_at).toLocaleDateString("pt-BR")})`).join(" · ")}
+    </p>
+  );
+}
+
+function LigacoesDoCartao({
+  cartao: c,
+  quadro,
+  vistos,
+  editavel,
+  aoAbrirOutro,
+}: {
+  cartao: Cartao;
+  quadro: Quadro;
+  vistos: CartaoVisto[];
+  editavel: boolean;
+  aoAbrirOutro: (id: string) => void;
+}) {
+  const ligadas = ligacoesDoCartao(c.id, quadro.ligacoes, vistos);
+  const candidatos = vistos.filter((v) => v.cartao.id !== c.id && v.visao === "completo");
+  const [para, setPara] = useState("");
+  const [rotulo, setRotulo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function ligar() {
+    if (!para || salvando) return;
+    setSalvando(true);
+    const ok = await quadro.ligar(c.id, para, rotulo);
+    setSalvando(false);
+    if (ok) {
+      setPara("");
+      setRotulo("");
+    }
+  }
+
+  if (ligadas.length === 0 && !editavel) return null;
+  return (
+    <section className="qd-secao" aria-label="Ligações">
+      <h4 className="qd-secaotitulo">🔗 Ligações</h4>
+      <ul className="qd-lista">
+        {ligadas.map(({ ligacao, outro, sentido }) => (
+          <li key={ligacao.id}>
+            <button type="button" className="qd-ligacao" onClick={() => aoAbrirOutro(outro.cartao.id)}>
+              <span className="qd-ligacaotexto">
+                {sentido === "saindo" ? (
+                  <>
+                    <i>{ligacao.rotulo || "ligado a"}</i> → <b>{tituloVisto(outro)}</b>
+                  </>
+                ) : (
+                  <>
+                    <b>{tituloVisto(outro)}</b> → <i>{ligacao.rotulo || "ligado a"}</i> → este
+                  </>
+                )}
+              </span>
+            </button>
+            {editavel && (
+              <BotaoRemover aria={`desfazer a ligação com ${tituloVisto(outro)}`} onConfirmar={() => void quadro.desligar(ligacao.id)} />
+            )}
+          </li>
+        ))}
+      </ul>
+      {editavel && candidatos.length > 0 && (
+        <div className="qd-ligar">
+          <div className="qd-linha">
+            <input
+              type="text"
+              aria-label="Tipo da ligação"
+              placeholder="serve a, mora em…"
+              maxLength={LIMITE_ROTULO_LIGACAO}
+              value={rotulo}
+              onChange={(e) => setRotulo(e.target.value)}
+            />
+            <select aria-label="Ligar a qual cartão" value={para} onChange={(e) => setPara(e.target.value)}>
+              <option value="">cartão…</option>
+              {candidatos.map((v) => (
+                <option key={v.cartao.id} value={v.cartao.id}>
+                  {emojiDoTipo(v.cartao.tipo)} {v.cartao.titulo || "Sem nome"}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="qd-sugestoes">
+            {ROTULOS_SUGERIDOS.map((r) => (
+              <button key={r} type="button" className="chip" aria-pressed={rotulo === r} onClick={() => setRotulo(r)}>
+                {r}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn" disabled={!para || salvando} onClick={() => void ligar()}>
+            {salvando ? "Ligando…" : "＋ ligar"}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AnotacoesDoCartao({
+  cartao: c,
+  visao,
+  quadro,
+  quem,
+  nomeDoAutor,
+}: {
+  cartao: Cartao;
+  visao: CartaoVisto["visao"];
+  quadro: Quadro;
+  quem: Identidade | null;
+  nomeDoAutor: (autor: string) => string;
+}) {
+  const doCartao = notasDoCartao(c.id, quadro.notas);
+  const autor = autorDaPessoa(quem);
+  const [texto, setTexto] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
+  async function anotar() {
+    if (!autor || !texto.trim() || salvando) return;
+    setSalvando(true);
+    const ok = await quadro.anotar(c.id, autor, texto);
+    setSalvando(false);
+    if (ok) setTexto("");
+  }
+
+  const pode = podeAnotar(visao, quem);
+  if (doCartao.length === 0 && !pode) return null;
+  return (
+    <section className="qd-secao" aria-label="Anotações">
+      <h4 className="qd-secaotitulo">💬 Anotações da mesa</h4>
+      <ul className="qd-lista">
+        {doCartao.map((n) => (
+          <li key={n.id} className="qd-nota">
+            <p className="qd-notatexto">
+              <b>{nomeDoAutor(n.autor)}:</b> {n.texto}
+            </p>
+            {podeApagarNota(n, quem) && (
+              <BotaoRemover aria={`apagar a anotação de ${nomeDoAutor(n.autor)}`} onConfirmar={() => void quadro.apagarNota(n.id)} />
+            )}
+          </li>
+        ))}
+      </ul>
+      {pode && (
+        <div className="qd-linha">
+          <input
+            type="text"
+            aria-label="Nova anotação"
+            placeholder="acho que ele mente…"
+            maxLength={LIMITE_NOTA}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void anotar();
+            }}
+          />
+          <button type="button" className="btn" disabled={!texto.trim() || salvando} onClick={() => void anotar()}>
+            anotar
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

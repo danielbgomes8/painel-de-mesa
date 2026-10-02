@@ -10,9 +10,15 @@ import {
   CARTOES_MAXIMOS,
   LADO_MAXIMO_FOTO,
   caminhoDaFoto,
+  LIMITE_NOTA,
+  ligacaoJaExiste,
   normalizarCartao,
+  normalizarLigacao,
+  normalizarNota,
   virouDestaque,
   type Cartao,
+  type Ligacao,
+  type NotaDoCartao,
   type NovoCartao,
 } from "@/lib/quadro";
 
@@ -30,6 +36,10 @@ export type Quadro = {
   carregando: boolean;
   /** A tabela ainda não existe (migration 0024 não rodada): o resto do app funciona. */
   indisponivel: boolean;
+  ligacoes: Ligacao[];
+  notas: NotaDoCartao[];
+  /** As tabelas de ligação e anotação ainda não existem (migration 0025 não rodada). */
+  extrasIndisponiveis: boolean;
   aviso: string | null;
   /** O cartão que o Mestre acabou de mostrar à mesa (tela cheia), se houver. */
   destaque: Cartao | null;
@@ -43,6 +53,10 @@ export type Quadro = {
   remover: (id: string) => Promise<boolean>;
   /** Revela o cartão e manda a foto em tela cheia pra mesa. */
   mostrarAMesa: (id: string) => Promise<boolean>;
+  ligar: (de: string, para: string, rotulo: string) => Promise<boolean>;
+  desligar: (id: string) => Promise<boolean>;
+  anotar: (cartaoId: string, autor: string, texto: string) => Promise<boolean>;
+  apagarNota: (id: string) => Promise<boolean>;
 };
 
 /**
@@ -57,12 +71,19 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
   const [indisponivel, setIndisponivel] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [destaque, setDestaque] = useState<Cartao | null>(null);
+  const [ligacoes, setLigacoes] = useState<Ligacao[]>([]);
+  const [notas, setNotas] = useState<NotaDoCartao[]>([]);
+  const [extrasIndisponiveis, setExtrasIndisponiveis] = useState(false);
   const ref = useRef<Cartao[]>([]);
+  const ligacoesRef = useRef<Ligacao[]>([]);
+  const notasRef = useRef<NotaDoCartao[]>([]);
   const quemRef = useRef(quem);
   useEffect(() => {
     ref.current = cartoes;
+    ligacoesRef.current = ligacoes;
+    notasRef.current = notas;
     quemRef.current = quem;
-  }, [cartoes, quem]);
+  }, [cartoes, ligacoes, notas, quem]);
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -87,7 +108,25 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
       // leva um susto com um cartão de minutos atrás.
       setCartoes((data ?? []).map(normalizarCartao).filter((c): c is Cartao => c !== null));
       setCarregando(false);
+      await carregarExtras();
       return true;
+    }
+
+    // Ligações e anotações: se faltar a tabela, os cartões seguem funcionando.
+    async function carregarExtras() {
+      const [l, n] = await Promise.all([
+        supabase.from("quadro_ligacoes").select("*").eq("room_code", codigo).order("created_at", { ascending: true }),
+        supabase.from("quadro_notas").select("*").eq("room_code", codigo).order("created_at", { ascending: true }),
+      ]);
+      if (!vivo) return;
+      const faltou = (l.error && ehTabelaAusente(l.error)) || (n.error && ehTabelaAusente(n.error));
+      setExtrasIndisponiveis(Boolean(faltou));
+      if (l.error) {
+        if (!ehTabelaAusente(l.error)) relatarErro("lerLigacoes", l.error);
+      } else setLigacoes((l.data ?? []).map(normalizarLigacao).filter((x): x is Ligacao => x !== null));
+      if (n.error) {
+        if (!ehTabelaAusente(n.error)) relatarErro("lerNotasDoQuadro", n.error);
+      } else setNotas((n.data ?? []).map(normalizarNota).filter((x): x is NotaDoCartao => x !== null));
     }
 
     const aoVoltar = () => {
@@ -122,6 +161,32 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
             setCartoes((atual) =>
               atual.some((c) => c.id === nova.id) ? atual.map((c) => (c.id === nova.id ? nova : c)) : [...atual, nova],
             );
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "quadro_ligacoes", filter: `room_code=eq.${codigo}` },
+          (msg) => {
+            if (msg.eventType === "DELETE") {
+              const id = (msg.old as { id?: string }).id;
+              setLigacoes((atual) => atual.filter((l) => l.id !== id));
+              return;
+            }
+            const nova = normalizarLigacao(msg.new);
+            if (nova) setLigacoes((atual) => (atual.some((l) => l.id === nova.id) ? atual.map((l) => (l.id === nova.id ? nova : l)) : [...atual, nova]));
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "quadro_notas", filter: `room_code=eq.${codigo}` },
+          (msg) => {
+            if (msg.eventType === "DELETE") {
+              const id = (msg.old as { id?: string }).id;
+              setNotas((atual) => atual.filter((n) => n.id !== id));
+              return;
+            }
+            const nova = normalizarNota(msg.new);
+            if (nova) setNotas((atual) => (atual.some((n) => n.id === nova.id) ? atual.map((n) => (n.id === nova.id ? nova : n)) : [...atual, nova]));
           },
         )
         .subscribe((status) => {
@@ -284,12 +349,86 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
     return true;
   }, []);
 
+  const ligar = useCallback<Quadro["ligar"]>(
+    async (de, para, rotulo) => {
+      const r = rotulo.trim().slice(0, 40);
+      if (de === para || ligacaoJaExiste(ligacoesRef.current, de, para, r)) return true;
+      const id = crypto.randomUUID();
+      const { data, error } = await supabase
+        .from("quadro_ligacoes")
+        .insert({ id, room_code: codigo, de, para, rotulo: r })
+        .select()
+        .single();
+      const nova = error ? null : normalizarLigacao(data);
+      if (error || !nova) {
+        if (error) relatarErro("ligarCartoes", error);
+        setAviso(AVISO_NAO_SALVOU);
+        return false;
+      }
+      setLigacoes((atual) => (atual.some((l) => l.id === nova.id) ? atual : [...atual, nova]));
+      setAviso(null);
+      return true;
+    },
+    [codigo],
+  );
+
+  const desligar = useCallback<Quadro["desligar"]>(async (id) => {
+    const antes = ligacoesRef.current;
+    setLigacoes((atual) => atual.filter((l) => l.id !== id));
+    const { error } = await supabase.from("quadro_ligacoes").delete().eq("id", id);
+    if (error) {
+      relatarErro("desligarCartoes", error);
+      setLigacoes(antes);
+      setAviso(AVISO_NAO_SALVOU);
+      return false;
+    }
+    return true;
+  }, []);
+
+  const anotar = useCallback<Quadro["anotar"]>(
+    async (cartaoId, autor, texto) => {
+      const limpo = texto.trim().slice(0, LIMITE_NOTA);
+      if (!limpo) return true;
+      const { data, error } = await supabase
+        .from("quadro_notas")
+        .insert({ room_code: codigo, cartao_id: cartaoId, autor, texto: limpo })
+        .select()
+        .single();
+      const nova = error ? null : normalizarNota(data);
+      if (error || !nova) {
+        if (error) relatarErro("anotarNoCartao", error);
+        setAviso(AVISO_NAO_SALVOU);
+        return false;
+      }
+      setNotas((atual) => (atual.some((n) => n.id === nova.id) ? atual : [...atual, nova]));
+      setAviso(null);
+      return true;
+    },
+    [codigo],
+  );
+
+  const apagarNota = useCallback<Quadro["apagarNota"]>(async (id) => {
+    const antes = notasRef.current;
+    setNotas((atual) => atual.filter((n) => n.id !== id));
+    const { error } = await supabase.from("quadro_notas").delete().eq("id", id);
+    if (error) {
+      relatarErro("apagarNotaDoQuadro", error);
+      setNotas(antes);
+      setAviso(AVISO_NAO_SALVOU);
+      return false;
+    }
+    return true;
+  }, []);
+
   const dispensarDestaque = useCallback(() => setDestaque(null), []);
 
   return {
     cartoes,
     carregando,
     indisponivel,
+    ligacoes,
+    notas,
+    extrasIndisponiveis,
     aviso,
     destaque,
     dispensarDestaque,
@@ -300,5 +439,9 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
     tirarFoto,
     remover,
     mostrarAMesa,
+    ligar,
+    desligar,
+    anotar,
+    apagarNota,
   };
 }

@@ -12,7 +12,7 @@ import type { Cena, RegraNevoa } from "../src/lib/cenas";
 import type { Peca } from "../src/lib/pecas";
 import type { Parede } from "../src/lib/paredes";
 import type { Marca } from "../src/lib/marcas";
-import type { Cartao } from "../src/lib/quadro";
+import type { Cartao, Ligacao, NotaDoCartao } from "../src/lib/quadro";
 import type { LinhaBastiao, LinhaCombate } from "../src/hooks/useSala";
 import { SALA, bancoConfigurado, criarFicha, limparSala, rest } from "./apoio";
 
@@ -114,7 +114,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
     }),
   },
   { tabela: "combat_log", colunas: colunas<LinhaLog>({ id: true, room_code: true, text: true, created_at: true }) },
-  { tabela: "diario", colunas: colunas<EntradaDiario>({ id: true, room_code: true, title: true, text: true, created_at: true }) },
+  { tabela: "diario", colunas: colunas<EntradaDiario>({ id: true, room_code: true, title: true, text: true, cartoes: true, created_at: true }) },
   { tabela: "bastiao", colunas: BASTIAO },
   {
     tabela: "bastiao_instalacoes",
@@ -206,6 +206,8 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       created_at: true,
     }),
   },
+  { tabela: "quadro_ligacoes", colunas: colunas<Ligacao>({ id: true, room_code: true, de: true, para: true, rotulo: true, created_at: true }) },
+  { tabela: "quadro_notas", colunas: colunas<NotaDoCartao>({ id: true, room_code: true, cartao_id: true, autor: true, texto: true, created_at: true }) },
   // Relato de erro dos aparelhos (lib/relatarErro.ts monta a linha à mão).
   {
     tabela: "erros",
