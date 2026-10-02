@@ -3697,7 +3697,7 @@ input.fj-score:focus-visible {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(8, 6, 4, 0.97);
+  background: #080604; /* opaco: o texto da tela de trás (ex.: "sem combate") não pode aparecer fantasma na TV */
   color: #f3ead9;
   display: flex;
   flex-direction: column;
@@ -4065,4 +4065,46 @@ input.fj-score:focus-visible {
 .qd-novo {
   flex: none;
   white-space: nowrap;
+}
+
+/* Destaque: a TV e o celular deitado são largos — foto de um lado, texto grande do outro. */
+.qd-destaque-corpo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.qd-destaque-textos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+@media (min-aspect-ratio: 4 / 3) {
+  .qd-destaque-corpo {
+    flex-direction: row;
+    gap: clamp(24px, 4vw, 64px);
+    justify-content: center;
+  }
+  .qd-destaque-foto img {
+    max-width: 42vw;
+    max-height: 76vh;
+  }
+  .qd-destaque-textos {
+    align-items: flex-start;
+    text-align: left;
+    max-width: 44vw;
+  }
+  .qd-destaque-titulo {
+    font-size: clamp(30px, 5vw, 76px);
+  }
+  .qd-destaque .qd-subtitulo {
+    font-size: clamp(16px, 2.4vw, 32px);
+  }
+  .qd-destaque-texto {
+    font-size: clamp(15px, 2vw, 28px);
+  }
+  .qd-destaque .qd-tiporotulo {
+    font-size: clamp(12px, 1.4vw, 20px);
+  }
 }

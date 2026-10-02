@@ -312,3 +312,56 @@ test("ligar arrastando: a página rola sozinha quando o cartão de destino está
   await expect(page.locator(".qd-folhaligacao")).toContainText("Cartão 09");
   await ctx.close();
 });
+
+test("telão: o cartão mostrado pelo Mestre aparece em tela cheia, silhueta não, e some sozinho", async ({ browser, page }) => {
+  test.setTimeout(120_000);
+  await limparSala();
+  const sombra = await criarCartaoNoBanco("A Sombra Secreta", { revelacao: "silhueta" });
+
+  // O telão (TV): ninguém toca nele.
+  const tv = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const telao = await tv.newPage();
+  const errosTelao = coletarErros(telao);
+  await telao.goto(`/?sala=${SALA}&telao=1`);
+  await expect(telao.locator(".telao")).toBeVisible();
+
+  // Silhueta não vira tela cheia nem no telão (não há o que mostrar).
+  await rest(`quadro_cartoes?id=eq.${sombra}`, { method: "PATCH", body: JSON.stringify({ destaque_em: new Date().toISOString() }) });
+  await telao.waitForTimeout(2500);
+  await expect(telao.locator(".qd-destaque")).toHaveCount(0);
+
+  // O Mestre cria um cartão com foto e manda pra mesa.
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Campanha", exact: true }).click();
+  await page.getByRole("button", { name: "+ cartão" }).click();
+  await page.getByLabel("Nome do cartão").fill("Barão Vael");
+  await page.locator(".qd-form input[type=file]").setInputFiles({ name: "baro.png", mimeType: "image/png", buffer: pngDeTeste(600, 800) });
+  await page.getByRole("button", { name: "Criar cartão" }).click();
+  await expect(page.locator(".qd-folha")).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel("Tipo do cartão").first().selectOption("vilao");
+  await page.getByPlaceholder("quem é (ex.: barão de Vael)").fill("Senhor da Torre Norte");
+  await page.getByPlaceholder("o que a mesa pode ler...").fill("Nobre cruel que cobra tributos em sangue.");
+  await page.getByPlaceholder("o que a mesa pode ler...").blur();
+  await page.waitForTimeout(900);
+  await page.getByRole("button", { name: "📣 Mostrar à mesa agora" }).click();
+
+  const destaque = telao.locator(".qd-destaque");
+  await expect(destaque).toContainText("Barão Vael", { timeout: 15_000 });
+  await expect(destaque).toContainText("Senhor da Torre Norte");
+  await expect(destaque).toContainText("Nobre cruel");
+  await expect(destaque.locator("img")).toBeVisible();
+  await expect.poll(() => destaque.locator("img").evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true);
+  // Cabe na TV sem rolar e a foto não passa da tela.
+  const medidas = await destaque.evaluate((el) => ({ rola: el.scrollHeight > el.clientHeight, h: el.clientHeight }));
+  expect(medidas.rola).toBe(false);
+  await telao.waitForTimeout(800); // a animação de entrada
+  await telao.screenshot({ path: process.env.FOTO_TELAO ?? "test-results/telao.png" });
+  // O Mestre não vê a própria revelação em tela cheia.
+  await expect(page.locator(".qd-destaque")).toHaveCount(0);
+
+  // Ninguém toca no telão: some sozinho (30 s) e volta a mostrar a vez.
+  await expect(destaque).toHaveCount(0, { timeout: 45_000 });
+  await expect(telao.locator(".telao")).toBeVisible();
+  expect(errosTelao).toEqual([]);
+  await tv.close();
+});

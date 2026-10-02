@@ -1244,18 +1244,22 @@ export function DestaqueDoCartao({
   return (
     <div className="qd-destaque" role="dialog" aria-modal="true" aria-label={`O Mestre mostrou: ${cartao.titulo}`} onClick={aoFechar}>
       <p className="qd-destaque-aviso">📣 O Mestre mostrou à mesa</p>
-      {url && (
-        <div className="qd-destaque-foto">
-          <img src={url} alt={cartao.titulo} />
+      <div className="qd-destaque-corpo">
+        {url && (
+          <div className="qd-destaque-foto">
+            <img src={url} alt={cartao.titulo} />
+          </div>
+        )}
+        <div className="qd-destaque-textos">
+          <p className="qd-tiporotulo">
+            {emojiDoTipo(cartao.tipo)} {rotuloDoTipo(cartao.tipo)}
+          </p>
+          <h2 className="qd-destaque-titulo">{cartao.titulo || "Sem nome"}</h2>
+          {cartao.subtitulo && <p className="qd-subtitulo">{cartao.subtitulo}</p>}
+          {cartao.texto && <p className="qd-destaque-texto">{cartao.texto}</p>}
         </div>
-      )}
-      <p className="qd-tiporotulo">
-        {emojiDoTipo(cartao.tipo)} {rotuloDoTipo(cartao.tipo)}
-      </p>
-      <h2 className="qd-destaque-titulo">{cartao.titulo || "Sem nome"}</h2>
-      {cartao.subtitulo && <p className="qd-subtitulo">{cartao.subtitulo}</p>}
-      {cartao.texto && <p className="qd-destaque-texto">{cartao.texto}</p>}
-      <p className="qd-destaque-fechar">toque para fechar</p>
+      </div>
+      {!fecharSozinhoEmMs && <p className="qd-destaque-fechar">toque para fechar</p>}
     </div>
   );
 }
