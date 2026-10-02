@@ -2916,6 +2916,37 @@ input.fj-score:focus-visible {
   gap: 6px;
   margin: 10px 0;
 }
+/* Importar paredes de um arquivo: fica no fim de "Paredes e visão", fechado. */
+.mapa-importar {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.mapa-importar .bkpexplica {
+  margin-top: 10px;
+}
+.mapa-passos {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.mapa-passos li + li {
+  margin-top: 4px;
+}
+.mapa-passos b {
+  color: var(--ink);
+}
+.mapa-importar .notesbox {
+  margin-bottom: 8px;
+}
+.mapa-importar textarea {
+  min-height: 96px;
+  max-height: 40vh;
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
 .mapa-dica {
   margin: 8px 0 0;
   font-size: 12px;

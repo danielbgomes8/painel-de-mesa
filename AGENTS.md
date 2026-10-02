@@ -1157,6 +1157,33 @@ Decisões que não estão no código à primeira vista:
     **apagar virou borracha** (passar o dedo tira os trechos por onde ele passa).
     Os contornos pretos são desenhados todos antes das cores (`desenharParedes`),
     senão cada emenda da curva ganhava uma marca escura.
+  - **Importar paredes de um arquivo** (01/10/2026, sem migration; pedido do Daniel:
+    "paredes e portas automáticas"). No fim de "Paredes e visão", fechado
+    (`ImportarParedes.tsx`, regras em `lib/importarParedes.ts`). **O passo a passo
+    fica escrito na própria tela** (pedido do Daniel: ele joga, não mestra, e não vai
+    estar do lado pra explicar — quem tem a imagem do mapa é o Mestre). O Mestre copia o
+    pedido (`pedidoDeParedes`, com o tamanho da cena), manda pra uma IA que enxergue
+    imagens junto com o mapa, e cola a resposta (ou escolhe o arquivo): um JSON
+    `{largura, altura, paredes: [[x1,y1,x2,y2]], portas: [...]}`. O app leva as
+    coordenadas pro tamanho da cena (a imagem guardada é reduzida), prende no mapa,
+    fecha as frestas e grava tudo **numa escrita só** pelo `muros.adicionar` de
+    sempre — então "↩ desfazer parede" tira a importação inteira. **É rascunho**: o
+    Mestre confere e corrige. O que foi testado antes de escolher este caminho, com
+    dois mapas reais (um pergaminho com grade, um cenário pintado): **detectar por
+    cor/contraste não serve** (limiar acha contorno furado e marca legenda, bússola e
+    borda como parede; "tocar no cômodo" vaza pela porta ou não chega na parede,
+    porque a luz pintada muda a cor do chão); já a IA olhando a imagem acertou as 53
+    paredes e 10 portas do pergaminho dentro da faixa de pedra, e no pintado acertou
+    o contorno mas errou o interior e não achou porta. Não refazer a detecção por
+    pixel sem um motivo novo. **Fechar fresta nunca muda de lugar uma linha do
+    arquivo** (`soldarPontas`): só estica a parede na direção dela ou acrescenta um
+    trechinho. A primeira versão puxava a ponta até a ponta vizinha, e isso entortava
+    a parede e **abria o "T" de outra parede no meio dela** — visto rodando o arquivo
+    real, não nos testes. Os trechinhos contam no limite de 400. **Não conferido na
+    tela de verdade**: esta máquina não tem `.env.local`, então a tela só tem teste
+    com banco de mentira (`ImportarParedes.test.ts`) e não há robô; a altura a 375px
+    não foi medida (fechado, é um botão). Não há botão "detectar" dentro do app
+    porque isso pediria rota de servidor e chave paga — decisão do Daniel.
   - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
     Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
     condições da ficha). Agora vale nos dois sentidos:

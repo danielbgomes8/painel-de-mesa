@@ -28,6 +28,7 @@ import { CampoTexto } from "@/components/CampoTexto";
 import { CartaoDoPeao } from "@/components/CartaoDoPeao";
 import { CenaMapa, type CenaMapaApi, type Ferramenta } from "@/components/CenaMapa";
 import { ControlesDeArea } from "@/components/ControlesDeArea";
+import { ImportarParedes } from "@/components/ImportarParedes";
 import { LegendaIconesPeao } from "@/components/LegendaIconesPeao";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
 
@@ -918,6 +919,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         </button>
                       )}
                     </div>
+                    <ImportarParedes cena={cena} paredes={muros.paredes} adicionar={muros.adicionar} />
                   </>
                 )}
               </SecaoRecolhivel>
