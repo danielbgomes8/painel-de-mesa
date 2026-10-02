@@ -1105,8 +1105,14 @@ Decisões que não estão no código à primeira vista:
     localmente e juntam com o que o Mestre guardou. Mudou a escala da grade: a
     memória antiga é descartada (`decodificarMascara` devolve null). "Cobrir de novo
     o explorado" zera (`reiniciarMemoria` + `explorado = ''`; quem vê a transição
-    pra vazio também esquece). **Limite conhecido:** aparelho que abre depois do
-    Mestre e antes de ele gravar só tem o que viu desde que abriu.
+    pra vazio também esquece). **Limite conhecido, e por que fica
+    assim** (revisto em 02/10/2026, pela leitura do código, sem teste com dois aparelhos): o aparelho que
+    abre depois do Mestre e antes de ele gravar fica sem o histórico por no máximo 1,5 s — quando o
+    Mestre grava, a coluna `cenas.explorado` muda e todo aparelho junta o que chegou com o que já viu
+    (efeito de `cena.explorado` em `CenaMapa`). O que sobra de verdade é que **só o aparelho do Mestre
+    grava**: com o app dele fechado, o que os jogadores exploram fica só em cada celular. Não vale
+    resolver: sem servidor, vários aparelhos gravando a mesma coluna se sobrescreveriam e perderiam
+    células (a união não é atômica), e numa sessão o Mestre está sempre com o app aberto.
   - **Peão de inimigo sob a vista**: aparece só onde o grupo enxerga AGORA — não na
     parte "já vista" (a névoa escurecida conta como coberta: o limiar de
     `cobertaPorNevoa` caiu de 128 pra 40 de alfa).
