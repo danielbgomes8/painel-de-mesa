@@ -3984,3 +3984,85 @@ input.fj-score:focus-visible {
 .qd-colunas[data-arrastando] {
   scroll-snap-type: none;
 }
+
+/* ---------- Mapa de ligações ---------- */
+.qd-mapabarra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.qd-mapacaixa {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  max-height: 75vh;
+}
+.qd-mapasvg {
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.qd-no {
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+.qd-no:focus-visible .qd-no-fundo {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+.qd-no[data-puxando] {
+  opacity: 0.8;
+}
+.qd-no-fundo {
+  fill: var(--surface2);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.qd-no-fundo[data-silhueta] {
+  fill: #0c0a08;
+  stroke: var(--dim);
+}
+.qd-no-emoji {
+  font-size: 26px;
+  fill: var(--ink);
+}
+.qd-no-nome {
+  font-size: 12px;
+  font-family: var(--f-display);
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.qd-linha-svg {
+  stroke: var(--muted);
+  stroke-width: 1.8;
+}
+.qd-setacor {
+  fill: var(--muted);
+}
+.qd-rotulo-svg {
+  font-size: 11px;
+  font-style: italic;
+  fill: var(--accent);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+.qd-soltos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+}
+.qd-novo {
+  flex: none;
+  white-space: nowrap;
+}

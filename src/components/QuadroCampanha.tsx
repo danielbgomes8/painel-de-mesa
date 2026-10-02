@@ -41,13 +41,15 @@ import {
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
+import { MapaDeLigacoes } from "@/components/MapaDeLigacoes";
 
 const CHAVE_VISAO = "mesa-quadro-visao";
-type ModoDeVista = "galeria" | "colunas";
+type ModoDeVista = "galeria" | "colunas" | "mapa";
 
 function lerVisao(): ModoDeVista {
   try {
-    return localStorage.getItem(CHAVE_VISAO) === "colunas" ? "colunas" : "galeria";
+    const salva = localStorage.getItem(CHAVE_VISAO);
+    return salva === "colunas" || salva === "mapa" ? salva : "galeria";
   } catch {
     return "galeria";
   }
@@ -85,7 +87,7 @@ export function QuadroCampanha({
   const [criando, setCriando] = useState(false);
   const listaRef = useRef<HTMLDivElement>(null);
   const arrasto = useArrastoDeColuna(quadro, quem !== null && vista === "colunas", listaRef);
-  const ligando = useArrastoDeLigacao();
+  const ligando = useArrastoDeLigacao(listaRef);
   const [vazias, setVazias] = useState<string[]>([]);
   const [nomeNovaColuna, setNomeNovaColuna] = useState<string | null>(null);
   const [pendente, setPendente] = useState<{ de: string; para: string } | null>(null);
@@ -143,6 +145,9 @@ export function QuadroCampanha({
           <button type="button" className="chip" aria-pressed={vista === "colunas"} onClick={() => mudarVista("colunas")}>
             ☰ Colunas
           </button>
+          <button type="button" className="chip" aria-pressed={vista === "mapa"} onClick={() => mudarVista("mapa")}>
+            🕸 Mapa
+          </button>
         </div>
         {quem && (
           <button type="button" className="btn primary qd-novo" onClick={() => setCriando((c) => !c)} aria-expanded={criando}>
@@ -193,7 +198,9 @@ export function QuadroCampanha({
         </p>
       )}
 
-      {vista === "galeria" ? (
+      {vista === "mapa" ? (
+        <MapaDeLigacoes vistos={lista} ligacoes={quadro.ligacoes} urlDaFoto={quadro.urlDaFoto} aoAbrir={setAberto} />
+      ) : vista === "galeria" ? (
         <div className="qd-grade">
           {lista.map((v) => (
             <MiniaturaDoCartao
@@ -422,18 +429,51 @@ function MiniaturaDoCartao({
   );
 }
 
+// ── Rolagem automática na borda (os dois arrastos) ──────────────────────
+
+const BORDA_DA_ROLAGEM = 56;
+const velocidadeDaRolagem = (dentro: number) => Math.round(4 + 16 * Math.min(1, Math.max(0, dentro / BORDA_DA_ROLAGEM)));
+
+/** Com o dedo perto da borda, rola o quadro (de lado, se houver `lista`, e a página pra baixo/cima).
+ *  Devolve se rolou: aí o que está sob o dedo mudou e o chamador refaz a conta. Roda a cada quadro
+ *  da animação: no celular não dá pra "rolar com outro dedo" no meio do arrasto. */
+function rolarPelaBorda(x: number, y: number, lista: HTMLElement | null): boolean {
+  let rolou = false;
+  if (lista) {
+    const r = lista.getBoundingClientRect();
+    if (x < r.left + BORDA_DA_ROLAGEM && lista.scrollLeft > 0) {
+      lista.scrollLeft -= velocidadeDaRolagem(r.left + BORDA_DA_ROLAGEM - x);
+      rolou = true;
+    } else if (x > r.right - BORDA_DA_ROLAGEM && lista.scrollLeft < lista.scrollWidth - lista.clientWidth) {
+      lista.scrollLeft += velocidadeDaRolagem(x - (r.right - BORDA_DA_ROLAGEM));
+      rolou = true;
+    }
+  }
+  const altura = window.innerHeight;
+  if (y < BORDA_DA_ROLAGEM + 40 && window.scrollY > 0) {
+    window.scrollBy(0, -velocidadeDaRolagem(BORDA_DA_ROLAGEM + 40 - y));
+    rolou = true;
+  } else if (y > altura - BORDA_DA_ROLAGEM && window.scrollY < document.documentElement.scrollHeight - altura) {
+    window.scrollBy(0, velocidadeDaRolagem(y - (altura - BORDA_DA_ROLAGEM)));
+    rolou = true;
+  }
+  return rolou;
+}
+
 // ── Arrastar pra ligar ──────────────────────────────────────────────────
 
 /** Arrastar pela alça 🔗 até outro cartão. Soltar em cima de um cartão devolve
  *  `solto` ({ de, para }); a tela então pergunta o tipo da ligação. */
-function useArrastoDeLigacao() {
+function useArrastoDeLigacao(listaRef: React.RefObject<HTMLDivElement | null>) {
   const [estado, setEstado] = useState<{ de: string; titulo: string; x: number; y: number; sobre: string | null } | null>(null);
   const [solto, setSolto] = useState<{ de: string; para: string } | null>(null);
   const deRef = useRef<string | null>(null);
+  const posRef = useRef({ x: 0, y: 0 });
 
   const comecar = (e: React.PointerEvent<HTMLSpanElement>, c: Cartao) => {
     e.preventDefault();
     deRef.current = c.id;
+    posRef.current = { x: e.clientX, y: e.clientY };
     setSolto(null);
     setEstado({ de: c.id, titulo: c.titulo || "Sem nome", x: e.clientX, y: e.clientY, sobre: null });
   };
@@ -446,8 +486,20 @@ function useArrastoDeLigacao() {
       return id && id !== deRef.current ? id : null;
     };
     function mover(e: PointerEvent) {
+      posRef.current = { x: e.clientX, y: e.clientY };
       setEstado((a) => (a ? { ...a, x: e.clientX, y: e.clientY, sobre: cartaoEm(e.clientX, e.clientY) } : a));
     }
+    // Perto da borda o quadro rola sozinho: o cartão de destino pode estar fora da tela.
+    let quadro = 0;
+    function rolar() {
+      const { x, y } = posRef.current;
+      if (rolarPelaBorda(x, y, listaRef.current)) {
+        const sobre = cartaoEm(x, y);
+        setEstado((a) => (a && a.sobre !== sobre ? { ...a, sobre } : a));
+      }
+      quadro = requestAnimationFrame(rolar);
+    }
+    quadro = requestAnimationFrame(rolar);
     function soltar(e: PointerEvent) {
       const de = deRef.current;
       const para = cartaoEm(e.clientX, e.clientY);
@@ -467,12 +519,13 @@ function useArrastoDeLigacao() {
     window.addEventListener("pointercancel", cancelar);
     window.addEventListener("keydown", tecla);
     return () => {
+      cancelAnimationFrame(quadro);
       window.removeEventListener("pointermove", mover);
       window.removeEventListener("pointerup", soltar);
       window.removeEventListener("pointercancel", cancelar);
       window.removeEventListener("keydown", tecla);
     };
-  }, [ativo]);
+  }, [ativo, listaRef]);
 
   return {
     comecar,
@@ -589,35 +642,12 @@ function useArrastoDeColuna(quadro: Quadro, habilitado: boolean, listaRef: React
       posRef.current = { x: e.clientX, y: e.clientY };
       setEstado((a) => (a ? { ...a, x: e.clientX, y: e.clientY, sobre: colunaEm(e.clientX, e.clientY) } : a));
     }
-    // Perto da borda, o quadro rola sozinho (de lado e pra baixo/cima), mesmo com o
-    // dedo parado: no celular não dá pra "rolar com outro dedo" no meio do arrasto.
-    const BORDA = 56;
-    const velocidade = (dentro: number) => Math.round(4 + 16 * Math.min(1, Math.max(0, dentro / BORDA)));
+    // Perto da borda o quadro rola sozinho, mesmo com o dedo parado.
     let quadro = 0;
     function rolar() {
       const { x, y } = posRef.current;
-      const lista = listaRef.current;
-      let rolou = false;
-      if (lista) {
-        const r = lista.getBoundingClientRect();
-        if (x < r.left + BORDA && lista.scrollLeft > 0) {
-          lista.scrollLeft -= velocidade(r.left + BORDA - x);
-          rolou = true;
-        } else if (x > r.right - BORDA && lista.scrollLeft < lista.scrollWidth - lista.clientWidth) {
-          lista.scrollLeft += velocidade(x - (r.right - BORDA));
-          rolou = true;
-        }
-      }
-      const altura = window.innerHeight;
-      if (y < BORDA + 40 && window.scrollY > 0) {
-        window.scrollBy(0, -velocidade(BORDA + 40 - y));
-        rolou = true;
-      } else if (y > altura - BORDA && window.scrollY < document.documentElement.scrollHeight - altura) {
-        window.scrollBy(0, velocidade(y - (altura - BORDA)));
-        rolou = true;
-      }
-      // O que está sob o dedo mudou porque o quadro andou.
-      if (rolou) {
+      if (rolarPelaBorda(x, y, listaRef.current)) {
+        // O que está sob o dedo mudou porque o quadro andou.
         const sobre = colunaEm(x, y);
         setEstado((a) => (a && a.sobre !== sobre ? { ...a, sobre } : a));
       }
@@ -1013,11 +1043,11 @@ function LigacoesDoCartao({
               <span className="qd-ligacaotexto">
                 {sentido === "saindo" ? (
                   <>
-                    <i>{ligacao.rotulo || "ligado a"}</i> → <b>{tituloVisto(outro)}</b>
+                    <i>{(outro.visao === "silhueta" ? "" : ligacao.rotulo) || "ligado a"}</i> → <b>{tituloVisto(outro)}</b>
                   </>
                 ) : (
                   <>
-                    <b>{tituloVisto(outro)}</b> → <i>{ligacao.rotulo || "ligado a"}</i> → este
+                    <b>{tituloVisto(outro)}</b> → <i>{(outro.visao === "silhueta" ? "" : ligacao.rotulo) || "ligado a"}</i> → este
                   </>
                 )}
               </span>

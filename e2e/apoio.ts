@@ -24,21 +24,25 @@ export async function rest(caminho: string, init: RequestInit = {}): Promise<Res
   return fetch(`${url}/rest/v1/${caminho}`, { ...init, headers: { ...cabecalhos, ...(init.headers as Record<string, string>) } });
 }
 
-/** Tira do Storage as imagens de mapa da sala (o `delete` da cena no banco não leva o arquivo). */
+/** Tira do Storage as imagens da sala: as dos mapas (na pasta da sala) e as fotos dos
+ *  cartões do Quadro (em `<sala>/quadro/`). O `delete` da cena ou do cartão no banco não leva o arquivo. */
 async function limparImagens(): Promise<void> {
-  const lista = await fetch(`${url}/storage/v1/object/list/mapas`, {
-    method: "POST",
-    headers: cabecalhos,
-    body: JSON.stringify({ prefix: SALA, limit: 200 }),
-  });
-  if (!lista.ok) return;
-  const arquivos = (await lista.json()) as { name: string }[];
-  if (arquivos.length === 0) return;
-  await fetch(`${url}/storage/v1/object/mapas`, {
-    method: "DELETE",
-    headers: cabecalhos,
-    body: JSON.stringify({ prefixes: arquivos.map((a) => `${SALA}/${a.name}`) }),
-  });
+  for (const pasta of [SALA, `${SALA}/quadro`]) {
+    const lista = await fetch(`${url}/storage/v1/object/list/mapas`, {
+      method: "POST",
+      headers: cabecalhos,
+      body: JSON.stringify({ prefix: pasta, limit: 200 }),
+    });
+    if (!lista.ok) continue;
+    // Subpasta também vem na lista (sem `id`): só arquivo de verdade entra.
+    const arquivos = ((await lista.json()) as { name: string; id: string | null }[]).filter((a) => a.id);
+    if (arquivos.length === 0) continue;
+    await fetch(`${url}/storage/v1/object/mapas`, {
+      method: "DELETE",
+      headers: cabecalhos,
+      body: JSON.stringify({ prefixes: arquivos.map((a) => `${pasta}/${a.name}`) }),
+    });
+  }
 }
 
 /** Deixa a sala de teste vazia: apaga o que o robô criou, tabela por tabela

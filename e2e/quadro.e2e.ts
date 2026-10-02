@@ -54,8 +54,9 @@ test("quadro: foto, revelação em três estados, ligação, anotação, sessão
   expect(cartoes[0].foto).toMatch(/quadro\//);
   // A foto carrega de verdade (a política de segurança do site já bloqueou imagens uma vez).
   await expect(page.locator(".qd-cartao img").first()).toBeVisible();
-  const carregou = await page.locator(".qd-cartao img").first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0);
-  expect(carregou).toBe(true);
+  await expect
+    .poll(() => page.locator(".qd-cartao img").first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0), { timeout: 15_000 })
+    .toBe(true);
 
   // Jogador (outro navegador): escondido não aparece.
   const ctx = await browser.newContext();
@@ -216,5 +217,98 @@ test("quadro no celular: arrastar um cartão até uma coluna que está fora da t
   await expect(page.locator('[data-coluna="Suspeitos"][data-alvo]')).toHaveCount(1);
   await page.mouse.up();
   await expect.poll(async () => (await cartoesDoBanco())[3].coluna).toBe("Suspeitos");
+  await ctx.close();
+});
+
+async function criarCartaoNoBanco(titulo: string, extra: Record<string, unknown> = {}): Promise<string> {
+  const r = await rest("quadro_cartoes", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ room_code: SALA, tipo: "npc", titulo, revelacao: "revelado", ...extra }),
+  });
+  if (!r.ok) throw new Error(`não criou o cartão: HTTP ${r.status} ${await r.text()}`);
+  return ((await r.json()) as { id: string }[])[0].id;
+}
+async function ligarNoBanco(de: string, para: string, rotulo: string): Promise<void> {
+  const r = await rest("quadro_ligacoes", { method: "POST", body: JSON.stringify({ room_code: SALA, de, para, rotulo }) });
+  if (!r.ok) throw new Error(`não criou a ligação: HTTP ${r.status} ${await r.text()}`);
+}
+
+test("mapa de ligações: círculos e setas, rótulo escondido em silhueta, tocar abre, arrastar muda de lugar", async ({ browser, page }) => {
+  await limparSala();
+  await criarFicha("ana-robo", "Ana Robô");
+  const barao = await criarCartaoNoBanco("Barão Vael");
+  const culto = await criarCartaoNoBanco("Culto do Raio");
+  const sombra = await criarCartaoNoBanco("A Sombra Secreta", { revelacao: "silhueta" });
+  await criarCartaoNoBanco("Mira Solta");
+  await ligarNoBanco(barao, culto, "serve a");
+  await ligarNoBanco(culto, sombra, "obedece a");
+
+  await page.addInitScript(() => localStorage.setItem("mesa-quadro-visao", "mapa"));
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Campanha", exact: true }).click();
+  await expect(page.locator(".qd-no")).toHaveCount(3);
+  await expect(page.locator(".qd-aresta")).toHaveCount(2);
+  await expect(page.locator(".qd-rotulo-svg").first()).toContainText("serve a");
+  await expect(page.locator(".qd-soltos")).toContainText("Mira Solta");
+
+  // Arrastar um círculo muda a posição (e não abre o cartão); tocar abre.
+  const no = page.locator('[data-cartao-no="' + barao + '"]');
+  const antes = await no.getAttribute("transform");
+  await no.scrollIntoViewIfNeeded();
+  const caixa = (await no.boundingBox())!;
+  await page.mouse.move(caixa.x + caixa.width / 2, caixa.y + 20);
+  await page.mouse.down();
+  // Em direção ao centro do desenho (nas bordas o círculo não tem pra onde ir).
+  const [px, py] = (antes!.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+  const dx = px > 180 ? -60 : 60;
+  const dy = py > 160 ? -50 : 50;
+  await page.mouse.move(caixa.x + caixa.width / 2 + dx, caixa.y + 20 + dy, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(() => no.getAttribute("transform")).not.toBe(antes);
+  await expect(page.locator(".qd-folha")).toHaveCount(0);
+  await no.click();
+  await expect(page.locator(".qd-folha")).toHaveAttribute("aria-label", "Barão Vael");
+  await page.getByRole("button", { name: "Fechar o cartão" }).click();
+
+  // O jogador vê a sombra como "???", sem o tipo da ligação dela.
+  const ctx = await browser.newContext();
+  const ana = await ctx.newPage();
+  await comoJogador(ana, "ana-robo");
+  await ana.addInitScript(() => localStorage.setItem("mesa-quadro-visao", "mapa"));
+  await ana.goto(`/?sala=${SALA}`);
+  await ana.getByRole("button", { name: "Campanha", exact: true }).click();
+  await expect(ana.locator(".qd-no")).toHaveCount(3);
+  await expect(ana.locator(".qd-svg, .qd-mapasvg")).not.toContainText("Sombra");
+  await expect(ana.locator(".qd-mapasvg")).toContainText("???");
+  const rotulos = await ana.locator(".qd-rotulo-svg").allTextContents();
+  expect(rotulos.sort()).toEqual(["?", "serve a"]);
+  await ctx.close();
+});
+
+test("ligar arrastando: a página rola sozinha quando o cartão de destino está fora da tela", async ({ browser }) => {
+  await limparSala();
+  const ids: string[] = [];
+  for (let i = 0; i < 10; i++) ids.push(await criarCartaoNoBanco(`Cartão ${String(i).padStart(2, "0")}`));
+  const ctx = await browser.newContext({ viewport: { width: 375, height: 640 }, hasTouch: true });
+  const page = await ctx.newPage();
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Campanha", exact: true }).click();
+  await expect(page.locator(".qd-cartao")).toHaveCount(10);
+  const ultimo = page.locator(".qd-cartao", { hasText: "Cartão 09" });
+  expect(await ultimo.evaluate((el) => el.getBoundingClientRect().top)).toBeGreaterThan(640); // fora da tela
+
+  const alca = (await page.getByRole("button", { name: "Ligar Cartão 00 a outro cartão" }).boundingBox())!;
+  await page.mouse.move(alca.x + alca.width / 2, alca.y + alca.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(150, 600, { steps: 6 }); // perto da borda de baixo; fica parado
+  await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 15_000 }).toBeGreaterThan(600);
+  // Com o cartão de baixo à vista, leva até ele e solta.
+  const alvo = (await ultimo.boundingBox())!;
+  await page.mouse.move(alvo.x + alvo.width / 2, Math.min(alvo.y + 40, 560), { steps: 6 });
+  await expect(page.locator("[data-alvo-ligacao]")).toContainText("Cartão 09");
+  await page.mouse.up();
+  await expect(page.locator(".qd-folhaligacao")).toContainText("Cartão 00");
+  await expect(page.locator(".qd-folhaligacao")).toContainText("Cartão 09");
   await ctx.close();
 });
