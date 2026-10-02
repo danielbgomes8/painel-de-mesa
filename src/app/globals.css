@@ -3920,3 +3920,10 @@ input.fj-score:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+.qd-dono {
+  font-size: 11.5px;
+  color: var(--accent);
+  padding: 0 10px;
+  overflow-wrap: anywhere;
+}

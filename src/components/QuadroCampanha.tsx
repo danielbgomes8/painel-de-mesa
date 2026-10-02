@@ -178,7 +178,7 @@ export function QuadroCampanha({
       {vista === "galeria" ? (
         <div className="qd-grade">
           {lista.map((v) => (
-            <MiniaturaDoCartao key={v.cartao.id} visto={v} quadro={quadro} quem={quem} aoAbrir={() => setAberto(v.cartao.id)} />
+            <MiniaturaDoCartao key={v.cartao.id} visto={v} quadro={quadro} quem={quem} nomeDoAutor={nomeDoAutor} aoAbrir={() => setAberto(v.cartao.id)} />
           ))}
         </div>
       ) : (
@@ -200,6 +200,7 @@ export function QuadroCampanha({
                   visto={v}
                   quadro={quadro}
                   quem={quem}
+                  nomeDoAutor={nomeDoAutor}
                   aoAbrir={() => setAberto(v.cartao.id)}
                   alca={souMestre && v.cartao.dono === null ? (e) => arrasto.comecar(e, v.cartao) : undefined}
                   arrastando={arrasto.id === v.cartao.id}
@@ -246,7 +247,7 @@ function estadoDoCartao(c: Cartao, quem: Identidade | null): { emoji: string; te
     const r = ROTULO_REVELACAO[c.revelacao];
     return { emoji: r.emoji, texto: r.curto };
   }
-  if (c.revelacao === "revelado") return { emoji: "👁", texto: quem?.tipo === "jogador" && quem.slug === c.dono ? "Da mesa" : "Do jogador" };
+  if (c.revelacao === "revelado") return { emoji: "👁", texto: "Compartilhado" };
   return { emoji: "🔒", texto: "Só meu" };
 }
 
@@ -257,10 +258,12 @@ function MiniaturaDoCartao({
   aoAbrir,
   alca,
   arrastando,
+  nomeDoAutor,
 }: {
   visto: CartaoVisto;
   quadro: Quadro;
   quem: Identidade | null;
+  nomeDoAutor: (autor: string) => string;
   aoAbrir: () => void;
   /** Só na vista em colunas e só pro Mestre: a alça de arrastar. */
   alca?: (e: React.PointerEvent<HTMLSpanElement>) => void;
@@ -291,6 +294,9 @@ function MiniaturaDoCartao({
         )}
       </span>
       <span className="qd-nome">{titulo}</span>
+      {c.dono !== null && (
+        <span className="qd-dono">🧑 {quem?.tipo === "jogador" && quem.slug === c.dono ? "seu cartão" : `de ${nomeDoAutor(c.dono)}`}</span>
+      )}
       {!silhueta && c.subtitulo && <span className="qd-sub">{c.subtitulo}</span>}
     </button>
     </div>
@@ -533,7 +539,7 @@ function FolhaDoCartao({
 
         <p className="qd-tiporotulo">
           {emojiDoTipo(c.tipo)} {rotuloDoTipo(c.tipo)}
-          {c.dono !== null && " · pessoal"}
+          {c.dono !== null && ` · cartão de ${nomeDoAutor(c.dono)}`}
         </p>
 
         {!editavel && (
