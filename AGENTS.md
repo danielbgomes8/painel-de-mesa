@@ -254,6 +254,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `0016` foi escrita pra rodar por cima dela (tudo "se ainda não existir") e
   ligou o tempo real, que faltava — encontro montado no notebook não aparecia
   no celular sem recarregar.
+- **Modo telão no painel do Mestre** (02/10/2026, sem migration, `Painel.tsx`): o botão "📺 modo telão"
+  abre um painel que explica o uso — o telão é uma página à parte (`?telao=1`), feita pra OUTRO aparelho
+  (TV, tablet) ou uma aba arrastada pra TV; **não ocupa o painel do Mestre** (era a dúvida dele) e não tem
+  controle. Tem "🔗 copiar link do telão" e "↗ abrir em aba nova". O link leva `?sala=` (`linkDoTelao`):
+  antes abria a sala que estivesse na barra de endereço. Copiar usa `navigator.clipboard`; se o navegador
+  negar, avisa e deixa o link na tela (o navegador de teste nega, então só o caminho de falha foi visto).
 - **Telão** (`?telao=1`, `Telao.tsx`): mostra de quem é a vez e, abaixo, os 3
   próximos da ordem (`proximosDaOrdem` em `regras.ts`, que dá a volta na
   virada de rodada). Só **nomes** na lista do "a seguir" — PV de NPC é
@@ -1354,6 +1360,16 @@ Decisões que não estão no código à primeira vista:
   `postgres_changes`): eventos chegam em ~0,2 s, aura inclusive. **Se um cenário falhar,
   rode-o sozinho com o GitHub parado antes de investigar**, e não atribua ao "tempo real"
   sem medir como acima (gastei um diagnóstico e um remendo de teste nisso).
+  **Terceira causa (02/10/2026): o service worker do build de produção.** O `versao.e2e.ts` passava
+  aqui (`next dev`, sem service worker) e falhava só no GitHub (`next build`, com ele): o service worker
+  atende `/versao` sozinho e o `page.route` do Playwright não enxerga esse pedido, então o aviso nunca
+  aparecia. Hoje o teste abre o contexto com `serviceWorkers: "block"`. **Teste que troca resposta de rede
+  com `page.route` precisa bloquear o service worker, senão só prova alguma coisa em desenvolvimento.**
+  Outras duas coisas do mesmo dia: (a) o `e2e.yml` tem `concurrency` (uma execução por vez no GitHub), então
+  o choque é sempre com ALGUÉM mexendo na `ci-teste` à mão — o Daniel criou um NPC lá e o robô apagou
+  ("meu NPC sumiu"); **a `ci-teste` é só do robô, teste sempre noutra sala (`teste-<nome>`)**; (b)
+  "paredes e visão" e "o jogador não atravessa parede" falharam uma vez e passaram na execução seguinte,
+  sem mudança de código: instabilidade quando a sala é usada por fora. Se repetirem sozinhos, investigar.
 - **Trava no apagar sala** (`0020_sem_apagar_sala.sql`, **rodada pelo Daniel em
   01/10/2026 e conferida**: `DELETE rooms` com a chave pública devolve 401
   "permission denied", enquanto criar/garantir sala e apagar ficha seguem
@@ -1429,9 +1445,17 @@ da aba continua `"diario"` (`BarraAbas.tsx`); só o rótulo mudou.
   (senão quem acorda o celular leva o cartão de minutos atrás) e o aparelho do Mestre não vê o próprio.
   O telão também recebe (fecha sozinho em 30 s); **só foi testado em celular, não no telão de verdade**.
   **🌫️ Mostrar só a silhueta** (02/10/2026, sem migration): mesmo caminho, mas deixa o cartão em
-  `silhueta` (em vez de `revelado`) e grava `destaque_em`; jogador e telão veem a foto escura e "???"
-  em tela cheia, sem nome, tipo nem texto (`destaqueEmSilhueta`; o rótulo de acessibilidade também não
-  vaza). O botão some quando o cartão já está revelado (não há o que esconder). Só vale pra cartão da mesa.
+  `silhueta` (em vez de `revelado`) e grava `destaque_em`; jogador e telão veem a foto **borrada**
+  e "???" em tela cheia, sem nome, tipo nem texto (`destaqueEmSilhueta`; o rótulo de acessibilidade
+  também não vaza). O botão some quando o cartão já está revelado (não há o que esconder). Só vale pra
+  cartão da mesa. **O visual foi afinado em quatro rodadas com o Daniel, e três eram erradas:** escurecer
+  (ele queria BORRAR, não escurecer); desfoque forte demais (6% da altura apagava a foto); e preto e
+  branco (ele perguntou se precisava; ficou cor a 40%, `saturate(0.4)`, pra não entregar a cor do bicho
+  e manter o clima). Hoje: `brightness(.9) blur(1.6vh) saturate(.4)` no telão — o desfoque é em `vh`
+  porque a foto de TV é grande e pixel fixo ficaria nítido — e `blur(6px)` nas miniaturas da galeria.
+  **Lição: afinar desfoque com FOTO REAL**, nunca com figura desenhada — a minha tinha contraste alto e
+  o valor "bom" nela apagava a foto de verdade (usei as fotos de `forgotten-realms/quadro/` só pra olhar,
+  leitura pública do Storage). Antes de 02/10 a silhueta não virava tela cheia nem no telão.
 - **Colunas**: não existe tabela de colunas — `coluna` é um texto no cartão, e a coluna vazia só existe no
   aparelho de quem a criou, até um cartão cair nela. Ordem: as sugeridas (`COLUNAS_SUGERIDAS`) primeiro,
   depois alfabética, "Sem coluna" por último (então uma coluna nova pode aparecer no meio).
