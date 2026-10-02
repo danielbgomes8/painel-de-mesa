@@ -452,7 +452,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   async function cobrirTudo() {
     if (!cena) return;
     if (!confirm("Cobrir o mapa inteiro de névoa de novo? As pinceladas feitas até agora são apagadas.")) return;
-    if (await nevoa.limpar()) await cenas.atualizarCena(cena.id, { nevoa_ligada: true });
+    if (!(await nevoa.limpar())) return;
+    // Com a visão ligada o "já explorado" é guardado à parte das pinceladas: sem
+    // esquecê-lo, o mapa continuaria aberto onde o grupo já passou.
+    if (cena.visao_ligada) mapaRef.current?.reiniciarMemoria();
+    await cenas.atualizarCena(cena.id, cena.visao_ligada ? { nevoa_ligada: true, explorado: "" } : { nevoa_ligada: true });
   }
 
   async function revelarTudo() {
