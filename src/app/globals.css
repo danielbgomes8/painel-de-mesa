@@ -4502,3 +4502,57 @@ input.fj-score:focus-visible {
   width: 100%;
   text-align: left;
 }
+
+/* ── Subir de nível ─────────────────────────────────────────────────────── */
+.sn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.sn-painel,
+.sn-feito {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+}
+.sn-feito {
+  border-color: var(--ok);
+}
+.sn-painel .inv-mag {
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 32px;
+}
+.sn-painel select,
+.sn-num {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 6px 8px;
+  min-height: 32px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+}
+.sn-num {
+  width: 64px;
+}
+.sn-linhas,
+.sn-avisos,
+.sn-feito ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sn-avisos {
+  color: var(--warn);
+}

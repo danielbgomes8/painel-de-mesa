@@ -1,5 +1,6 @@
 "use client";
 
+import type { Sala } from "@/hooks/useSala";
 import type { Atributo, NivelProficiencia, Pericia, Personagem } from "@/lib/tipos";
 import { NOME_CLASSE } from "@/lib/classesNomes";
 import { useCatalogoClasses } from "@/hooks/useCatalogoClasses";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/regras";
 import { CampoNumero } from "@/components/CampoNumero";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
+import { SubirDeNivel } from "@/components/SubirDeNivel";
 
 const ATRIBUTOS: { chave: Atributo; sigla: string; nome: string }[] = [
   { chave: "for", sigla: "FOR", nome: "Força" },
@@ -88,11 +90,14 @@ export function FichaClassicaJogador({
   personagem: p,
   editavel,
   patch,
+  sala,
   modo = "mestre",
 }: {
   personagem: Personagem;
   editavel: boolean;
   patch: (mudanca: Partial<Personagem>) => void;
+  /** Pra subir de nível gravando com log e desfazer (sem ela, o botão não aparece). */
+  sala?: Sala;
   /** "jogador": a folha é a ficha principal de quem joga — CA, iniciativa e
    *  deslocamento já estão editáveis logo acima (não repete), e o "cartão" de
    *  combate é chamado de "resumo", que é o que o Mestre enxerga. */
@@ -211,10 +216,11 @@ export function FichaClassicaJogador({
               )}
               {pv !== null && (
                 <p className="fc-sub">
-                  PV ao subir: {sinal(pv)} (valor fixo do {p.hd_die} {sinal(modCon)} de Constituição) — some à mão no
-                  PV máximo, lá em cima.
+                  PV ao subir: {sinal(pv)} (valor fixo do {p.hd_die} {sinal(modCon)} de Constituição)
+                  {sala && editavel ? "." : " — some à mão no PV máximo, lá em cima."}
                 </p>
               )}
+              {sala && editavel && <SubirDeNivel personagem={p} indiceClasse={i} habilidadesNovas={novas ?? []} sala={sala} />}
             </SecaoRecolhivel>
           </div>
         );

@@ -144,7 +144,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   papel: a paleta é a do app): faixa de identidade ("Classe · Nível ·
   Proficiência"), card recolhido "Próximo nível · Paladino 2" (o que a classe
   ganha, `habilidadesDoNivel`, e o PV ao subir, `pvAoSubir`: valor fixo do dado
-  + CON, só com uma classe), tiles (CA, iniciativa e deslocamento só leitura —
+  + CON, só com uma classe) — desde 02/10/2026 com o botão que SOBE o nível (ver "Subir de nível"), tiles (CA, iniciativa e deslocamento só leitura —
   edita-se no cartão —, percepção passiva, CD e ataque de magia) e **seis blocos
   de atributo**: caixa à esquerda (sigla, modificador grande, valor editável) e,
   à direita, a resistência e as perícias DAQUELE atributo (o agrupamento sai de
@@ -1610,6 +1610,32 @@ confirmar" — **não funcionava**, porque a "lista do banco" que o componente e
 Os robôs `inventario`/`recap` rodaram 15 vezes seguidas sem falhar, sem nenhuma espera artificial.
 O que NÃO foi resolvido: dois aparelhos mexendo na MESMA lista (inventário) da MESMA pessoa em instantes muito próximos
 ainda se sobrescrevem (a escrita manda a lista inteira da cópia local). Para isso seria preciso controle de versão como o do combate.
+
+## Subir de nível (02/10/2026, sem migration)
+
+Antes existia só a PRÉVIA ("Próximo nível · Paladino 2": o que a classe ganha e o PV sugerido) e o jogador somava tudo
+à mão. Agora o card tem **⬆ Subir para o nível N** (`SubirDeNivel.tsx`, regras puras em `lib/subirDeNivel.ts`, 33 testes):
+mostra EXATAMENTE o que vai mudar, e só então grava tudo numa escrita, escreve no log ("X subiu para o nível N (Classe N)") e
+entra no botão ↩ Desfazer (`lembrarDesfazer`, igual aos PV). Quem pode: o dono da ficha e o Mestre (`editavel`).
+
+- **PV**: valor fixo (metade do dado + 1) ou o que o jogador rolou (1 até as faces), mais Constituição, **no mínimo 1**. O dado
+  é o **da classe que sobe** (`DADO_DE_VIDA`, conferido na fonte), não o `hd_die` da ficha — importa na multiclasse. PV atual
+  sobe junto, **menos pra quem está a 0** (nível não levanta ninguém caído). Dado de vida +1 (o gasto continua gasto); `hd_die`
+  só é trocado quando há UMA classe.
+- **Aumento de atributo** nos níveis 4, 8, 12 e 16 (**6 e 14 pro Guerreiro, 10 pro Ladino**; `NIVEIS_DE_ATRIBUTO`, tabela própria
+  porque o catálogo de habilidades só marca o nível 4): +2 num atributo ou +1 em dois, ninguém passa de 20, ou "talento" (o app
+  não conhece os efeitos: manda anotar). A Constituição vale pro nível novo e, **se o modificador dela sobe, soma o retroativo de
+  todos os níveis de antes** (+1 PV por nível por ponto). Nível 19: só avisa da Dádiva Épica.
+- **Espaços de magia**: só quando há UMA classe conjuradora e é ela que sobe; mexe só nos recursos "Espaço de magia Nv. N" que
+  a calculadora gerou. O máximo sobe e **o que já foi gasto continua gasto**. Sem espaços gerados na ficha: não inventa, avisa.
+  Duas conjuradoras (tabela de multiclasse): avisa e deixa pra pessoa. Pacto do Bruxo: o nível do espaço sobe e o antigo some.
+- **Habilidades novas** (do catálogo) listadas na confirmação; marcada a opção (liga por padrão), vão pra uma seção de lista
+  "Habilidades de <Classe>" na ficha completa — sem duplicar se o nível for refeito e sem apagar o que o jogador escreveu.
+- **Bônus de proficiência** é derivado do nível (nada a gravar), mas CD/resistências/percepção do cartão NÃO mudam sozinhos
+  (o cartão manda, item mágico soma por cima): quando a proficiência sobe, a confirmação manda usar "usar o calculado".
+- **Multiclasse nova** (primeiro nível de uma classe que o personagem ainda não tem) NÃO está aqui: continua sendo cadastrar a
+  classe em "Classe e conjuração". O botão sobe níveis de classes que já estão na ficha. Teto de 20 no total.
+- Robô: `e2e/subirDeNivel.e2e.ts` (Paladino 3→4 com +1 FOR/+1 CON, PV retroativo, log, habilidades na ficha completa e desfazer).
 
 ## Próximos passos (combinados em 17/09/2026)
 
