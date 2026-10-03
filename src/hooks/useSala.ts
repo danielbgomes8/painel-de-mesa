@@ -6,6 +6,7 @@ import { relatarErro } from "@/lib/relatarErro";
 import { desfazerPecas, tirarPecasDasFichas } from "@/lib/pecasNoBanco";
 import { slugUnico } from "@/lib/sala";
 import { turnoAposRemover } from "@/lib/regras";
+import { ecoAtrasado } from "@/lib/ecoAtrasado";
 import { linhasParaInserir, type Backup } from "@/lib/backup";
 import {
   camposConferiveis,
@@ -453,6 +454,9 @@ export function useSala(codigo: string): Sala {
   // Ponte pro `recarregar` que mora dentro do efeito: quem restaura um backup
   // precisa reler a sala inteira depois de trocar o banco.
   const recarregarRef = useRef<() => void>(() => {});
+  // Escritas na MESMA ficha saem uma depois da outra (ver `escreverNaFicha`); aqui fica a ponta de cada
+  // fila, e a releitura da sala consulta pra não apagar uma ficha com escrita ainda em voo.
+  const cadeiaDeEscritaRef = useRef(new Map<string, Promise<void>>());
 
   const sincronizandoRef = useRef<Promise<boolean> | null>(null);
   // Ponte pra `sincronizar` (definida logo abaixo, e que também chama a si
@@ -754,7 +758,16 @@ export function useSala(codigo: string): Sala {
         }
       }
 
-      setPersonagens(ordenar((pc.data ?? []) as Personagem[]));
+      // A foto foi lida antes de agora: ficha com escrita ainda em voo, ou mais nova na tela do que na
+      // foto, fica como está (a foto apagaria da tela o que a pessoa acabou de fazer).
+      setPersonagens((atual) =>
+        ordenar(
+          ((pc.data ?? []) as Personagem[]).map((nova) => {
+            const local = atual.find((p) => p.id === nova.id);
+            return local && (cadeiaDeEscritaRef.current.has(nova.id) || ecoAtrasado(local, nova)) ? local : nova;
+          }),
+        ),
+      );
       setCombate(comoCombate((cs.data ?? null) as LinhaCombate | null));
       setCombateVersao((cs.data as LinhaCombate | null)?.version ?? 0);
       setNotasMestre((dn.data?.text ?? "") as string);
@@ -840,6 +853,11 @@ export function useSala(codigo: string): Sala {
               return atual.filter((p) => p.id !== id);
             }
             const novo = msg.new as Personagem;
+            // Ficha com escrita nossa em voo: o evento é o eco de uma escrita anterior (ou de outro aparelho)
+            // e apagaria da tela o que a pessoa acabou de fazer; a releitura do fim da fila traz tudo.
+            if (cadeiaDeEscritaRef.current.has(novo.id)) return atual;
+            // Evento que chegou atrasado (mais velho que a linha que a tela já tem) apagaria o mais novo.
+            if (ecoAtrasado(atual.find((p) => p.id === novo.id), novo)) return atual;
             const semEle = atual.filter((p) => p.id !== novo.id);
             return ordenar([...semEle, novo]);
           });
@@ -1029,6 +1047,33 @@ export function useSala(codigo: string): Sala {
     encontros,
   ]);
 
+  // Em paralelo, duas escritas seguidas na mesma ficha (três magias adicionadas em sequência, cada uma
+  // com a lista inteira) podem chegar ao banco trocadas, e a mais velha, por último, desfaz a mais
+  // nova — visto de verdade no robô contra o banco. Fichas diferentes continuam em paralelo.
+  const escreverNaFicha = useCallback((id: string, patch: Partial<Personagem>) => {
+    const cadeia = cadeiaDeEscritaRef.current;
+    const antes = cadeia.get(id) ?? Promise.resolve();
+    const esta = antes.then(() => supabase.from("characters").update(patch).eq("id", id));
+    const fim = esta.then(
+      () => undefined,
+      () => undefined,
+    );
+    cadeia.set(id, fim);
+    // Quando a fila da ficha esvazia, relê a linha uma vez: durante as escritas os eventos dela foram
+    // ignorados (o eco de uma escrita ANTERIOR chegando no meio da seguinte reverteria a tela), então
+    // aqui a tela volta a ser o que o banco tem — inclusive a mudança que outro aparelho fez nesse meio
+    // tempo. A linha lida traz o carimbo novo, e com ele o `ecoAtrasado` passa a barrar o resto.
+    void fim.then(async () => {
+      if (cadeia.get(id) !== fim) return; // tem escrita mais nova na fila: a última faz a releitura
+      cadeia.delete(id);
+      const { data } = await supabase.from("characters").select("*").eq("id", id).maybeSingle();
+      if (!data || cadeia.has(id)) return;
+      const linha = data as Personagem;
+      setPersonagens((atual) => atual.map((p) => (p.id === id && !ecoAtrasado(p, linha) ? linha : p)));
+    });
+    return esta;
+  }, []);
+
   const atualizarPersonagem = useCallback(
     async (id: string, patch: Partial<Personagem>) => {
       const seq = proximaSeq();
@@ -1042,7 +1087,7 @@ export function useSala(codigo: string): Sala {
         if (alvo) guardarNaFila({ tipo: "personagens", mudancas: [mudancaDe(alvo, patch)] }, seq);
         return;
       }
-      const { error } = await supabase.from("characters").update(patch).eq("id", id);
+      const { error } = await escreverNaFicha(id, patch);
       if (error && ehFalhaDeRede(error) && alvo) {
         guardarNaFila({ tipo: "personagens", mudancas: [mudancaDe(alvo, patch)] }, seq);
         return;
@@ -1053,7 +1098,7 @@ export function useSala(codigo: string): Sala {
         setAvisoFalha(AVISO_FALHA_ESCRITA);
       }
     },
-    [guardarNaFila, proximaSeq],
+    [escreverNaFicha, guardarNaFila, proximaSeq],
   );
 
   const atualizarVariosPersonagens = useCallback(
@@ -1096,7 +1141,7 @@ export function useSala(codigo: string): Sala {
         return true;
       }
       const respostas = await Promise.all(
-        alvos.map(({ id, patch }) => supabase.from("characters").update(patch).eq("id", id)),
+        alvos.map(({ id, patch }) => escreverNaFicha(id, patch)),
       );
       // Sem internet no meio: o que não foi fica na tela e vai pra fila.
       const erros = respostas.map((r) => r.error);
@@ -1115,7 +1160,7 @@ export function useSala(codigo: string): Sala {
       }
       return true;
     },
-    [guardarNaFila, proximaSeq],
+    [escreverNaFicha, guardarNaFila, proximaSeq],
   );
 
   const criarPersonagem = useCallback(
