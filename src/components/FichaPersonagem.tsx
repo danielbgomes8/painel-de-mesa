@@ -543,7 +543,7 @@ export function FichaPersonagem({
           <>
             <FichaClasse personagem={p} editavel={editavel} patch={patch} />
             <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
-            <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} />
+            <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
             <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
           </>
         )}
@@ -562,7 +562,7 @@ export function FichaPersonagem({
                 <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} />
                 <FichaClasse personagem={p} editavel={editavel} patch={patch} />
                 <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
-                <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} />
+                <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
                 <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
               </>
             )}

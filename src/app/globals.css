@@ -4478,3 +4478,27 @@ input.fj-score:focus-visible {
   min-height: 32px;
   box-sizing: border-box;
 }
+
+/* ── Recap da sessão ────────────────────────────────────────────────────── */
+.recap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 12px;
+}
+.recap-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recap-lista .btn {
+  width: 100%;
+  text-align: left;
+}

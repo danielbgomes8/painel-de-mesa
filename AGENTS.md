@@ -1562,6 +1562,55 @@ O Daniel pediu "o que falta pra ficar completo" e escolheu inventário + magias.
   histórico do baú, backup do baú dentro do botão "backup" do app (ele entra no backup bruto diário,
   `TABELAS_COM_SALA`, como o Quadro).
 
+## Recap da sessão (02/10/2026, sem migration)
+
+Botão **📝 Gerar recap da sessão** em Campanha → Sessões (só o Mestre). Escolhe uma sessão e o app escreve um
+RASCUNHO que cai no formulário "nova entrada" do Diário; **nada é salvo** até o Mestre editar e apertar
+"+ nova entrada". Regras puras em `lib/recap.ts` (testadas, 22 testes), tela em `RecapDaSessao.tsx`.
+
+- **Não existe "sessão" no banco.** Sessão = trecho do log de combate sem buraco de mais de 3 h
+  (`detectarSessoes`); trecho com menos de 5 linhas é mexida avulsa e não aparece. A lista mostra até 6.
+- **O `sala.log` da tela guarda só as últimas 40 linhas** (`TAMANHO_LOG`). O recap NÃO usa ele:
+  `hooks/lerHistoricoDoLog.ts` lê o `combat_log` direto do banco (até 3 páginas de 1000 linhas) na hora do clique.
+- **O recap lê as frases do log por regex** (`resumirSessao`): "X sofreu N de dano (hp/max)", "recuperou N PV",
+  "entrou no combate", "Rodada N começou", teste de morte, "conjura", "ficou <condição>", e linhas que começam com 🎒/💰
+  (baú). Os testes geram as linhas com as funções reais de `regras.ts` (`mensagemAjustePV`, `resolverTesteMorte`...):
+  **se alguém mudar uma frase do log, o teste do recap quebra de propósito.** Linha não reconhecida é ignorada
+  (contar de menos é melhor que inventar). Quem não é jogador conta como inimigo; PV de inimigo não vai pro log, então
+  o recap só sabe o dano total que eles sofreram, não quantos caíram.
+- **Por isso o baú agora escreve no log** (`🎒 Ana pegou 2× Poção do baú`, `💰 O Mestre guardou 41 PO no baú`, divisão
+  de dinheiro, item jogado fora, e "guardar no baú" a partir do inventário). É a única fonte do tesouro no recap.
+- Cartões do Quadro mostrados à mesa (`destaque_em` dentro da sessão + 30 min, só os `revelado`) entram como
+  "Mostrado à mesa". O texto cabe no limite do diário (2000 caracteres); se passar, as últimas seções caem e um "…" avisa.
+- Robô: `e2e/recap.e2e.ts` (semeia 54 linhas de log de dois dias atrás, mais que as 40 da tela, e confere o rascunho,
+  a edição e o salvar no diário).
+
+## Corrida de escrita da ficha (02/10/2026) — LEIA antes de mexer em `atualizarPersonagem`
+
+O robô do inventário perdia item/magia adicionado em sequência (2 de 3 salvavam). Era um defeito antigo do app, que o
+inventário e as magias (listas inteiras numa coluna) só deixaram mais visível. **Quatro causas, todas fechadas no
+`useSala.ts`**:
+
+1. **Escritas em paralelo na mesma ficha chegavam ao banco trocadas** (a mais velha por último desfazia a mais nova).
+   Agora `escreverNaFicha` serializa as escritas de **cada ficha** (`cadeiaDeEscritaRef`); fichas diferentes seguem em
+   paralelo. `atualizarPersonagem` e `atualizarVariosPersonagens` passam por ela.
+2. **O eco do tempo real de uma escrita ANTERIOR chegava no meio da seguinte e revertia a tela**, e a ação seguinte
+   partia da lista velha. O evento da ficha é **ignorado enquanto há escrita nossa em voo**; quando a fila da ficha
+   esvazia, ela é **relida uma vez** (isso também traz o que outro aparelho mudou nesse meio tempo).
+3. **Evento fora de ordem** (o tempo real não garante a ordem): `lib/ecoAtrasado.ts` descarta o evento mais velho que a
+   linha da tela, pelo `updated_at` (trigger `tocar_updated_at`, migration 0001). Sem carimbo legível, o evento passa.
+4. **A releitura da sala inteira (`carregar`, roda a cada inscrição do canal) trazia uma foto lida antes da escrita.**
+   Ficha com escrita em voo, ou mais nova na tela que na foto, é mantida.
+
+Armadilha que custou horas: eu tinha feito um hook (`useValorOtimista`) que "lembrava o último valor gravado até o banco
+confirmar" — **não funcionava**, porque a "lista do banco" que o componente enxerga já é o estado OTIMISTA do `useSala`
+(igual ao que acabou de gravar desde o primeiro milissegundo), então a confirmação vinha na hora. O log mostrou
+"PEND set" e "PEND limpa" com 20 ms de diferença, antes do PATCH sair. Foi removido. Lição: **achar a causa no log
+(console.log temporário + o PATCH que saiu) antes de empilhar remendo**; três remendos seguidos só mudaram a taxa de falha.
+Os robôs `inventario`/`recap` rodaram 15 vezes seguidas sem falhar, sem nenhuma espera artificial.
+O que NÃO foi resolvido: dois aparelhos mexendo na MESMA lista (inventário) da MESMA pessoa em instantes muito próximos
+ainda se sobrescrevem (a escrita manda a lista inteira da cópia local). Para isso seria preciso controle de versão como o do combate.
+
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram

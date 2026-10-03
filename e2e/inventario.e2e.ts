@@ -109,6 +109,11 @@ test("inventário: moedas, item que empilha, peso e limite de sintonia", async (
   // Três itens já sintonizados: o quarto recusa e explica.
   const mag = (nome: string, sintonia: number) => ({ nome, qtd: 1, peso: 0, descricao: "", magico: true, raridade: "raro", equipado: false, sintonia });
   await mudarFicha("ana-robo", { inventario: [mag("Anel A", 2), mag("Anel B", 2), mag("Anel C", 2), mag("Anel D", 1)] });
+  // Recarrega em vez de esperar o tempo real entregar: aqui o que se prova é o limite de sintonia
+  // (a entrega ao vivo já é coberta pelos outros robôs).
+  await page.reload();
+  await page.getByRole("button", { name: "Fichas", exact: true }).click();
+  await page.locator(".fc-sechead", { hasText: "Inventário e moedas" }).click();
   await expect(page.locator(".inv-item", { hasText: "Anel D" })).toBeVisible();
   await page.locator(".inv-item", { hasText: "Anel D" }).getByRole("button", { name: "sintonizar" }).click();
   await expect(page.getByRole("status").filter({ hasText: "limite" })).toBeVisible();
@@ -153,6 +158,14 @@ test("baú do grupo: guardar, entregar item, dividir o dinheiro", async ({ page 
   await expect.poll(async () => ((await fichaDoBanco("ana-robo")).moedas as { po: number }).po).toBe(20);
   expect(((await fichaDoBanco("beto-robo")).moedas as { po: number }).po).toBe(20);
   expect((await bauDoBanco()).find((b) => b.moeda === "po")?.qtd).toBe(1);
+
+  // Cada troca do baú deixou uma linha no log (é daí que o recap da sessão conta o tesouro).
+  const log = await rest(`combat_log?select=text&room_code=eq.${SALA}`);
+  const linhas = ((await log.json()) as { text: string }[]).map((l) => l.text);
+  expect(linhas).toContain("🎒 O Mestre guardou 3× Poção de cura no baú");
+  expect(linhas).toContain("💰 O Mestre guardou 41 PO no baú");
+  expect(linhas).toContain("🎒 Ana Robô pegou 2× Poção de cura do baú");
+  expect(linhas).toContain("💰 Dinheiro do baú dividido entre Ana Robô, Beto Robô: cada um levou 20 PO");
 
   expect(erros).toEqual([]);
 });

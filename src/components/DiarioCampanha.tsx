@@ -7,17 +7,21 @@ import { alternarCartaoNaSessao, cartoesDaSessao, emojiDoTipo, type CartaoVisto 
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { RecapDaSessao } from "@/components/RecapDaSessao";
 
 /** Resumo por sessão, escrito pelo Mestre, visível pra todo mundo — pra
  *  lembrar "onde paramos" na próxima mesa. */
 export function DiarioCampanha({
   sala,
+  codigo,
   souMestre,
   semCabecalho = false,
   cartoes = [],
   aoAbrirCartao,
 }: {
   sala: Sala;
+  /** Código da sala: o recap lê o histórico do log direto do banco. */
+  codigo: string;
   souMestre: boolean;
   /** Os cartões do Quadro que esta pessoa vê (pra marcar e mostrar em cada sessão). */
   cartoes?: CartaoVisto[];
@@ -25,6 +29,9 @@ export function DiarioCampanha({
   /** Dentro da aba Campanha o título já está lá em cima. */
   semCabecalho?: boolean;
 }) {
+  // O rascunho do recap entra no formulário de nova entrada; trocar a `key` recomeça o
+  // formulário com o texto novo (sem efeito pra copiar prop em estado).
+  const [rascunho, setRascunho] = useState({ id: 0, titulo: "", texto: "" });
   return (
     <div className={semCabecalho ? undefined : "combat"}>
       {!semCabecalho && (
@@ -45,7 +52,17 @@ export function DiarioCampanha({
         ))}
       </div>
 
-      {souMestre && <FormNovaEntrada sala={sala} />}
+      {souMestre && (
+        <>
+          <RecapDaSessao
+            codigo={codigo}
+            jogadores={sala.personagens.filter((p) => !p.is_npc).map((p) => p.name)}
+            cartoes={cartoes}
+            aoGerar={(titulo, texto) => setRascunho((r) => ({ id: r.id + 1, titulo, texto }))}
+          />
+          <FormNovaEntrada key={rascunho.id} sala={sala} inicial={rascunho} />
+        </>
+      )}
     </div>
   );
 }
@@ -153,9 +170,9 @@ function CartoesDaSessao({
   );
 }
 
-function FormNovaEntrada({ sala }: { sala: Sala }) {
-  const [titulo, setTitulo] = useState("");
-  const [texto, setTexto] = useState("");
+function FormNovaEntrada({ sala, inicial }: { sala: Sala; inicial: { titulo: string; texto: string } }) {
+  const [titulo, setTitulo] = useState(inicial.titulo);
+  const [texto, setTexto] = useState(inicial.texto);
 
   function adicionar() {
     if (!texto.trim()) return;

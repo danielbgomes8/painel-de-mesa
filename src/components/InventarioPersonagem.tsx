@@ -33,11 +33,14 @@ export function InventarioPersonagem({
   editavel,
   patch,
   bau,
+  registrar,
 }: {
   personagem: Personagem;
   editavel: boolean;
   patch: (mudanca: Partial<Personagem>) => void;
   bau?: Bau;
+  /** Escreve uma linha no log ("🎒 Ana guardou 2× Corda no baú"). */
+  registrar?: (texto: string) => void;
 }) {
   // `normalizar*`: a linha pode ser de antes da migration 0026 (sem a coluna).
   const moedas = normalizarMoedas(p.moedas);
@@ -99,6 +102,7 @@ export function InventarioPersonagem({
     setAviso(null);
     setEditandoIdx(null);
     patch({ inventario: tirarQuantidade(inventario, i, item.qtd) });
+    registrar?.(`🎒 ${p.name} guardou ${item.qtd > 1 ? `${item.qtd}× ` : ""}${item.nome} no baú`);
   }
 
   return (

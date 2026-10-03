@@ -16,11 +16,13 @@ type Parte = "quadro" | "bau" | "sessoes";
  *  o baú do grupo e, ao lado, o diário de sessões de sempre. */
 export function AbaCampanha({
   sala,
+  codigo,
   quadro,
   bau,
   identidade,
 }: {
   sala: Sala;
+  codigo: string;
   quadro: Quadro;
   bau: Bau;
   identidade: Identidade | null;
@@ -61,6 +63,7 @@ export function AbaCampanha({
       ) : (
         <DiarioCampanha
           sala={sala}
+          codigo={codigo}
           souMestre={identidade?.tipo === "mestre"}
           semCabecalho
           cartoes={vistos}

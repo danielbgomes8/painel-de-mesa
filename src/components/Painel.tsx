@@ -401,7 +401,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
-      {abaEfetiva === "diario" && <AbaCampanha sala={sala} quadro={quadro} bau={bau} identidade={identidade} />}
+      {abaEfetiva === "diario" && <AbaCampanha sala={sala} codigo={codigo} quadro={quadro} bau={bau} identidade={identidade} />}
 
       {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} />}
 

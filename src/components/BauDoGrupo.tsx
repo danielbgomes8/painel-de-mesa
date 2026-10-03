@@ -57,6 +57,10 @@ export function BauDoGrupo({
   const [qtd, setQtd] = useState("1");
   const [peso, setPeso] = useState("");
   const [magico, setMagico] = useState(false);
+  // O log é público e é de onde o recap da sessão conta o tesouro: cada troca do baú deixa uma linha.
+  const registrar = (texto: string) => void sala.registrarLog(texto);
+  const quemMexe = souMestre ? "O Mestre" : (jogadores.find((p) => p.slug === meuSlug)?.name ?? "Alguém");
+  const vezes = (n: number) => (n > 1 ? `${n}× ` : "");
 
   const pedido: Moedas = (() => {
     const m = moedasVazias();
@@ -81,6 +85,7 @@ export function BauDoGrupo({
     executar(async () => {
       if (!temMoeda(pedido)) return "Digite quanto vai pro baú.";
       if (!(await bau.guardarMoedas(pedido))) return AVISO_NAO_FOI;
+      registrar(`💰 ${quemMexe} guardou ${textoMoedas(pedido)} no baú`);
       limparEntrada();
       return null;
     });
@@ -98,6 +103,7 @@ export function BauDoGrupo({
         await bau.guardarMoedas(pedido); // desfaz: o dinheiro volta pro baú
         return AVISO_NAO_FOI;
       }
+      registrar(`💰 ${destino.name} pegou ${textoMoedas(pedido)} do baú`);
       limparEntrada();
       return null;
     });
@@ -119,6 +125,7 @@ export function BauDoGrupo({
         return AVISO_NAO_FOI;
       }
       setDivisao(null);
+      registrar(`💰 Dinheiro do baú dividido entre ${alvos.map((p) => p.name).join(", ")}: cada um levou ${textoMoedas(cada)}`);
       return `Cada um levou ${textoMoedas(cada)}.`;
     });
 
@@ -133,6 +140,7 @@ export function BauDoGrupo({
         magico,
       });
       if (!ok) return AVISO_NAO_FOI;
+      registrar(`🎒 ${quemMexe} guardou ${vezes(Math.max(1, Number.parseInt(qtd, 10) || 1))}${n} no baú`);
       setNome("");
       setQtd("1");
       setPeso("");
@@ -155,6 +163,7 @@ export function BauDoGrupo({
         await bau.guardarItem({ ...item, qtd: quanto }); // desfaz: o item volta pro baú
         return AVISO_NAO_FOI;
       }
+      registrar(`🎒 ${destino.name} pegou ${vezes(quanto)}${item.nome} do baú`);
       return `${quanto > 1 ? `${quanto}× ` : ""}${item.nome} foi pra ${destino.name}.`;
     });
 
@@ -296,7 +305,9 @@ export function BauDoGrupo({
                     <BotaoRemover
                       aria={`remover ${item.nome} do baú`}
                       confirmar={`Jogar fora "${item.nome}"? Ninguém vai ficar com ele.`}
-                      onConfirmar={() => void bau.remover(item.id)}
+                      onConfirmar={() => {
+                        void bau.remover(item.id).then((ok) => ok && registrar(`🎒 ${quemMexe} jogou fora ${vezes(item.qtd)}${item.nome} do baú`));
+                      }}
                     />
                   </>
                 )}
