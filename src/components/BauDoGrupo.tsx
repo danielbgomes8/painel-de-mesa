@@ -22,6 +22,7 @@ import {
   valorEmPo,
 } from "@/lib/inventario";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { HistoricoDoBau } from "@/components/HistoricoDoBau";
 
 const AVISO_NAO_FOI = "Não deu certo. Confira a conexão e tente de novo.";
 
@@ -32,10 +33,12 @@ const AVISO_NAO_FOI = "Não deu certo. Confira a conexão e tente de novo.";
 export function BauDoGrupo({
   bau,
   sala,
+  codigo,
   identidade,
 }: {
   bau: Bau;
   sala: Sala;
+  codigo: string;
   identidade: Identidade | null;
 }) {
   const souMestre = identidade?.tipo === "mestre";
@@ -361,6 +364,8 @@ export function BauDoGrupo({
           {aviso}
         </p>
       )}
+
+      <HistoricoDoBau codigo={codigo} gatilho={sala.log[0]?.id} />
     </div>
   );
 }

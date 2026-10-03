@@ -14,6 +14,8 @@
  * é um rascunho que o Mestre edita, e contar de menos é melhor que inventar.
  */
 
+import { ehLinhaDoBau } from "./historicoBau";
+
 export type LinhaDoLog = { text: string; created_at: string };
 
 export type SessaoDetectada = {
@@ -71,8 +73,6 @@ export type Resumo = {
   bau: string[];
 };
 
-const MARCAS_DO_BAU = ["🎒", "💰"];
-
 function acumular<T>(lista: T[], achar: (x: T) => boolean, novo: () => T): T {
   let x = lista.find(achar);
   if (!x) {
@@ -116,7 +116,7 @@ export function resumirSessao(linhas: LinhaDoLog[], jogadores: string[]): Resumo
 
   for (const { text: bruto } of linhas) {
     const texto = bruto.trim();
-    if (MARCAS_DO_BAU.some((m) => texto.startsWith(m))) {
+    if (ehLinhaDoBau(texto)) {
       if (r.bau[r.bau.length - 1] !== texto) r.bau.push(texto);
       continue;
     }

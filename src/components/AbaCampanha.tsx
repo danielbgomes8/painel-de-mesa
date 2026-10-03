@@ -50,7 +50,7 @@ export function AbaCampanha({
         </div>
       </div>
       {parte === "bau" ? (
-        <BauDoGrupo bau={bau} sala={sala} identidade={identidade} />
+        <BauDoGrupo bau={bau} sala={sala} codigo={codigo} identidade={identidade} />
       ) : parte === "quadro" ? (
         <QuadroCampanha
           quadro={quadro}

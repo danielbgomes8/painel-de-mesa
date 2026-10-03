@@ -1637,6 +1637,29 @@ entra no botão ↩ Desfazer (`lembrarDesfazer`, igual aos PV). Quem pode: o don
   classe em "Classe e conjuração". O botão sobe níveis de classes que já estão na ficha. Teto de 20 no total.
 - Robô: `e2e/subirDeNivel.e2e.ts` (Paladino 3→4 com +1 FOR/+1 CON, PV retroativo, log, habilidades na ficha completa e desfazer).
 
+## Histórico do baú (02/10/2026, sem migration)
+
+Em Campanha → 🎒 Baú, seção **📜 Histórico do baú** (fechada por padrão; `HistoricoDoBau.tsx`, regras em `lib/historicoBau.ts`, 8 testes):
+quem guardou, pegou, dividiu ou jogou fora o quê, e quando, agrupado por Hoje / Ontem / dia, com filtro Tudo / 🎒 Itens / 💰 Dinheiro.
+
+- **Não há tabela de histórico**: é o log do combate. Cada troca do baú já escreve uma linha que começa com 🎒 (item) ou 💰 (dinheiro);
+  o histórico é essas linhas. É a MESMA fonte do recap da sessão (`ehLinhaDoBau` é um só, em `historicoBau.ts`, e o recap importa de lá) —
+  **se mudar o prefixo das frases do baú, mude as marcas lá**, senão histórico e recap perdem as linhas.
+- **Só existe a partir de 02/10/2026** (dia em que o baú passou a escrever no log). O que foi mexido antes não deixou rastro.
+- Lê do banco com o filtro no servidor (`or=(text.like.🎒*,text.like.💰*)`, as 200 mais novas): o `sala.log` da tela guarda só 40 linhas
+  misturadas com o combate. Abre sob pedido e, aberto, **relê sozinho** quando chega linha nova no log (`gatilho` = id da linha mais nova).
+  Mostra 30 e abre mais de 30 em 30. O dia é o do fuso de quem olha (a sessão da noite não cai no "dia seguinte").
+- É público como o log: qualquer um da mesa abre. O telão não mostra.
+- Robô: `e2e/historicoBau.e2e.ts`.
+
+## Rodar o robô de tela aqui — LEIA antes de rodar (lição de 02/10/2026)
+
+O robô local e o do GitHub **usam a mesma sala `ci-teste` no banco real**: se rodam ao mesmo tempo, um apaga os dados do outro e aparecem
+falhas em testes que nada têm a ver com a mudança (aura, mapa, quadro...). Isso já derrubou o robô do GitHub de um commit bom.
+**A checagem certa é `gh run list --workflow e2e.yml --limit 1 --json status`** (o `gh run list --limit 1` sozinho pode mostrar o workflow
+"Verificar", que acaba em 1 minuto, e dar "completed" com o robô ainda andando). Depois de um push, **espere o "Robô de tela" terminar
+(~9 min) antes de rodar qualquer `playwright` aqui**; e se ele falhar, refaça com `gh run rerun <id>` antes de achar defeito no código.
+
 ## Próximos passos (combinados em 17/09/2026)
 
 Lista de melhorias que o Daniel aprovou, na ordem. Os riscados já foram

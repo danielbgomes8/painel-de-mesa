@@ -4556,3 +4556,36 @@ input.fj-score:focus-visible {
 .sn-avisos {
   color: var(--warn);
 }
+
+/* ── Histórico do baú ───────────────────────────────────────────────────── */
+.bau-hist-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 32px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink);
+  cursor: pointer;
+}
+.bau-hist-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bau-hist-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.bau-hist-hora {
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
