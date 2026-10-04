@@ -232,8 +232,8 @@ const TRUQUES_POR_CLASSE: Partial<Record<ClasseBase, number[]>> = {
 };
 
 /** Quantos truques o personagem conhece pelas classes: mesma soma e mesmo critério de
- *  `limiteDePreparadas` (aviso, não trava: truque de espécie, talento e subclasse vem de
- *  fora da tabela). null = nenhuma classe com truque na tabela. */
+ *  `limiteDePreparadas` (aviso, não trava; truque de espécie, talento ou subclasse o jogador
+ *  marca como extra e sai da conta). null = nenhuma classe com truque na tabela. */
 export function limiteDeTruques(classes: ClassePersonagem[]): LimitePreparadas | null {
   const porClasse: LimitePreparadas["porClasse"] = [];
   for (const c of classes) {
@@ -246,9 +246,15 @@ export function limiteDeTruques(classes: ClassePersonagem[]): LimitePreparadas |
   return { total: porClasse.reduce((s, c) => s + c.limite, 0), porClasse };
 }
 
-/** Quantos truques a lista tem (todos contam: truque não se prepara). */
+/** Quantos truques contam no limite da classe: todos, menos os marcados como extras
+ *  (`sempre`: espécie, talento ou subclasse). Truque não se prepara, então `preparada` não entra. */
 export function contarTruques(magias: MagiaPersonagem[]): number {
-  return magias.filter((m) => m.nivel === 0).length;
+  return magias.filter((m) => m.nivel === 0 && !m.sempre).length;
+}
+
+/** Quantos truques estão marcados como extras. */
+export function contarTruquesExtras(magias: MagiaPersonagem[]): number {
+  return magias.filter((m) => m.nivel === 0 && m.sempre).length;
 }
 
 /** A magia já está na lista? (mesmo nome, ignorando maiúscula e acento) */

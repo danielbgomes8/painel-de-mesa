@@ -1731,5 +1731,5 @@ num checkbox nos detalhes da magia ("sempre preparada: subclasse, juramento, esp
 `preparada` junto; `normalizarMagia` também faz isso se o banco trouxer `sempre` sem `preparada`, e ficha antiga lê como
 `false`. Magia sempre preparada **não conta** em `contarPreparadas` (nem no limite), e o contador mostra "3/5 preparadas · +2
 sempre". O chip vira "sempre" (desabilitado; desmarcar é nos detalhes). Isso fecha a ressalva dos avisos de limite: quem
-marca fica exato. Truque de subclasse/espécie continua só no aviso (não há marca de "truque extra").
+marca fica exato. Truque extra de subclasse/espécie/talento usa o mesmo campo `sempre`: no truque (nível 0) o checkbox dos detalhes vira "truque extra", ele sai de `contarTruques` e o contador mostra "4/3 truques · +1 extra" (`contarTruquesExtras`). Marcar não mexe em `preparada` (truque não se prepara).
 

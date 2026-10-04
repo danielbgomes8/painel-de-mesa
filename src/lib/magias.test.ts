@@ -5,6 +5,7 @@ import {
   contarPreparadas,
   contarSempre,
   contarTruques,
+  contarTruquesExtras,
   devolverEspaco,
   espacosDosRecursos,
   espacosPossiveis,
@@ -256,5 +257,13 @@ describe("limite de truques conhecidos", () => {
   it("conta só os truques da lista, preparados ou não", () => {
     const m = (nivel: number) => ({ ...normalizarMagia({ nome: "x", nivel }) });
     expect(contarTruques([m(0), m(0), m(1), m(3)])).toBe(2);
+  });
+
+  it("truque extra (espécie, talento, subclasse) sai da conta e é contado à parte", () => {
+    const t = (sempre: boolean) => normalizarMagia({ nome: "x", nivel: 0, sempre });
+    expect(contarTruques([t(false), t(true), t(true)])).toBe(1);
+    expect(contarTruquesExtras([t(false), t(true), t(true)])).toBe(2);
+    // a marca num truque não mexe na conta das preparadas
+    expect(contarSempre([t(true)])).toBe(0);
   });
 });

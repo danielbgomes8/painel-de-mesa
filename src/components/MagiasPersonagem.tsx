@@ -10,6 +10,7 @@ import {
   contarPreparadas,
   contarSempre,
   contarTruques,
+  contarTruquesExtras,
   espacosDosRecursos,
   espacosPossiveis,
   jaTemMagia,
@@ -54,10 +55,11 @@ export function MagiasPersonagem({
   const limite = limiteDePreparadas(Array.isArray(p.classes) ? p.classes : []);
   const acima = limite !== null && preparadas > limite.total;
   const truques = contarTruques(magias);
+  const truquesExtras = contarTruquesExtras(magias);
   const limiteTruques = limiteDeTruques(Array.isArray(p.classes) ? p.classes : []);
   const truquesAcima = limiteTruques !== null && truques > limiteTruques.total;
   const detalheTruques = limiteTruques
-    ? `Limite pelas tabelas de classe do SRD: ${limiteTruques.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Truque de espécie, talento ou subclasse não conta.`
+    ? `Limite pelas tabelas de classe do SRD: ${limiteTruques.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Truque marcado como extra (espécie, talento, subclasse) não conta.`
     : undefined;
   const detalheLimite = limite
     ? `Limite pelas tabelas de classe do SRD: ${limite.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Magia marcada como sempre preparada (subclasse, juramento, espécie) não conta.`
@@ -127,9 +129,9 @@ export function MagiasPersonagem({
               </span>
             ))
           )}
-          {truques > 0 && (
+          {truques + truquesExtras > 0 && (
             <span className="mg-contagem mg-truques" data-acima={truquesAcima || undefined} title={detalheTruques}>
-              {limiteTruques ? `${truques}/${limiteTruques.total}` : truques} truques
+              {limiteTruques ? `${truques}/${limiteTruques.total}` : truques} truques{truquesExtras > 0 ? ` · +${truquesExtras} extra` : ""}
             </span>
           )}
           <span className="mg-contagem" data-acima={acima || undefined} title={detalheLimite}>
@@ -235,6 +237,16 @@ export function MagiasPersonagem({
                               placeholder="nome"
                               onCommit={(t) => alterar(indice, { nome: t })}
                             />
+                            {magia.nivel === 0 && (
+                              <label className="inv-mag">
+                                <input
+                                  type="checkbox"
+                                  checked={magia.sempre}
+                                  onChange={(e) => alterar(indice, { sempre: e.target.checked })}
+                                />{" "}
+                                truque extra (espécie, talento, subclasse): não conta no limite
+                              </label>
+                            )}
                             {magia.nivel > 0 && (
                               <label className="inv-mag">
                                 <input

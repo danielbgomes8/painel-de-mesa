@@ -69,7 +69,9 @@ export type ItemInventario = {
  *  escolhida do catálogo do SRD, e ficam vazios numa magia cadastrada à mão.
  *  `preparada` não vale pra truque (nível 0), que sempre pode ser conjurado.
  *  `sempre` = sempre preparada por subclasse, juramento ou espécie: fica preparada
- *  (`preparada` vira true junto) mas não conta no limite de preparadas da classe. */
+ *  (`preparada` vira true junto) mas não conta no limite de preparadas da classe.
+ *  Num truque (nível 0), `sempre` quer dizer "truque extra" de espécie, talento ou subclasse:
+ *  não conta no limite de truques conhecidos. */
 export type MagiaPersonagem = {
   nome: string;
   nivel: number;
