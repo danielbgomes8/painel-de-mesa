@@ -131,9 +131,12 @@ export function FichaPersonagem({
             <button type="button" className="btn" onClick={() => patch(aplicarDescansoCurto(p))}>
               Descanso curto
             </button>
-            <button type="button" className="btn" onClick={descansoLongoCompleto}>
-              Descanso longo
-            </button>
+            {/* O descanso longo é do Mestre: ele decide quem descansa e quando o dia passa (ver "Tempo da campanha"). */}
+            {souMestre && (
+              <button type="button" className="btn" onClick={descansoLongoCompleto}>
+                Descanso longo
+              </button>
+            )}
           </div>
         ) : null}
     </>

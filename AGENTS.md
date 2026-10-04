@@ -1762,6 +1762,8 @@ Canal próprio (`useTempo.ts`, molde do `useBau`) e tolerante à migration ausen
   **🌙 Descanso longo nas Ações em massa** (aba Combate): descansa só quem está selecionado e, com a campanha contando, passa 1 dia
   (um só, não um por selecionado), com o log "🗓 Descanso longo de Ana, Beto. Passou 1 dia...". Decidido em 04/10/2026; tentei
   antes ligar o botão da ficha ao dia (com trava `descanso_dia`, migration 0029) e o Daniel recusou, então não existe.
+  **O botão "Descanso longo" da ficha só aparece pro Mestre** (o jogador vê só "Descanso curto"; decidido por ele em 04/10/2026):
+  o descanso longo é recurso do Mestre. O jogador não tem mais jeito de fazer descanso longo sozinho.
 - **Calendário** (`lib/tempoCampanha.ts`, 17 testes): "só Dia N" (padrão) ou **Harptos** (Forgotten Realms: 12 meses de 30 dias + 5
   festivais = 365; **Shieldmeet, o dia extra de a cada 4 anos, não entra**). A data é derivada do contador + uma âncora
   (`inicio_dia_do_ano`, `inicio_ano`), então "hoje é 16 de Flamerule de 1492" (Calendário → "Hoje é…") só move a âncora, nunca o
