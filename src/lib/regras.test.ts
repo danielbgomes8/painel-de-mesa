@@ -311,6 +311,10 @@ describe("PV na iniciativa (anti-spoiler de NPC)", () => {
 
   it("jogador nunca vê PV de NPC, mesmo revelado", () => {
     expect(pvExibidoIniciativa({ is_npc: true, hp: 10, hp_max: 30 }, false)).toBeNull();
+    // companheiro de jogador é aliado: o PV dele aparece pra mesa
+    expect(pvExibidoIniciativa({ is_npc: true, hp: 3, hp_max: 5, dono: "ana" }, false)).toEqual({ hp: 3, hp_max: 5 });
+    expect(pvNoLog({ is_npc: true, dono: "ana" })).toBe(true);
+    expect(pvNoLog({ is_npc: true, dono: null })).toBe(false);
   });
 });
 

@@ -1861,6 +1861,9 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
 - **Quem mexe**: o jogador controla o PV dos companheiros dele na linha da iniciativa (`ehDoJogador`, usado no lugar da comparação de slug);
   o Mestre, todos. A linha mostra "🐾 de Ana". Log: "Pip acompanha Ana na iniciativa" — **de propósito sem "entrou no combate"**, senão o
   recap contaria o companheiro como inimigo (`resumirSessao` conta `entrou no combate` de quem não é jogador).
+- **O PV do companheiro aparece pra mesa**, como o de qualquer aliado: `pvExibidoIniciativa` e `pvNoLog` tratam NPC com `dono` como jogador (a regra
+  "PV de NPC é só do Mestre" é pra inimigo). Descoberto ao testar: sem isso o dono nem via o PV do familiar. O recap também conta o companheiro
+  como do grupo (`DiarioCampanha` manda `!is_npc || dono` em `jogadores`), senão o dano nele entrava como "dano nos inimigos".
 - A criação só manda `dono`/`revealed` pro banco quando vêm (`linhaDePersonagem`), então a coluna nova não quebra criar ninguém antes da migration.
 - **Não cobre**: peão no mapa do companheiro (não ganha peão oculto como os inimigos; o Mestre põe à mão), dar o turno do companheiro ao dono no
   telão, e transformar uma ficha NPC que já existe em companheiro (só cria novo).

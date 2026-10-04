@@ -56,7 +56,7 @@ export function DiarioCampanha({
         <>
           <RecapDaSessao
             codigo={codigo}
-            jogadores={sala.personagens.filter((p) => !p.is_npc).map((p) => p.name)}
+            jogadores={sala.personagens.filter((p) => !p.is_npc || p.dono).map((p) => p.name)}
             cartoes={cartoes}
             aoGerar={(titulo, texto) => setRascunho((r) => ({ id: r.id + 1, titulo, texto }))}
           />

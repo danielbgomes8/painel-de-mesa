@@ -121,8 +121,8 @@ export function nomeNoLog(p: QuemNoLog): string {
 
 /** PV de NPC nunca vai pro log, nem depois de revelado — mesma regra de
  *  `pvExibidoIniciativa`: revelar mostra quem é, não o quanto falta pra cair. */
-export function pvNoLog(p: { is_npc: boolean }): boolean {
-  return !p.is_npc;
+export function pvNoLog(p: { is_npc: boolean; dono?: string | null }): boolean {
+  return !p.is_npc || Boolean(p.dono);
 }
 
 /** Cura e a linha pro log (null = PV já estava cheio, nada a logar). */
@@ -510,12 +510,14 @@ export function nomeExibidoIniciativa(
  * PV exibido na ordem de iniciativa (e no telão): PV de NPC é informação só
  * do Mestre, sempre — diferente do nome, revelar o NPC não mostra o PV pro
  * jogador (ele continua sem saber o quão perto da morte o monstro está).
+ * Exceção: o companheiro de um jogador (`dono`: familiar, montaria...) é aliado, então o PV dele aparece
+ * pra mesa como o de qualquer personagem de jogador.
  */
 export function pvExibidoIniciativa(
-  item: { is_npc: boolean; hp: number; hp_max: number },
+  item: { is_npc: boolean; hp: number; hp_max: number; dono?: string | null },
   souMestre: boolean,
 ): { hp: number; hp_max: number } | null {
-  if (souMestre || !item.is_npc) return { hp: item.hp, hp_max: item.hp_max };
+  if (souMestre || !item.is_npc || item.dono) return { hp: item.hp, hp_max: item.hp_max };
   return null;
 }
 
