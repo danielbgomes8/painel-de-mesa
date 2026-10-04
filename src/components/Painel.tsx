@@ -5,6 +5,7 @@ import { useSala } from "@/hooks/useSala";
 import { useCenas } from "@/hooks/useCenas";
 import { useQuadro } from "@/hooks/useQuadro";
 import { useBau } from "@/hooks/useBau";
+import { useTempo } from "@/hooks/useTempo";
 import { useVersaoNova } from "@/hooks/useVersaoNova";
 import { AvisoVersaoNova } from "@/components/AvisoVersaoNova";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
@@ -108,6 +109,8 @@ function PainelSala({ codigo }: { codigo: string }) {
   const quadro = useQuadro(codigo, telao ? null : identidade);
   // O baú do grupo (itens e moedas ainda sem dono) também tem canal próprio.
   const bau = useBau(codigo);
+  // O tempo da campanha (dia, calendário e efeitos que duram dias), idem.
+  const tempo = useTempo(codigo);
   // Saiu uma versão nova depois de abrir? O telão (que ninguém toca) recarrega sozinho; nos
   // celulares aparece um aviso e a pessoa decide a hora (não no meio de um combate).
   const versaoNova = useVersaoNova(telao);
@@ -401,7 +404,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
-      {abaEfetiva === "diario" && <AbaCampanha sala={sala} codigo={codigo} quadro={quadro} bau={bau} identidade={identidade} />}
+      {abaEfetiva === "diario" && <AbaCampanha sala={sala} codigo={codigo} quadro={quadro} bau={bau} tempo={tempo} identidade={identidade} />}
 
       {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} />}
 

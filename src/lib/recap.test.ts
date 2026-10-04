@@ -174,6 +174,18 @@ describe("contar o que aconteceu (com as frases de verdade do log)", () => {
     expect(r.bau).toEqual(["🎒 Ana pegou 2× Poção de cura do baú", "💰 Dinheiro do baú dividido: cada um levou 20 PO"]);
   });
 
+  it("linhas do tempo da campanha entram no resumo e no rascunho, sem contar como inimigo", () => {
+    const linhas = [
+      linha("🗓 Descanso longo do grupo. Passou 1 dia: Dia 14 → Dia 15"),
+      linha("🗓 Efeito venceu: Maldição (Ana)"),
+      linha("🗓 Efeito venceu: Maldição (Ana)"),
+    ];
+    const r = resumirSessao(linhas, JOGADORES);
+    expect(r.tempo).toEqual(["🗓 Descanso longo do grupo. Passou 1 dia: Dia 14 → Dia 15", "🗓 Efeito venceu: Maldição (Ana)"]);
+    expect(r.inimigosEntraram).toBe(0);
+    expect(textoDoRecap({ inicio: min(0), fim: min(5) }, r)).toContain("Tempo da campanha:\n🗓 Descanso longo do grupo");
+  });
+
   it("linha que não reconhece é ignorada, sem inventar nada", () => {
     const r = resumirSessao([linha("Combate reiniciado"), linha("algo que ninguém esperava")], JOGADORES);
     expect(r).toMatchObject({ rodadas: 0, inimigosEntraram: 0, jogadores: [], magias: [] });

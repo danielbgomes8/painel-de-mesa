@@ -1746,3 +1746,29 @@ longa: +7, 1d8+4 cortante", sinal ASCII `-`, não o `−` da ficha clássica) e 
 confere que o texto gerado volta com o mesmo acerto e dano. NPC só usa o texto livre. Não cobre: dano versátil/duas mãos, ataque
 extra, crítico de classe, arma de ataque à distância com desvantagem, bônus de estilo de luta automático (vai em "acerto/dano extra").
 
+
+## Tempo da campanha (04/10/2026, migration `0028`)
+
+Em Campanha, o chip **🗓 Dia N** (ou "Tempo", antes de começar) abre `TempoDaCampanha.tsx`. Todo mundo vê; **só o Mestre mexe**
+(a trava é na tela, o banco é aberto como o resto). Duas tabelas novas, `campanha_tempo` (uma linha por sala, chave = a sala; `dia`
+é um contador que começa em 1) e `campanha_efeitos` (um efeito por linha: nome, quem, `inicio_dia`, `duracao` em dias, nota).
+Canal próprio (`useTempo.ts`, molde do `useBau`) e tolerante à migration ausente ("falta rodar a migration 0028").
+
+- **Avançar o dia é "troco só se ninguém mexeu antes"** (`update ... where dia = o que li`, repete até 6×): dois aparelhos tocando
+  "+1 dia" juntos passam UM dia, não dois. Botões: "+ 1 dia", "passar dias" (N), "voltar 1 dia" (corrigir clique errado, com
+  confirmação) e **🌙 Descanso longo do grupo**: aplica `aplicarDescansoLongo` em todos os personagens de jogador numa escrita só
+  (`atualizarVariosPersonagens`) e SÓ ENTÃO passa 1 dia; se a escrita das fichas falha, o dia não passa. O descanso longo da
+  ficha individual não mexe no dia (a mesa decide quando o dia passou).
+- **Calendário** (`lib/tempoCampanha.ts`, 17 testes): "só Dia N" (padrão) ou **Harptos** (Forgotten Realms: 12 meses de 30 dias + 5
+  festivais = 365; **Shieldmeet, o dia extra de a cada 4 anos, não entra**). A data é derivada do contador + uma âncora
+  (`inicio_dia_do_ano`, `inicio_ano`), então "hoje é 16 de Flamerule de 1492" (Calendário → "Hoje é…") só move a âncora, nunca o
+  contador nem os efeitos.
+- **Efeitos**: nascem no dia atual e vencem em `inicio_dia + duracao`. A lista mostra "faltam 3 dias" / "falta 1 dia" (cor de alerta)
+  / "venceu hoje" / "venceu há N dias" (esmaecido); vencidos ficam até o Mestre encerrar. Ao avançar o dia, os que acabam de vencer
+  ganham uma linha no log e um aviso na tela. Máx. 100 por sala.
+- **Log e recap**: toda linha do tempo começa com 🗓 (`MARCA_DE_TEMPO`); o recap da sessão ganhou a seção "Tempo da campanha"
+  (`resumirSessao().tempo`) com essas linhas.
+- Backup: as duas tabelas entram no backup bruto diário (`TABELAS_COM_SALA`; `campanha_tempo` não tem `id`, então vai em
+  `UMA_LINHA_POR_SALA`) e o robô de tela limpa as duas. O robô de esquema confere as colunas contra o banco.
+- **Não cobre**: relógio/hora do dia, estações e clima, efeito ligado à ficha do personagem (a lista é à parte; o "quem" é texto),
+  contagem em rodadas de combate (isso já existe nos prazos das condições), mudar o dia pelo jogador.

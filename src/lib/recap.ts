@@ -15,6 +15,7 @@
  */
 
 import { ehLinhaDoBau } from "./historicoBau";
+import { ehLinhaDeTempo } from "./tempoCampanha";
 
 export type LinhaDoLog = { text: string; created_at: string };
 
@@ -71,6 +72,8 @@ export type Resumo = {
   condicoes: { nome: string; condicao: string }[];
   /** Linhas do baú, como foram escritas no log. */
   bau: string[];
+  /** Linhas do tempo da campanha (dias que passaram, efeitos), como foram escritas no log. */
+  tempo: string[];
 };
 
 function acumular<T>(lista: T[], achar: (x: T) => boolean, novo: () => T): T {
@@ -108,6 +111,7 @@ export function resumirSessao(linhas: LinhaDoLog[], jogadores: string[]): Resumo
     magias: [],
     condicoes: [],
     bau: [],
+    tempo: [],
   };
   const jogador = (nome: string) => acumular(r.jogadores, (j) => j.nome === nome, () => ({ nome, sofreu: 0, recuperou: 0 }));
   const unico = (lista: string[], v: string) => {
@@ -118,6 +122,10 @@ export function resumirSessao(linhas: LinhaDoLog[], jogadores: string[]): Resumo
     const texto = bruto.trim();
     if (ehLinhaDoBau(texto)) {
       if (r.bau[r.bau.length - 1] !== texto) r.bau.push(texto);
+      continue;
+    }
+    if (ehLinhaDeTempo(texto)) {
+      if (r.tempo[r.tempo.length - 1] !== texto) r.tempo.push(texto);
       continue;
     }
     if (/^Rodada \d+ começou$/.test(texto)) {
@@ -248,6 +256,7 @@ export function textoDoRecap(
     secoes.push(`Condições: ${resumo.condicoes.map((c) => `${c.nome} ficou ${c.condicao}`).join("; ")}.`);
   }
   if (cartoes.length > 0) secoes.push(`🗂 Mostrado à mesa: ${cartoes.join(", ")}.`);
+  if (resumo.tempo.length > 0) secoes.push(`Tempo da campanha:\n${resumo.tempo.join("\n")}`);
   if (resumo.bau.length > 0) secoes.push(`Baú do grupo:\n${resumo.bau.join("\n")}`);
 
   let texto = "";

@@ -4642,3 +4642,124 @@ input.fj-score:focus-visible {
   font-size: 11.5px;
   color: var(--muted);
 }
+
+/* Tempo da campanha (TempoDaCampanha): o dia em destaque, os efeitos que duram dias, o calendário. */
+.tp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tp-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tp-numero {
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.tp-data {
+  font-size: 14px;
+  color: var(--accent);
+}
+.tp-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tp-varios {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tp-varios input[type="number"],
+.tp-novo input,
+.tp-data-hoje input,
+.tp-data-hoje select {
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.tp-varios input[type="number"] {
+  width: 64px;
+}
+.tp-efeitos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tp-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tp-efeito {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.tp-efeito[data-situacao="ultimo-dia"] .tp-restante {
+  color: var(--warn);
+}
+.tp-efeito[data-situacao="venceu"] {
+  opacity: 0.6;
+}
+.tp-efeito-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tp-efeito-nome {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+}
+.tp-alvo,
+.tp-dias {
+  color: var(--muted);
+  font-size: 13px;
+}
+.tp-restante {
+  font-size: 13px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.tp-nota {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.tp-novo,
+.tp-data-hoje {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tp-novo-linha {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tp-novo-linha input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.tp-novo-linha input[type="number"] {
+  width: 72px;
+}
+.tp-cal summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.tp-cal[open] summary {
+  margin-bottom: 6px;
+}

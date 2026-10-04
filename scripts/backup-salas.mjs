@@ -59,11 +59,14 @@ export const TABELAS_COM_SALA = [
   "quadro_notas",
   // Baú do grupo (0026): itens e moedas que ainda não são de ninguém.
   "bau_itens",
+  // Tempo da campanha (0028): o dia (uma linha por sala, sem id) e os efeitos que duram dias.
+  "campanha_tempo",
+  "campanha_efeitos",
 ];
 
 /** Uma linha por sala, sem `id`/`created_at`: sem ordem estável, ler em
  *  páginas podia repetir ou pular linha se algo mudasse no meio. */
-const UMA_LINHA_POR_SALA = new Set(["combat_state", "dm_notes", "bastiao"]);
+const UMA_LINHA_POR_SALA = new Set(["combat_state", "dm_notes", "bastiao", "campanha_tempo"]);
 
 const TAMANHO_PAGINA = 1000;
 
