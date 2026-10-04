@@ -319,7 +319,7 @@ export function FichaPersonagem({
         {modoJogador && caido && blocoTestesDeMorte}
         {modoJogador && blocoChipsEStats}
         {modoJogador && (
-          <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} sala={sala} modo="jogador" />
+          <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} sala={sala} modo="jogador" souMestre={souMestre} />
         )}
         {modoJogador && blocoAtaquesEDescansos}
 
@@ -569,7 +569,7 @@ export function FichaPersonagem({
             </button>
             {mostrarFichaCompleta && (
               <>
-                <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} sala={sala} />
+                <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} sala={sala} souMestre={souMestre} />
                 <FichaClasse personagem={p} editavel={editavel} patch={patch} />
                 <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
                 <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} registrar={(t) => void sala.registrarLog(t)} />

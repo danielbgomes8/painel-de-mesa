@@ -6,6 +6,7 @@ import type { Personagem } from "@/lib/tipos";
 import { CONDICOES } from "@/lib/condicoes";
 import { aplicarDescansoLongo, condicaoComLog, curaComLog, danoComLog } from "@/lib/regras";
 import type { Tempo } from "@/hooks/useTempo";
+import { XP_MAXIMO, dividirXp, formatarXp, linhaDeXp, normalizarXp } from "@/lib/experiencia";
 import { efeitosQueVenceram, linhasDoAvanco, plural } from "@/lib/tempoCampanha";
 import { contarAlvos, mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 
@@ -17,6 +18,7 @@ export function AcoesEmMassa({ sala, tempo }: { sala: Sala; tempo: Tempo }) {
   const [cond, setCond] = useState<string>(CONDICOES[0]);
   const [aviso, setAviso] = useState<string | null>(null);
   const [descansando, setDescansando] = useState(false);
+  const [xpValor, setXpValor] = useState("");
 
   const selecionados = useMemo(
     () => sala.personagens.filter((p) => alvos[p.id]),
@@ -113,6 +115,52 @@ export function AcoesEmMassa({ sala, tempo }: { sala: Sala; tempo: Tempo }) {
     setDescansando(false);
   }
 
+  /** Dá XP aos jogadores selecionados: o mesmo valor pra cada um ("cada") ou um prêmio dividido entre eles
+   *  ("dividir"; o que não divide certo sobra e o aviso diz quanto). Valor negativo só no "cada" (corrigir
+   *  um erro). NPC não tem XP. Vai pro log e dá pra desfazer. */
+  async function darXp(modo: "cada" | "dividir") {
+    const total = Number.parseInt(xpValor, 10);
+    setAviso(null);
+    if (!Number.isFinite(total) || total === 0) return;
+    const jogadores = selecionados.filter((p) => !p.is_npc);
+    if (jogadores.length === 0) {
+      setAviso("Selecione ao menos um personagem de jogador: NPC não tem XP.");
+      return;
+    }
+    if (modo === "dividir" && total < 0) {
+      setAviso("Pra tirar XP use \"XP pra cada\" com valor negativo.");
+      return;
+    }
+    const { cada, sobra } = modo === "cada" ? { cada: total, sobra: 0 } : dividirXp(total, jogadores.length);
+    if (cada === 0) {
+      setAviso(`${formatarXp(total)} XP dividido entre ${jogadores.length} dá menos de 1 pra cada um.`);
+      return;
+    }
+    const mudancas: MudancaPersonagem[] = [];
+    const textos: string[] = [];
+    for (const p of jogadores) {
+      const antes = normalizarXp(p.xp);
+      const depois = Math.max(0, Math.min(XP_MAXIMO, antes + cada));
+      if (depois === antes) continue;
+      mudancas.push(mudancaDe(p, { xp: depois }));
+      textos.push(linhaDeXp(p.name, depois - antes, depois));
+    }
+    if (mudancas.length === 0) return;
+    const deuCerto = await sala.atualizarVariosPersonagens(mudancas.map((m) => ({ id: m.id, patch: m.depois })));
+    if (!deuCerto) return;
+    sala.registrarVariosLogs(textos);
+    const oQue = `${cada > 0 ? "+" : "−"}${formatarXp(Math.abs(cada))} XP em ${contarAlvos(mudancas.length)}`;
+    sala.lembrarDesfazer({
+      rotulo: oQue,
+      textoLog: textoDesfeito(textos, oQue),
+      personagens: mudancas,
+      combate: null,
+      criados: [],
+    });
+    setXpValor("");
+    if (sobra > 0) setAviso(`Sobraram ${formatarXp(sobra)} XP que não dividem certo; ninguém levou.`);
+  }
+
   const n = selecionados.length;
 
   return (
@@ -169,6 +217,23 @@ export function AcoesEmMassa({ sala, tempo }: { sala: Sala; tempo: Tempo }) {
         </button>
         <button type="button" className="btn" disabled={n === 0 || descansando} onClick={descansoLongo}>
           🌙 Descanso longo{tempo.tempo ? " (passa 1 dia)" : ""}
+        </button>
+      </div>
+      <div className="masstools">
+        <input
+          className="num"
+          type="number"
+          inputMode="numeric"
+          placeholder="XP"
+          aria-label="XP a dar"
+          value={xpValor}
+          onChange={(e) => setXpValor(e.target.value)}
+        />
+        <button type="button" className="btn" disabled={n === 0} onClick={() => darXp("cada")}>
+          🏅 XP pra cada
+        </button>
+        <button type="button" className="btn" disabled={n === 0} onClick={() => darXp("dividir")}>
+          🏅 Dividir XP
         </button>
       </div>
       {aviso && (

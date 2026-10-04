@@ -2653,6 +2653,54 @@ body:has(.telao) {
   text-transform: uppercase;
   color: var(--accent);
 }
+.xp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.xp-linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.xp-linha .sectitle {
+  margin-bottom: 0;
+}
+.xp-total {
+  font-size: 18px;
+  color: var(--ink);
+}
+.xp-ate {
+  font-size: 13px;
+  color: var(--muted);
+}
+.xp-editar {
+  margin-left: auto;
+  width: 96px;
+}
+.xp-editar input {
+  min-height: 36px;
+  box-sizing: border-box;
+  width: 100%;
+}
+.xp-barra {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+.xp-cheio {
+  height: 100%;
+  background: var(--accent);
+}
+.xp-texto {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.xp-texto[data-pronto] {
+  color: var(--accent);
+}
 .fj-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));

@@ -186,6 +186,13 @@ describe("contar o que aconteceu (com as frases de verdade do log)", () => {
     expect(textoDoRecap({ inicio: min(0), fim: min(5) }, r)).toContain("Tempo da campanha:\n🗓 Descanso longo do grupo");
   });
 
+  it("linhas de XP entram no resumo e no rascunho, uma por personagem, sem contar como inimigo", () => {
+    const r = resumirSessao([linha("🏅 Ana ganhou 300 XP (total 1.250)"), linha("🏅 Beto ganhou 300 XP (total 900)")], JOGADORES);
+    expect(r.xp).toEqual(["🏅 Ana ganhou 300 XP (total 1.250)", "🏅 Beto ganhou 300 XP (total 900)"]);
+    expect(r.inimigosEntraram).toBe(0);
+    expect(textoDoRecap({ inicio: min(0), fim: min(5) }, r)).toContain("XP:\n🏅 Ana ganhou 300 XP");
+  });
+
   it("linha que não reconhece é ignorada, sem inventar nada", () => {
     const r = resumirSessao([linha("Combate reiniciado"), linha("algo que ninguém esperava")], JOGADORES);
     expect(r).toMatchObject({ rodadas: 0, inimigosEntraram: 0, jogadores: [], magias: [] });

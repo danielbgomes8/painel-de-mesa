@@ -1777,3 +1777,18 @@ Canal próprio (`useTempo.ts`, molde do `useBau`) e tolerante à migration ausen
   `UMA_LINHA_POR_SALA`) e o robô de tela limpa as duas. O robô de esquema confere as colunas contra o banco.
 - **Não cobre**: relógio/hora do dia, estações e clima, efeito ligado à ficha do personagem (a lista é à parte; o "quem" é texto),
   contagem em rodadas de combate (isso já existe nos prazos das condições), mudar o dia pelo jogador.
+
+## XP do personagem (04/10/2026, migration `0030`)
+
+Coluna `xp integer` em `characters` (0 a 10.000.000). **Só o Mestre mexe** (a trava é na tela): pelas **Ações em massa** (aba
+Combate: "🏅 XP pra cada" dá o mesmo valor a cada selecionado, "🏅 Dividir XP" reparte um prêmio — o que não divide certo sobra e
+o aviso diz quanto; valor negativo só no "pra cada", pra corrigir erro; NPC não tem XP; vai pro log e dá pra desfazer) ou
+acertando o número na ficha (`XpDoPersonagem.tsx`, dentro da ficha clássica, acima dos cards "Próximo nível": placar "1.250 / 2.700",
+barra e "Faltam 1.450 XP pro nível 4" ou "XP suficiente pro nível 4"). Contas em `lib/experiencia.ts` (10 testes).
+- **O XP não sobe o nível nem trava nada.** Campanha por marco simplesmente não usa (a barra fica vazia e o "Subir de nível" da ficha
+  continua valendo pros dois jeitos de jogar). O nível mostrado vem das classes da ficha, não do XP.
+- **Tabela de XP por nível**: a do livro (igual em 2014 e 2024). O SRD 5.2 na open5e só me deixou conferir dois pontos (64.000 no nível
+  10 e 355.000 no 20); o resto veio do livro básico. Multiclasse usa o nível TOTAL.
+- Log: toda linha começa com 🏅 ("🏅 Ana ganhou 300 XP (total 1.250)"); o recap da sessão ganhou a seção "XP" com essas linhas.
+- **Não cobre**: calcular o XP pelos monstros derrotados (o catálogo tem o XP por ND, mas o app não sabe quem morreu "de verdade"),
+  XP por jogador diferente no mesmo prêmio, e subir o nível automático ao bater o limite.

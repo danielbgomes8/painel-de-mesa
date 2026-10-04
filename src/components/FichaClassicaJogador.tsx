@@ -3,6 +3,7 @@
 import type { Sala } from "@/hooks/useSala";
 import type { Atributo, NivelProficiencia, Pericia, Personagem } from "@/lib/tipos";
 import { NOME_CLASSE } from "@/lib/classesNomes";
+import { XpDoPersonagem } from "@/components/XpDoPersonagem";
 import { useCatalogoClasses } from "@/hooks/useCatalogoClasses";
 import { AvisoCatalogo } from "@/components/FichaClasse";
 import {
@@ -92,6 +93,7 @@ export function FichaClassicaJogador({
   patch,
   sala,
   modo = "mestre",
+  souMestre = false,
 }: {
   personagem: Personagem;
   editavel: boolean;
@@ -102,6 +104,8 @@ export function FichaClassicaJogador({
    *  deslocamento já estão editáveis logo acima (não repete), e o "cartão" de
    *  combate é chamado de "resumo", que é o que o Mestre enxerga. */
   modo?: "mestre" | "jogador";
+  /** Só o Mestre acerta o XP à mão. */
+  souMestre?: boolean;
 }) {
   const doJogador = modo === "jogador";
   const termoCartao = doJogador ? "resumo" : "cartão";
@@ -187,6 +191,8 @@ export function FichaClassicaJogador({
             : "Sem classe cadastrada."}
         </p>
       )}
+
+      {nivel > 0 && <XpDoPersonagem xp={p.xp} nivel={nivel} mestreEdita={souMestre && editavel} onSalvar={(xp) => patch({ xp })} />}
 
       {classes.map((c, i) => {
         if (c.nivel >= 20) return null;

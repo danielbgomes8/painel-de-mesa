@@ -262,6 +262,8 @@ export type Personagem = {
   magias: MagiaPersonagem[];
   /** Ataques calculados do jogador (migration 0027); o campo livre `ataque` segue valendo. */
   ataques: AtaqueFicha[];
+  /** Pontos de experiência (migration 0030); só o Mestre mexe. O nível não depende dele. */
+  xp: number;
   created_at: string;
   updated_at: string;
 };
