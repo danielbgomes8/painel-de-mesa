@@ -2804,6 +2804,20 @@ body:has(.telao) {
   font-size: clamp(18px, 2.4vw, 28px);
   opacity: 0.85;
 }
+.emb {
+  margin-top: 12px;
+}
+.emb summary {
+  cursor: pointer;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.emb[open] summary {
+  margin-bottom: 4px;
+}
 .fj-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));

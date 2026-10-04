@@ -14,3 +14,15 @@ export function d100(): number {
 export function rolarDado(faces: number): number {
   return 1 + Math.floor(Math.random() * faces);
 }
+
+/** Rolagem de iniciativa: d20 + modificador. Com `desvantagem` (surpresa, regra de 2024) rola dois d20 e
+ *  fica com o MENOR. Devolve os dados rolados pra tela e o log poderem mostrar. O dado vem de fora pra
+ *  dar pra testar com número combinado. */
+export function rolarIniciativa(
+  mod: number,
+  desvantagem = false,
+  dado: () => number = d20,
+): { total: number; dados: number[] } {
+  const dados = desvantagem ? [dado(), dado()] : [dado()];
+  return { total: Math.min(...dados) + mod, dados };
+}

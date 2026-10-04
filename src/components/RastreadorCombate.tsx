@@ -5,7 +5,8 @@ import type { Sala } from "@/hooks/useSala";
 import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import type { Cena } from "@/lib/cenas";
 import { porPecasDosQueEntram, tirarPecasDasFichas } from "@/lib/pecasNoBanco";
-import { d20 } from "@/lib/dados";
+import { rolarIniciativa as rolarDados } from "@/lib/dados";
+import { CHAVE_INIMIGOS, EmboscadaDaIniciativa } from "@/components/EmboscadaDaIniciativa";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
 import { ExplicacaoCondicao, ExplicacaoExaustao } from "@/components/ExplicacaoCondicao";
@@ -130,6 +131,11 @@ export function RastreadorCombate({
   const [retorno, setRetorno] = useState<{ slug: string; texto: string } | null>(null);
   // Etiqueta de condição tocada: a explicação abre embaixo daquela linha.
   const [explicando, setExplicando] = useState<{ slug: string; nome: string } | null>(null);
+  // Emboscada: quem está surpreso rola a iniciativa com desvantagem (não guarda: some ao recarregar).
+  const [surpresos, setSurpresos] = useState<Record<string, boolean>>({});
+  const [rolouSurpreso, setRolouSurpreso] = useState(false);
+  const [dicaRolagem, setDicaRolagem] = useState<string | null>(null);
+  const alternarSurpreso = (chave: string) => setSurpresos((s) => ({ ...s, [chave]: !s[chave] }));
 
   function alternarExplicacao(slug: string, nome: string) {
     setExplicando((atual) => (atual?.slug === slug && atual.nome === nome ? null : { slug, nome }));
@@ -156,7 +162,11 @@ export function RastreadorCombate({
 
   function rolarIniciativa() {
     const mod = quem !== NOVO_NPC ? personagens.find((x) => x.slug === quem)?.init_mod ?? 0 : extrasModelo.init_mod ?? 0;
-    setIni(String(d20() + mod));
+    const desvantagem = Boolean(surpresos[quem !== NOVO_NPC ? quem : CHAVE_INIMIGOS]);
+    const r = rolarDados(mod, desvantagem);
+    setIni(String(r.total));
+    setRolouSurpreso(desvantagem);
+    setDicaRolagem(desvantagem ? `Surpreso: rolou ${r.dados.join(" e ")}, vale o menor.` : null);
   }
 
   async function adicionar() {
@@ -207,9 +217,11 @@ export function RastreadorCombate({
       return { order: r.ordem };
     });
     setIni("");
+    setRolouSurpreso(false);
+    setDicaRolagem(null);
     if (feito && entrou) {
       // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
-      const linha = `${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init})`;
+      const linha = `${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init}${rolouSurpreso ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
       // Inimigo com mapa na mesa ganha peão oculto (ver pecasDosQueEntram).
       const pecas = await porPecasDosQueEntram(mapa, [entrando]);
@@ -233,10 +245,11 @@ export function RastreadorCombate({
   async function porTodosOsJogadores() {
     if (ocupado || jogadoresDeFora.length === 0) return;
     setOcupado(true);
+    const surpresosDaVez = new Set(jogadoresDeFora.filter((p) => surpresos[p.slug]).map((p) => p.slug));
     const novos: ItemIniciativa[] = jogadoresDeFora.map((p) => ({
       slug: p.slug,
       name: p.name,
-      init: d20() + p.init_mod,
+      init: rolarDados(p.init_mod, surpresosDaVez.has(p.slug)).total,
     }));
     let entraram: ItemIniciativa[] = [];
     const feito = await sala.definirCombate((atual) => {
@@ -246,7 +259,7 @@ export function RastreadorCombate({
     });
     setOcupado(false);
     if (!feito) return;
-    const linhas = entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init})`);
+    const linhas = entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init}${surpresosDaVez.has(n.slug) ? ", surpreso" : ""})`);
     sala.registrarVariosLogs(linhas);
     const resumo = entraram.length === 1 ? linhas[0] : `${entraram.length} jogadores entraram no combate`;
     sala.lembrarDesfazer({
@@ -586,7 +599,9 @@ export function RastreadorCombate({
             </button>
           )}
 
-          <ComecarEncontro sala={sala} cenaNaMesa={mapa} />
+          <EmboscadaDaIniciativa jogadoresFora={jogadoresDeFora} surpresos={surpresos} onAlternar={alternarSurpreso} />
+
+          <ComecarEncontro sala={sala} cenaNaMesa={mapa} inimigosSurpresos={Boolean(surpresos[CHAVE_INIMIGOS])} />
 
           <div className="addcombatant">
             <select value={quem} onChange={(e) => setQuem(e.target.value)}>
@@ -633,7 +648,11 @@ export function RastreadorCombate({
               inputMode="numeric"
               placeholder="iniciativa"
               value={ini}
-              onChange={(e) => setIni(e.target.value)}
+              onChange={(e) => {
+                setIni(e.target.value);
+                setRolouSurpreso(false);
+                setDicaRolagem(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") adicionar();
               }}
@@ -645,6 +664,7 @@ export function RastreadorCombate({
               Adicionar à ordem
             </button>
           </div>
+          {dicaRolagem && <p className="empty-note">{dicaRolagem}</p>}
 
           {quem === NOVO_NPC && sala.modelosNpc.length > 0 && (
             <div className="chips" style={{ marginTop: 8 }}>
@@ -779,9 +799,15 @@ export function AcoesNaLinha({
  *  vez do Mestre ter que fazer isso manualmente por cada um. */
 function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Personagem }) {
   const [ini, setIni] = useState("");
+  const [surpreso, setSurpreso] = useState(false);
+  const [rolouSurpreso, setRolouSurpreso] = useState(false);
+  const [dica, setDica] = useState<string | null>(null);
 
   function rolar() {
-    setIni(String(d20() + personagem.init_mod));
+    const r = rolarDados(personagem.init_mod, surpreso);
+    setIni(String(r.total));
+    setRolouSurpreso(surpreso);
+    setDica(surpreso ? `Surpreso: rolou ${r.dados.join(" e ")}, vale o menor.` : null);
   }
 
   async function entrar() {
@@ -799,7 +825,7 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
       return { order: r.ordem };
     });
     if (feito && entrou) {
-      const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa})`;
+      const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa}${rolouSurpreso ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
       sala.lembrarDesfazer({
         rotulo: linha,
@@ -810,6 +836,8 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
       });
     }
     setIni("");
+    setRolouSurpreso(false);
+    setDica(null);
   }
 
   return (
@@ -831,6 +859,11 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
       <button type="button" className="btn" onClick={entrar} disabled={!ini}>
         Entrar no combate
       </button>
+      <label className="inv-mag">
+        <input type="checkbox" checked={surpreso} onChange={(e) => setSurpreso(e.target.checked)} />
+        estou surpreso (desvantagem)
+      </label>
+      {dica && <p className="empty-note">{dica}</p>}
     </div>
   );
 }

@@ -1836,3 +1836,14 @@ campanha não começou a contar). No celular a etiqueta cai numa segunda linha e
 último dia ou que vencem hoje (`efeitosPertoDeVencer`: "⏳ Maldição da múmia: falta 1 dia"); com o mapa na mesa, o dia vai numa linha da
 faixa de baixo — **esse caminho não foi visto na tela**, só o do telão sem mapa. Descanso curto do grupo: o Daniel disse que não precisa.
 
+
+## Emboscada: surpresa na iniciativa (04/10/2026, sem migration)
+
+**Regra de 2024, não a de 2014**: o surpreso NÃO perde o turno; ele rola a iniciativa com **desvantagem** (dois d20, vale o menor).
+`rolarIniciativa(mod, desvantagem, dado)` em `lib/dados.ts` (3 testes, dado injetado) devolve o total e os dados rolados. Na aba Combate, o
+Mestre tem **💥 Emboscada** (`EmboscadaDaIniciativa.tsx`, fechada por padrão): chips dos jogadores que ainda vão rolar e "Inimigos que vão
+entrar". A marca vale pras rolagens que o Mestre faz na tela (🎲 do formulário, "Pôr os jogadores na ordem", encontro preparado) e **não fica
+guardada** (some ao recarregar). O jogador que rola a própria iniciativa tem a caixinha "estou surpreso (desvantagem)". A tela diz "Surpreso:
+rolou 19 e 3, vale o menor." e o log ganha ", surpreso" (`Ana Robô entrou no combate (iniciativa 3, surpreso)`; o encontro preparado
+escreve "(surpresos)", sem nome de monstro). Se o Mestre digitar o número na mão depois de rolar, o ", surpreso" some do log (só marca quando
+a rolagem com desvantagem foi a que entrou). Não cobre: vantagem na iniciativa (Alerta, etc.) nem surpresa por ficha (a marca é da tela).

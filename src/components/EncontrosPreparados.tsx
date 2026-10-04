@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Encontro, FichaMonstro, GrupoEncontro, ItemIniciativa } from "@/lib/tipos";
-import { d20 } from "@/lib/dados";
+import { rolarIniciativa } from "@/lib/dados";
 import { FichaClassicaMonstro, dadosDoMonstro } from "@/components/FichaClassicaMonstro";
 import { useCatalogoMonstros } from "@/hooks/useCatalogoMonstros";
 import { textoDesfeito } from "@/lib/desfazer";
@@ -284,7 +284,16 @@ function EscolherMonstro({
  * nenhuma), e só depois entram na ordem. Se a ordem falhar, as fichas já
  * existem na sala — aparecem na lista de quem pode entrar, dá pra pôr na mão.
  */
-export function ComecarEncontro({ sala, cenaNaMesa = null }: { sala: Sala; cenaNaMesa?: Cena | null }) {
+export function ComecarEncontro({
+  sala,
+  cenaNaMesa = null,
+  inimigosSurpresos = false,
+}: {
+  sala: Sala;
+  cenaNaMesa?: Cena | null;
+  /** Emboscada nos inimigos: cada um rola a iniciativa com desvantagem (regra de 2024). */
+  inimigosSurpresos?: boolean;
+}) {
   const [ocupado, setOcupado] = useState(false);
   const prontos = sala.encontros.filter((e) => totalDoEncontro(e.grupos) > 0);
   if (prontos.length === 0) return null;
@@ -300,7 +309,7 @@ export function ComecarEncontro({ sala, cenaNaMesa = null }: { sala: Sala; cenaN
       setOcupado(false);
       return;
     }
-    const novos: ItemIniciativa[] = criados.map((p) => ({ slug: p.slug, name: p.name, init: d20() + p.init_mod }));
+    const novos: ItemIniciativa[] = criados.map((p) => ({ slug: p.slug, name: p.name, init: rolarIniciativa(p.init_mod, inimigosSurpresos).total }));
     let entraram = 0;
     const feito = await sala.definirCombate((atual) => {
       const r = entrarNaOrdem(atual.order, novos);
@@ -314,7 +323,7 @@ export function ComecarEncontro({ sala, cenaNaMesa = null }: { sala: Sala; cenaN
     // O log é público: nem o nome do encontro nem o dos monstros vão pra lá,
     // senão "Emboscada do Dragão Vermelho" entregaria o chefão antes da hora.
     // Quem joga vê "Inimigo N" na ordem, como com qualquer NPC não revelado.
-    const linha = entraram === 1 ? "1 inimigo entrou no combate" : `${entraram} inimigos entraram no combate`;
+    const linha = `${entraram === 1 ? "1 inimigo entrou no combate" : `${entraram} inimigos entraram no combate`}${inimigosSurpresos ? " (surpresos)" : ""}`;
     sala.registrarLog(linha);
     // Com mapa na mesa, cada monstro ganha peão oculto (o Mestre arruma e mostra).
     const pecas = await porPecasDosQueEntram(cenaNaMesa, criados);
