@@ -2659,7 +2659,13 @@ body:has(.telao) {
 /* Em tela larga os blocos se empacotam em duas colunas, sem esticar cada um até
    a altura do vizinho (a CON, de uma linha só, ficaria com um buraco do lado
    da INT, de seis). */
-@media (min-width: 560px) {
+/* A decisão é pela largura da própria ficha, não da janela: na visão do Mestre ela
+   fica numa coluna de ~570px dentro de uma tela larga, e duas colunas ali dão
+   blocos de ~270px onde os nomes das perícias e os bônus se sobrepõem. */
+.fj-blocos-caixa {
+  container-type: inline-size;
+}
+@container (min-width: 640px) {
   .fj-blocos {
     display: block;
     column-count: 2;

@@ -287,6 +287,7 @@ export function FichaClassicaJogador({
           </span>
         }
       >
+        <div className="fj-blocos-caixa">
         <div className="fj-blocos">
           {ATRIBUTOS.map((a) => {
             const s = saves.find((x) => x.chave === a.chave)!;
@@ -386,6 +387,7 @@ export function FichaClassicaJogador({
               </div>
             );
           })}
+        </div>
         </div>
         {editavel && <p className="fc-sub">Toque na resistência ou na perícia pra marcar proficiência; ×2 é especialista.</p>}
       </SecaoRecolhivel>
