@@ -88,6 +88,7 @@ const PERSONAGEM = colunas<Personagem>({
   magias: true,
   ataques: true,
   xp: true,
+  dono: true,
   created_at: true,
   updated_at: true,
 });

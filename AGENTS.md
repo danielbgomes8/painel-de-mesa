@@ -1847,3 +1847,20 @@ guardada** (some ao recarregar). O jogador que rola a própria iniciativa tem a 
 rolou 19 e 3, vale o menor." e o log ganha ", surpreso" (`Ana Robô entrou no combate (iniciativa 3, surpreso)`; o encontro preparado
 escreve "(surpresos)", sem nome de monstro). Se o Mestre digitar o número na mão depois de rolar, o ", surpreso" some do log (só marca quando
 a rolagem com desvantagem foi a que entrou). Não cobre: vantagem na iniciativa (Alerta, etc.) nem surpresa por ficha (a marca é da tela).
+
+## Companheiros e invocações (04/10/2026, migration `0031`)
+
+Coluna `dono text` (nullable) em `characters`. Um companheiro (familiar, montaria, animal companheiro, criatura invocada) é uma **ficha de NPC
+já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono e o Mestre criam e apagam pela ficha de quem joga, em
+**Companheiros** (`CompanheirosDaFicha.tsx`: nome, PV e CA; sem `dono`, tudo funciona como antes). Regras em `lib/companheiros.ts` (6 testes).
+- **Na iniciativa (regra de 2024: age na iniciativa do dono)**: quando o dono entra na ordem — pelo formulário do Mestre, "Pôr os jogadores
+  na ordem" ou "Entrar no combate" do próprio jogador — os companheiros dele que ainda não estão na ordem entram **logo depois, com a mesma
+  contagem** (`comCompanheiros`; empates ficam na ordem de entrada, então ficam colados). Criar um companheiro com o dono já na ordem põe ele
+  na ordem na hora; "pôr na ordem" cobre o caso de tirar e voltar. **Tirar o dono da ordem leva os companheiros** (um de cada vez, pra
+  `turnoAposRemover` acertar o turno). Desfazer volta a ordem inteira (o estado anterior é guardado).
+- **Quem mexe**: o jogador controla o PV dos companheiros dele na linha da iniciativa (`ehDoJogador`, usado no lugar da comparação de slug);
+  o Mestre, todos. A linha mostra "🐾 de Ana". Log: "Pip acompanha Ana na iniciativa" — **de propósito sem "entrou no combate"**, senão o
+  recap contaria o companheiro como inimigo (`resumirSessao` conta `entrou no combate` de quem não é jogador).
+- A criação só manda `dono`/`revealed` pro banco quando vêm (`linhaDePersonagem`), então a coluna nova não quebra criar ninguém antes da migration.
+- **Não cobre**: peão no mapa do companheiro (não ganha peão oculto como os inimigos; o Mestre põe à mão), dar o turno do companheiro ao dono no
+  telão, e transformar uma ficha NPC que já existe em companheiro (só cria novo).

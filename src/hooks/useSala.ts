@@ -278,6 +278,9 @@ function linhaDePersonagem(codigo: string, slug: string, dados: NovoPersonagem) 
     ataque: dados.ataque ?? "",
     is_npc: dados.is_npc ?? false,
     notes: dados.notes ?? "",
+    // Só se vierem: coluna nova não pode quebrar a criação de ninguém antes da migration 0031 rodar.
+    ...(dados.dono ? { dono: dados.dono } : {}),
+    ...(dados.revealed !== undefined ? { revealed: dados.revealed } : {}),
   };
 }
 

@@ -264,6 +264,8 @@ export type Personagem = {
   ataques: AtaqueFicha[];
   /** Pontos de experiência (migration 0030); só o Mestre mexe. O nível não depende dele. */
   xp: number;
+  /** Slug do personagem de quem este NPC é companheiro (migration 0031); null = comum. */
+  dono: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -280,6 +282,10 @@ export type NovoPersonagem = {
   ataque?: string;
   is_npc?: boolean;
   notes?: string;
+  /** Companheiro de quem (slug); só vai pro banco se vier. */
+  dono?: string;
+  /** Já nasce revelado (o companheiro do jogador não é segredo); só vai pro banco se vier. */
+  revealed?: boolean;
 };
 
 export type ItemIniciativa = {

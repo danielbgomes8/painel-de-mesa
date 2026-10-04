@@ -27,6 +27,7 @@ import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
+import { CompanheirosDaFicha } from "@/components/CompanheirosDaFicha";
 import { normalizarAtaques, textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
@@ -139,6 +140,8 @@ export function FichaPersonagem({
             )}
           </div>
         ) : null}
+
+        {editavel && !p.is_npc ? <CompanheirosDaFicha sala={sala} personagem={p} /> : null}
     </>
   );
 

@@ -35,6 +35,7 @@ import {
 import { textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 import { LendariasNaLinha } from "@/components/LendariasNaLinha";
 import { EncerrarCombate } from "@/components/EncerrarCombate";
+import { comCompanheiros, companheirosQueSaemJunto, ehDoJogador, linhaDeCompanheiro } from "@/lib/companheiros";
 import { horaDoCovil, recuperarAcoesLendarias, temCovil } from "@/lib/lendarias";
 
 const NOVO_NPC = "__novo__";
@@ -211,15 +212,20 @@ export function RastreadorCombate({
     // tentativa do controle de concorrência — vale o da última, que é a que
     // gravou de verdade.
     let entrou = false;
+    let extras: { item: ItemIniciativa; dono: string }[] = [];
     const feito = await sala.definirCombate((atual) => {
-      const r = entrarNaOrdem(atual.order, [item]);
-      entrou = r.entraram.length > 0;
+      // Quem tem companheiro (familiar, montaria...) entra com ele, logo depois, na mesma contagem.
+      const c = comCompanheiros([item], personagens, atual.order);
+      const r = entrarNaOrdem(atual.order, c.itens);
+      entrou = r.entraram.some((x) => x.slug === item.slug);
+      extras = c.acrescentados.filter((a) => r.entraram.some((x) => x.slug === a.item.slug));
       return { order: r.ordem };
     });
     setIni("");
     setRolouSurpreso(false);
     setDicaRolagem(null);
     if (feito && entrou) {
+      if (extras.length > 0) sala.registrarVariosLogs(extras.map((e) => linhaDeCompanheiro(e.item.name, e.dono)));
       // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
       const linha = `${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init}${rolouSurpreso ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
@@ -252,15 +258,18 @@ export function RastreadorCombate({
       init: rolarDados(p.init_mod, surpresosDaVez.has(p.slug)).total,
     }));
     let entraram: ItemIniciativa[] = [];
+    let extras: { item: ItemIniciativa; dono: string }[] = [];
     const feito = await sala.definirCombate((atual) => {
-      const r = entrarNaOrdem(atual.order, novos);
-      entraram = r.entraram;
+      const c = comCompanheiros(novos, personagens, atual.order);
+      const r = entrarNaOrdem(atual.order, c.itens);
+      entraram = r.entraram.filter((x) => novos.some((n) => n.slug === x.slug));
+      extras = c.acrescentados.filter((a) => r.entraram.some((x) => x.slug === a.item.slug));
       return { order: r.ordem };
     });
     setOcupado(false);
     if (!feito) return;
     const linhas = entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init}${surpresosDaVez.has(n.slug) ? ", surpreso" : ""})`);
-    sala.registrarVariosLogs(linhas);
+    sala.registrarVariosLogs([...linhas, ...extras.map((e) => linhaDeCompanheiro(e.item.name, e.dono))]);
     const resumo = entraram.length === 1 ? linhas[0] : `${entraram.length} jogadores entraram no combate`;
     sala.lembrarDesfazer({
       rotulo: resumo,
@@ -312,10 +321,17 @@ export function RastreadorCombate({
     // Pelo slug, não pelo índice da tela: se alguém entrou na ordem de outro
     // celular no meio tempo, o índice já é de outra pessoa.
     const feito = await sala.definirCombate((atual) => {
-      const idx = atual.order.findIndex((o) => o.slug === saindo.slug);
-      if (idx < 0) return {};
-      const ordem = atual.order.filter((_, j) => j !== idx);
-      return { order: ordem, turn: turnoAposRemover(atual.turn, idx, ordem.length) };
+      if (!atual.order.some((o) => o.slug === saindo.slug)) return {};
+      // O dono leva os companheiros dele junto (um de cada vez, pra o turno acertar a conta).
+      let ordem = atual.order;
+      let turn = atual.turn;
+      for (const slug of [saindo.slug, ...companheirosQueSaemJunto(personagens, saindo.slug)]) {
+        const i = ordem.findIndex((o) => o.slug === slug);
+        if (i < 0) continue;
+        ordem = ordem.filter((_, j) => j !== i);
+        turn = turnoAposRemover(turn, i, ordem.length);
+      }
+      return { order: ordem, turn };
     });
     // Tirar da ordem não vai pro log, então desfazer também não grava nada lá.
     if (feito) {
@@ -383,7 +399,7 @@ export function RastreadorCombate({
               : c.name;
             // Mesma permissão da ficha: o Mestre em qualquer linha, o jogador
             // só na do próprio personagem.
-            const podeAjustar = pv !== null && podeEditarPersonagem(souMestre, pv.slug === meuPersonagem?.slug);
+            const podeAjustar = pv !== null && podeEditarPersonagem(souMestre, ehDoJogador(pv, meuPersonagem?.slug));
             const aberto = podeAjustar && ajustando === c.slug;
             // Condições valem pra todo mundo ver, NPC oculto inclusive: o log
             // (público) já anuncia "Um inimigo ficou Atordoado", e o jogador
@@ -398,6 +414,7 @@ export function RastreadorCombate({
             const quem = (
               <>
                 <span className="nm">{nomeExibido}</span>
+                {pv?.dono && <span className="comp-tag">🐾 de {personagens.find((x) => x.slug === pv.dono)?.name ?? "?"}</span>}
                 {pvVisivel && (
                   <span className="pvlinha">
                     <span className={`hpmini${critico ? " crit" : ""}`}>
@@ -819,12 +836,17 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
     // que pode já estar velho quando esta chega — reduz (não garante 100%, isso
     // pediria uma escrita atômica no banco) o risco de uma sobrescrever a outra.
     let entrou = false;
+    let extras: { item: ItemIniciativa; dono: string }[] = [];
     const feito = await sala.definirCombate((atual) => {
-      const r = entrarNaOrdem(atual.order, [item]);
-      entrou = r.entraram.length > 0;
+      // Quem tem companheiro (familiar, montaria...) entra com ele, logo depois, na mesma contagem.
+      const c = comCompanheiros([item], sala.personagens, atual.order);
+      const r = entrarNaOrdem(atual.order, c.itens);
+      entrou = r.entraram.some((x) => x.slug === item.slug);
+      extras = c.acrescentados.filter((a) => r.entraram.some((x) => x.slug === a.item.slug));
       return { order: r.ordem };
     });
     if (feito && entrou) {
+      if (extras.length > 0) sala.registrarVariosLogs(extras.map((e) => linhaDeCompanheiro(e.item.name, e.dono)));
       const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa}${rolouSurpreso ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
       sala.lembrarDesfazer({

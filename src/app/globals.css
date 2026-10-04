@@ -2818,6 +2818,64 @@ body:has(.telao) {
 .emb[open] summary {
   margin-bottom: 4px;
 }
+.comp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.comp .subrow .sectitle {
+  margin-bottom: 0;
+}
+.comp-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.comp-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  min-height: 32px;
+}
+.comp-acoes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.comp-novo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.comp-linha {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.comp-linha input[type="number"] {
+  width: 72px;
+}
+.comp-novo input {
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.comp .minilink {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+.comp-tag {
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .fj-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));

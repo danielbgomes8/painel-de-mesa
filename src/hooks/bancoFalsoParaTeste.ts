@@ -88,6 +88,7 @@ export function fichaPadrao(): Linha {
     magias: [],
     ataques: [],
     xp: 0,
+    dono: null,
   };
 }
 
