@@ -8,6 +8,7 @@ import {
   agruparPorNivel,
   conjurar,
   contarPreparadas,
+  contarSempre,
   contarTruques,
   espacosDosRecursos,
   espacosPossiveis,
@@ -49,6 +50,7 @@ export function MagiasPersonagem({
   const [aviso, setAviso] = useState<string | null>(null);
   const [adicionando, setAdicionando] = useState(false);
   const preparadas = contarPreparadas(magias);
+  const sempre = contarSempre(magias);
   const limite = limiteDePreparadas(Array.isArray(p.classes) ? p.classes : []);
   const acima = limite !== null && preparadas > limite.total;
   const truques = contarTruques(magias);
@@ -58,17 +60,17 @@ export function MagiasPersonagem({
     ? `Limite pelas tabelas de classe do SRD: ${limiteTruques.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Truque de espécie, talento ou subclasse não conta.`
     : undefined;
   const detalheLimite = limite
-    ? `Limite pelas tabelas de classe do SRD: ${limite.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Magia sempre preparada de subclasse ou juramento não conta.`
+    ? `Limite pelas tabelas de classe do SRD: ${limite.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Magia marcada como sempre preparada (subclasse, juramento, espécie) não conta.`
     : undefined;
 
-  /** Preparar passando do limite é permitido (o app não sabe quais magias são "sempre
-   *  preparadas" de subclasse), mas avisa; despreparar limpa o aviso. */
+  /** Preparar passando do limite é permitido (pode haver magia sempre preparada que ainda
+   *  não foi marcada), mas avisa; despreparar limpa o aviso. */
   function alternarPreparada(i: number) {
     const virar = !magias[i].preparada;
     alterar(i, { preparada: virar });
     if (virar && limite && preparadas + 1 > limite.total) {
       setAviso(
-        `Isso passa do limite: ${preparadas + 1} preparadas pra ${limite.total} permitidas. Vale se a magia for sempre preparada pela subclasse ou juramento.`,
+        `Isso passa do limite: ${preparadas + 1} preparadas pra ${limite.total} permitidas. Se for sempre preparada (subclasse, juramento), abra a magia e marque “sempre preparada”.`,
       );
     } else {
       setAviso(null);
@@ -131,7 +133,7 @@ export function MagiasPersonagem({
             </span>
           )}
           <span className="mg-contagem" data-acima={acima || undefined} title={detalheLimite}>
-            {limite ? `${preparadas}/${limite.total}` : preparadas} preparadas
+            {limite ? `${preparadas}/${limite.total}` : preparadas} preparadas{sempre > 0 ? ` · +${sempre} sempre` : ""}
           </span>
         </div>
 
@@ -165,7 +167,7 @@ export function MagiasPersonagem({
             <ul className="mg-lista">
               {g.magias.map(({ magia, indice }) => {
                 const detalhe = aberta === indice;
-                const pronta = magia.nivel === 0 || magia.preparada;
+                const pronta = magia.nivel === 0 || magia.preparada || magia.sempre;
                 return (
                   <li key={indice} className="mg-item" data-pronta={pronta || undefined}>
                     <div className="mg-linha">
@@ -184,10 +186,11 @@ export function MagiasPersonagem({
                           type="button"
                           className="chip alvo"
                           aria-pressed={magia.preparada}
-                          disabled={!editavel}
+                          disabled={!editavel || magia.sempre}
+                          title={magia.sempre ? "Sempre preparada: não conta no limite. Desmarque nos detalhes da magia." : undefined}
                           onClick={() => alternarPreparada(indice)}
                         >
-                          {magia.preparada ? "preparada" : "preparar"}
+                          {magia.sempre ? "sempre" : magia.preparada ? "preparada" : "preparar"}
                         </button>
                       )}
                       {editavel && (
@@ -232,6 +235,18 @@ export function MagiasPersonagem({
                               placeholder="nome"
                               onCommit={(t) => alterar(indice, { nome: t })}
                             />
+                            {magia.nivel > 0 && (
+                              <label className="inv-mag">
+                                <input
+                                  type="checkbox"
+                                  checked={magia.sempre}
+                                  onChange={(e) =>
+                                    alterar(indice, e.target.checked ? { sempre: true, preparada: true } : { sempre: false })
+                                  }
+                                />{" "}
+                                sempre preparada (subclasse, juramento, espécie)
+                              </label>
+                            )}
                             <label className="inv-mag">
                               <input
                                 type="checkbox"

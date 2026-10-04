@@ -67,11 +67,14 @@ export type ItemInventario = {
 /** Uma magia na lista do personagem (ver migration 0026). Os campos de
  *  consulta (escola, tempo, alcance...) vêm preenchidos quando a magia é
  *  escolhida do catálogo do SRD, e ficam vazios numa magia cadastrada à mão.
- *  `preparada` não vale pra truque (nível 0), que sempre pode ser conjurado. */
+ *  `preparada` não vale pra truque (nível 0), que sempre pode ser conjurado.
+ *  `sempre` = sempre preparada por subclasse, juramento ou espécie: fica preparada
+ *  (`preparada` vira true junto) mas não conta no limite de preparadas da classe. */
 export type MagiaPersonagem = {
   nome: string;
   nivel: number;
   preparada: boolean;
+  sempre: boolean;
   concentracao: boolean;
   ritual: boolean;
   escola: string;

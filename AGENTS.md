@@ -1725,3 +1725,11 @@ antes): personagem sem classe cadastrada e Guerreiro/Ladino/Bárbaro/Monge — C
 subclasses que o SRD não publica, e não chutei tabela. Truque não conta nas preparadas (já era assim).
 
 **Truques conhecidos** (mesmo dia): ao lado do contador, "2/3 truques" (`limiteDeTruques`/`contarTruques`, 3 testes), coluna "Cantrips" do SRD 5.2, mesma soma por classe e mesmo critério de aviso (truque de espécie, talento e subclasse vêm de fora da tabela). Só Bardo, Clérigo, Druida, Feiticeiro, Bruxo e Mago têm coluna; Paladino/Patrulheiro não têm truque. Sem truque na lista, o contador não aparece.
+
+**Sempre preparada** (04/10/2026, sem migration — `magias` é jsonb): campo `sempre` na magia (`MagiaPersonagem.sempre`), marcado
+num checkbox nos detalhes da magia ("sempre preparada: subclasse, juramento, espécie"; só nível 1+). Marcar liga
+`preparada` junto; `normalizarMagia` também faz isso se o banco trouxer `sempre` sem `preparada`, e ficha antiga lê como
+`false`. Magia sempre preparada **não conta** em `contarPreparadas` (nem no limite), e o contador mostra "3/5 preparadas · +2
+sempre". O chip vira "sempre" (desabilitado; desmarcar é nos detalhes). Isso fecha a ressalva dos avisos de limite: quem
+marca fica exato. Truque de subclasse/espécie continua só no aviso (não há marca de "truque extra").
+

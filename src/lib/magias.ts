@@ -23,7 +23,8 @@ export function normalizarMagia(v: unknown): MagiaPersonagem {
   return {
     nome: texto(o.nome, 80),
     nivel: Math.max(0, Math.min(NIVEL_MAXIMO_MAGIA, n)),
-    preparada: o.preparada === true,
+    preparada: o.preparada === true || o.sempre === true,
+    sempre: o.sempre === true,
     concentracao: o.concentracao === true,
     ritual: o.ritual === true,
     escola: texto(o.escola, 30),
@@ -44,6 +45,7 @@ export function magiaNova(nome: string, nivel = 0): MagiaPersonagem {
     nome,
     nivel,
     preparada: false,
+    sempre: false,
     concentracao: false,
     ritual: false,
     escola: "",
@@ -172,9 +174,15 @@ export function agruparPorNivel(magias: MagiaPersonagem[]): { nivel: number; mag
     }));
 }
 
-/** Quantas magias de nível 1+ estão preparadas (truque não conta no limite de preparadas). */
+/** Quantas magias de nível 1+ estão preparadas e CONTAM no limite: truque não conta, e a
+ *  "sempre preparada" (subclasse, juramento, espécie) também não. */
 export function contarPreparadas(magias: MagiaPersonagem[]): number {
-  return magias.filter((m) => m.nivel > 0 && m.preparada).length;
+  return magias.filter((m) => m.nivel > 0 && m.preparada && !m.sempre).length;
+}
+
+/** Quantas magias de nível 1+ estão marcadas como sempre preparadas. */
+export function contarSempre(magias: MagiaPersonagem[]): number {
+  return magias.filter((m) => m.nivel > 0 && m.sempre).length;
 }
 
 /** Magias preparadas por nível de classe (índice 0 = nível 1) — coluna "Prepared
@@ -199,7 +207,7 @@ export type LimitePreparadas = { total: number; porClasse: { classe: ClasseBase;
  *  coluna "Prepared Spells" do nível dela. Multiclasse soma porque a ficha não guarda de
  *  qual classe é cada magia. null = nenhuma classe com tabela (sem limite a mostrar).
  *  É AVISO, não trava: magia sempre preparada de subclasse/juramento não conta no limite e o
- *  app não sabe quais são. */
+ *  app só sabe quais são as que o jogador marca "sempre preparada" (ver `contarPreparadas`). */
 export function limiteDePreparadas(classes: ClassePersonagem[]): LimitePreparadas | null {
   const porClasse: LimitePreparadas["porClasse"] = [];
   for (const c of classes) {

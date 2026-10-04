@@ -3,6 +3,7 @@ import {
   agruparPorNivel,
   conjurar,
   contarPreparadas,
+  contarSempre,
   contarTruques,
   devolverEspaco,
   espacosDosRecursos,
@@ -209,6 +210,21 @@ describe("limite de magias preparadas", () => {
     expect(limiteDePreparadas([cl("mago", 0)])).toBeNull();
     expect(limiteDePreparadas([cl("mago", 99)])?.total).toBe(25);
     expect(limiteDePreparadas([cl("mago", Number.NaN)])).toBeNull();
+  });
+});
+
+describe("magia sempre preparada", () => {
+  const m = (nome: string, nivel: number, extra: object = {}) => ({ ...magiaNova(nome, nivel), preparada: true, ...extra });
+
+  it("fica preparada mas não conta no limite", () => {
+    expect(contarPreparadas([m("A", 1), m("B", 2, { sempre: true }), m("C", 3, { sempre: true })])).toBe(1);
+    expect(contarSempre([m("A", 1), m("B", 2, { sempre: true }), m("Luz", 0, { sempre: true })])).toBe(1);
+  });
+
+  it("o banco que diz sempre sem preparada vira as duas coisas; ficha antiga vira false", () => {
+    expect(normalizarMagia({ nome: "X", nivel: 2, sempre: true })).toMatchObject({ sempre: true, preparada: true });
+    expect(normalizarMagia({ nome: "X", nivel: 2, preparada: true })).toMatchObject({ sempre: false, preparada: true });
+    expect(magiaNova("X", 1).sempre).toBe(false);
   });
 });
 
