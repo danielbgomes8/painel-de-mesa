@@ -3,11 +3,13 @@ import {
   ancorarHoje,
   dataHarptos,
   diasRestantes,
+  efeitosQueVenceram,
   ehLinhaDeTempo,
   indiceDoDiaHarptos,
   linhaDeAvanco,
   linhaDeEfeitoEncerrado,
   linhaDeEfeitoNovo,
+  linhasDoAvanco,
   normalizarEfeito,
   normalizarTempo,
   ordenarEfeitos,
@@ -134,6 +136,20 @@ describe("linhas do log", () => {
     expect(linhaDeAvanco(dias(14), dias(17), true)).toBe("🗓 Descanso longo do grupo. Passou 3 dias: Dia 14 → Dia 17");
     expect(linhaDeAvanco(harptos(30), harptos(31), false)).toBe("🗓 Passou 1 dia: Dia 30 → Dia 31 (Midwinter, 1492 CV)");
     expect(linhaDeAvanco(dias(14), dias(13), false)).toBe("🗓 Voltou 1 dia: Dia 14 → Dia 13");
+  });
+
+  it("descanso longo de quem o Mestre escolheu diz os nomes", () => {
+    expect(linhaDeAvanco(dias(3), dias(4), "Ana, Beto")).toBe("🗓 Descanso longo de Ana, Beto. Passou 1 dia: Dia 3 → Dia 4");
+  });
+
+  it("o avanço leva junto uma linha pra cada efeito que acabou de vencer", () => {
+    const e = (id: string, inicio_dia: number, duracao: number): EfeitoDeTempo => ({ id, room_code: "s", nome: `E${id}`, alvo: "", inicio_dia, duracao, nota: "", created_at: "" });
+    const lista = [e("1", 1, 3), e("2", 1, 10), e("3", 1, 1)]; // vencem nos dias 4, 11 e 2
+    expect(efeitosQueVenceram(lista, 3, 4).map((x) => x.id)).toEqual(["1"]);
+    expect(efeitosQueVenceram(lista, 1, 4).map((x) => x.id)).toEqual(["1", "3"]);
+    expect(linhasDoAvanco(lista, dias(3), dias(4), false)).toEqual(["🗓 Passou 1 dia: Dia 3 → Dia 4", "🗓 Efeito venceu: E1"]);
+    // quem já tinha vencido antes não entra de novo
+    expect(efeitosQueVenceram(lista, 4, 5)).toEqual([]);
   });
 
   it("efeitos", () => {
