@@ -2332,6 +2332,15 @@ body:has(.telao) {
   font-size: 12px;
   color: var(--muted);
 }
+.atq-card select,
+.atq-card input[type="number"],
+.atq-card .removechar {
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.atq-card input[type="number"] {
+  width: 100%;
+}
 .atq-previa {
   font-size: 13px;
   color: var(--accent);
