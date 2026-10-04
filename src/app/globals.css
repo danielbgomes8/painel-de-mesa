@@ -2727,6 +2727,60 @@ body:has(.telao) {
   font-size: 13.5px;
   color: var(--accent);
 }
+.fim {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+}
+.fim-cab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fim-resumo {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.fim-xp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fim-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fim-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+}
+.fim-item input[type="number"] {
+  width: 84px;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.fim-total {
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent);
+}
+.fim-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .fj-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));

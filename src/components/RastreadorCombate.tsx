@@ -33,6 +33,7 @@ import {
 } from "@/lib/regras";
 import { textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 import { LendariasNaLinha } from "@/components/LendariasNaLinha";
+import { EncerrarCombate } from "@/components/EncerrarCombate";
 import { horaDoCovil, recuperarAcoesLendarias, temCovil } from "@/lib/lendarias";
 
 const NOVO_NPC = "__novo__";
@@ -121,6 +122,7 @@ export function RastreadorCombate({
   }>({});
   const [ini, setIni] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [encerrando, setEncerrando] = useState(false);
   // Dano/cura direto na linha: qual linha está com o campo aberto (por slug —
   // índice mudaria de dono quando alguém entra na ordem) e o retorno do
   // último ajuste, que fica embaixo da linha até a próxima ação.
@@ -562,10 +564,15 @@ export function RastreadorCombate({
             >
               Próximo turno →
             </button>
+            <button type="button" className="btn" disabled={combate.order.length === 0} onClick={() => setEncerrando(true)}>
+              🏁 Encerrar combate
+            </button>
             <button type="button" className="btn" onClick={reiniciar}>
               Reiniciar combate
             </button>
           </div>
+
+          {encerrando && <EncerrarCombate sala={sala} onFechar={() => setEncerrando(false)} />}
 
           {jogadoresDeFora.length > 0 && (
             <button

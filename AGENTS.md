@@ -1810,3 +1810,21 @@ em `lib/lendarias.ts`, 13 testes) liga três coisas, **todas nos `resources` do 
   própria na iniciativa (é só aviso).
 **Armadilha deste dia**: semeei a sala `ci-teste` com o robô do GitHub rodando e ele falhou 1 de 26 testes (`andarComParedes`); rodou de
 novo sem mim e passou. `gh run list --workflow e2e.yml` ANTES de semear, sempre — e esperar o run terminar, não só começar.
+
+## Encerrar combate (04/10/2026, sem migration)
+
+Na aba Combate, o Mestre ganhou **🏁 Encerrar combate** ao lado de "Reiniciar combate" (que continua só apagando a ordem). Abre o painel
+`EncerrarCombate.tsx` (regras em `lib/fimDoCombate.ts`, 11 testes): resumo ("Rodada 4 · 4 inimigos a 0 PV · 1 jogador caído"), o XP dos
+derrotados, quem recebe, e uma opção de tirar dos jogadores as condições com prazo (desligada por padrão).
+- **"Derrotado" é sugestão, o Mestre confirma**: inimigo (NPC) na ordem com 0 PV ou menos. O app não sabe quem fugiu, se rendeu ou foi
+  poupado, então cada um tem checkbox. O XP vem do catálogo pelo **nome** (`xpDoInimigo`: sem acento, sem caixa, e tira o número de cópia
+  no fim — "Goblin 2", "goblin #3", "Goblin nº 4" valem "Goblin"; casa o nome em português ou o em inglês); nome que não bate **não chuta**,
+  fica em branco pro Mestre digitar ("Goblin Chefe" não vira Goblin). Quem recebe são os jogadores que estão na ordem (chips, todos
+  marcados); o total é dividido por igual (`dividirXp`) e a sobra não vai pra ninguém (o texto diz).
+- **Ordem das gravações**: primeiro as fichas (XP, e as condições se marcado), numa escrita só; se falha, o combate continua aberto. Depois
+  limpa a ordem (como o Reiniciar), grava o log (`🏁 Combate encerrado: 4 rodadas, 4 inimigos derrotados, 250 XP (250 pra o jogador)` +
+  uma linha 🏅 por jogador) e guarda **tudo junto no "Desfazer"** (testado: devolve o XP, as condições com prazo e a ordem na rodada em que
+  estava).
+- O catálogo de monstros só baixa ao abrir o painel (`useCatalogoMonstros`, igual à biblioteca).
+- **Não cobre**: voltar as ações lendárias (elas voltam no turno do monstro e "tirar tudo" no bloco Chefe limpa), apagar as fichas/peões dos
+  derrotados (continuam, a 0 PV), e XP de monstro que o catálogo não conhece além do que o Mestre digita.
