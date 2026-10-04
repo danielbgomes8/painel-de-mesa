@@ -9,7 +9,7 @@
  * concentração que a ficha já tem (`concentration`/`concentration_on`).
  */
 import { PREFIXO_ESPACO_MAGIA } from "./regras";
-import type { MagiaPersonagem, Recurso } from "./tipos";
+import type { ClasseBase, ClassePersonagem, MagiaPersonagem, Recurso } from "./tipos";
 
 export const NIVEL_MAXIMO_MAGIA = 9;
 
@@ -175,6 +175,41 @@ export function agruparPorNivel(magias: MagiaPersonagem[]): { nivel: number; mag
 /** Quantas magias de nível 1+ estão preparadas (truque não conta no limite de preparadas). */
 export function contarPreparadas(magias: MagiaPersonagem[]): number {
   return magias.filter((m) => m.nivel > 0 && m.preparada).length;
+}
+
+/** Magias preparadas por nível de classe (índice 0 = nível 1) — coluna "Prepared
+ *  Spells" das tabelas de classe do SRD 5.2, lida da open5e (srd-2024). Só entram as
+ *  classes que o SRD traz com a coluna: Guerreiro e Ladino conjuradores vêm de
+ *  subclasse (Cavaleiro Arcano, Trapaceiro Arcano) que o SRD não publica, então
+ *  ficam sem limite aqui em vez de eu chutar uma tabela. */
+const PREPARADAS_POR_CLASSE: Partial<Record<ClasseBase, number[]>> = {
+  bardo: [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+  clerigo: [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+  druida: [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+  feiticeiro: [2, 4, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 17, 18, 18, 19, 20, 21, 22],
+  bruxo: [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15],
+  mago: [4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 16, 17, 18, 19, 21, 22, 23, 24, 25],
+  paladino: [2, 3, 4, 5, 6, 6, 7, 7, 9, 9, 10, 10, 11, 11, 12, 12, 14, 14, 15, 15],
+  patrulheiro: [2, 3, 4, 5, 6, 6, 7, 7, 9, 9, 10, 10, 11, 11, 12, 12, 14, 14, 15, 15],
+};
+
+export type LimitePreparadas = { total: number; porClasse: { classe: ClasseBase; nivel: number; limite: number }[] };
+
+/** Quantas magias de nível 1+ o personagem pode ter preparadas: soma, por classe, a
+ *  coluna "Prepared Spells" do nível dela. Multiclasse soma porque a ficha não guarda de
+ *  qual classe é cada magia. null = nenhuma classe com tabela (sem limite a mostrar).
+ *  É AVISO, não trava: magia sempre preparada de subclasse/juramento não conta no limite e o
+ *  app não sabe quais são. */
+export function limiteDePreparadas(classes: ClassePersonagem[]): LimitePreparadas | null {
+  const porClasse: LimitePreparadas["porClasse"] = [];
+  for (const c of classes) {
+    const tabela = PREPARADAS_POR_CLASSE[c.classe];
+    if (!tabela || !Number.isFinite(c.nivel) || c.nivel < 1) continue;
+    const nivel = Math.min(20, Math.round(c.nivel));
+    porClasse.push({ classe: c.classe, nivel, limite: tabela[nivel - 1] });
+  }
+  if (porClasse.length === 0) return null;
+  return { total: porClasse.reduce((s, c) => s + c.limite, 0), porClasse };
 }
 
 /** A magia já está na lista? (mesmo nome, ignorando maiúscula e acento) */

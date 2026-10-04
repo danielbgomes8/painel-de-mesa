@@ -1558,8 +1558,8 @@ O Daniel pediu "o que falta pra ficar completo" e escolheu inventário + magias.
   log de combate (seria ruído); se a mesa quiser histórico de quem pegou o quê, é a próxima melhoria.
 - **Tolerante à migration ausente**: `normalizar*` aceitam coluna inexistente; o baú mostra "falta rodar a
   0026" (`ehTabelaAusente`). Mesmo assim, **rode a 0026 antes do push**: sem ela, gravar inventário/magias falha.
-- Fora do escopo desta leva (decidido): limite de magias preparadas por classe, progressão/subida de nível,
-  histórico do baú, backup do baú dentro do botão "backup" do app (ele entra no backup bruto diário,
+- Fora do escopo desta leva (decidido; o limite de preparadas, a subida de nível e o histórico do baú
+  entraram depois, ver abaixo): backup do baú dentro do botão "backup" do app (ele entra no backup bruto diário,
   `TABELAS_COM_SALA`, como o Quadro).
 
 ## Recap da sessão (02/10/2026, sem migration)
@@ -1712,3 +1712,14 @@ de **Sigha**, **Mordecai** e **Massaranduba** — os três estão com atributos
 10, então o botão "pôr todos na ordem" rola d20+0 pra eles; a classe do
 **Mistery Grey**; e confirmar se **"Kensei"** (subclasse de 2014) ainda vale
 pra Sigha nas regras de 2024.
+
+## Limite de magias preparadas (03/10/2026, sem migration)
+
+Em Magias, o contador virou "3/5 preparadas" (`limiteDePreparadas` em `lib/magias.ts`, 4 testes). O limite é a soma, por
+classe, da coluna "Prepared Spells" da tabela de classe do SRD 5.2 no nível dela (lida da open5e `srd-2024`, conferida
+linha a linha; Bardo, Clérigo, Druida, Feiticeiro, Bruxo, Mago, Paladino, Patrulheiro). **É aviso, não trava**: preparar
+acima do limite funciona, o contador fica na cor de alerta e aparece uma frase, porque magia sempre preparada de
+subclasse/juramento não conta no limite e o app não sabe quais são (mesmo critério da conjuração sem espaço travado).
+Multiclasse soma, porque a ficha não guarda de qual classe é cada magia. **Fica sem limite** (mostra só o número, como
+antes): personagem sem classe cadastrada e Guerreiro/Ladino/Bárbaro/Monge — Cavaleiro Arcano e Trapaceiro Arcano são
+subclasses que o SRD não publica, e não chutei tabela. Truque não conta (já era assim). Não cobre "truques conhecidos".

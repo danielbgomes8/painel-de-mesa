@@ -8,12 +8,13 @@ import {
   espacosPossiveis,
   gastarEspaco,
   jaTemMagia,
+  limiteDePreparadas,
   magiaNova,
   normalizarMagia,
   normalizarMagias,
 } from "./magias";
 import { PREFIXO_ESPACO_MAGIA } from "./regras";
-import type { Recurso } from "./tipos";
+import type { ClassePersonagem, Recurso } from "./tipos";
 
 const espaco = (nivel: number, cur: number, max = 4): Recurso => ({
   name: `${PREFIXO_ESPACO_MAGIA}${nivel}`,
@@ -166,5 +167,45 @@ describe("lista de magias", () => {
   it("detecta magia repetida ignorando maiúscula e acento", () => {
     expect(jaTemMagia([m("Mísseis Mágicos", 1)], "misseis magicos")).toBe(true);
     expect(jaTemMagia([m("Mísseis Mágicos", 1)], "Escudo")).toBe(false);
+  });
+});
+
+describe("limite de magias preparadas", () => {
+  const cl = (classe: ClassePersonagem["classe"], nivel: number): ClassePersonagem => ({
+    classe,
+    nivel,
+    conjurador: "completo",
+    atributo_conjuracao: null,
+  });
+
+  it("lê a coluna da classe no nível dela (SRD 5.2)", () => {
+    expect(limiteDePreparadas([cl("mago", 1)])?.total).toBe(4);
+    expect(limiteDePreparadas([cl("mago", 20)])?.total).toBe(25);
+    expect(limiteDePreparadas([cl("clerigo", 5)])?.total).toBe(9);
+    expect(limiteDePreparadas([cl("feiticeiro", 1)])?.total).toBe(2);
+    expect(limiteDePreparadas([cl("bruxo", 9)])?.total).toBe(10);
+    expect(limiteDePreparadas([cl("paladino", 6)])?.total).toBe(6);
+    expect(limiteDePreparadas([cl("patrulheiro", 17)])?.total).toBe(14);
+  });
+
+  it("multiclasse soma as classes e detalha cada uma", () => {
+    const r = limiteDePreparadas([cl("clerigo", 3), cl("paladino", 2)]);
+    expect(r?.total).toBe(6 + 3);
+    expect(r?.porClasse).toEqual([
+      { classe: "clerigo", nivel: 3, limite: 6 },
+      { classe: "paladino", nivel: 2, limite: 3 },
+    ]);
+  });
+
+  it("classe sem coluna no SRD (Bárbaro, Guerreiro, Ladino, Monge) não entra; sem nenhuma, devolve null", () => {
+    expect(limiteDePreparadas([cl("guerreiro", 7)])).toBeNull();
+    expect(limiteDePreparadas([])).toBeNull();
+    expect(limiteDePreparadas([cl("guerreiro", 7), cl("mago", 2)])?.total).toBe(5);
+  });
+
+  it("nível fora da faixa não quebra", () => {
+    expect(limiteDePreparadas([cl("mago", 0)])).toBeNull();
+    expect(limiteDePreparadas([cl("mago", 99)])?.total).toBe(25);
+    expect(limiteDePreparadas([cl("mago", Number.NaN)])).toBeNull();
   });
 });

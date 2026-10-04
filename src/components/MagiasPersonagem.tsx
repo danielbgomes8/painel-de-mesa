@@ -11,10 +11,12 @@ import {
   espacosDosRecursos,
   espacosPossiveis,
   jaTemMagia,
+  limiteDePreparadas,
   magiaNova,
   normalizarMagias,
   rotuloDeNivel,
 } from "@/lib/magias";
+import { NOME_CLASSE } from "@/lib/classesNomes";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
@@ -44,6 +46,26 @@ export function MagiasPersonagem({
   const [conjurando, setConjurando] = useState<number | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [adicionando, setAdicionando] = useState(false);
+  const preparadas = contarPreparadas(magias);
+  const limite = limiteDePreparadas(Array.isArray(p.classes) ? p.classes : []);
+  const acima = limite !== null && preparadas > limite.total;
+  const detalheLimite = limite
+    ? `Limite pelas tabelas de classe do SRD: ${limite.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Magia sempre preparada de subclasse ou juramento não conta.`
+    : undefined;
+
+  /** Preparar passando do limite é permitido (o app não sabe quais magias são "sempre
+   *  preparadas" de subclasse), mas avisa; despreparar limpa o aviso. */
+  function alternarPreparada(i: number) {
+    const virar = !magias[i].preparada;
+    alterar(i, { preparada: virar });
+    if (virar && limite && preparadas + 1 > limite.total) {
+      setAviso(
+        `Isso passa do limite: ${preparadas + 1} preparadas pra ${limite.total} permitidas. Vale se a magia for sempre preparada pela subclasse ou juramento.`,
+      );
+    } else {
+      setAviso(null);
+    }
+  }
 
   function alterar(i: number, mudanca: Partial<MagiaPersonagem>) {
     patch({ magias: magias.map((m, idx) => (idx === i ? { ...m, ...mudanca } : m)) });
@@ -95,7 +117,9 @@ export function MagiasPersonagem({
               </span>
             ))
           )}
-          <span className="mg-contagem">{contarPreparadas(magias)} preparadas</span>
+          <span className="mg-contagem" data-acima={acima || undefined} title={detalheLimite}>
+            {limite ? `${preparadas}/${limite.total}` : preparadas} preparadas
+          </span>
         </div>
 
         {p.concentration && (
@@ -148,7 +172,7 @@ export function MagiasPersonagem({
                           className="chip alvo"
                           aria-pressed={magia.preparada}
                           disabled={!editavel}
-                          onClick={() => alterar(indice, { preparada: !magia.preparada })}
+                          onClick={() => alternarPreparada(indice)}
                         >
                           {magia.preparada ? "preparada" : "preparar"}
                         </button>
