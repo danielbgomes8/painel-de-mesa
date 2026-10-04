@@ -2308,6 +2308,38 @@ body:has(.telao) {
   font-weight: 600;
   margin-right: 6px;
 }
+.atq-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.atq-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.atq-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.atq-previa {
+  font-size: 13px;
+  color: var(--accent);
+}
+.atq-livre {
+  display: block;
+  margin: 10px 0 4px;
+}
 .ataquenovo {
   align-self: flex-start;
 }

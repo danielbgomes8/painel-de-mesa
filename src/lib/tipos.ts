@@ -87,6 +87,19 @@ export type MagiaPersonagem = {
   descricao: string;
 };
 
+/** Um ataque do jogador que o app CALCULA (migration 0027): guarda como se calcula, não o
+ *  resultado — o acerto e o dano saem dos atributos e do nível (ver `ataquesFicha.ts`).
+ *  `atributo` null = ataque de valor fixo (só proficiência e bônus). */
+export type AtaqueFicha = {
+  nome: string;
+  atributo: Atributo | null;
+  proficiente: boolean;
+  bonusAcerto: number;
+  dado: string;
+  bonusDano: number;
+  tipo: string;
+};
+
 export type Atributo = "for" | "des" | "con" | "int" | "sab" | "car";
 
 export type Atributos = Record<Atributo, number>;
@@ -247,6 +260,8 @@ export type Personagem = {
   moedas: Moedas;
   inventario: ItemInventario[];
   magias: MagiaPersonagem[];
+  /** Ataques calculados do jogador (migration 0027); o campo livre `ataque` segue valendo. */
+  ataques: AtaqueFicha[];
   created_at: string;
   updated_at: string;
 };

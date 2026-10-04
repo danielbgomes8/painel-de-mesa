@@ -1733,3 +1733,16 @@ num checkbox nos detalhes da magia ("sempre preparada: subclasse, juramento, esp
 sempre". O chip vira "sempre" (desabilitado; desmarcar é nos detalhes). Isso fecha a ressalva dos avisos de limite: quem
 marca fica exato. Truque extra de subclasse/espécie/talento usa o mesmo campo `sempre`: no truque (nível 0) o checkbox dos detalhes vira "truque extra", ele sai de `contarTruques` e o contador mostra "4/3 truques · +1 extra" (`contarTruquesExtras`). Marcar não mexe em `preparada` (truque não se prepara).
 
+## Ataques calculados do jogador (04/10/2026, migration `0027`)
+
+Na ficha do jogador, "Ataques" → "editar" ganhou **ataques calculados** (`AtaquesPersonagem.tsx`, regras em `lib/ataquesFicha.ts`, 13
+testes): cada um guarda atributo, proficiência, bônus extra de acerto e de dano, dado (`1d8`) e tipo. O acerto e o dano saem dos
+atributos e do nível total NA HORA (nada de resultado guardado: subiu a Força ou o nível, muda sozinho). Acerto = modificador +
+proficiência (se marcada) + extra; dano = dado + modificador + extra (proficiência só no acerto). Coluna `ataques jsonb` em
+`characters` (máx. 30). **O campo livre `ataque` continua valendo**: a lista mostra os calculados primeiro e o texto livre depois,
+então ficha antiga não perde nada e o que não cabe na conta (magia de ataque, ataque especial) segue como texto.
+**O painel de rolagem da iniciativa não mudou**: `textoEfetivoDeAtaques(p)` devolve o texto no mesmo formato do campo livre ("Espada
+longa: +7, 1d8+4 cortante", sinal ASCII `-`, não o `−` da ficha clássica) e o `RolarAtaques`/`lerAtaquesRolaveis` lê igual; o teste
+confere que o texto gerado volta com o mesmo acerto e dano. NPC só usa o texto livre. Não cobre: dano versátil/duas mãos, ataque
+extra, crítico de classe, arma de ataque à distância com desvantagem, bônus de estilo de luta automático (vai em "acerto/dano extra").
+

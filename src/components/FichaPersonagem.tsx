@@ -20,12 +20,14 @@ import {
   limitarExaustao,
   limitarPV,
   podeEditarPersonagem,
+  nivelTotal,
 } from "@/lib/regras";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { CampoNumero } from "@/components/CampoNumero";
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { AtaquesPersonagem } from "@/components/AtaquesPersonagem";
+import { normalizarAtaques, textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 import { FichaCompleta } from "@/components/FichaCompleta";
 import { FichaClasse } from "@/components/FichaClasse";
 import { MagiasPersonagem } from "@/components/MagiasPersonagem";
@@ -113,9 +115,14 @@ export function FichaPersonagem({
     <>
         {p.is_npc ? null : (
           <AtaquesPersonagem
-            texto={p.ataque ?? ""}
+            textoEfetivo={textoEfetivoDeAtaques(p)}
+            textoLivre={p.ataque ?? ""}
+            ataques={normalizarAtaques(p.ataques)}
+            atributos={p.atributos}
+            nivel={nivelTotal(p.classes ?? [])}
             editavel={editavel}
-            onSalvar={(texto) => patch({ ataque: texto })}
+            onSalvarTexto={(texto) => patch({ ataque: texto })}
+            onSalvarAtaques={(ataques) => patch({ ataques })}
           />
         )}
 

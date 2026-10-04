@@ -31,6 +31,7 @@ import {
   turnoAposRemover,
   turnoAposTrocar,
 } from "@/lib/regras";
+import { textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 
 const NOVO_NPC = "__novo__";
 
@@ -660,7 +661,7 @@ export function AcoesNaLinha({
   // Na vez de quem tem ataque pra rolar, abrir a linha é pra atacar, não pra
   // tomar dano: sem o cursor no campo de PV, o teclado do celular não sobe
   // por cima dos botões de ataque.
-  const focarDano = focarAoAbrir && !(naVez && lerAtaquesRolaveis(p.ataque ?? "").ataques.length > 0);
+  const focarDano = focarAoAbrir && !(naVez && lerAtaquesRolaveis(textoEfetivoDeAtaques(p)).ataques.length > 0);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const n = lerValorPV(texto);
@@ -733,7 +734,7 @@ export function AcoesNaLinha({
           <TestesDeMorte sala={sala} personagem={p} editavel titulo="Testes de morte" />
         </div>
       )}
-      <RolarAtaques texto={p.ataque ?? ""} />
+      <RolarAtaques texto={textoEfetivoDeAtaques(p)} />
       <div className="initajustecond">
         <span className="sectitle">Condições</span>
         <ChipsCondicao sala={sala} personagem={p} editavel />
