@@ -4669,6 +4669,11 @@ input.fj-score:focus-visible {
   align-items: center;
   gap: 8px;
 }
+.tp-acoes .minilink {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
 .tp-varios {
   display: flex;
   align-items: center;
