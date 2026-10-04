@@ -1722,4 +1722,6 @@ acima do limite funciona, o contador fica na cor de alerta e aparece uma frase, 
 subclasse/juramento não conta no limite e o app não sabe quais são (mesmo critério da conjuração sem espaço travado).
 Multiclasse soma, porque a ficha não guarda de qual classe é cada magia. **Fica sem limite** (mostra só o número, como
 antes): personagem sem classe cadastrada e Guerreiro/Ladino/Bárbaro/Monge — Cavaleiro Arcano e Trapaceiro Arcano são
-subclasses que o SRD não publica, e não chutei tabela. Truque não conta (já era assim). Não cobre "truques conhecidos".
+subclasses que o SRD não publica, e não chutei tabela. Truque não conta nas preparadas (já era assim).
+
+**Truques conhecidos** (mesmo dia): ao lado do contador, "2/3 truques" (`limiteDeTruques`/`contarTruques`, 3 testes), coluna "Cantrips" do SRD 5.2, mesma soma por classe e mesmo critério de aviso (truque de espécie, talento e subclasse vêm de fora da tabela). Só Bardo, Clérigo, Druida, Feiticeiro, Bruxo e Mago têm coluna; Paladino/Patrulheiro não têm truque. Sem truque na lista, o contador não aparece.

@@ -4354,6 +4354,9 @@ input.fj-score:focus-visible {
 .mg-contagem[data-acima] {
   color: var(--warn);
 }
+.mg-truques + .mg-contagem {
+  margin-left: 12px;
+}
 .mg-conc {
   margin: 0;
   font-size: 13px;

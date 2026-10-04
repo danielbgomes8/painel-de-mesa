@@ -3,12 +3,14 @@ import {
   agruparPorNivel,
   conjurar,
   contarPreparadas,
+  contarTruques,
   devolverEspaco,
   espacosDosRecursos,
   espacosPossiveis,
   gastarEspaco,
   jaTemMagia,
   limiteDePreparadas,
+  limiteDeTruques,
   magiaNova,
   normalizarMagia,
   normalizarMagias,
@@ -207,5 +209,36 @@ describe("limite de magias preparadas", () => {
     expect(limiteDePreparadas([cl("mago", 0)])).toBeNull();
     expect(limiteDePreparadas([cl("mago", 99)])?.total).toBe(25);
     expect(limiteDePreparadas([cl("mago", Number.NaN)])).toBeNull();
+  });
+});
+
+describe("limite de truques conhecidos", () => {
+  const cl = (classe: ClassePersonagem["classe"], nivel: number): ClassePersonagem => ({
+    classe,
+    nivel,
+    conjurador: "completo",
+    atributo_conjuracao: null,
+  });
+
+  it("lê a coluna Cantrips da classe no nível dela (SRD 5.2)", () => {
+    expect(limiteDeTruques([cl("mago", 1)])?.total).toBe(3);
+    expect(limiteDeTruques([cl("mago", 10)])?.total).toBe(5);
+    expect(limiteDeTruques([cl("clerigo", 4)])?.total).toBe(4);
+    expect(limiteDeTruques([cl("feiticeiro", 10)])?.total).toBe(6);
+    expect(limiteDeTruques([cl("bardo", 3)])?.total).toBe(2);
+    expect(limiteDeTruques([cl("bruxo", 4)])?.total).toBe(3);
+  });
+
+  it("multiclasse soma; Paladino, Patrulheiro e sem conjuração não entram", () => {
+    expect(limiteDeTruques([cl("mago", 1), cl("clerigo", 1)])?.total).toBe(6);
+    expect(limiteDeTruques([cl("paladino", 9)])).toBeNull();
+    expect(limiteDeTruques([cl("paladino", 9), cl("druida", 1)])?.total).toBe(2);
+    expect(limiteDeTruques([])).toBeNull();
+    expect(limiteDeTruques([cl("mago", 0)])).toBeNull();
+  });
+
+  it("conta só os truques da lista, preparados ou não", () => {
+    const m = (nivel: number) => ({ ...normalizarMagia({ nome: "x", nivel }) });
+    expect(contarTruques([m(0), m(0), m(1), m(3)])).toBe(2);
   });
 });

@@ -8,10 +8,12 @@ import {
   agruparPorNivel,
   conjurar,
   contarPreparadas,
+  contarTruques,
   espacosDosRecursos,
   espacosPossiveis,
   jaTemMagia,
   limiteDePreparadas,
+  limiteDeTruques,
   magiaNova,
   normalizarMagias,
   rotuloDeNivel,
@@ -49,6 +51,12 @@ export function MagiasPersonagem({
   const preparadas = contarPreparadas(magias);
   const limite = limiteDePreparadas(Array.isArray(p.classes) ? p.classes : []);
   const acima = limite !== null && preparadas > limite.total;
+  const truques = contarTruques(magias);
+  const limiteTruques = limiteDeTruques(Array.isArray(p.classes) ? p.classes : []);
+  const truquesAcima = limiteTruques !== null && truques > limiteTruques.total;
+  const detalheTruques = limiteTruques
+    ? `Limite pelas tabelas de classe do SRD: ${limiteTruques.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Truque de espécie, talento ou subclasse não conta.`
+    : undefined;
   const detalheLimite = limite
     ? `Limite pelas tabelas de classe do SRD: ${limite.porClasse.map((c) => `${NOME_CLASSE[c.classe]} ${c.nivel} = ${c.limite}`).join(" + ")}. Magia sempre preparada de subclasse ou juramento não conta.`
     : undefined;
@@ -116,6 +124,11 @@ export function MagiasPersonagem({
                 {e.nivel}º <b>{e.cur}</b>/{e.max}
               </span>
             ))
+          )}
+          {truques > 0 && (
+            <span className="mg-contagem mg-truques" data-acima={truquesAcima || undefined} title={detalheTruques}>
+              {limiteTruques ? `${truques}/${limiteTruques.total}` : truques} truques
+            </span>
           )}
           <span className="mg-contagem" data-acima={acima || undefined} title={detalheLimite}>
             {limite ? `${preparadas}/${limite.total}` : preparadas} preparadas

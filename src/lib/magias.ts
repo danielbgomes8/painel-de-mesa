@@ -212,6 +212,37 @@ export function limiteDePreparadas(classes: ClassePersonagem[]): LimitePreparada
   return { total: porClasse.reduce((s, c) => s + c.limite, 0), porClasse };
 }
 
+/** Truques conhecidos por nível de classe (índice 0 = nível 1) — coluna "Cantrips" das
+ *  tabelas de classe do SRD 5.2 (open5e, srd-2024). Paladino e Patrulheiro não têm truque. */
+const TRUQUES_POR_CLASSE: Partial<Record<ClasseBase, number[]>> = {
+  bardo: [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+  clerigo: [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+  druida: [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+  feiticeiro: [4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+  bruxo: [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+  mago: [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+};
+
+/** Quantos truques o personagem conhece pelas classes: mesma soma e mesmo critério de
+ *  `limiteDePreparadas` (aviso, não trava: truque de espécie, talento e subclasse vem de
+ *  fora da tabela). null = nenhuma classe com truque na tabela. */
+export function limiteDeTruques(classes: ClassePersonagem[]): LimitePreparadas | null {
+  const porClasse: LimitePreparadas["porClasse"] = [];
+  for (const c of classes) {
+    const tabela = TRUQUES_POR_CLASSE[c.classe];
+    if (!tabela || !Number.isFinite(c.nivel) || c.nivel < 1) continue;
+    const nivel = Math.min(20, Math.round(c.nivel));
+    porClasse.push({ classe: c.classe, nivel, limite: tabela[nivel - 1] });
+  }
+  if (porClasse.length === 0) return null;
+  return { total: porClasse.reduce((s, c) => s + c.limite, 0), porClasse };
+}
+
+/** Quantos truques a lista tem (todos contam: truque não se prepara). */
+export function contarTruques(magias: MagiaPersonagem[]): number {
+  return magias.filter((m) => m.nivel === 0).length;
+}
+
 /** A magia já está na lista? (mesmo nome, ignorando maiúscula e acento) */
 export function jaTemMagia(magias: MagiaPersonagem[], nome: string): boolean {
   const k = (s: string) =>
