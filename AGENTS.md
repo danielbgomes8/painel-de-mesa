@@ -1828,3 +1828,11 @@ derrotados, quem recebe, e uma opção de tirar dos jogadores as condições com
 - O catálogo de monstros só baixa ao abrir o painel (`useCatalogoMonstros`, igual à biblioteca).
 - **Não cobre**: voltar as ações lendárias (elas voltam no turno do monstro e "tirar tudo" no bloco Chefe limpa), apagar as fichas/peões dos
   derrotados (continuam, a 0 PV), e XP de monstro que o catálogo não conhece além do que o Mestre digita.
+
+**Dia e data no topo e no telão** (04/10/2026, sem migration): com a campanha contando os dias, o cabeçalho de todo mundo ganha a etiqueta
+"🗓 Dia 14 · 29 Flamerule" (`rotuloCurtoDoDia`: sem o ano; festival aparece pelo nome; calendário simples vira só "Dia 14"; some se a
+campanha não começou a contar). No celular a etiqueta cai numa segunda linha e custa ~22 px de altura (medido: topo de 141 para 163 px a
+375 px). O **telão** (`Telao.tsx`) escreve o dia na linha de cima ("Ci Teste · Rodada 2 · Dia 14 · 29 Flamerule") e lista só os efeitos no
+último dia ou que vencem hoje (`efeitosPertoDeVencer`: "⏳ Maldição da múmia: falta 1 dia"); com o mapa na mesa, o dia vai numa linha da
+faixa de baixo — **esse caminho não foi visto na tela**, só o do telão sem mapa. Descanso curto do grupo: o Daniel disse que não precisa.
+

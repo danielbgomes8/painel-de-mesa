@@ -2781,6 +2781,29 @@ body:has(.telao) {
   flex-wrap: wrap;
   gap: 8px;
 }
+.brand {
+  row-gap: 2px;
+}
+.brand .tag-dia {
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 13px;
+  color: var(--accent);
+}
+.telao-faixa-dia {
+  font-size: 18px;
+  opacity: 0.85;
+  margin-top: 6px;
+}
+.telao-efeitos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  font-size: clamp(18px, 2.4vw, 28px);
+  opacity: 0.85;
+}
 .fj-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));

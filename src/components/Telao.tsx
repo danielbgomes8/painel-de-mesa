@@ -1,6 +1,8 @@
 "use client";
 
 import type { Sala } from "@/hooks/useSala";
+import type { Tempo } from "@/hooks/useTempo";
+import { diasRestantes, efeitosPertoDeVencer, rotuloCurtoDoDia, textoDoRestante } from "@/lib/tempoCampanha";
 import type { Cenas } from "@/hooks/useCenas";
 import { VisorDaMesa } from "@/components/MapaSobDemanda";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
@@ -25,13 +27,19 @@ export function Telao({
   rotulo,
   cenas,
   codigo,
+  tempo,
 }: {
   sala: Sala;
   rotulo: string;
   cenas: Cenas;
   codigo: string;
+  /** O tempo da campanha: o dia e os efeitos que vencem logo aparecem pra mesa. */
+  tempo?: Tempo;
 }) {
   const { combate, personagens } = sala;
+  const hoje = tempo?.tempo ?? null;
+  const diaDaCampanha = hoje ? rotuloCurtoDoDia(hoje) : null;
+  const vencendo = hoje && tempo ? efeitosPertoDeVencer(tempo.efeitos, hoje.dia) : [];
   // Ninguém mexe no aparelho do telão: sem isto a tela apaga (ou o notebook
   // entra em descanso) no meio do combate.
   const tela = useTelaAcesa();
@@ -115,6 +123,14 @@ export function Telao({
               <span className="telao-faixa-nome">Sem combate no momento</span>
             </div>
           )}
+          {diaDaCampanha && (
+            <div className="telao-faixa-dia">
+              🗓 {diaDaCampanha}
+              {vencendo.map((e) => (
+                <span key={e.id}> · ⏳ {e.nome}: {textoDoRestante(diasRestantes(e, hoje!.dia))}</span>
+              ))}
+            </div>
+          )}
           {aviso}
         </div>
       </div>
@@ -125,7 +141,17 @@ export function Telao({
     <div className="telao" data-tela={tela ?? undefined}>
       <div className="telao-eyebrow">
         {rotulo} · Rodada {combate.round}
+        {diaDaCampanha && ` · ${diaDaCampanha}`}
       </div>
+      {vencendo.length > 0 && hoje && (
+        <div className="telao-efeitos">
+          {vencendo.map((e) => (
+            <span key={e.id}>
+              ⏳ {e.nome}: {textoDoRestante(diasRestantes(e, hoje.dia))}
+            </span>
+          ))}
+        </div>
+      )}
       {atual ? (
         <>
           <div className="telao-label">é a vez de</div>

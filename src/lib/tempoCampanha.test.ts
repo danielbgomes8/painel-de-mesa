@@ -3,6 +3,7 @@ import {
   ancorarHoje,
   dataHarptos,
   diasRestantes,
+  efeitosPertoDeVencer,
   efeitosQueVenceram,
   ehLinhaDeTempo,
   indiceDoDiaHarptos,
@@ -13,6 +14,7 @@ import {
   normalizarEfeito,
   normalizarTempo,
   ordenarEfeitos,
+  rotuloCurtoDoDia,
   rotuloDoDia,
   situacaoDoEfeito,
   textoDoRestante,
@@ -110,6 +112,21 @@ describe("rótulos e efeitos", () => {
     const d = efeito(1, 12, { id: "d" });
     // dia 13: a falta 7, b falta 2, c venceu há 10, d venceu hoje
     expect(ordenarEfeitos([a, c, b, d], 13).map((e) => e.id)).toEqual(["b", "a", "d", "c"]);
+  });
+});
+
+describe("rótulo curto e efeitos perto de vencer (topo e telão)", () => {
+  it("dia simples, com mês, com festival", () => {
+    expect(rotuloCurtoDoDia(dias(14))).toBe("Dia 14");
+    expect(rotuloCurtoDoDia(harptos(14, 198))).toBe("Dia 14 · 29 Flamerule");
+    expect(rotuloCurtoDoDia(harptos(31))).toBe("Dia 31 · Midwinter");
+  });
+
+  it("só os que estão no último dia ou vencem hoje, os de menos prazo primeiro", () => {
+    const e = (id: string, inicio_dia: number, duracao: number): EfeitoDeTempo => ({ id, room_code: "s", nome: id, alvo: "", inicio_dia, duracao, nota: "", created_at: "" });
+    const lista = [e("longe", 1, 20), e("amanha", 5, 6), e("hoje", 2, 8), e("velho", 1, 3)]; // no dia 10: restam 11, 1, 0 e -6
+    expect(efeitosPertoDeVencer(lista, 10).map((x) => x.id)).toEqual(["amanha", "hoje"]);
+    expect(efeitosPertoDeVencer([], 10)).toEqual([]);
   });
 });
 

@@ -234,3 +234,18 @@ export function linhasDoAvanco(efeitos: EfeitoDeTempo[], antes: TempoCampanha, d
     ...efeitosQueVenceram(efeitos, antes.dia, depois.dia).map((e) => linhaDeEfeitoEncerrado(e, true)),
   ];
 }
+
+/** O dia pro topo da tela e pro telão, curto: "Dia 14" ou "Dia 14 · 16 Flamerule" (sem o ano). */
+export function rotuloCurtoDoDia(tempo: TempoCampanha, dia: number = tempo.dia): string {
+  if (tempo.calendario !== "harptos") return `Dia ${dia}`;
+  const d = dataHarptos(tempo, dia).dia;
+  return `Dia ${dia} · ${d.tipo === "festival" ? d.nome : `${d.dia} ${MESES_HARPTOS[d.mes - 1]}`}`;
+}
+
+/** Efeitos no último dia ou que vencem hoje (os que a mesa deve ter na cabeça), os que vencem antes primeiro. */
+export function efeitosPertoDeVencer(efeitos: EfeitoDeTempo[], diaAtual: number): EfeitoDeTempo[] {
+  return ordenarEfeitos(efeitos, diaAtual).filter((e) => {
+    const r = diasRestantes(e, diaAtual);
+    return r === 0 || r === 1;
+  });
+}

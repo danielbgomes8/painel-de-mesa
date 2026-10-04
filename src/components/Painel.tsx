@@ -6,6 +6,7 @@ import { useCenas } from "@/hooks/useCenas";
 import { useQuadro } from "@/hooks/useQuadro";
 import { useBau } from "@/hooks/useBau";
 import { useTempo } from "@/hooks/useTempo";
+import { rotuloCurtoDoDia } from "@/lib/tempoCampanha";
 import { useVersaoNova } from "@/hooks/useVersaoNova";
 import { AvisoVersaoNova } from "@/components/AvisoVersaoNova";
 import { useCodigoSala, useNoNavegador } from "@/hooks/useCodigoSala";
@@ -252,7 +253,7 @@ function PainelSala({ codigo }: { codigo: string }) {
   if (telao) {
     return (
       <>
-        <Telao sala={sala} rotulo={rotulo} cenas={cenas} codigo={codigo} />
+        <Telao sala={sala} rotulo={rotulo} cenas={cenas} codigo={codigo} tempo={tempo} />
         {quadro.destaque && (
           <DestaqueDoCartao
             cartao={quadro.destaque}
@@ -281,6 +282,7 @@ function PainelSala({ codigo }: { codigo: string }) {
         <div className="brand">
           <h1>Painel de Mesa</h1>
           <span className="tag">{rotulo}</span>
+          {tempo.tempo && <span className="tag tag-dia">🗓 {rotuloCurtoDoDia(tempo.tempo)}</span>}
         </div>
         <div className="whoami">
           <span className={`synctag${sala.semInternet ? " semrede" : sala.conectado ? " on" : ""}`}>
