@@ -32,6 +32,8 @@ import {
   turnoAposTrocar,
 } from "@/lib/regras";
 import { textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
+import { LendariasNaLinha } from "@/components/LendariasNaLinha";
+import { horaDoCovil, recuperarAcoesLendarias, temCovil } from "@/lib/lendarias";
 
 const NOVO_NPC = "__novo__";
 
@@ -48,6 +50,15 @@ export async function avancarTurno(sala: Sala): Promise<EstadoCombate | null> {
   if (!mudanca) return null;
   const { antes, depois } = mudanca;
   const virou = depois.round !== antes.round;
+  // O monstro que acaba de ganhar o turno recupera as ações lendárias (regra do livro: no início do próprio
+  // turno). Fica guardado pro desfazer junto com a virada de rodada.
+  const daVez = depois.order[depois.turn];
+  const monstro = daVez ? personagens.find((p) => p.slug === daVez.slug && p.is_npc) : undefined;
+  const recuperadas = monstro ? recuperarAcoesLendarias(monstro.resources ?? []) : null;
+  const lendarias: MudancaPersonagem[] = [];
+  if (monstro && recuperadas && (await sala.atualizarVariosPersonagens([{ id: monstro.id, patch: { resources: recuperadas } }]))) {
+    lendarias.push(mudancaDe(monstro, { resources: recuperadas }));
+  }
   const linhaRodada = `Rodada ${depois.round} começou`;
   const prazos: MudancaPersonagem[] = [];
   if (virou) {
@@ -73,7 +84,7 @@ export async function avancarTurno(sala: Sala): Promise<EstadoCombate | null> {
     rotulo: virou ? `Próximo turno — começou a rodada ${depois.round}` : "Próximo turno",
     // Passar a vez sem virar a rodada não vai pro log; desfazer também não.
     textoLog: textoDesfeito(virou ? [linhaRodada] : [], ""),
-    personagens: prazos,
+    personagens: [...prazos, ...lendarias],
     combate: mudanca,
     criados: [],
   });
@@ -309,6 +320,12 @@ export function RastreadorCombate({
     }
   }
 
+  // Quem tem ações de covil e está na ordem (o Mestre vê o nome de verdade).
+  const donosDoCovil = combate.order
+    .map((c) => sala.personagens.find((x) => x.slug === c.slug))
+    .filter((x): x is Personagem => Boolean(x) && temCovil(x!.resources ?? []))
+    .map((x) => x.name);
+
   function trocar(i: number, j: number) {
     if (j < 0 || j >= combate.order.length) return;
     sala.definirCombate((atual) => {
@@ -326,6 +343,12 @@ export function RastreadorCombate({
           Rodada <b>{combate.round}</b>
         </div>
       </div>
+
+      {souMestre && donosDoCovil.length > 0 && horaDoCovil(combate.order, combate.turn) && (
+        <p className="covil-aviso" role="status">
+          🏰 Contagem 20: hora das ações de covil de {donosDoCovil.join(", ")}.
+        </p>
+      )}
 
       <div className="initlist">
         {combate.order.length === 0 && (
@@ -735,6 +758,7 @@ export function AcoesNaLinha({
         </div>
       )}
       <RolarAtaques texto={textoEfetivoDeAtaques(p)} />
+      {p.is_npc && <LendariasNaLinha sala={sala} personagem={p} />}
       <div className="initajustecond">
         <span className="sectitle">Condições</span>
         <ChipsCondicao sala={sala} personagem={p} editavel />

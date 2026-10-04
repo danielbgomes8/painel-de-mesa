@@ -2701,6 +2701,32 @@ body:has(.telao) {
 .xp-texto[data-pronto] {
   color: var(--accent);
 }
+.lend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.lend-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.lend .minilink {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+.covil-aviso {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--accent);
+}
 .fj-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));

@@ -1792,3 +1792,21 @@ barra e "Faltam 1.450 XP pro nível 4" ou "XP suficiente pro nível 4"). Contas 
 - Log: toda linha começa com 🏅 ("🏅 Ana ganhou 300 XP (total 1.250)"); o recap da sessão ganhou a seção "XP" com essas linhas.
 - **Não cobre**: calcular o XP pelos monstros derrotados (o catálogo tem o XP por ND, mas o app não sabe quem morreu "de verdade"),
   XP por jogador diferente no mesmo prêmio, e subir o nível automático ao bater o limite.
+
+## Ações lendárias, resistência lendária e covil (04/10/2026, sem migration)
+
+No painel que abre embaixo da linha da iniciativa de um **NPC** (e no cartão do peão), o bloco **Chefe** (`LendariasNaLinha.tsx`, regras
+em `lib/lendarias.ts`, 13 testes) liga três coisas, **todas nos `resources` do monstro** (sem coluna nova), reconhecidas pelo nome:
+- **"Ações lendárias"** (padrão 3): botões "gastar 1/2/3" (desabilitam se não sobra) e "devolver 1" (corrigir erro). **Voltam ao máximo
+  sozinhas quando o turno chega no monstro** — está em `avancarTurno` (regra do livro: recupera no início do próprio turno), entra no
+  "desfazer" do próximo turno junto com a virada de rodada. Cada gasto escreve no log (`👑 Dragão usou 2 ações lendárias (restam 1/3)`;
+  `nomeNoLog`, então monstro oculto vira "Um inimigo").
+- **"Resistência lendária"** (padrão 3 por dia): botão "usar"; **não volta sozinha** (o descanso longo do Mestre zera todos os recursos).
+- **"Ações de covil"**: só uma marca (máx. 1). O Mestre vê o aviso **"🏰 Contagem 20: hora das ações de covil de X"** no turno que vem
+  logo depois da contagem 20 (o primeiro com iniciativa < 20; quem empata em 20 age antes do covil; se todos têm 20 ou mais, o aviso
+  vem no primeiro da rodada). Não grava estado: é calculado da ordem e do turno.
+- Os recursos aparecem também na ficha do monstro como qualquer outro (dá pra mudar o máximo lá). "tirar tudo" remove só os três.
+- **Não cobre**: texto das ações lendárias do monstro (o catálogo não tem), custo de cada ação pré-definido, e ações de covil como linha
+  própria na iniciativa (é só aviso).
+**Armadilha deste dia**: semeei a sala `ci-teste` com o robô do GitHub rodando e ele falhou 1 de 26 testes (`andarComParedes`); rodou de
+novo sem mim e passou. `gh run list --workflow e2e.yml` ANTES de semear, sempre — e esperar o run terminar, não só começar.
