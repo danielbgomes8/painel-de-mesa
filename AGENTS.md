@@ -1865,5 +1865,11 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   "PV de NPC é só do Mestre" é pra inimigo). Descoberto ao testar: sem isso o dono nem via o PV do familiar. O recap também conta o companheiro
   como do grupo (`DiarioCampanha` manda `!is_npc || dono` em `jogadores`), senão o dano nele entrava como "dano nos inimigos".
 - A criação só manda `dono`/`revealed` pro banco quando vêm (`linhaDePersonagem`), então a coluna nova não quebra criar ninguém antes da migration.
-- **Não cobre**: peão no mapa do companheiro (não ganha peão oculto como os inimigos; o Mestre põe à mão), dar o turno do companheiro ao dono no
-  telão, e transformar uma ficha NPC que já existe em companheiro (só cria novo).
+- **Peão no mapa** (04/10/2026, sem migration): com um mapa na mesa, o companheiro que entra na iniciativa junto do dono ganha peão **visível** (não
+  oculto como o dos inimigos) **encostado no peão do dono**, no primeiro quadradinho livre em volta (`pecasDosCompanheiros` em `lib/pecas.ts`, 6 testes:
+  lado, depois embaixo/em cima/diagonais, em anéis; o tamanho vem do tipo da ficha, "Fera grande" ocupa 2×2 sem sobrepor). Dono sem peão neste mapa: cai
+  no meio do que a mesa vê. `porPecasDosCompanheiros` (`lib/pecasNoBanco.ts`) acha o mapa da mesa sozinho, então vale pros três caminhos de entrada e
+  pro "pôr na ordem" da ficha. **Tirar o dono da ordem tira os peões dos companheiros** (e desfazer devolve todos, no mesmo lugar). **Não anda junto**:
+  cada peão é movido pelo seu dono.
+- **Não cobre**: o companheiro andar junto com o dono no mapa, dar o turno do companheiro ao dono no telão, e transformar uma ficha NPC que já existe em
+  companheiro (só cria novo).

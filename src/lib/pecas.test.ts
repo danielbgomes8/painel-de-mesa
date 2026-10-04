@@ -14,6 +14,7 @@ import {
   montarPecasNaTela,
   nomeDaPeca,
   normalizarPeca,
+  pecasDosCompanheiros,
   pecasDosQueEntram,
   pecaVisivel,
   podeMoverPeca,
@@ -541,3 +542,46 @@ describe("aura (emanação) no peão", () => {
     expect(a.auraPx).toBe(50 + 300);
   });
 });
+
+describe("companheiro que entra com o dono ganha peão encostado nele", () => {
+  const cenaComCamera = { ...cena, camera: { x: 1000, y: 500, w: 800, h: 600 } };
+  const dono = { slug: "ana", x: 250, y: 250, tamanho: 1 as const };
+  const pip = { slug: "pip", cls: "Fera miúda", dono: "ana" };
+  const lobo = { slug: "lobo", cls: "Fera média", dono: "ana" };
+
+  it("nasce visível, no quadradinho do lado do dono", () => {
+    const [p] = pecasDosCompanheiros({ cena: cenaComCamera, companheiros: [pip], existentes: [dono] });
+    expect(p).toMatchObject({ slug: "pip", oculto: false, tamanho: 1, x: 350, y: 250 });
+  });
+
+  it("se o lado está ocupado, vai pro próximo quadradinho livre em volta", () => {
+    const [p] = pecasDosCompanheiros({ cena: cenaComCamera, companheiros: [pip], existentes: [dono, { slug: "x", x: 350, y: 250, tamanho: 1 }] });
+    expect([p.x, p.y]).toEqual([250, 350]);
+  });
+
+  it("vários companheiros do mesmo dono não caem um em cima do outro", () => {
+    const r = pecasDosCompanheiros({ cena: cenaComCamera, companheiros: [pip, lobo], existentes: [dono] });
+    expect(r).toHaveLength(2);
+    expect(r[0].x === r[1].x && r[0].y === r[1].y).toBe(false);
+    for (const p of r) expect(Math.hypot(p.x - 250, p.y - 250)).toBeLessThanOrEqual(100 * Math.SQRT2 + 1);
+  });
+
+  it("quem já tem peão nesta cena não ganha outro", () => {
+    const r = pecasDosCompanheiros({ cena: cenaComCamera, companheiros: [pip], existentes: [dono, { slug: "pip", x: 900, y: 900, tamanho: 1 }] });
+    expect(r).toEqual([]);
+  });
+
+  it("companheiro grande encosta na borda do peão do dono, sem sobrepor", () => {
+    const [p] = pecasDosCompanheiros({ cena: cenaComCamera, companheiros: [{ slug: "urso", cls: "Fera grande", dono: "ana" }], existentes: [dono] });
+    expect(p.tamanho).toBe(2);
+    expect(Math.hypot(p.x - 250, p.y - 250)).toBeGreaterThanOrEqual(100 * 1.5 * 0.7);
+  });
+
+  it("dono sem peão neste mapa: cai no meio do que a mesa vê, visível", () => {
+    const [p] = pecasDosCompanheiros({ cena: cenaComCamera, companheiros: [pip], existentes: [] });
+    expect(p.oculto).toBe(false);
+    expect(p.x).toBeGreaterThanOrEqual(1000);
+    expect(p.x).toBeLessThanOrEqual(1800);
+  });
+});
+

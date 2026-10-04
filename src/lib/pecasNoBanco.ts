@@ -12,8 +12,8 @@
  */
 import { supabase, supabaseConfigurado } from "./supabase";
 import { relatarErro } from "./relatarErro";
-import { ehTabelaAusente, type Cena } from "./cenas";
-import { normalizarPeca, pecasDosQueEntram, type Peca } from "./pecas";
+import { ehTabelaAusente, normalizarCena, type Cena } from "./cenas";
+import { normalizarPeca, pecasDosCompanheiros, pecasDosQueEntram, type Peca } from "./pecas";
 import type { PecasDaAcao } from "./desfazer";
 
 function relatar(onde: string, erro: { code?: string | null; message?: string | null }) {
@@ -53,6 +53,61 @@ export async function porPecasDosQueEntram(
   if (erroAoPor) {
     // 23505 = outro aparelho do Mestre pôs o mesmo peão no meio tempo.
     if (erroAoPor.code !== "23505") relatar("porPecas (iniciativa)", erroAoPor);
+    return undefined;
+  }
+  return { criadas: linhas.map((l) => l.id), tiradas: [] };
+}
+
+/** Junta o que várias etapas criaram/tiraram, pra o desfazer devolver tudo de uma vez. */
+export function juntarPecasDaAcao(...listas: (PecasDaAcao | undefined)[]): PecasDaAcao | undefined {
+  const itens = listas.filter((l): l is PecasDaAcao => Boolean(l));
+  if (itens.length === 0) return undefined;
+  return { criadas: itens.flatMap((l) => l.criadas), tiradas: itens.flatMap((l) => l.tiradas) };
+}
+
+/** Companheiros que entraram na iniciativa com o dono ganham peão VISÍVEL, encostado no do dono, no mapa que está
+ *  na mesa (ver `pecasDosCompanheiros`). Acha o mapa da mesa sozinho (quem chama não precisa ter o mapa à mão).
+ *  Sem mapa na mesa, não faz nada. Devolve o que o desfazer precisa. */
+export async function porPecasDosCompanheiros(
+  codigo: string,
+  companheiros: readonly { slug: string; cls?: string; dono: string }[],
+): Promise<PecasDaAcao | undefined> {
+  if (companheiros.length === 0 || !supabaseConfigurado) return undefined;
+  const mesa = await supabase.from("cenas").select("*").eq("room_code", codigo).eq("na_mesa", true).limit(1).maybeSingle();
+  if (mesa.error) {
+    relatar("lerCenaDaMesa (companheiros)", mesa.error);
+    return undefined;
+  }
+  const cena = normalizarCena(mesa.data);
+  if (!cena) return undefined;
+  const { data, error } = await supabase.from("cena_pecas").select("slug, x, y, tamanho").eq("cena_id", cena.id);
+  if (error) {
+    relatar("lerPecas (companheiros)", error);
+    return undefined;
+  }
+  const existentes = (data ?? []).map((p) => ({
+    slug: p.slug as string | null,
+    x: Number(p.x),
+    y: Number(p.y),
+    tamanho: ([1, 2, 3, 4].includes(Number(p.tamanho)) ? Number(p.tamanho) : 1) as 1 | 2 | 3 | 4,
+  }));
+  const novas = pecasDosCompanheiros({ cena, companheiros, existentes });
+  if (novas.length === 0) return undefined;
+  const linhas = novas.map((n) => ({
+    id: crypto.randomUUID(),
+    cena_id: cena.id,
+    room_code: cena.room_code,
+    slug: n.slug,
+    nome: n.nome,
+    x: n.x,
+    y: n.y,
+    tamanho: n.tamanho ?? 1,
+    cor: null,
+    oculto: false,
+  }));
+  const { error: erroAoPor } = await supabase.from("cena_pecas").insert(linhas);
+  if (erroAoPor) {
+    if (erroAoPor.code !== "23505") relatar("porPecas (companheiros)", erroAoPor);
     return undefined;
   }
   return { criadas: linhas.map((l) => l.id), tiradas: [] };

@@ -6,6 +6,7 @@ import type { Personagem } from "@/lib/tipos";
 import { companheirosDe, linhaDeCompanheiro } from "@/lib/companheiros";
 import { entrarNaOrdem } from "@/lib/regras";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { porPecasDosCompanheiros } from "@/lib/pecasNoBanco";
 
 /** Companheiros e invocações do personagem (familiar, montaria, animal companheiro, criatura invocada), na
  *  ficha de quem joga: o dono e o Mestre criam e controlam. Cada um é uma ficha de NPC já revelada, ligada ao
@@ -33,6 +34,8 @@ export function CompanheirosDaFicha({ sala, personagem: dono }: { sala: Sala; pe
       return { order: r.ordem };
     });
     void sala.registrarLog(linhaDeCompanheiro(c.name, dono.name));
+    // Com um mapa na mesa, o peão dele nasce encostado no do dono (sem mapa na mesa, nada acontece).
+    if (!sala.semInternet) await porPecasDosCompanheiros(dono.room_code, [{ slug: c.slug, cls: c.cls, dono: dono.slug }]);
   }
 
   async function criar() {

@@ -28,11 +28,11 @@ export function comCompanheiros<T extends QuemTemDono>(
   entrando: ItemIniciativa[],
   personagens: T[],
   ordemAtual: { slug: string }[],
-): { itens: ItemIniciativa[]; acrescentados: { item: ItemIniciativa; dono: string }[] } {
+): { itens: ItemIniciativa[]; acrescentados: { item: ItemIniciativa; dono: string; donoSlug: string }[] } {
   const jaNaOrdem = new Set(ordemAtual.map((o) => o.slug));
   const jaVem = new Set(entrando.map((e) => e.slug));
   const itens: ItemIniciativa[] = [];
-  const acrescentados: { item: ItemIniciativa; dono: string }[] = [];
+  const acrescentados: { item: ItemIniciativa; dono: string; donoSlug: string }[] = [];
   for (const e of entrando) {
     itens.push(e);
     const dono = personagens.find((p) => p.slug === e.slug);
@@ -42,7 +42,7 @@ export function comCompanheiros<T extends QuemTemDono>(
       jaVem.add(c.slug);
       const item = { slug: c.slug, name: c.name, init: e.init };
       itens.push(item);
-      acrescentados.push({ item, dono: dono.name });
+      acrescentados.push({ item, dono: dono.name, donoSlug: dono.slug });
     }
   }
   return { itens, acrescentados };

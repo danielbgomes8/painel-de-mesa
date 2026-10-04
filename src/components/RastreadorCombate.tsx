@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { EstadoCombate, ItemIniciativa, ModeloNpc, Personagem } from "@/lib/tipos";
 import type { Cena } from "@/lib/cenas";
-import { porPecasDosQueEntram, tirarPecasDasFichas } from "@/lib/pecasNoBanco";
+import { juntarPecasDaAcao, porPecasDosCompanheiros, porPecasDosQueEntram, tirarPecasDasFichas } from "@/lib/pecasNoBanco";
 import { rolarIniciativa as rolarDados } from "@/lib/dados";
 import { CHAVE_INIMIGOS, EmboscadaDaIniciativa } from "@/components/EmboscadaDaIniciativa";
 import { ComecarEncontro } from "@/components/EncontrosPreparados";
@@ -92,6 +92,14 @@ export async function avancarTurno(sala: Sala): Promise<EstadoCombate | null> {
     criados: [],
   });
   return depois;
+}
+
+/** O que `comCompanheiros` acrescentou, no formato que o peão do mapa pede (precisa do `cls` pro tamanho). */
+function paraPeao(
+  extras: { item: ItemIniciativa; donoSlug: string }[],
+  personagens: { slug: string; cls: string }[],
+): { slug: string; cls?: string; dono: string }[] {
+  return extras.map((e) => ({ slug: e.item.slug, dono: e.donoSlug, cls: personagens.find((p) => p.slug === e.item.slug)?.cls }));
 }
 
 export function RastreadorCombate({
@@ -212,7 +220,7 @@ export function RastreadorCombate({
     // tentativa do controle de concorrência — vale o da última, que é a que
     // gravou de verdade.
     let entrou = false;
-    let extras: { item: ItemIniciativa; dono: string }[] = [];
+    let extras: { item: ItemIniciativa; dono: string; donoSlug: string }[] = [];
     const feito = await sala.definirCombate((atual) => {
       // Quem tem companheiro (familiar, montaria...) entra com ele, logo depois, na mesma contagem.
       const c = comCompanheiros([item], personagens, atual.order);
@@ -230,7 +238,9 @@ export function RastreadorCombate({
       const linha = `${nomeNoLog(entrando)} entrou no combate (iniciativa ${item.init}${rolouSurpreso ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
       // Inimigo com mapa na mesa ganha peão oculto (ver pecasDosQueEntram).
-      const pecas = await porPecasDosQueEntram(mapa, [entrando]);
+      const pecasInimigo = await porPecasDosQueEntram(mapa, [entrando]);
+      const pecasCompanheiros = mapa ? await porPecasDosCompanheiros(mapa.room_code, paraPeao(extras, personagens)) : undefined;
+      const pecas = juntarPecasDaAcao(pecasInimigo, pecasCompanheiros);
       sala.lembrarDesfazer({
         rotulo: `${entrando.name} entrou no combate (iniciativa ${item.init})`,
         textoLog: textoDesfeito([linha], ""),
@@ -258,7 +268,7 @@ export function RastreadorCombate({
       init: rolarDados(p.init_mod, surpresosDaVez.has(p.slug)).total,
     }));
     let entraram: ItemIniciativa[] = [];
-    let extras: { item: ItemIniciativa; dono: string }[] = [];
+    let extras: { item: ItemIniciativa; dono: string; donoSlug: string }[] = [];
     const feito = await sala.definirCombate((atual) => {
       const c = comCompanheiros(novos, personagens, atual.order);
       const r = entrarNaOrdem(atual.order, c.itens);
@@ -271,12 +281,14 @@ export function RastreadorCombate({
     const linhas = entraram.map((n) => `${n.name} entrou no combate (iniciativa ${n.init}${surpresosDaVez.has(n.slug) ? ", surpreso" : ""})`);
     sala.registrarVariosLogs([...linhas, ...extras.map((e) => linhaDeCompanheiro(e.item.name, e.dono))]);
     const resumo = entraram.length === 1 ? linhas[0] : `${entraram.length} jogadores entraram no combate`;
+    const pecas = mapa ? await porPecasDosCompanheiros(mapa.room_code, paraPeao(extras, personagens)) : undefined;
     sala.lembrarDesfazer({
       rotulo: resumo,
       textoLog: textoDesfeito(linhas, resumo),
       personagens: [],
       combate: feito,
       criados: [],
+      pecas,
     });
   }
 
@@ -339,7 +351,8 @@ export function RastreadorCombate({
       // Inimigo que sai da ordem sai também do mapa da mesa (o jogador fica:
       // ele continua ali mesmo fora do combate). Desfazer devolve o peão no
       // mesmo lugar.
-      const tiradas = ficha?.is_npc && mapa ? await tirarPecasDasFichas(mapa.room_code, [ficha.slug], mapa.id) : [];
+      const slugsDePeao = [...(ficha?.is_npc ? [ficha.slug] : []), ...companheirosQueSaemJunto(personagens, saindo.slug)];
+      const tiradas = mapa && slugsDePeao.length > 0 ? await tirarPecasDasFichas(mapa.room_code, slugsDePeao, mapa.id) : [];
       sala.lembrarDesfazer({
         rotulo: `${ficha?.name ?? saindo.name} saiu da ordem`,
         textoLog: null,
@@ -836,7 +849,7 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
     // que pode já estar velho quando esta chega — reduz (não garante 100%, isso
     // pediria uma escrita atômica no banco) o risco de uma sobrescrever a outra.
     let entrou = false;
-    let extras: { item: ItemIniciativa; dono: string }[] = [];
+    let extras: { item: ItemIniciativa; dono: string; donoSlug: string }[] = [];
     const feito = await sala.definirCombate((atual) => {
       // Quem tem companheiro (familiar, montaria...) entra com ele, logo depois, na mesma contagem.
       const c = comCompanheiros([item], sala.personagens, atual.order);
@@ -846,7 +859,11 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
       return { order: r.ordem };
     });
     if (feito && entrou) {
-      if (extras.length > 0) sala.registrarVariosLogs(extras.map((e) => linhaDeCompanheiro(e.item.name, e.dono)));
+      if (extras.length > 0) {
+        sala.registrarVariosLogs(extras.map((e) => linhaDeCompanheiro(e.item.name, e.dono)));
+        // O peão dos companheiros nasce no mapa da mesa, encostado no do dono (sem mapa na mesa, nada acontece).
+        if (!sala.semInternet) void porPecasDosCompanheiros(personagem.room_code, paraPeao(extras, sala.personagens));
+      }
       const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa}${rolouSurpreso ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
       sala.lembrarDesfazer({

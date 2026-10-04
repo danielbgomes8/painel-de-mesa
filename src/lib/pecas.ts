@@ -249,6 +249,52 @@ export function pecasDosQueEntram(entrada: {
   });
 }
 
+type CompanheiroQueEntra = { slug: string; cls?: string; dono: string };
+
+/**
+ * Os peões dos companheiros (familiar, montaria, animal companheiro) de quem está na iniciativa, com um mapa na
+ * mesa: cada um nasce VISÍVEL (é aliado) e ENCOSTADO no peão do dono, no primeiro quadradinho livre em volta (do
+ * lado, depois embaixo, em cima e as diagonais, e assim em anéis). Dono sem peão neste mapa: o companheiro cai no
+ * meio do que a mesa vê, sem cair em cima de ninguém. Quem já tem peão nesta cena não ganha outro. O tamanho vem
+ * do tipo da ficha. Não anda junto com o dono depois: cada um é movido pelo seu.
+ */
+export function pecasDosCompanheiros(entrada: {
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura" | "camera">;
+  companheiros: readonly CompanheiroQueEntra[];
+  existentes: readonly Pick<Peca, "slug" | "x" | "y" | "tamanho">[];
+}): NovaPeca[] {
+  const { cena, companheiros, existentes } = entrada;
+  const lado = ladoDeReferencia(cena);
+  const jaTem = new Set(existentes.map((p) => p.slug).filter((s): s is string => Boolean(s)));
+  const ocupadas: { x: number; y: number; t: number }[] = existentes.map((p) => ({ x: p.x, y: p.y, t: p.tamanho }));
+  const saida: NovaPeca[] = [];
+  for (const c of companheiros) {
+    if (jaTem.has(c.slug)) continue;
+    jaTem.add(c.slug);
+    const tamanho = tamanhoPeloTipo(c.cls);
+    const dono = existentes.find((p) => p.slug === c.dono);
+    let ponto: Ponto;
+    if (dono) {
+      const passo = (lado * (dono.tamanho + tamanho)) / 2;
+      const deslocar = (n: number) => (n === 0 ? 0 : Math.sign(n) * (passo + (Math.abs(n) - 1) * lado));
+      const candidatos: Ponto[] = [];
+      for (let k = 1; k <= 4; k++) {
+        const anel: [number, number][] = [];
+        for (let dx = -k; dx <= k; dx++) for (let dy = -k; dy <= k; dy++) if (Math.max(Math.abs(dx), Math.abs(dy)) === k) anel.push([dx, dy]);
+        anel.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]) || b[0] - a[0] || b[1] - a[1]);
+        for (const [dx, dy] of anel) candidatos.push(encaixarNaGrade(cena, dono.x + deslocar(dx), dono.y + deslocar(dy), tamanho));
+      }
+      const livre = (p: Ponto) => ocupadas.every((o) => Math.hypot(p[0] - o.x, p[1] - o.y) >= (lado * (o.t + tamanho)) / 2 * 0.7);
+      ponto = candidatos.find(livre) ?? encaixarNaGrade(cena, dono.x + passo, dono.y, tamanho);
+    } else {
+      ponto = encaixarNaGrade(cena, ...posicoesIniciais(cena, 1, cena.camera, ocupadas.map((o) => [o.x, o.y]))[0], tamanho);
+    }
+    ocupadas.push({ x: ponto[0], y: ponto[1], t: tamanho });
+    saida.push({ slug: c.slug, nome: "", x: ponto[0], y: ponto[1], tamanho, oculto: false });
+  }
+  return saida;
+}
+
 /** Um trecho do mapa em volta de `ponto` (de `quadradinhos` de lado), pra
  *  `posicoesIniciais` agrupar os peões ali em vez de no meio da tela — é o que
  *  faz "pôr o grupo onde eu tocar". */
