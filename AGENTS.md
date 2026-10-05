@@ -597,7 +597,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0025` (a 0020 é a trava de apagar sala) e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0032` (a 0029 não existe; a 0020 é a trava de apagar sala) e o `seed.sql`
   já rodadas — o banco tem `rooms` mais treze filhas (as dez de antes, `cenas`,
   `cena_nevoa` e `cena_pecas`), todas com `on delete cascade` ligado em `rooms`,
   fora a `erros`, e o bucket de imagens `mapas`. (A 0020, que tira do `anon` o
@@ -1608,8 +1608,30 @@ confirmar" — **não funcionava**, porque a "lista do banco" que o componente e
 "PEND set" e "PEND limpa" com 20 ms de diferença, antes do PATCH sair. Foi removido. Lição: **achar a causa no log
 (console.log temporário + o PATCH que saiu) antes de empilhar remendo**; três remendos seguidos só mudaram a taxa de falha.
 Os robôs `inventario`/`recap` rodaram 15 vezes seguidas sem falhar, sem nenhuma espera artificial.
-O que NÃO foi resolvido: dois aparelhos mexendo na MESMA lista (inventário) da MESMA pessoa em instantes muito próximos
-ainda se sobrescrevem (a escrita manda a lista inteira da cópia local). Para isso seria preciso controle de versão como o do combate.
+~~O que NÃO foi resolvido: dois aparelhos mexendo na MESMA lista da MESMA pessoa~~ — resolvido em 05/10/2026, ver "Listas da
+ficha com trava de versão" logo abaixo.
+
+### Listas da ficha com trava de versão (05/10/2026, migration `0032_versao_listas.sql`, rodada e conferida)
+
+`inventario`, `magias` e `moedas` viajam como a lista INTEIRA, montada a partir da cópia local. O caso real: o Mestre passa um
+item do baú pro inventário de um jogador (`BauDoGrupo`) enquanto o jogador edita o dele — quem gravasse por último apagava a
+mudança do outro. **O baú em si nunca teve esse problema** (uma linha por item, moeda troca só se ninguém mexeu).
+- **Coluna `characters.versao_listas`** (inteiro, começa em 0). **`alterarListasDoPersonagem(id, fazer)`** no `useSala`:
+  `fazer(fichaDeAgora)` devolve o patch, ou `null` se o que a pessoa tocou já não existe. O UPDATE leva
+  `.eq("versao_listas", v)` e soma 1; se zero linhas mudam (outro aparelho mexeu), relê a ficha direto do banco e chama `fazer`
+  de novo em cima dela (até 5 vezes, `MAX_TENTATIVAS_VERSAO`). Devolve `"ok" | "mudou" | "erro"`. Roda dentro da mesma fila por
+  ficha das outras escritas (`naCadeiaDaFicha`), então a ordem se mantém.
+- **Edição por item acha o item pelo CONTEÚDO, não pela posição** (`acharIgual` em `lib/inventario.ts`): a posição muda quando
+  alguém apaga ou acrescenta antes. Item que saiu ou mudou → não grava e a tela diz "mudou em outro aparelho".
+- **Lista nova da ficha (ou qualquer coluna que viaje inteira) passa por aqui, nunca por `atualizarPersonagem`.** Os componentes
+  recebem `alterarListas` (tipo `AlterarListas` em `tipos.ts`); `patch` fica pro resto (PV, concentração, recursos).
+- **Dividir moedas do baú**: se uma escrita falha, só a parte de quem não recebeu volta ao baú (antes devolvia tudo e duplicava
+  o dinheiro de quem já tinha recebido).
+- **Compatibilidade**: sem a coluna (linha de antes da migration) ou sem internet, cai no caminho antigo (a fila sem internet já
+  só grava o que o banco ainda tem como a mudança encontrou). O resto da ficha continua mandando só a coluna que mudou.
+- **Testes**: `useSala.test.ts` (grava e soma a versão; outro aparelho mexeu no meio → nenhum item some; item saiu → "mudou").
+  Conferido plantando o defeito (tirar o `.eq` da versão): 2 testes falham. **Não testado com dois celulares de verdade** — só
+  o banco de mentira. `versao_listas` entrou na lista de `e2e/esquema.e2e.ts`.
 
 ## Subir de nível (02/10/2026, sem migration)
 
