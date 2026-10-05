@@ -106,6 +106,62 @@ describe("useSala: escrever sem atropelar outro celular", () => {
   });
 });
 
+describe("useSala: listas da ficha com trava de versão (0032)", () => {
+  const corda = { nome: "Corda", qtd: 1, peso: 5, descricao: "", magico: false, raridade: "", equipado: false, sintonia: 0 as const };
+  const pocao = { ...corda, nome: "Poção de cura", peso: 0.5 };
+  const inventarioNoBanco = () => (bd.linhas("characters")[0].inventario as { nome: string }[]).map((i) => i.nome);
+
+  it("grava a lista e soma a versão", async () => {
+    const t = ficha("tiberio", "Tibério Vaz");
+    const { result } = await abrir();
+    let r: string | undefined;
+    await act(async () => {
+      r = await result.current.alterarListasDoPersonagem(t.id, (f) => ({ inventario: [...(f.inventario ?? []), corda] }));
+    });
+    expect(r).toBe("ok");
+    expect(inventarioNoBanco()).toEqual(["Corda"]);
+    expect(bd.linhas("characters")[0].versao_listas).toBe(1);
+  });
+
+  it("se outro aparelho mexeu no inventário no meio, refaz a conta em cima da lista nova (nenhum item some)", async () => {
+    const t = ficha("tiberio", "Tibério Vaz");
+    const { result } = await abrir();
+    // O Mestre passou uma poção do baú pro jogador e o aviso ainda não chegou neste aparelho.
+    bd.comoOutroAparelho("characters", (l) => l.id === t.id, { inventario: [pocao], versao_listas: 1 }, { avisar: false });
+    let r: string | undefined;
+    await act(async () => {
+      r = await result.current.alterarListasDoPersonagem(t.id, (f) => ({ inventario: [...(f.inventario ?? []), corda] }));
+    });
+    expect(r).toBe("ok");
+    expect(inventarioNoBanco()).toEqual(["Poção de cura", "Corda"]);
+    expect(bd.linhas("characters")[0].versao_listas).toBe(2);
+  });
+
+  it("se o item que a pessoa tocou já saiu da lista, não grava nada e avisa que mudou", async () => {
+    const t = ficha("tiberio", "Tibério Vaz", { inventario: [corda], versao_listas: 0 });
+    const { result } = await abrir();
+    bd.comoOutroAparelho("characters", (l) => l.id === t.id, { inventario: [], versao_listas: 1 }, { avisar: false });
+    let r: string | undefined;
+    await act(async () => {
+      r = await result.current.alterarListasDoPersonagem(t.id, (f) => {
+        const k = (f.inventario ?? []).findIndex((i) => i.nome === "Corda");
+        return k === -1 ? null : { inventario: [] };
+      });
+    });
+    expect(r).toBe("mudou");
+    expect(inventarioNoBanco()).toEqual([]);
+    expect(bd.linhas("characters")[0].versao_listas).toBe(1);
+  });
+
+  it("escrever PV continua mandando só a coluna do PV (a versão das listas não entra)", async () => {
+    const t = ficha("tiberio", "Tibério Vaz", { hp: 20, hp_max: 20 });
+    const { result } = await abrir();
+    await act(() => result.current.atualizarPersonagem(t.id, { hp: 12 }));
+    const enviados = bd.pedidos.filter((p) => p.tabela === "characters" && p.op === "update").map((p) => p.carga);
+    expect(enviados).toEqual([{ hp: 12 }]);
+  });
+});
+
 describe("useSala: desfazer", () => {
   it("volta o dano quando nada mudou depois", async () => {
     ficha("tiberio", "Tibério Vaz", { hp: 20, hp_max: 20 });

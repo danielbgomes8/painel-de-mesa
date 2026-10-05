@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
-import type { Personagem } from "@/lib/tipos";
+import type { AlterarListas, Personagem } from "@/lib/tipos";
 import { mudancaDe, textoDesfeito } from "@/lib/desfazer";
 import {
   ajustarPV,
@@ -80,6 +80,7 @@ export function FichaPersonagem({
   bau?: Bau;
 }) {
   const patch = (mudanca: Partial<Personagem>) => sala.atualizarPersonagem(p.id, mudanca);
+  const alterarListas: AlterarListas = (fazer) => sala.alterarListasDoPersonagem(p.id, fazer);
   // Permissão é da própria ficha, não de quem manda renderizar — ver
   // podeEditarPersonagem em regras.ts.
   const editavel = podeEditarPersonagem(souMestre, ehMinha);
@@ -555,8 +556,8 @@ export function FichaPersonagem({
         {modoJogador && (
           <>
             <FichaClasse personagem={p} editavel={editavel} patch={patch} />
-            <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
-            <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
+            <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} alterarListas={alterarListas} registrar={(t) => void sala.registrarLog(t)} />
+            <InventarioPersonagem personagem={p} editavel={editavel} alterarListas={alterarListas} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
             <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
           </>
         )}
@@ -574,8 +575,8 @@ export function FichaPersonagem({
               <>
                 <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} sala={sala} souMestre={souMestre} />
                 <FichaClasse personagem={p} editavel={editavel} patch={patch} />
-                <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} registrar={(t) => void sala.registrarLog(t)} />
-                <InventarioPersonagem personagem={p} editavel={editavel} patch={patch} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
+                <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} alterarListas={alterarListas} registrar={(t) => void sala.registrarLog(t)} />
+                <InventarioPersonagem personagem={p} editavel={editavel} alterarListas={alterarListas} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
                 <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
               </>
             )}

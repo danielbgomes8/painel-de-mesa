@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  acharIgual,
   capacidadeDeCarga,
   dividirMoedas,
   formatarKg,
@@ -181,5 +182,18 @@ describe("baú do grupo", () => {
   it("pegar do baú leva só a quantidade pedida e nasce sem equipar nem sintonizar", () => {
     const i = itemDoBauParaInventario(linha({ nome: "Anel", qtd: 5, peso: 0.1, magico: true }), 2);
     expect(i).toMatchObject({ nome: "Anel", qtd: 2, peso: 0.1, magico: true, equipado: false, sintonia: 0 });
+  });
+});
+
+describe("acharIgual", () => {
+  const a = { ...itemNovo("Corda"), qtd: 1 };
+  const b = { ...itemNovo("Tocha"), qtd: 3 };
+  it("acha o item pelo conteúdo, mesmo que a posição tenha mudado", () => {
+    expect(acharIgual([a, b], b)).toBe(1);
+    expect(acharIgual([b, a], b)).toBe(0);
+  });
+  it("devolve -1 se o item mudou ou saiu", () => {
+    expect(acharIgual([a], b)).toBe(-1);
+    expect(acharIgual([a, { ...b, qtd: 2 }], b)).toBe(-1);
   });
 });

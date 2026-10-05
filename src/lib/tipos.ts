@@ -210,6 +210,9 @@ export type Personagem = {
   /** Epígrafe curta sob o nome na ficha completa (ex.: uma frase de efeito).
    *  Só pra personagem de jogador (ver migration 0012). */
   ficha_epiteto: string;
+  /** Contador de versão das listas (inventário, magias, moedas), pra duas escritas
+   *  quase juntas não se apagarem (ver migration 0032). Linha de antes dela: ausente. */
+  versao_listas: number;
   /** Seções da ficha completa — história, características, magias, itens
    *  mágicos, trejeitos... (ver migration 0012). */
   ficha_secoes: SecaoFicha[];
@@ -420,3 +423,10 @@ export type LinhaLogBastiao = {
   text: string;
   created_at: string;
 };
+
+/** Escrita das listas da ficha com trava de versão: recebe uma função que monta o patch a partir da
+ *  ficha como está AGORA (ou devolve null se o que a pessoa tocou já não existe). Ver
+ *  `alterarListasDoPersonagem` no `useSala`. */
+export type AlterarListas = (
+  fazer: (atual: Personagem) => Partial<Personagem> | null,
+) => Promise<"ok" | "mudou" | "erro">;

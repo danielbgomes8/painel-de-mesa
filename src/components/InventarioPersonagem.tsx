@@ -5,6 +5,7 @@ import type { Bau } from "@/hooks/useBau";
 import type { ItemInventario, MoedaId, Personagem } from "@/lib/tipos";
 import {
   LIMITE_SINTONIA,
+  acharIgual,
   MOEDAS,
   capacidadeDeCarga,
   formatarKg,
@@ -23,6 +24,7 @@ import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
+import type { AlterarListas } from "@/lib/tipos";
 
 /** Inventário do personagem: moedas, itens com quantidade e peso, o que está
  *  equipado e a sintonização dos mágicos (limite de três). Lê e escreve na
@@ -31,13 +33,14 @@ import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
 export function InventarioPersonagem({
   personagem: p,
   editavel,
-  patch,
+  alterarListas,
   bau,
   registrar,
 }: {
   personagem: Personagem;
   editavel: boolean;
-  patch: (mudanca: Partial<Personagem>) => void;
+  /** Escrita das listas com trava de versão (`alterarListasDoPersonagem` do useSala). */
+  alterarListas: AlterarListas;
   bau?: Bau;
   /** Escreve uma linha no log ("🎒 Ana guardou 2× Corda no baú"). */
   registrar?: (texto: string) => void;
@@ -57,8 +60,25 @@ export function InventarioPersonagem({
   const aoLimite = capacidade > 0 && carga > capacidade;
   const podeMandarAoBau = Boolean(bau && !bau.indisponivel);
 
+  /** Grava uma mudança de lista em cima da ficha de AGORA (outro aparelho pode ter mexido); se o que a
+   *  pessoa tocou já não está lá, não aplica e avisa. */
+  async function alterar(fazer: Parameters<AlterarListas>[0]) {
+    const r = await alterarListas(fazer);
+    if (r === "mudou") setAviso("Esse item mudou em outro aparelho enquanto você mexia. Olhe de novo e tente outra vez.");
+  }
+
+  /** Muda o item `i` (o que está na tela), achando-o de novo na lista atual pelo conteúdo. */
+  function sobreItem(i: number, fazer: (lista: ItemInventario[], k: number) => ItemInventario[]) {
+    const visto = inventario[i];
+    return alterar((f) => {
+      const lista = normalizarInventario(f.inventario);
+      const k = acharIgual(lista, visto);
+      return k === -1 ? null : { inventario: fazer(lista, k) };
+    });
+  }
+
   function mudarItem(i: number, mudanca: Partial<ItemInventario>) {
-    patch({ inventario: inventario.map((x, idx) => (idx === i ? { ...x, ...mudanca } : x)) });
+    void sobreItem(i, (lista, k) => lista.map((x, idx) => (idx === k ? { ...x, ...mudanca } : x)));
   }
 
   function alternarSintonia(i: number) {
@@ -78,7 +98,8 @@ export function InventarioPersonagem({
     if (!n) return;
     const q = Math.max(1, Number.parseInt(qtd, 10) || 1);
     const kg = Number.parseFloat(peso.replace(",", ".")) || 0;
-    patch({ inventario: juntarItem(inventario, { ...itemNovo(n), qtd: q, peso: Math.max(0, kg) }) });
+    const novo = { ...itemNovo(n), qtd: q, peso: Math.max(0, kg) };
+    void alterar((f) => ({ inventario: juntarItem(normalizarInventario(f.inventario), novo) }));
     setNome("");
     setQtd("1");
     setPeso("");
@@ -101,7 +122,7 @@ export function InventarioPersonagem({
     }
     setAviso(null);
     setEditandoIdx(null);
-    patch({ inventario: tirarQuantidade(inventario, i, item.qtd) });
+    void sobreItem(i, (lista, k) => tirarQuantidade(lista, k, item.qtd));
     registrar?.(`🎒 ${p.name} guardou ${item.qtd > 1 ? `${item.qtd}× ` : ""}${item.nome} no baú`);
   }
 
@@ -115,7 +136,9 @@ export function InventarioPersonagem({
               {editavel ? (
                 <CampoNumero
                   valor={moedas[id]}
-                  onCommit={(n) => patch({ moedas: { ...moedas, [id as MoedaId]: Math.max(0, n) } })}
+                  onCommit={(n) =>
+                    void alterar((f) => ({ moedas: { ...normalizarMoedas(f.moedas), [id as MoedaId]: Math.max(0, n) } }))
+                  }
                 />
               ) : (
                 <b>{moedas[id]}</b>
@@ -158,7 +181,7 @@ export function InventarioPersonagem({
                         type="button"
                         className="inv-passo"
                         aria-label={`menos um ${item.nome}`}
-                        onClick={() => patch({ inventario: tirarQuantidade(inventario, i, 1) })}
+                        onClick={() => void sobreItem(i, (lista, k) => tirarQuantidade(lista, k, 1))}
                       >
                         −
                       </button>
@@ -273,7 +296,7 @@ export function InventarioPersonagem({
                         confirmar={`Remover "${item.nome || "item"}" do inventário?`}
                         onConfirmar={() => {
                           setEditandoIdx(null);
-                          patch({ inventario: inventario.filter((_, idx) => idx !== i) });
+                          void sobreItem(i, (lista, k) => lista.filter((_, idx) => idx !== k));
                         }}
                         className="removechar"
                       >

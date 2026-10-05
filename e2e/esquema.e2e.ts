@@ -58,6 +58,7 @@ const PERSONAGEM = colunas<Personagem>({
   notes: true,
   vantagens_resistencias: true,
   ficha_epiteto: true,
+  versao_listas: true,
   ficha_secoes: true,
   atributos: true,
   proficiencias: true,

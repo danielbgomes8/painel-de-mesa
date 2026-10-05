@@ -149,6 +149,14 @@ function chave(nome: string): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
+/** Onde está, numa lista que pode ter mudado em outro aparelho, o item que a pessoa tinha na tela:
+ *  procura por CONTEÚDO, não por posição (a posição muda quando alguém apaga ou acrescenta antes).
+ *  -1 = o item mudou ou saiu, e a edição não deve ser aplicada às cegas. Serve pra magias também. */
+export function acharIgual<T>(lista: readonly T[], visto: T): number {
+  const alvo = JSON.stringify(visto);
+  return lista.findIndex((x) => JSON.stringify(x) === alvo);
+}
+
 /** Põe um item no inventário. Item comum (não mágico, sem sintonia) com o
  *  mesmo nome de um que já existe empilha — "Flecha" ×20 e "flecha" ×10 viram
  *  ×30 —; o resto entra como linha nova. */

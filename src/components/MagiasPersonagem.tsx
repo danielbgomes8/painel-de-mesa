@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MagiaPersonagem, Personagem } from "@/lib/tipos";
+import type { AlterarListas, MagiaPersonagem, Personagem } from "@/lib/tipos";
+import { acharIgual } from "@/lib/inventario";
 import { useCatalogoMagias } from "@/hooks/useCatalogoMagias";
 import type { MagiaCatalogo } from "@/lib/magiasSrd";
 import {
@@ -35,11 +36,14 @@ export function MagiasPersonagem({
   personagem: p,
   editavel,
   patch,
+  alterarListas,
   registrar,
 }: {
   personagem: Personagem;
   editavel: boolean;
   patch: (mudanca: Partial<Personagem>) => void;
+  /** Escrita da lista de magias com trava de versão (`alterarListasDoPersonagem` do useSala). */
+  alterarListas: AlterarListas;
   /** Escreve uma linha no log do combate ("Tibério conjura Bênção"). */
   registrar?: (texto: string) => void;
 }) {
@@ -79,8 +83,24 @@ export function MagiasPersonagem({
     }
   }
 
+  /** Grava uma mudança da lista em cima da ficha de AGORA (outro aparelho pode ter mexido). */
+  async function gravarLista(fazer: Parameters<AlterarListas>[0]) {
+    const r = await alterarListas(fazer);
+    if (r === "mudou") setAviso("Essa magia mudou em outro aparelho enquanto você mexia. Olhe de novo e tente outra vez.");
+  }
+
+  /** Muda a magia `i` (a que está na tela), achando-a de novo na lista atual pelo conteúdo. */
+  function sobreMagia(i: number, fazer: (lista: MagiaPersonagem[], k: number) => MagiaPersonagem[]) {
+    const vista = magias[i];
+    return gravarLista((f) => {
+      const lista = normalizarMagias(f.magias);
+      const k = acharIgual(lista, vista);
+      return k === -1 ? null : { magias: fazer(lista, k) };
+    });
+  }
+
   function alterar(i: number, mudanca: Partial<MagiaPersonagem>) {
-    patch({ magias: magias.map((m, idx) => (idx === i ? { ...m, ...mudanca } : m)) });
+    void sobreMagia(i, (lista, k) => lista.map((m, idx) => (idx === k ? { ...m, ...mudanca } : m)));
   }
 
   function conjurarMagia(i: number, opcoes: { nivelDoEspaco?: number; comoRitual?: boolean }) {
@@ -287,7 +307,7 @@ export function MagiasPersonagem({
                               confirmar={`Tirar "${magia.nome || "magia"}" da lista?`}
                               onConfirmar={() => {
                                 setAberta(null);
-                                patch({ magias: magias.filter((_, idx) => idx !== indice) });
+                                void sobreMagia(indice, (lista, k) => lista.filter((_, idx) => idx !== k));
                               }}
                               className="removechar"
                             >
@@ -315,7 +335,7 @@ export function MagiasPersonagem({
           (adicionando ? (
             <AdicionarMagia
               magias={magias}
-              aoAdicionar={(m) => patch({ magias: [...magias, m] })}
+              aoAdicionar={(m) => void gravarLista((f) => ({ magias: [...normalizarMagias(f.magias), m] }))}
               aoFechar={() => setAdicionando(false)}
             />
           ) : (

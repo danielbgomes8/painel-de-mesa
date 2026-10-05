@@ -58,6 +58,7 @@ export function fichaPadrao(): Linha {
     notes: "",
     vantagens_resistencias: "",
     ficha_epiteto: "",
+    versao_listas: 0,
     ficha_secoes: [],
     atributos: { for: 10, des: 10, con: 10, int: 10, sab: 10, car: 10 },
     proficiencias: { saves: [], pericias: {} },

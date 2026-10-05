@@ -135,6 +135,14 @@ export type Sala = {
    *  (já avisa na tela). */
   criarVariosPersonagens: (dados: NovoPersonagem[]) => Promise<Personagem[] | null>;
   atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
+  /** Escrita das listas da ficha (inventário, magias, moedas) com trava de versão (migration 0032):
+   *  `fazer` recebe a ficha como está AGORA e devolve o patch, ou null se o que a pessoa tocou já
+   *  não existe mais ("mudou"). Se outro aparelho mexeu nas listas no meio tempo, relê a ficha e
+   *  chama `fazer` de novo em cima dela, em vez de gravar por cima. */
+  alterarListasDoPersonagem: (
+    id: string,
+    fazer: (atual: Personagem) => Partial<Personagem> | null,
+  ) => Promise<"ok" | "mudou" | "erro">;
   /** Igual a atualizarPersonagem, só que pra vários de uma vez em uma única
    *  escrita (Ações em Massa) — usado quando o patch de cada um pode ter um
    *  formato diferente (ex.: cura zera dss/dsf só de quem estava caído).
@@ -1053,10 +1061,10 @@ export function useSala(codigo: string): Sala {
   // Em paralelo, duas escritas seguidas na mesma ficha (três magias adicionadas em sequência, cada uma
   // com a lista inteira) podem chegar ao banco trocadas, e a mais velha, por último, desfaz a mais
   // nova — visto de verdade no robô contra o banco. Fichas diferentes continuam em paralelo.
-  const escreverNaFicha = useCallback((id: string, patch: Partial<Personagem>) => {
+  const naCadeiaDaFicha = useCallback(<R,>(id: string, executar: () => PromiseLike<R>): Promise<R> => {
     const cadeia = cadeiaDeEscritaRef.current;
     const antes = cadeia.get(id) ?? Promise.resolve();
-    const esta = antes.then(() => supabase.from("characters").update(patch).eq("id", id));
+    const esta = antes.then(executar);
     const fim = esta.then(
       () => undefined,
       () => undefined,
@@ -1076,6 +1084,12 @@ export function useSala(codigo: string): Sala {
     });
     return esta;
   }, []);
+
+  const escreverNaFicha = useCallback(
+    (id: string, patch: Partial<Personagem>) =>
+      naCadeiaDaFicha(id, () => supabase.from("characters").update(patch).eq("id", id)),
+    [naCadeiaDaFicha],
+  );
 
   const atualizarPersonagem = useCallback(
     async (id: string, patch: Partial<Personagem>) => {
@@ -1102,6 +1116,71 @@ export function useSala(codigo: string): Sala {
       }
     },
     [escreverNaFicha, guardarNaFila, proximaSeq],
+  );
+
+  const alterarListasDoPersonagem = useCallback(
+    async (
+      id: string,
+      fazer: (atual: Personagem) => Partial<Personagem> | null,
+    ): Promise<"ok" | "mudou" | "erro"> => {
+      let atual = ref.current.personagens.find((x) => x.id === id);
+      if (!atual) return "erro";
+      // Sem a coluna (migration 0032 ainda não rodou) ou sem internet: o caminho de sempre — a fila
+      // sem internet já só grava o que o banco ainda tem como a mudança encontrou.
+      if (atual.versao_listas === undefined || semInternetRef.current) {
+        const patch = fazer(atual);
+        if (!patch) return "mudou";
+        await atualizarPersonagem(id, patch);
+        return "ok";
+      }
+      const anterior = ref.current.personagens;
+      const aplicar = (p: Personagem) => {
+        ref.current = { ...ref.current, personagens: ref.current.personagens.map((x) => (x.id === id ? p : x)) };
+        setPersonagens((lista) => lista.map((x) => (x.id === id ? p : x)));
+      };
+      for (let tentativa = 0; tentativa < MAX_TENTATIVAS_VERSAO; tentativa++) {
+        const patch = fazer(atual);
+        if (!patch) return "mudou";
+        const versao = atual.versao_listas ?? 0;
+        const base = atual;
+        aplicar({ ...atual, ...patch, versao_listas: versao + 1 });
+        const seq = proximaSeq();
+        const { data, error } = await naCadeiaDaFicha(id, () =>
+          supabase
+            .from("characters")
+            .update({ ...patch, versao_listas: versao + 1 })
+            .eq("id", id)
+            .eq("versao_listas", versao)
+            .select()
+            .maybeSingle(),
+        );
+        if (error && ehFalhaDeRede(error)) {
+          guardarNaFila({ tipo: "personagens", mudancas: [mudancaDe(base, patch)] }, seq);
+          return "ok";
+        }
+        if (error) {
+          relatarErro("alterarListasDoPersonagem", error);
+          setPersonagens(anterior);
+          setAvisoFalha(AVISO_FALHA_ESCRITA);
+          return "erro";
+        }
+        if (data) return "ok";
+        // Conflito: outro aparelho mexeu nas listas. Relê direto do banco (o tempo real pode ainda
+        // não ter avisado) e refaz a conta em cima da ficha de verdade.
+        const releitura = await supabase.from("characters").select("*").eq("id", id).maybeSingle();
+        if (releitura.error || !releitura.data) {
+          if (releitura.error) relatarErro("alterarListasDoPersonagem", releitura.error);
+          setPersonagens(anterior);
+          return "erro";
+        }
+        atual = releitura.data as Personagem;
+        aplicar(atual);
+      }
+      relatarErro("alterarListasDoPersonagem", `contenção demais: desisti depois de ${MAX_TENTATIVAS_VERSAO} tentativas`);
+      setAvisoFalha(AVISO_FALHA_ESCRITA);
+      return "erro";
+    },
+    [atualizarPersonagem, guardarNaFila, naCadeiaDaFicha, proximaSeq],
   );
 
   const atualizarVariosPersonagens = useCallback(
@@ -1893,6 +1972,7 @@ export function useSala(codigo: string): Sala {
     criarPersonagem,
     criarVariosPersonagens,
     atualizarPersonagem,
+    alterarListasDoPersonagem,
     atualizarVariosPersonagens,
     removerPersonagem,
     definirCombate,

@@ -99,9 +99,10 @@ export function BauDoGrupo({
       if (!temMoeda(pedido)) return "Digite quanto vai pegar.";
       for (const { id, sigla } of MOEDAS) if (pedido[id] > dinheiro[id]) return `O baú não tem tantos ${sigla}.`;
       if (!(await bau.tirarMoedas(pedido))) return "O baú mudou enquanto você pedia. Olhe de novo e tente outra vez.";
-      const ok = await sala.atualizarVariosPersonagens([
-        { id: destino.id, patch: { moedas: somarMoedas(normalizarMoedas(destino.moedas), pedido) } },
-      ]);
+      const ok =
+        (await sala.alterarListasDoPersonagem(destino.id, (f) => ({
+          moedas: somarMoedas(normalizarMoedas(f.moedas), pedido),
+        }))) === "ok";
       if (!ok) {
         await bau.guardarMoedas(pedido); // desfaz: o dinheiro volta pro baú
         return AVISO_NAO_FOI;
@@ -120,11 +121,17 @@ export function BauDoGrupo({
       const total = moedasVazias();
       for (const { id } of MOEDAS) total[id] = cada[id] * alvos.length;
       if (!(await bau.tirarMoedas(total))) return "O baú mudou enquanto você dividia. Olhe de novo e tente outra vez.";
-      const ok = await sala.atualizarVariosPersonagens(
-        alvos.map((p) => ({ id: p.id, patch: { moedas: somarMoedas(normalizarMoedas(p.moedas), cada) } })),
+      const resultados = await Promise.all(
+        alvos.map((p) =>
+          sala.alterarListasDoPersonagem(p.id, (f) => ({ moedas: somarMoedas(normalizarMoedas(f.moedas), cada) })),
+        ),
       );
-      if (!ok) {
-        await bau.guardarMoedas(total);
+      const falharam = resultados.filter((r) => r !== "ok").length;
+      if (falharam > 0) {
+        // Devolve ao baú só a parte de quem não recebeu; quem recebeu fica com o que levou.
+        const devolver = moedasVazias();
+        for (const { id } of MOEDAS) devolver[id] = cada[id] * falharam;
+        await bau.guardarMoedas(devolver);
         return AVISO_NAO_FOI;
       }
       setDivisao(null);
@@ -159,9 +166,10 @@ export function BauDoGrupo({
       const quanto = Math.min(item.qtd, Math.max(1, Number.parseInt(quantidades[id] ?? "1", 10) || 1));
       if (!(await bau.tirarItem(id, quanto))) return "Alguém levou esse item antes de você. O baú já foi atualizado.";
       const novo = itemDoBauParaInventario(item, quanto);
-      const ok = await sala.atualizarVariosPersonagens([
-        { id: destino.id, patch: { inventario: juntarItem(normalizarInventario(destino.inventario), novo) } },
-      ]);
+      const ok =
+        (await sala.alterarListasDoPersonagem(destino.id, (f) => ({
+          inventario: juntarItem(normalizarInventario(f.inventario), novo),
+        }))) === "ok";
       if (!ok) {
         await bau.guardarItem({ ...item, qtd: quanto }); // desfaz: o item volta pro baú
         return AVISO_NAO_FOI;
