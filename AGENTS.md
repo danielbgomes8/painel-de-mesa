@@ -1729,11 +1729,9 @@ concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
 de versão do combate, os dois agora passam por `gravarSeVersaoBater` em
 `useSala.ts`.)
 
-**Pendente com o Daniel** (não dá pra resolver sozinho): as fichas completas
-de **Sigha**, **Mordecai** e **Massaranduba** — os três estão com atributos
-10, então o botão "pôr todos na ordem" rola d20+0 pra eles; a classe do
-**Mistery Grey**; e confirmar se **"Kensei"** (subclasse de 2014) ainda vale
-pra Sigha nas regras de 2024.
+**Fichas de Sigha, Mordecai, Massaranduba e Mistery Grey ficam como estão**
+(decisão do Daniel em 06/10/2026: não vai preencher). Atributos 10, então o botão
+"pôr todos na ordem" rola d20+0 pra eles. Não cobrar de novo.
 
 ## Limite de magias preparadas (03/10/2026, sem migration)
 
