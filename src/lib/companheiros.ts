@@ -57,3 +57,14 @@ export function companheirosQueSaemJunto<T extends QuemTemDono>(personagens: T[]
 export function linhaDeCompanheiro(nomeDoCompanheiro: string, nomeDoDono: string): string {
   return `${nomeDoCompanheiro} acompanha ${nomeDoDono} na iniciativa`;
 }
+
+/** O nome do dono de um companheiro (pro telão dizer "Pip · de Ana"); null se a ficha não é companheira de ninguém. */
+export function nomeDoDono<T extends QuemTemDono>(personagens: T[], ficha: Pick<QuemTemDono, "is_npc" | "dono"> | null | undefined): string | null {
+  if (!ficha?.is_npc || !ficha.dono) return null;
+  return personagens.find((p) => !p.is_npc && p.slug === ficha.dono)?.name ?? null;
+}
+
+/** Fichas de NPC que o Mestre pode "adotar" como companheiro: ainda sem dono. */
+export function npcsAdotaveis<T extends QuemTemDono>(personagens: T[]): T[] {
+  return personagens.filter((p) => p.is_npc && !p.dono);
+}

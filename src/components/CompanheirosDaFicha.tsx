@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
-import { companheirosDe, linhaDeCompanheiro } from "@/lib/companheiros";
+import { companheirosDe, linhaDeCompanheiro, npcsAdotaveis } from "@/lib/companheiros";
 import { entrarNaOrdem } from "@/lib/regras";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { porPecasDosCompanheiros } from "@/lib/pecasNoBanco";
@@ -12,13 +12,14 @@ import { porPecasDosCompanheiros } from "@/lib/pecasNoBanco";
  *  ficha de quem joga: o dono e o Mestre criam e controlam. Cada um é uma ficha de NPC já revelada, ligada ao
  *  dono; na iniciativa ele entra logo depois do dono, com a mesma contagem, e sai junto (ver
  *  `lib/companheiros.ts`). */
-export function CompanheirosDaFicha({ sala, personagem: dono }: { sala: Sala; personagem: Personagem }) {
+export function CompanheirosDaFicha({ sala, personagem: dono, souMestre = false }: { sala: Sala; personagem: Personagem; souMestre?: boolean }) {
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState("");
   const [pv, setPv] = useState("");
   const [ca, setCa] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [adotar, setAdotar] = useState("");
 
   const companheiros = companheirosDe(sala.personagens, dono.slug);
   const naOrdem = new Set(sala.combate.order.map((o) => o.slug));
@@ -36,6 +37,18 @@ export function CompanheirosDaFicha({ sala, personagem: dono }: { sala: Sala; pe
     void sala.registrarLog(linhaDeCompanheiro(c.name, dono.name));
     // Com um mapa na mesa, o peão dele nasce encostado no do dono (sem mapa na mesa, nada acontece).
     if (!sala.semInternet) await porPecasDosCompanheiros(dono.room_code, [{ slug: c.slug, cls: c.cls, dono: dono.slug }]);
+  }
+
+  /** Mestre: uma ficha de NPC que já existe (um lobo domado, uma criatura invocada antes) vira companheiro. */
+  async function adotarNpc() {
+    const alvo = sala.personagens.find((p) => p.id === adotar);
+    if (!alvo || ocupado) return;
+    setOcupado(true);
+    setAviso(null);
+    await sala.atualizarPersonagem(alvo.id, { dono: dono.slug, revealed: true });
+    setAdotar("");
+    await pelaOrdem({ ...alvo, dono: dono.slug, revealed: true });
+    setOcupado(false);
   }
 
   async function criar() {
@@ -90,6 +103,11 @@ export function CompanheirosDaFicha({ sala, personagem: dono }: { sala: Sala; pe
                       pôr na ordem
                     </button>
                   )}
+                  {souMestre && (
+                    <button type="button" className="chip alvo" onClick={() => void sala.atualizarPersonagem(c.id, { dono: null })}>
+                      soltar
+                    </button>
+                  )}
                   <BotaoRemover
                     aria={`apagar ${c.name}`}
                     confirmar={`Apagar o companheiro "${c.name}"? A ficha dele some.`}
@@ -112,6 +130,21 @@ export function CompanheirosDaFicha({ sala, personagem: dono }: { sala: Sala; pe
               + criar
             </button>
           </div>
+          {souMestre && npcsAdotaveis(sala.personagens).length > 0 && (
+            <div className="comp-linha">
+              <select aria-label="NPC que vira companheiro" value={adotar} onChange={(e) => setAdotar(e.target.value)}>
+                <option value="">ou adotar um NPC que já existe…</option>
+                {npcsAdotaveis(sala.personagens).map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="btn" disabled={!adotar || ocupado} onClick={adotarNpc}>
+                adotar
+              </button>
+            </div>
+          )}
           <p className="empty-note">Entra na iniciativa logo depois de {dono.name}, com a mesma contagem, e sai junto.</p>
           {aviso && <p className="inv-alerta">{aviso}</p>}
         </div>

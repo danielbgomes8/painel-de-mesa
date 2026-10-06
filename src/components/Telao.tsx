@@ -7,6 +7,7 @@ import type { Cenas } from "@/hooks/useCenas";
 import { VisorDaMesa } from "@/components/MapaSobDemanda";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
+import { nomeDoDono } from "@/lib/companheiros";
 import {
   estaCaido,
   nomeExibidoIniciativa,
@@ -55,6 +56,8 @@ export function Telao({
       : atual.name
     : null;
   const pvVisivel = pv ? pvExibidoIniciativa(pv, false) : null;
+  // Companheiro age na vez do dono: o telão diz de quem é pra mesa saber quem decide.
+  const donoDaVez = nomeDoDono(personagens, pv);
   // As condições de quem está na vez, do tamanho de serem lidas do outro
   // lado da mesa. Valem pra todo mundo ver, NPC oculto inclusive (o log já
   // anuncia, e é o que decide se o ataque tem vantagem). Jogador a 0 PV
@@ -98,6 +101,7 @@ export function Telao({
               <div className="telao-faixa-vez">
                 <span className="telao-faixa-rotulo">vez de</span>
                 <span className="telao-faixa-nome">{nomeExibido}</span>
+                {donoDaVez && <span className="telao-faixa-pv">🐾 de {donoDaVez}</span>}
                 {pvVisivel && (
                   <span className="telao-faixa-pv">
                     {pvVisivel.hp} / {pvVisivel.hp_max} PV
@@ -156,6 +160,7 @@ export function Telao({
         <>
           <div className="telao-label">é a vez de</div>
           <div className="telao-nome">{nomeExibido}</div>
+          {donoDaVez && <div className="telao-pv">🐾 de {donoDaVez}</div>}
           {pvVisivel && (
             <div className="telao-pv">
               {pvVisivel.hp} / {pvVisivel.hp_max} PV

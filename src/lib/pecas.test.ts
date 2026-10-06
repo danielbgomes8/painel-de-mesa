@@ -16,6 +16,7 @@ import {
   normalizarPeca,
   pecasDosCompanheiros,
   pecasDosQueEntram,
+  pecasQueAcompanham,
   pecaVisivel,
   podeMoverPeca,
   posicoesDosIcones,
@@ -585,3 +586,37 @@ describe("companheiro que entra com o dono ganha peão encostado nele", () => {
   });
 });
 
+
+describe("pecasQueAcompanham", () => {
+  const grade = { grade_ligada: true, grade_px: 100, grade_dx: 0, grade_dy: 0, largura: 3000, altura: 2000 };
+  const pecas = [
+    { id: "d", slug: "ana", x: 250, y: 250, tamanho: 1 as const },
+    { id: "c", slug: "pip", x: 350, y: 250, tamanho: 1 as const },
+    { id: "o", slug: "bia", x: 650, y: 250, tamanho: 1 as const },
+    { id: "m", slug: null, x: 450, y: 250, tamanho: 1 as const },
+  ];
+  const donos = { pip: "ana" };
+
+  it("o companheiro anda o mesmo tanto que o dono", () => {
+    const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 450, y: 350 }, donos });
+    expect(r).toEqual([{ id: "c", x: 550, y: 350 }]);
+  });
+
+  it("quem não é companheiro dele não se mexe", () => {
+    const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 450, y: 250 }, donos });
+    expect(r.map((p) => p.id)).toEqual(["c"]);
+  });
+
+  it("mexer no companheiro não arrasta o dono", () => {
+    expect(pecasQueAcompanham({ cena: grade, pecas, movida: { id: "c", x: 550, y: 250 }, donos })).toEqual([]);
+  });
+
+  it("peão que ficou no mesmo lugar não gera escrita", () => {
+    expect(pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 250, y: 250 }, donos })).toEqual([]);
+  });
+
+  it("fica dentro do mapa", () => {
+    const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 250, y: 250 - 200 }, donos });
+    expect(r[0].y).toBeGreaterThanOrEqual(0);
+  });
+});

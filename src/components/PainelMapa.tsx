@@ -10,7 +10,7 @@ import { ControlesDeMarca, EditorDeDesenho, ListaDeNotas, NovaNota, resumoDasMar
 import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
-import { montarPecasNaTela, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
+import { montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
 import { PAREDES_MAXIMAS, ultimoDesenho, type ModoParede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
@@ -37,6 +37,23 @@ import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
 
 /** O peão com o cartão de ações aberto e a ficha dele — só se ainda existem
  *  (peão tirado, ficha apagada ou marcador avulso: nada a abrir). */
+/** Move um peão e, se `juntos`, os dos companheiros dele o mesmo tanto (`pecasQueAcompanham`). */
+function moverPeao(
+  banco: ReturnType<typeof usePecas>,
+  cena: Parameters<typeof pecasQueAcompanham>[0]["cena"],
+  personagens: Sala["personagens"],
+  juntos: boolean,
+  id: string,
+  x: number,
+  y: number,
+) {
+  const donos: Record<string, string> = {};
+  if (juntos) for (const f of personagens) if (f.dono) donos[f.slug] = f.dono;
+  const seguem = pecasQueAcompanham({ cena, pecas: banco.pecas, movida: { id, x, y }, donos });
+  void banco.atualizar(id, { x, y });
+  for (const c of seguem) void banco.atualizar(c.id, { x: c.x, y: c.y });
+}
+
 function cartaoAberto(id: string | null, pecas: readonly Peca[], sala: Sala) {
   const peca = id ? pecas.find((p) => p.id === id) : undefined;
   const ficha = peca?.slug ? sala.personagens.find((f) => f.slug === peca.slug) : undefined;
@@ -81,6 +98,7 @@ export function VisorDaMesa({
   const mapaRef = useRef<CenaMapaApi>(null);
   // O que o toque faz no mapa: mexer, medir (régua) ou marcar uma área de magia.
   const [uso, setUso] = useState<"mover" | "regua" | "area">("mover");
+  const [juntos, setJuntos] = useState(true);
   const medindo = uso === "regua";
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
@@ -134,7 +152,7 @@ export function VisorDaMesa({
         marcas={desenhos.marcas}
         visaoPronta={!muros.carregando && !banco.carregando}
         pecas={pecas}
-        aoMoverPeca={telao ? undefined : (id, x, y) => void banco.atualizar(id, { x, y })}
+        aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, juntos, id, x, y)}
         aoAbrirPeca={telao ? undefined : setCartao}
       />
       {telao && <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />}
@@ -171,6 +189,11 @@ export function VisorDaMesa({
                     ✨ área
                   </button>
                 </>
+              )}
+              {quem && sala.personagens.some((f) => f.dono) && (
+                <button type="button" className="chip alvo" aria-pressed={juntos} onClick={() => setJuntos(!juntos)}>
+                  🐾 companheiros junto
+                </button>
               )}
               <button type="button" className="btn" onClick={() => mapaRef.current?.reenquadrar()}>
                 voltar à visão da mesa
@@ -326,6 +349,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const nevoa = useNevoa(cena?.id ?? null, codigo);
   const ping = usePing(cena, quem);
   const banco = usePecas(cena?.id ?? null, codigo);
+  const [juntos, setJuntos] = useState(true);
   const muros = useParedes(cena?.id ?? null, codigo);
   const [modoParede, setModoParede] = useState<ModoParede>("parede");
   const desenhos = useMarcas(cena?.id ?? null, codigo);
@@ -563,6 +587,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "mover"} onClick={() => escolherFerramenta("mover")}>
                   ✋ mover
                 </button>
+                {sala.personagens.some((f) => f.dono) && (
+                  <button type="button" className="chip alvo" aria-pressed={juntos} onClick={() => setJuntos(!juntos)}>
+                    🐾 companheiros junto
+                  </button>
+                )}
                 {podeQuadradinhos && (
                   <button
                     type="button"
@@ -700,7 +729,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
                 aoEscolherPonto={colocarOnde}
                 pecas={pecas}
-                aoMoverPeca={(id, x, y) => void banco.atualizar(id, { x, y })}
+                aoMoverPeca={(id, x, y) => cena && moverPeao(banco, cena, sala.personagens, juntos, id, x, y)}
                 aoTocarPeca={setPecaSelecionada}
                 aoAbrirPeca={setCartao}
               />

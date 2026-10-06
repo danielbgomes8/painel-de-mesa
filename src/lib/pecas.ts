@@ -256,7 +256,7 @@ type CompanheiroQueEntra = { slug: string; cls?: string; dono: string };
  * mesa: cada um nasce VISÍVEL (é aliado) e ENCOSTADO no peão do dono, no primeiro quadradinho livre em volta (do
  * lado, depois embaixo, em cima e as diagonais, e assim em anéis). Dono sem peão neste mapa: o companheiro cai no
  * meio do que a mesa vê, sem cair em cima de ninguém. Quem já tem peão nesta cena não ganha outro. O tamanho vem
- * do tipo da ficha. Não anda junto com o dono depois: cada um é movido pelo seu.
+ * do tipo da ficha. Depois, anda junto com o dono (`pecasQueAcompanham`), a não ser que a mesa desligue.
  */
 export function pecasDosCompanheiros(entrada: {
   cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura" | "camera">;
@@ -291,6 +291,35 @@ export function pecasDosCompanheiros(entrada: {
     }
     ocupadas.push({ x: ponto[0], y: ponto[1], t: tamanho });
     saida.push({ slug: c.slug, nome: "", x: ponto[0], y: ponto[1], tamanho, oculto: false });
+  }
+  return saida;
+}
+
+/**
+ * Quando o peão do dono anda, os dos companheiros dele andam o MESMO deslocamento (montaria, familiar que acompanha), de
+ * modo que continuam encostados. Devolve só os que mudam de lugar. Cada um é encaixado na grade e fica dentro do mapa
+ * (junto da borda, o companheiro pode acabar mais perto do dono do que antes). Não olha parede: o companheiro atravessa
+ * o que o dono atravessou. Peão que não é de ficha, ou de ficha sem dono, nunca é arrastado.
+ */
+export function pecasQueAcompanham(entrada: {
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura">;
+  pecas: readonly Pick<Peca, "id" | "slug" | "x" | "y" | "tamanho">[];
+  /** Peão que o dono acabou de mover e o ponto novo dele. */
+  movida: { id: string; x: number; y: number };
+  /** slug do companheiro → slug do dono. */
+  donos: Readonly<Record<string, string>>;
+}): { id: string; x: number; y: number }[] {
+  const { cena, pecas, movida, donos } = entrada;
+  const dono = pecas.find((p) => p.id === movida.id);
+  if (!dono?.slug) return [];
+  const dx = movida.x - dono.x;
+  const dy = movida.y - dono.y;
+  if (dx === 0 && dy === 0) return [];
+  const saida: { id: string; x: number; y: number }[] = [];
+  for (const p of pecas) {
+    if (!p.slug || p.id === dono.id || donos[p.slug] !== dono.slug) continue;
+    const [x, y] = encaixarNaGrade(cena, p.x + dx, p.y + dy, p.tamanho);
+    if (x !== p.x || y !== p.y) saida.push({ id: p.id, x, y });
   }
   return saida;
 }

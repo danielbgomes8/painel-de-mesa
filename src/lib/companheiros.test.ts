@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companheirosDe, companheirosQueSaemJunto, comCompanheiros, ehDoJogador, linhaDeCompanheiro, type QuemTemDono } from "./companheiros";
+import { companheirosDe, companheirosQueSaemJunto, comCompanheiros, ehDoJogador, linhaDeCompanheiro, nomeDoDono, npcsAdotaveis, type QuemTemDono } from "./companheiros";
 
 const ana: QuemTemDono = { slug: "ana", name: "Ana", is_npc: false };
 const beto: QuemTemDono = { slug: "beto", name: "Beto", is_npc: false };
@@ -51,5 +51,22 @@ describe("entrar na ordem junto com o dono", () => {
   it("a linha do log não usa 'entrou no combate' (o recap contaria como inimigo)", () => {
     expect(linhaDeCompanheiro("Pip", "Ana")).toBe("Pip acompanha Ana na iniciativa");
     expect(linhaDeCompanheiro("Pip", "Ana")).not.toMatch(/entrou no combate/);
+  });
+});
+
+describe("dono e adoção", () => {
+  it("o telão diz de quem é o companheiro", () => {
+    expect(nomeDoDono(todos, pip)).toBe("Ana");
+    expect(nomeDoDono(todos, goblin)).toBeNull();
+    expect(nomeDoDono(todos, ana)).toBeNull();
+    expect(nomeDoDono(todos, null)).toBeNull();
+  });
+
+  it("dono que não existe mais não vira nome", () => {
+    expect(nomeDoDono([pip], pip)).toBeNull();
+  });
+
+  it("só NPC sem dono pode ser adotado", () => {
+    expect(npcsAdotaveis(todos).map((x) => x.slug)).toEqual(["goblin"]);
   });
 });

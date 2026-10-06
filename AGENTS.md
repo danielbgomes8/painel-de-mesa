@@ -1891,5 +1891,12 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   no meio do que a mesa vê. `porPecasDosCompanheiros` (`lib/pecasNoBanco.ts`) acha o mapa da mesa sozinho, então vale pros três caminhos de entrada e
   pro "pôr na ordem" da ficha. **Tirar o dono da ordem tira os peões dos companheiros** (e desfazer devolve todos, no mesmo lugar). **Não anda junto**:
   cada peão é movido pelo seu dono.
-- **Não cobre**: o companheiro andar junto com o dono no mapa, dar o turno do companheiro ao dono no telão, e transformar uma ficha NPC que já existe em
-  companheiro (só cria novo).
+- **Anda junto** (06/10/2026, sem migration): mover o peão do dono move os dos companheiros dele o mesmo deslocamento (`pecasQueAcompanham` em
+  `lib/pecas.ts`, 5 testes; encaixa na grade e fica dentro do mapa; **não olha parede**, o companheiro atravessa o que o dono atravessou).
+  Vale pro Mestre (`PainelMapa`) e pro jogador (`VisorDaMesa`), via `moverPeao`. Botão "🐾 companheiros junto" (ligado por padrão, só aparece
+  se a sala tem companheiro; estado local de cada tela) pro familiar que vai explorar sozinho. Mexer no companheiro nunca arrasta o dono.
+- **Telão**: na vez de um companheiro mostra "🐾 de Ana" (`nomeDoDono`), nos dois formatos (com e sem mapa).
+- **Adotar NPC** (Mestre, na ficha do dono, em Companheiros): escolhe uma ficha de NPC sem dono (`npcsAdotaveis`) e ela vira companheiro
+  (`dono` + `revealed`), entrando na ordem se o dono já está. "soltar" tira o `dono` (a ficha volta a ser NPC comum, continua revelada). Usa a
+  coluna que já existe, **sem migration nova**. Robôs: `companheirosNoMapa.e2e.ts` e `adotarCompanheiro.e2e.ts`.
+- **Não cobre**: peões de companheiros não se desviam um do outro nem de parede ao seguir o dono.

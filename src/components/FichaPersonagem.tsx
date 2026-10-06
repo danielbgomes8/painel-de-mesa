@@ -142,7 +142,7 @@ export function FichaPersonagem({
           </div>
         ) : null}
 
-        {editavel && !p.is_npc ? <CompanheirosDaFicha sala={sala} personagem={p} /> : null}
+        {editavel && !p.is_npc ? <CompanheirosDaFicha sala={sala} personagem={p} souMestre={souMestre} /> : null}
     </>
   );
 
