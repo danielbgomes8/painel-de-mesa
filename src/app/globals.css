@@ -945,10 +945,23 @@ body:has(.desfazerbarra) .proximoturno {
   /* Campo de texto do formulário ocupa a linha toda: nome/ataque com
      placeholder longo ("ataque (ex.: Cimitarra +4, 1d6+2)") não cabem no
      tamanho padrão de um input a 375px. Os numéricos seguem lado a lado. */
-  .addcombatant input:not(.num) {
+  .addcombatant input:not(.num):not([type="checkbox"]) {
     flex: 1 1 100%;
     min-width: 0;
   }
+}
+/* A caixinha ("estou surpreso") herdava o estilo de campo de texto e, a 375px,
+   esticava pela linha toda, longe do rótulo. O rótulo inteiro é o alvo de toque. */
+.addcombatant label.inv-mag {
+  flex: 1 1 100%;
+  min-height: 32px;
+  gap: 8px;
+}
+.addcombatant input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex: none;
 }
 
 /* ---------- ações em massa ---------- */
@@ -5013,4 +5026,38 @@ input.fj-score:focus-visible {
 }
 .tp-cal[open] summary {
   margin-bottom: 6px;
+}
+
+/* ---------- atalhos da ficha do jogador (AtalhosDaFicha) ---------- */
+.fichaatalhos {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+  margin: 4px 0;
+  scrollbar-width: none;
+}
+.fichaatalhos::-webkit-scrollbar {
+  display: none;
+}
+.fichaatalhos button {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.fichaatalhos button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Deixa o título da parte visível abaixo das abas, que ficam presas no topo. */
+.alvo-atalho {
+  scroll-margin-top: 56px;
 }

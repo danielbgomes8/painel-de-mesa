@@ -842,9 +842,19 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
     setDica(surpreso ? `Surpreso: rolou ${r.dados.join(" e ")}, vale o menor.` : null);
   }
 
+  // Sem número digitado, o botão rola por você (d20 + modificador) e entra de
+  // uma vez: antes ele ficava apagado sem dizer por quê.
   async function entrar() {
-    const init = Number.parseInt(ini, 10);
-    const iniciativa = Number.isNaN(init) ? 0 : init;
+    let iniciativa: number;
+    let surpresoNaRolagem = rolouSurpreso;
+    if (ini === "") {
+      const r = rolarDados(personagem.init_mod, surpreso);
+      iniciativa = r.total;
+      surpresoNaRolagem = surpreso;
+    } else {
+      const init = Number.parseInt(ini, 10);
+      iniciativa = Number.isNaN(init) ? 0 : init;
+    }
     const item: ItemIniciativa = { slug: personagem.slug, name: personagem.name, init: iniciativa };
     // Função, não objeto: se outro jogador entrar quase no mesmo instante, cada
     // escrita parte do estado mais recente conhecido em vez de um `sala.combate`
@@ -866,7 +876,7 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
         // O peão dos companheiros nasce no mapa da mesa, encostado no do dono (sem mapa na mesa, nada acontece).
         if (!sala.semInternet) void porPecasDosCompanheiros(personagem.room_code, paraPeao(extras, sala.personagens));
       }
-      const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa}${rolouSurpreso ? ", surpreso" : ""})`;
+      const linha = `${personagem.name} entrou no combate (iniciativa ${iniciativa}${surpresoNaRolagem ? ", surpreso" : ""})`;
       sala.registrarLog(linha);
       sala.lembrarDesfazer({
         rotulo: linha,
@@ -898,8 +908,8 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
       <button type="button" className="btn" aria-label="Rolar iniciativa" onClick={rolar}>
         🎲
       </button>
-      <button type="button" className="btn" onClick={entrar} disabled={!ini}>
-        Entrar no combate
+      <button type="button" className="btn" onClick={entrar}>
+        {ini ? "Entrar no combate" : "🎲 Rolar e entrar"}
       </button>
       <label className="inv-mag">
         <input type="checkbox" checked={surpreso} onChange={(e) => setSurpreso(e.target.checked)} />

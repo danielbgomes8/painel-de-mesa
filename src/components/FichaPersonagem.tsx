@@ -322,10 +322,11 @@ export function FichaPersonagem({
             (cartão de combate completo + "ver ficha completa") é do Mestre. */}
         {modoJogador && caido && blocoTestesDeMorte}
         {modoJogador && blocoChipsEStats}
+        {modoJogador && <AtalhosDaFicha idBase={p.id} />}
         {modoJogador && (
           <FichaClassicaJogador personagem={p} editavel={editavel} patch={patch} sala={sala} modo="jogador" souMestre={souMestre} />
         )}
-        {modoJogador && blocoAtaquesEDescansos}
+        {modoJogador && <div id={idAtalho(p.id, "ataques")} className="alvo-atalho">{blocoAtaquesEDescansos}</div>}
 
         {p.is_npc && (editavel || p.ataque) ? (
           <div className="ataquebloco">
@@ -458,7 +459,7 @@ export function FichaPersonagem({
 
         {!(modoJogador && caido) && blocoTestesDeMorte}
 
-        <div>
+        <div id={idAtalho(p.id, "condicoes")} className="alvo-atalho">
           <span className="sectitle">Condições</span>
           <ChipsCondicao sala={sala} personagem={p} editavel={editavel} />
           {editavel && <PrazosCondicao sala={sala} personagem={p} />}
@@ -466,7 +467,7 @@ export function FichaPersonagem({
         </div>
 
         {p.is_npc ? null : (
-        <div>
+        <div id={idAtalho(p.id, "recursos")} className="alvo-atalho">
           <span className="sectitle">Recursos (Fúria, Ki, espaços de magia…)</span>
           {p.resources.length === 0 && (
             <p className="empty-note">
@@ -556,8 +557,12 @@ export function FichaPersonagem({
         {modoJogador && (
           <>
             <FichaClasse personagem={p} editavel={editavel} patch={patch} />
-            <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} alterarListas={alterarListas} registrar={(t) => void sala.registrarLog(t)} />
-            <InventarioPersonagem personagem={p} editavel={editavel} alterarListas={alterarListas} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
+            <div id={idAtalho(p.id, "magias")} className="alvo-atalho">
+              <MagiasPersonagem personagem={p} editavel={editavel} patch={patch} alterarListas={alterarListas} registrar={(t) => void sala.registrarLog(t)} />
+            </div>
+            <div id={idAtalho(p.id, "inventario")} className="alvo-atalho">
+              <InventarioPersonagem personagem={p} editavel={editavel} alterarListas={alterarListas} bau={bau} registrar={(t) => void sala.registrarLog(t)} />
+            </div>
             <FichaCompleta personagem={p} editavel={editavel} patch={patch} />
           </>
         )}
@@ -714,5 +719,38 @@ function FormContador({
         + {comDescansoCurto ? "recurso" : "item"}
       </button>
     </div>
+  );
+}
+
+const ATALHOS_DA_FICHA = [
+  { chave: "ataques", rotulo: "⚔ Ataques e descanso" },
+  { chave: "condicoes", rotulo: "⏳ Condições" },
+  { chave: "recursos", rotulo: "✨ Recursos" },
+  { chave: "magias", rotulo: "🔮 Magias" },
+  { chave: "inventario", rotulo: "🎒 Inventário" },
+] as const;
+
+function idAtalho(idBase: string, chave: string): string {
+  return `ficha-${idBase}-${chave}`;
+}
+
+/** A folha de atributos ocupa mais de 1.200px no celular e empurra pra baixo o
+ *  que se usa no combate. Em vez de recolhê-la (o jogador abre a ficha já na
+ *  folha, de propósito), uma fileira de atalhos leva direto a cada parte. */
+function AtalhosDaFicha({ idBase }: { idBase: string }) {
+  function ir(chave: string) {
+    const alvo = document.getElementById(idAtalho(idBase, chave));
+    if (!alvo) return;
+    const reduzido = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    alvo.scrollIntoView({ behavior: reduzido ? "auto" : "smooth", block: "start" });
+  }
+  return (
+    <nav className="fichaatalhos" aria-label="Ir para uma parte da ficha">
+      {ATALHOS_DA_FICHA.map((a) => (
+        <button key={a.chave} type="button" onClick={() => ir(a.chave)}>
+          {a.rotulo}
+        </button>
+      ))}
+    </nav>
   );
 }
