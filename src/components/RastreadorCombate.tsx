@@ -598,7 +598,7 @@ export function RastreadorCombate({
 
       {souMestre && (
         <>
-          <div className="combatctrls" style={{ marginTop: 12 }}>
+          <div className="proximoturno">
             <button
               type="button"
               className="btn primary"
@@ -607,6 +607,8 @@ export function RastreadorCombate({
             >
               Próximo turno →
             </button>
+          </div>
+          <div className="combatctrls" style={{ marginTop: 12 }}>
             <button type="button" className="btn" disabled={combate.order.length === 0} onClick={() => setEncerrando(true)}>
               🏁 Encerrar combate
             </button>
@@ -885,7 +887,8 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
         className="num"
         type="number"
         inputMode="numeric"
-        placeholder="sua iniciativa"
+        placeholder="iniciativa"
+        aria-label="Sua iniciativa"
         value={ini}
         onChange={(e) => setIni(e.target.value)}
         onKeyDown={(e) => {

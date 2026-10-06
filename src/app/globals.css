@@ -172,6 +172,12 @@ button:focus-visible {
   overflow-x: auto;
   border-bottom: 1px solid var(--line);
   margin-bottom: 20px;
+  /* Presas no alto: numa ficha de 4.000px ou mais, trocar de aba não pode
+     exigir rolar tudo de volta. Fundo opaco, senão o conteúdo aparece por baixo. */
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
 }
 .aba {
   background: none;
@@ -568,6 +574,23 @@ button:focus-visible {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+/* "Próximo turno" é a ação mais repetida do Mestre: com a ordem comprida ele
+   saía da tela. Fica preso no rodapé enquanto a lista passa. Quando há
+   "Desfazer" (também preso no rodapé), sobe pra não ficar por baixo dele. */
+.proximoturno {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 4;
+  margin-top: 12px;
+}
+body:has(.desfazerbarra) .proximoturno {
+  bottom: calc(76px + env(safe-area-inset-bottom));
+}
+.proximoturno .btn {
+  width: 100%;
+  min-height: 44px;
+  box-shadow: var(--shadow);
 }
 .btn {
   background: var(--surface2);
