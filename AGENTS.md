@@ -1228,7 +1228,7 @@ Decisões que não estão no código à primeira vista:
     os vãos são só vãos (a visão passa por eles). Escala 1125 → 1080 sem desvio visível. Rascunho bom, o Mestre ainda confere. Não há robô fixo para isso, só `ImportarParedes.test.ts` com banco de mentira. **Portas nos vãos** (06/10/2026, sem migration; `lib/vaos.ts`, 10 testes, botão `VaosViramPortas` em "Paredes e visão"): a IA não marca portas, então o botão
     "🚪 marcar N vãos como portas" acha onde duas paredes se apontam na mesma linha (até 20° de desvio) com abertura de meio a **dois** quadradinhos (sem
     grade: 1,5% a 4% do lado do mapa), sem outra parede no meio, cada ponta num vão só (o mais curto ganha), sem porta já ali. Entram como portas **abertas**
-    (a vista não muda; o Mestre fecha as que importam tocando com ✋ mover) numa escrita só, então "↩ desfazer parede" tira todas. No mapa das ruínas, com
+    (a vista não muda; o Mestre fecha as que importam tocando com ✋ mover) numa escrita só, então "↩ desfazer parede" tira todas. **Conferido no mapa das ruínas de verdade (06/10/2026):** o botão diz "marcar 15 vãos como portas", entram 15 portas abertas (as 55 paredes ficam), caem nas quebras dos muros das construções e dos muretes; alguns vãos pequenos em fila num mesmo muro (leste da construção de baixo à direita) são mais ruína quebrada que porta — é rascunho, o Mestre apaga as que não valem. No mesmo mapa, com
     até 3 quadradinhos deu 17 vãos e os dois maiores (~105 px) eram a rua entre construções: por isso o teto de 2. Robô: `portasNosVaos.e2e.ts`.
     Não há botão "detectar" dentro do app
     porque isso pediria rota de servidor e chave paga — decisão do Daniel.
