@@ -1223,8 +1223,9 @@ Decisões que não estão no código à primeira vista:
     da largura da tela. **Arquivo de IA de verdade conferido em 06/10/2026**
     (`paredes-mapa-ruinas.json`, 1125×1125, 55 paredes, 0 portas; robô provisório contra a `ci-teste`, depois apagado): escolhido pelo
     botão "escolher arquivo…", "Prontas pra entrar: 55 paredes e 0 portas. Fechei 2 frestas", 55 gravadas numa escrita só, nenhuma fora do
-    mapa, "↩ desfazer parede" tirou tudo, sem erro no console. **Não conferido**: se as paredes batem com o desenho do mapa (a imagem original
-    não estava à mão; o robô subiu uma imagem lisa do mesmo tamanho). Não há robô fixo para isso, só `ImportarParedes.test.ts` com banco de mentira. Não há botão "detectar" dentro do app
+    mapa, "↩ desfazer parede" tirou tudo, sem erro no console. **Com a imagem de verdade** (mesmo dia; `art-ruined-village-battle-map-30x30`, 1080×1080 webp, que a cena guardou sem reduzir): as 55 paredes caem sobre
+    os muros das cinco construções e dos dois muretes de caminho, vãos de porta e brecha ficam abertos; o arquivo veio **sem nenhuma porta**, então
+    os vãos são só vãos (a visão passa por eles). Escala 1125 → 1080 sem desvio visível. Rascunho bom, o Mestre ainda confere. Não há robô fixo para isso, só `ImportarParedes.test.ts` com banco de mentira. Não há botão "detectar" dentro do app
     porque isso pediria rota de servidor e chave paga — decisão do Daniel.
   - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
     Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
