@@ -11,7 +11,8 @@ import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
-import { PAREDES_MAXIMAS, ultimoDesenho, type ModoParede } from "@/lib/paredes";
+import { PAREDES_MAXIMAS, cabemParedes, segmentosQueBloqueiam, ultimoDesenho, type ModoParede, type NovaParede, type Parede } from "@/lib/paredes";
+import { vaosDePorta } from "@/lib/vaos";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
 import {
@@ -42,6 +43,7 @@ function moverPeao(
   banco: ReturnType<typeof usePecas>,
   cena: Parameters<typeof pecasQueAcompanham>[0]["cena"],
   personagens: Sala["personagens"],
+  paredes: readonly Parede[],
   juntos: boolean,
   id: string,
   x: number,
@@ -49,9 +51,37 @@ function moverPeao(
 ) {
   const donos: Record<string, string> = {};
   if (juntos) for (const f of personagens) if (f.dono) donos[f.slug] = f.dono;
-  const seguem = pecasQueAcompanham({ cena, pecas: banco.pecas, movida: { id, x, y }, donos });
+  const seguem = pecasQueAcompanham({ cena, pecas: banco.pecas, movida: { id, x, y }, donos, bloqueios: segmentosQueBloqueiam(paredes) });
   void banco.atualizar(id, { x, y });
   for (const c of seguem) void banco.atualizar(c.id, { x: c.x, y: c.y });
+}
+
+/** Onde duas paredes quase se encontram na mesma linha, com uma abertura de passagem (`vaosDePorta`), vira porta ABERTA
+ *  numa escrita só: nada muda na vista até o Mestre fechar; "↩ desfazer parede" tira todas de uma vez. */
+function VaosViramPortas({ cena, paredes, adicionar }: { cena: Cena; paredes: Parede[]; adicionar: (novas: NovaParede[]) => Promise<boolean> }) {
+  const vaos = useMemo(() => vaosDePorta(paredes, cena), [paredes, cena]);
+  const [ocupado, setOcupado] = useState(false);
+  if (vaos.length === 0 || !cabemParedes(paredes.length, vaos.length)) return null;
+  return (
+    <div className="mapa-ferr">
+      <button
+        type="button"
+        className="btn"
+        disabled={ocupado}
+        onClick={async () => {
+          setOcupado(true);
+          await adicionar(vaos);
+          setOcupado(false);
+        }}
+      >
+        🚪 marcar {vaos.length} {vaos.length === 1 ? "vão" : "vãos"} como {vaos.length === 1 ? "porta" : "portas"}
+      </button>
+      <p className="fc-sub">
+        Achei {vaos.length} {vaos.length === 1 ? "abertura" : "aberturas"} entre paredes do tamanho de uma passagem. Entram como portas abertas
+        (a vista passa); toque numa com ✋ mover pra fechar.
+      </p>
+    </div>
+  );
 }
 
 function cartaoAberto(id: string | null, pecas: readonly Peca[], sala: Sala) {
@@ -152,7 +182,7 @@ export function VisorDaMesa({
         marcas={desenhos.marcas}
         visaoPronta={!muros.carregando && !banco.carregando}
         pecas={pecas}
-        aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, juntos, id, x, y)}
+        aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
         aoAbrirPeca={telao ? undefined : setCartao}
       />
       {telao && <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />}
@@ -729,7 +759,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
                 aoEscolherPonto={colocarOnde}
                 pecas={pecas}
-                aoMoverPeca={(id, x, y) => cena && moverPeao(banco, cena, sala.personagens, juntos, id, x, y)}
+                aoMoverPeca={(id, x, y) => cena && moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
                 aoTocarPeca={setPecaSelecionada}
                 aoAbrirPeca={setCartao}
               />
@@ -1084,6 +1114,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                         </button>
                       )}
                     </div>
+                    <VaosViramPortas cena={cena} paredes={muros.paredes} adicionar={muros.adicionar} />
                     <ImportarParedes cena={cena} paredes={muros.paredes} adicionar={muros.adicionar} />
                   </>
                 )}

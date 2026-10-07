@@ -5,6 +5,7 @@ import {
   cenaDoBanco,
   coletarErros,
   criarFicha,
+  criarParedes,
   criarPeca,
   entrarComoMestre,
   limparSala,
@@ -111,3 +112,37 @@ async function rest_proximoTurno() {
   const r = await rest(`combat_state?room_code=eq.${SALA}`, { method: "PATCH", body: JSON.stringify({ turn: 1 }) });
   if (!r.ok) throw new Error(`não passou o turno: HTTP ${r.status}`);
 }
+
+test("o companheiro não atravessa parede atrás do dono (nem o Mestre passando o dono por cima dela)", async ({ page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await criarFicha("ana-robo", "Ana Robô");
+  await criarFicha("pip-robo", "Pip Robô", { is_npc: true, revealed: true, dono: "ana-robo", cls: "Companheiro" });
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-companheiro-parede.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+
+  const cena = await cenaDoBanco();
+  // Parede vertical de cima a baixo em x = 345, entre os dois peões e o destino.
+  await criarParedes(cena.id, [{ tipo: "parede", x1: 345, y1: 0, x2: 345, y2: 600 }]);
+  await criarPeca(cena.id, "ana-robo", 255, 315);
+  await criarPeca(cena.id, "pip-robo", 315, 315);
+  await expect(async () => {
+    await tocar(page, [255, 315]);
+    await expect(page.locator(".mapa-cartao")).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 30_000 });
+
+  // O Mestre leva a Ana pro outro lado da parede (ele passa); o Pip encosta nela e fica.
+  await arrastar(page, [255, 315], [435, 315]);
+  await expect.poll(async () => (await lugar("ana-robo"))[0]).toBe(435);
+  // Dá tempo de a escrita do companheiro, se houvesse, chegar ao banco antes de conferir que ela não veio.
+  await page.waitForTimeout(2000);
+  expect((await lugar("pip-robo"))[0]).toBeLessThan(345);
+  expect(erros).toEqual([]);
+});

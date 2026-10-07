@@ -619,4 +619,20 @@ describe("pecasQueAcompanham", () => {
     const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 250, y: 250 - 200 }, donos });
     expect(r[0].y).toBeGreaterThanOrEqual(0);
   });
+
+  it("parede entre o companheiro e o destino: ele encosta e não atravessa", () => {
+    // Parede vertical em x = 400; o Pip (350) tentaria ir pra 550 junto com a Ana (250 → 450).
+    const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 450, y: 250 }, donos, bloqueios: [[400, 0, 400, 600]] });
+    expect(r).toEqual([]);
+  });
+
+  it("porta aberta não segura (só o que entra em `bloqueios`)", () => {
+    const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 450, y: 250 }, donos, bloqueios: [] });
+    expect(r).toEqual([{ id: "c", x: 550, y: 250 }]);
+  });
+
+  it("parede que corta o caminho na diagonal: o companheiro fica do mesmo lado em que estava", () => {
+    const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 250, y: 450 }, donos, bloqueios: [[0, 300, 900, 300]] });
+    for (const p of r) expect(p.y).toBeLessThan(300);
+  });
 });

@@ -1225,7 +1225,12 @@ Decisões que não estão no código à primeira vista:
     botão "escolher arquivo…", "Prontas pra entrar: 55 paredes e 0 portas. Fechei 2 frestas", 55 gravadas numa escrita só, nenhuma fora do
     mapa, "↩ desfazer parede" tirou tudo, sem erro no console. **Com a imagem de verdade** (mesmo dia; `art-ruined-village-battle-map-30x30`, 1080×1080 webp, que a cena guardou sem reduzir): as 55 paredes caem sobre
     os muros das cinco construções e dos dois muretes de caminho, vãos de porta e brecha ficam abertos; o arquivo veio **sem nenhuma porta**, então
-    os vãos são só vãos (a visão passa por eles). Escala 1125 → 1080 sem desvio visível. Rascunho bom, o Mestre ainda confere. Não há robô fixo para isso, só `ImportarParedes.test.ts` com banco de mentira. Não há botão "detectar" dentro do app
+    os vãos são só vãos (a visão passa por eles). Escala 1125 → 1080 sem desvio visível. Rascunho bom, o Mestre ainda confere. Não há robô fixo para isso, só `ImportarParedes.test.ts` com banco de mentira. **Portas nos vãos** (06/10/2026, sem migration; `lib/vaos.ts`, 10 testes, botão `VaosViramPortas` em "Paredes e visão"): a IA não marca portas, então o botão
+    "🚪 marcar N vãos como portas" acha onde duas paredes se apontam na mesma linha (até 20° de desvio) com abertura de meio a **dois** quadradinhos (sem
+    grade: 1,5% a 4% do lado do mapa), sem outra parede no meio, cada ponta num vão só (o mais curto ganha), sem porta já ali. Entram como portas **abertas**
+    (a vista não muda; o Mestre fecha as que importam tocando com ✋ mover) numa escrita só, então "↩ desfazer parede" tira todas. No mapa das ruínas, com
+    até 3 quadradinhos deu 17 vãos e os dois maiores (~105 px) eram a rua entre construções: por isso o teto de 2. Robô: `portasNosVaos.e2e.ts`.
+    Não há botão "detectar" dentro do app
     porque isso pediria rota de servidor e chave paga — decisão do Daniel.
   - **Mapa ↔ iniciativa (01/10/2026, sem migration; pedido do Daniel no mesmo dia).**
     Antes só a iniciativa mandava no mapa (anel da vez, "pôr os inimigos", nome/cor/
@@ -1907,4 +1912,7 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
 - **Adotar NPC** (Mestre, na ficha do dono, em Companheiros): escolhe uma ficha de NPC sem dono (`npcsAdotaveis`) e ela vira companheiro
   (`dono` + `revealed`), entrando na ordem se o dono já está. "soltar" tira o `dono` (a ficha volta a ser NPC comum, continua revelada). Usa a
   coluna que já existe, **sem migration nova**. Robôs: `companheirosNoMapa.e2e.ts` e `adotarCompanheiro.e2e.ts`.
-- **Não cobre**: peões de companheiros não se desviam um do outro nem de parede ao seguir o dono.
+- **Parede segura o companheiro** (06/10/2026): ao seguir o dono, `pecasQueAcompanham` recebe `bloqueios` (`segmentosQueBloqueiam`: parede e porta fechada)
+  e usa `andarComParedes` — ele encosta, desliza, e se nem assim dá fica onde está, **mesmo que o Mestre tenha passado o dono por cima da parede**
+  (o Mestre passa; o companheiro não, como o jogador). Robô: 2º cenário de `companheirosNoMapa.e2e.ts` (conferido que falha sem a trava: o Pip vai a 495).
+- **Não cobre**: peões de companheiros não se desviam um do outro ao seguir o dono.

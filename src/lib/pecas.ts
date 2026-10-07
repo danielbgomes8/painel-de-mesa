@@ -11,7 +11,9 @@
  */
 import { metrosParaPx } from "./area";
 import { celulaNoPonto, gradeUsavel, ladoDeReferencia, type Cena, type Ponto, type Regiao } from "./cenas";
+import { andarComParedes, passoBloqueado } from "./paredes";
 import { corDoJogador } from "./ping";
+import type { Segmento } from "./visao";
 import { CONDICOES, ICONE_CONDICAO, ICONE_EXAUSTAO, condicoesAtivas } from "./condicoes";
 import { estaCaido } from "./regras";
 
@@ -298,8 +300,10 @@ export function pecasDosCompanheiros(entrada: {
 /**
  * Quando o peão do dono anda, os dos companheiros dele andam o MESMO deslocamento (montaria, familiar que acompanha), de
  * modo que continuam encostados. Devolve só os que mudam de lugar. Cada um é encaixado na grade e fica dentro do mapa
- * (junto da borda, o companheiro pode acabar mais perto do dono do que antes). Não olha parede: o companheiro atravessa
- * o que o dono atravessou. Peão que não é de ficha, ou de ficha sem dono, nunca é arrastado.
+ * (junto da borda, o companheiro pode acabar mais perto do dono do que antes). **Parede e porta fechada seguram o
+ * companheiro como seguram o jogador** (`bloqueios`, ver `segmentosQueBloqueiam`): ele encosta e desliza, e se nem
+ * assim dá, fica onde está — mesmo que o Mestre tenha passado o dono por cima da parede. Peão que não é de ficha, ou de
+ * ficha sem dono, nunca é arrastado.
  */
 export function pecasQueAcompanham(entrada: {
   cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura">;
@@ -308,8 +312,10 @@ export function pecasQueAcompanham(entrada: {
   movida: { id: string; x: number; y: number };
   /** slug do companheiro → slug do dono. */
   donos: Readonly<Record<string, string>>;
+  /** Paredes e portas fechadas (px da imagem); vazio = nada segura. */
+  bloqueios?: readonly Segmento[];
 }): { id: string; x: number; y: number }[] {
-  const { cena, pecas, movida, donos } = entrada;
+  const { cena, pecas, movida, donos, bloqueios = [] } = entrada;
   const dono = pecas.find((p) => p.id === movida.id);
   if (!dono?.slug) return [];
   const dx = movida.x - dono.x;
@@ -318,7 +324,12 @@ export function pecasQueAcompanham(entrada: {
   const saida: { id: string; x: number; y: number }[] = [];
   for (const p of pecas) {
     if (!p.slug || p.id === dono.id || donos[p.slug] !== dono.slug) continue;
-    const [x, y] = encaixarNaGrade(cena, p.x + dx, p.y + dy, p.tamanho);
+    const de: Ponto = [p.x, p.y];
+    const querIr = encaixarNaGrade(cena, p.x + dx, p.y + dy, p.tamanho);
+    // Anda até onde a parede deixar; o ponto de chegada é encaixado na grade e só vale se o caminho até ele está livre.
+    const alcancado = andarComParedes(de, querIr, bloqueios);
+    const [x, y] = encaixarNaGrade(cena, alcancado[0], alcancado[1], p.tamanho);
+    if (passoBloqueado(de, [x, y], bloqueios)) continue;
     if (x !== p.x || y !== p.y) saida.push({ id: p.id, x, y });
   }
   return saida;
