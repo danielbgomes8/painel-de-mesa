@@ -1860,6 +1860,10 @@ campanha não começou a contar). No celular a etiqueta cai numa segunda linha e
 faixa de baixo — **esse caminho não foi visto na tela**, só o do telão sem mapa. Descanso curto do grupo: o Daniel disse que não precisa.
 
 
+**Robô de tela** (06/10/2026, `e2e/combateAvancado.e2e.ts`, contra o banco real): encerrar combate (Goblin a 0 PV vale 50 XP pelo catálogo, 25 pra cada
+um de dois jogadores, ordem limpa, log 🏁, e "↩ Desfazer" devolve XP e ordem), ações lendárias (gastar 2 vai pro log, resistência gasta, as ações voltam a
+3 no turno do monstro e a resistência continua gasta) e emboscada (jogador surpreso entra na ordem e o log diz ", surpreso").
+
 ## Emboscada: surpresa na iniciativa (04/10/2026, sem migration)
 
 **Regra de 2024, não a de 2014**: o surpreso NÃO perde o turno; ele rola a iniciativa com **desvantagem** (dois d20, vale o menor).
