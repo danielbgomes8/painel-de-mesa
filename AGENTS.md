@@ -1916,3 +1916,37 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   e usa `andarComParedes` — ele encosta, desliza, e se nem assim dá fica onde está, **mesmo que o Mestre tenha passado o dono por cima da parede**
   (o Mestre passa; o companheiro não, como o jogador). Robô: 2º cenário de `companheirosNoMapa.e2e.ts` (conferido que falha sem a trava: o Pip vai a 495).
 - **Não cobre**: peões de companheiros não se desviam um do outro ao seguir o dono.
+
+## Achar paredes e portas sozinho (08/10/2026, sem migration)
+
+Em Mapa → Paredes e portas → "importar paredes de um arquivo": **🔍 achar paredes e portas sozinho** roda um detector NO APARELHO (sem servidor,
+sem chave) e preenche o mesmo campo do importador; **▭ fechar a borda do mapa** põe as quatro paredes da borda (`contornoQueFalta` em
+`lib/importarParedes.ts`), pra mapa cortado rente. Nasceu de um script Python que um amigo do Daniel mandou (`scripts/mapas/detectar_topologia.py`,
+só funciona com fundo preto). **É rascunho**: o Mestre confere na prévia (`PreviaDeParedes.tsx`: tocar numa linha tira/põe de volta) e corrige.
+
+- **Como acha** (`lib/detectarParedes.ts`, `lib/detectarCurvas.ts`, testados): black-hat (linha escura e fina sobre chão claro) → só retas
+  horizontais/verticais compridas → filtro de contraste ponto a ponto (corta a parte falsa de uma linha, tapete/móvel) → pontas recuam até o canto →
+  sai a moldura de papel → curvas (o que sobra, afinado por Zhang-Suen e simplificado). Porta = vão com parede nas DUAS pontas, largura de porta
+  (≤ 8× o traço) e **algo desenhado dentro** — vão de chão liso é passagem aberta.
+- **`prepararDeteccao` (pesada) × `aplicarDeteccao` (barata)**: o controle "menos linhas ↔ mais linhas" (`NIVEIS_DE_SENSIBILIDADE`, 1 a 5) só
+  refaz a barata. A imagem é analisada a no máximo 1.400 px (`LADO_DA_ANALISE`).
+- **As folgas saem da espessura do traço do próprio mapa** (`espessuraDoTraco`), não do tamanho da imagem: com folga por tamanho a linha
+  atravessava corredor e juntava duas paredes.
+- **"Parede clara"** (pedra/contorno claro sobre chão ou fundo escuro) lê DUAS vezes: brilho e **saturação** (`aplicarComCor`). Pedra bege sobre piso
+  marrom tem o mesmo brilho sob um clarão, mas menos cor — foi o que destravou o labirinto. A razão de contraste da parede clara é medida no brilho
+  de verdade (lado ÷ linha), não na imagem invertida (era o defeito que fazia a opção não achar nada). A leitura pela cor ignora o vazio escuro.
+- **O Mestre escolhe** escura × clara: escolher sozinho pelo total de linhas erra (a moldura do pergaminho faz a clara parecer melhor).
+- Passou do limite de 400 trechos: ficam as paredes mais compridas (`soAsMaiores`) e a tela avisa.
+- **Medir, não achar**: `scripts/mapas/como_no_app.sh imagem saida.png [escuras|claras] [nível] [gabarito]` roda o MESMO código da tela e desenha
+  por cima; `avaliar.py` dá recall/precisão. Precisa de `.venv-mapas/` (opencv, numpy, scikit-image; fora do Git). Gabaritos em
+  `scripts/mapas/testes/`: `labirinto_trecho.json` (semiautomático, conferido a olho; **85% das paredes, 96% de precisão** com clara nível 5) e
+  `taverna_paredes.json` (à mão, alguns px fora: ~65%/61%, **não serve pra ajuste fino**).
+- **Onde está**: bom em planta preto e branco e no labirinto de pedra clara; razoável (com limpeza na prévia) em taverna e pergaminho; **ruim** em mapa
+  muito ilustrado com contorno de fio branco (o "poço"). O critério combinado com o Daniel (95% das paredes, ≤ 5% falsas) **não foi atingido** em geral.
+- **Tentado e descartado, não repetir sem motivo novo**: um sinal único pra qualquer cor de parede (piorou a taverna); tirar linha curta solta e tirar
+  "ilhas" de linhas sem ligação (derruba parede de verdade: móvel fica ligado à parede); moldura na imagem pra pegar parede da beirada (piorou o
+  labirinto); "segunda chance" por contraste regional (trouxe linha em corredor); detector por fio (quebra nos cruzamentos).
+- **Não medido**: tempo no celular (no notebook: ~0,1 s num mapa pequeno, ~1,5 s no labirinto com parede clara; a tela para nesse tempo) e a
+  detecção num aparelho de verdade. IA de visão com chave do Mestre foi oferecida e o Daniel recusou.
+- Teste em sala própria (`teste-detector`; ficou no banco, apagar pelo SQL Editor). Duas sessões mexeram no mesmo checkout nesse dia: commitar só
+  os próprios arquivos, com `git add <caminhos>`.
