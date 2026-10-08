@@ -14,8 +14,8 @@ import { simplificar } from "./detectarCurvas";
 import { morfologia, otsu, type ResultadoDaDeteccao, type Segmento } from "./detectarParedes";
 
 /** Distância (0–255) da cor de cada pixel até a cor do fundo, e se o fundo é mesmo liso. */
-export function distanciaDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number): { distancia: Uint8Array; fundoLiso: boolean } {
-  // O fundo é a cor dos quatro cantos (mediana por canal).
+/** A cor do fundo: a mediana (por canal) dos quatro cantos da imagem. */
+function corDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number): number[] {
   const lado = Math.max(8, Math.floor(Math.min(w, h) / 60));
   const canais: number[][] = [[], [], []];
   for (const [cx, cy] of [[0, 0], [w - lado, 0], [0, h - lado], [w - lado, h - lado]])
@@ -26,14 +26,20 @@ export function distanciaDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number
         canais[1].push(rgba[j + 1]);
         canais[2].push(rgba[j + 2]);
       }
-  const fundo = canais.map((c) => c.sort((a, b) => a - b)[c.length >> 1]);
+  return canais.map((c) => c.sort((a, b) => a - b)[c.length >> 1]);
+}
+
+export function distanciaDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number, h: number): { distancia: Uint8Array; fundoLiso: boolean } {
+  const lado = Math.max(8, Math.floor(Math.min(w, h) / 60));
+  const fundo = corDoFundo(rgba, w, h);
   const distancia = new Uint8Array(w * h);
   let longe = 0;
   for (let i = 0, j = 0; i < distancia.length; i++, j += 4) {
     const d = Math.hypot(rgba[j] - fundo[0], rgba[j + 1] - fundo[1], rgba[j + 2] - fundo[2]);
     distancia[i] = Math.min(255, Math.round(d));
   }
-  // Liso = quase todos os pixels dos cantos têm a cor do fundo, e o fundo ocupa um bom pedaço da imagem.
+  // Liso = quase todos os pixels dos cantos têm a cor do fundo, e o fundo ocupa um bom pedaço da imagem
+  // (até 97%: planta pequena numa página branca, com título e quadros de texto, tem muito fundo).
   let cantosIguais = 0;
   let cantos = 0;
   for (const [cx, cy] of [[0, 0], [w - lado, 0], [0, h - lado], [w - lado, h - lado]])
@@ -44,7 +50,7 @@ export function distanciaDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number
       }
   for (let i = 0; i < distancia.length; i += 3) if (distancia[i] <= 16) longe++;
   const fracaoDeFundo = longe / Math.ceil(distancia.length / 3);
-  return { distancia, fundoLiso: cantosIguais / cantos > 0.9 && fracaoDeFundo > 0.15 && fracaoDeFundo < 0.85 };
+  return { distancia, fundoLiso: cantosIguais / cantos > 0.9 && fracaoDeFundo > 0.15 && fracaoDeFundo < 0.97 };
 }
 
 /** Rotula as manchas (vizinhança de 4) de uma máscara 0/1. Devolve o rótulo de cada pixel (0 = fora) e a área de cada rótulo. */
@@ -83,16 +89,99 @@ export function mascaraDoMapa(distancia: Uint8Array, w: number, h: number, limia
   // Mancha pequena demais (menos de 0,15% da imagem) é sujeira, não cômodo.
   const frente = rotular(m, w, h);
   for (let i = 0; i < m.length; i++) m[i] = m[i] && frente.areas[frente.rotulo[i]] >= total * 0.0015 ? 1 : 0;
-  // Buraco pequeno e fechado dentro do mapa é sombra/textura: tapa.
+  tapaBuracos(m, w, h, total * 0.0004);
+  return m;
+}
+
+/** Buraco pequeno e fechado dentro do mapa (até `maximo` px) é sombra/textura/mobília: tapa. */
+function tapaBuracos(m: Uint8Array, w: number, h: number, maximo: number): void {
+  const total = w * h;
   const inverso = new Uint8Array(total);
   for (let i = 0; i < total; i++) inverso[i] = m[i] ? 0 : 1;
   const fundo = rotular(inverso, w, h);
   const tocaBorda = new Uint8Array(fundo.areas.length);
   for (let x = 0; x < w; x++) { tocaBorda[fundo.rotulo[x]] = 1; tocaBorda[fundo.rotulo[(h - 1) * w + x]] = 1; }
   for (let y = 0; y < h; y++) { tocaBorda[fundo.rotulo[y * w]] = 1; tocaBorda[fundo.rotulo[y * w + w - 1]] = 1; }
-  const buraco = total * 0.0004;
-  for (let i = 0; i < total; i++) if (!m[i] && !tocaBorda[fundo.rotulo[i]] && fundo.areas[fundo.rotulo[i]] <= buraco) m[i] = 1;
-  return m;
+  for (let i = 0; i < total; i++) if (!m[i] && !tocaBorda[fundo.rotulo[i]] && fundo.areas[fundo.rotulo[i]] <= maximo) m[i] = 1;
+}
+
+/** Só os buracos fechados da máscara (o que ela cerca sem tocar a borda da imagem), como uma máscara 0/1. */
+function buracosFechados(m: Uint8Array, w: number, h: number): Uint8Array {
+  const inverso = new Uint8Array(w * h);
+  for (let i = 0; i < inverso.length; i++) inverso[i] = m[i] ? 0 : 1;
+  const { rotulo, areas } = rotular(inverso, w, h);
+  const tocaBorda = new Uint8Array(areas.length);
+  for (let x = 0; x < w; x++) { tocaBorda[rotulo[x]] = 1; tocaBorda[rotulo[(h - 1) * w + x]] = 1; }
+  for (let y = 0; y < h; y++) { tocaBorda[rotulo[y * w]] = 1; tocaBorda[rotulo[y * w + w - 1]] = 1; }
+  const saida = new Uint8Array(w * h);
+  for (let i = 0; i < saida.length; i++) saida[i] = inverso[i] && !tocaBorda[rotulo[i]] ? 1 : 0;
+  return saida;
+}
+
+/** Tira da máscara as manchas menores que `fracao` da maior: título, quadros de texto e legendas, que não são cômodo. */
+function tiraManchasPequenas(m: Uint8Array, w: number, h: number, fracao: number): void {
+  const { rotulo, areas } = rotular(m, w, h);
+  const maior = Math.max(0, ...areas.slice(1));
+  for (let i = 0; i < m.length; i++) if (m[i] && areas[rotulo[i]] < maior * fracao) m[i] = 0;
+}
+
+/**
+ * Do SILHUETA do mapa (tudo que difere do fundo, inclusive borda de pedra, sombreado e parede grossa) pra
+ * beira do CHÃO: a cor do chão é a mediana dos pontos bem fundos dentro da silhueta (o miolo dos cômodos),
+ * e chão é o que tem essa cor. Grade, mobília e porta ficam como buraco e são tapadas. Se o chão tem a cor
+ * do fundo (mapa de fundo branco, onde a silhueta já é só parede e sombreado) ou não há cômodo largo o
+ * bastante pra medir, devolve a máscara como veio.
+ */
+export function refinarParaOChao(rgba: Uint8ClampedArray | Uint8Array, m: Uint8Array, w: number, h: number, limiar: number): { m: Uint8Array; soBuracos: boolean } {
+  const lado = Math.max(w, h);
+  // Se o que a máscara cerca (buracos fechados) é bem mais do que a própria máscara, ela é só parede e sombreado
+  // em volta do chão: o chão é o buraco e a borda de fora (o sombreado) não é parede.
+  {
+    const inverso = new Uint8Array(w * h);
+    let areaMascara = 0;
+    for (let i = 0; i < inverso.length; i++) { inverso[i] = m[i] ? 0 : 1; areaMascara += m[i]; }
+    const { rotulo, areas } = rotular(inverso, w, h);
+    const tocaBorda = new Uint8Array(areas.length);
+    for (let x = 0; x < w; x++) { tocaBorda[rotulo[x]] = 1; tocaBorda[rotulo[(h - 1) * w + x]] = 1; }
+    for (let y = 0; y < h; y++) { tocaBorda[rotulo[y * w]] = 1; tocaBorda[rotulo[y * w + w - 1]] = 1; }
+    let cercado = 0;
+    for (let r = 1; r < areas.length; r++) if (!tocaBorda[r]) cercado += areas[r];
+    if (areaMascara > 0 && cercado > areaMascara * 0.6) return { m, soBuracos: true };
+  }
+  const dist = distanciaAteZero(m, w, h);
+  const hist = new Uint32Array(256);
+  let n = 0;
+  for (let i = 0; i < m.length; i++) if (m[i]) { hist[Math.min(255, Math.round(dist[i]))]++; n++; }
+  if (n === 0) return { m, soBuracos: false };
+  let acum = 0;
+  let d95 = 0;
+  for (let v = 0; v < 256; v++) { acum += hist[v]; if (acum >= n * 0.95) { d95 = v; break; } }
+  // Máscara só de traço fino (nenhum trecho largo): é parede e sombreado em volta de chão com a cor do fundo.
+  if (d95 < lado * 0.006) return { m, soBuracos: true };
+  const corte = d95 * 0.5;
+  const amostra: number[] = [];
+  const passo = Math.max(1, Math.floor(n / 20000));
+  for (let i = 0, k = 0; i < m.length; i++) if (m[i] && dist[i] >= corte && k++ % passo === 0) amostra.push(i);
+  if (amostra.length < 200) return { m, soBuracos: false };
+  const mediana = (c: number) => { const v = amostra.map((i) => rgba[i * 4 + c]).sort((a, b) => a - b); return v[v.length >> 1]; };
+  const chao = [mediana(0), mediana(1), mediana(2)];
+  const fundo = corDoFundo(rgba, w, h);
+  // Chão com a cor do fundo: a máscara já é parede + sombreado e o chão é o buraco dela. Aí a borda de FORA
+  // da máscara é a do sombreado (não é parede) e só valem os contornos dos buracos.
+  if (Math.hypot(chao[0] - fundo[0], chao[1] - fundo[1], chao[2] - fundo[2]) <= limiar) return { m, soBuracos: true };
+  const dc = (i: number) => Math.hypot(rgba[i * 4] - chao[0], rgba[i * 4 + 1] - chao[1], rgba[i * 4 + 2] - chao[2]);
+  const ds = amostra.map(dc).sort((a, b) => a - b);
+  const tolerancia = Math.max(28, Math.min(70, ds[Math.floor(ds.length * 0.9)] * 1.6));
+  let c: Uint8Array = new Uint8Array(w * h);
+  for (let i = 0; i < c.length; i++) c[i] = m[i] && dc(i) <= tolerancia ? 255 : 0;
+  for (let k = 0; k < 2; k++) c = morfologia(morfologia(c, w, h, 5, 5, true), w, h, 5, 5, false);
+  c = morfologia(morfologia(c, w, h, 3, 3, false), w, h, 3, 3, true);
+  const saida = new Uint8Array(w * h);
+  for (let i = 0; i < saida.length; i++) saida[i] = c[i] && m[i] ? 1 : 0;
+  const { rotulo, areas } = rotular(saida, w, h);
+  for (let i = 0; i < saida.length; i++) if (saida[i] && areas[rotulo[i]] < w * h * 0.0015) saida[i] = 0;
+  tapaBuracos(saida, w, h, w * h * 0.001);
+  return { m: saida, soBuracos: false };
 }
 
 /**
@@ -161,6 +250,68 @@ function distanciaAteZero(m: Uint8Array, w: number, h: number): Float32Array {
   return d;
 }
 
+/**
+ * Portas desenhadas como uma célula no meio da passagem (o gerador de masmorra põe um símbolo de porta numa célula entre
+ * o cômodo e o corredor): no chão sobra uma LACUNA retangular entre dois pisos, mais curta que a célula (o símbolo come as
+ * bordas) e com a largura de um corredor, `c`. Parede fina entre dois cômodos é lacuna curta demais e comprida demais de
+ * través; vão entre cômodos distantes é longo demais. Procura nos dois eixos; cada lacuna vira uma porta de lado a lado.
+ */
+export function portasPorLacuna(m: Uint8Array, w: number, h: number, c: number, distancia?: Uint8Array, limiar = 16): Segmento[] {
+  const gmin = c * LACUNA_MIN;
+  const gmax = c * LACUNA_MAX;
+  const achadas: Segmento[] = [];
+  for (const eixo of [0, 1] as const) {
+    // eixo 0: a lacuna é horizontal (piso à esquerda e à direita); eixo 1: vertical.
+    const A = eixo === 0 ? h : w;
+    const B = eixo === 0 ? w : h;
+    const get = (a: number, b: number) => (eixo === 0 ? m[a * w + b] : m[b * w + a]);
+    const marca = new Uint8Array(w * h);
+    for (let a = 0; a < A; a++) {
+      let ultimoPiso = -1;
+      for (let b = 0; b < B; b++) {
+        if (!get(a, b)) continue;
+        const g = b - ultimoPiso - 1;
+        if (ultimoPiso >= 0 && g >= gmin && g <= gmax) for (let k = ultimoPiso + 1; k < b; k++) marca[eixo === 0 ? a * w + k : k * w + a] = 1;
+        ultimoPiso = b;
+      }
+    }
+    const { rotulo, areas } = rotular(marca, w, h);
+    const caixa: number[][] = areas.map(() => [Infinity, Infinity, -Infinity, -Infinity]);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const r = rotulo[y * w + x];
+        if (!r) continue;
+        const b = caixa[r];
+        if (x < b[0]) b[0] = x;
+        if (y < b[1]) b[1] = y;
+        if (x > b[2]) b[2] = x;
+        if (y > b[3]) b[3] = y;
+      }
+    for (let r = 1; r < areas.length; r++) {
+      const [x0, y0, x1, y1] = caixa[r];
+      const larg = x1 - x0 + 1;
+      const alt = y1 - y0 + 1;
+      const compr = eixo === 0 ? larg : alt; // ao longo da passagem
+      const lateral = eixo === 0 ? alt : larg;
+      if (compr < gmin || compr > gmax * 1.15 || lateral < c * LATERAL_MIN || lateral > c * LATERAL_MAX) continue;
+      if (areas[r] < larg * alt * 0.6) continue;
+      if (distancia) {
+        // O símbolo de porta (batentes, tábuas) é desenhado ali: a lacuna tem de ter traço, não ser só vazio.
+        let sujo = 0;
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (distancia[y * w + x] > limiar) sujo++;
+        if (sujo < larg * alt * 0.5) continue;
+      }
+      achadas.push(eixo === 0 ? [(x0 + x1 + 1) / 2, y0, (x0 + x1 + 1) / 2, y1 + 1] : [x0, (y0 + y1 + 1) / 2, x1 + 1, (y0 + y1 + 1) / 2]);
+    }
+  }
+  return achadas;
+}
+/** Tamanho aceito da lacuna (ao longo da passagem) e da sua largura (de través), em larguras de corredor. Medidos nos mapas do Watabou. */
+const LACUNA_MIN = 0.25;
+const LACUNA_MAX = 1.3;
+const LATERAL_MIN = 0.5;
+const LATERAL_MAX = 1.6;
+
 /** O controle "menos linhas ↔ mais linhas" neste modo: quão diferente do fundo a cor precisa ser (menor = pega área mais escura). */
 export const LIMIAR_DO_FUNDO_POR_NIVEL: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 28, 2: 22, 3: 16, 4: 12, 5: 8 };
 
@@ -171,11 +322,18 @@ export type OpcoesDoContorno = {
   maximo?: number;
   /** Largura máxima de uma porta, em fração do lado maior (padrão 0,06). */
   portaMaxima?: number;
+  /** A imagem (RGBA). Com ela, o contorno é o da beira do CHÃO e não o da silhueta inteira (borda de pedra, sombreado). */
+  rgba?: Uint8ClampedArray | Uint8Array;
 };
 
 export function detectarContorno(distancia: Uint8Array, w: number, h: number, opcoes: OpcoesDoContorno = {}): ResultadoDaDeteccao {
   const lado = Math.max(w, h);
-  const m = mascaraDoMapa(distancia, w, h, opcoes.limiarDoFundo ?? 16);
+  let m = mascaraDoMapa(distancia, w, h, opcoes.limiarDoFundo ?? 16);
+  tiraManchasPequenas(m, w, h, 0.04);
+  let soBuracos = false;
+  if (opcoes.rgba) ({ m, soBuracos } = refinarParaOChao(opcoes.rgba, m, w, h, opcoes.limiarDoFundo ?? 16));
+  // Parede + sombreado em volta de chão da cor do fundo: o chão é o que ela cerca. Daqui pra frente (contorno e portas) é ele.
+  if (soBuracos) m = buracosFechados(m, w, h);
   const voltas = contornos(m, w, h);
   if (voltas.length === 0) return { largura: w, altura: h, paredes: [], portas: [] };
 
@@ -195,6 +353,7 @@ export function detectarContorno(distancia: Uint8Array, w: number, h: number, op
   // O corte fica no meio do caminho entre a largura típica de corredor e a de cômodo (as médias das duas
   // classes que o Otsu separa) — o valor do Otsu sozinho cola na classe de baixo quando as larguras são bem certinhas.
   let corte = lado * 0.025;
+  let meiaLarguraDeCorredor = 0; // metade da largura típica de corredor (px); 0 = não deu pra medir
   if (cristas.length >= 32) {
     const t = otsu(amostra);
     let somaBaixo = 0, nBaixo = 0, somaCima = 0, nCima = 0;
@@ -202,6 +361,7 @@ export function detectarContorno(distancia: Uint8Array, w: number, h: number, op
       if (v <= t) { somaBaixo += v; nBaixo++; } else { somaCima += v; nCima++; }
     }
     corte = nBaixo && nCima ? (somaBaixo / nBaixo + somaCima / nCima) / 2 : t;
+    if (nBaixo && nCima) meiaLarguraDeCorredor = somaBaixo / nBaixo;
   }
   const limiarComodo = Math.max(lado * 0.01, corte * 0.8);
 
@@ -250,7 +410,8 @@ export function detectarContorno(distancia: Uint8Array, w: number, h: number, op
     for (let s = 0.5; s <= alcance; s += 0.5) if (!noMapa(ox + dx * s, oy + dy * s)) return [ox + dx * (s - 0.25), oy + dy * (s - 0.25)];
     return null;
   };
-  const portaMaxima = lado * (opcoes.portaMaxima ?? 0.06);
+  // Porta atravessa uma passagem: não passa de ~2,4 larguras de corredor (corda que cruza um cômodo não é porta).
+  const portaMaxima = Math.min(lado * (opcoes.portaMaxima ?? 0.06), meiaLarguraDeCorredor >= 3 ? meiaLarguraDeCorredor * 2 * 2.4 : Infinity);
   const portaMinima = Math.max(6, lado * 0.007);
   type Porta = { seg: Segmento; largura: number; cx: number; cy: number };
   // Porta liga dois ESPAÇOS: com ela fechada, cada lado tem de ter área de cômodo ou de corredor. Um nicho
@@ -360,6 +521,13 @@ export function detectarContorno(distancia: Uint8Array, w: number, h: number, op
   candidatas.sort((a, b) => a.largura - b.largura);
   const portasAchadas: Porta[] = [];
   const perto = Math.max(12, lado * 0.013);
+  // Primeiro as portas desenhadas como célula (a lacuna entre dois pisos): são certeiras onde existem.
+  if (meiaLarguraDeCorredor >= 3)
+    for (const seg of portasPorLacuna(m, w, h, meiaLarguraDeCorredor * 2, distancia, opcoes.limiarDoFundo ?? 16)) {
+      const cx = (seg[0] + seg[2]) / 2;
+      const cy = (seg[1] + seg[3]) / 2;
+      if (portasAchadas.every((k) => Math.hypot(k.cx - cx, k.cy - cy) > perto)) portasAchadas.push({ seg, largura: Math.hypot(seg[2] - seg[0], seg[3] - seg[1]), cx, cy });
+    }
   for (const c of candidatas) if (portasAchadas.every((k) => Math.hypot(k.cx - c.cx, k.cy - c.cy) > perto)) portasAchadas.push(c);
 
   // ── Paredes: o contorno simplificado, sem perder os pontos onde as portas encostam ──

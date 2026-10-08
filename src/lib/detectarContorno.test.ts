@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { contornos, detectarContorno, distanciaDoFundo } from "./detectarContorno";
+import { contornos, detectarContorno, distanciaDoFundo, portasPorLacuna } from "./detectarContorno";
+
+/** Imagem RGBA: fundo bege, uma sala de chão claro (x 100–300, y 80–240) cercada por uma faixa de parede grossa e escura (20 px). */
+function salaComParedeGrossa() {
+  const w = 400;
+  const h = 320;
+  const rgba = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const j = (y * w + x) * 4;
+      const noChao = x >= 100 && x < 300 && y >= 80 && y < 240;
+      const naFaixa = x >= 80 && x < 320 && y >= 60 && y < 260;
+      const cor = noChao ? [245, 245, 240] : naFaixa ? [60, 55, 50] : [190, 175, 150];
+      rgba[j] = cor[0]; rgba[j + 1] = cor[1]; rgba[j + 2] = cor[2]; rgba[j + 3] = 255;
+    }
+  return { rgba, w, h };
+}
 
 /** Fundo preto; duas salas de 120×120 ligadas por um corredor de 24 px de largura e 100 de comprimento. */
 function duasSalas() {
@@ -115,5 +131,48 @@ describe("distanciaDoFundo", () => {
     const w = 200;
     const h = 200;
     expect(distanciaDoFundo(rgba(w, h, (x, y) => [(x * 7 + y * 13) % 200, (x * 3) % 180, (y * 5) % 160]), w, h).fundoLiso).toBe(false);
+  });
+});
+
+describe("contorno da beira do chão", () => {
+  it("com a imagem, a parede fica na beira do chão e não na borda de fora da parede grossa", () => {
+    const { rgba, w, h } = salaComParedeGrossa();
+    const { distancia } = distanciaDoFundo(rgba, w, h);
+    const sem = detectarContorno(distancia, w, h);
+    const com = detectarContorno(distancia, w, h, { rgba });
+    const xs = (r: { paredes: number[][] }) => r.paredes.flatMap((p) => [p[0], p[2]]);
+    // Sem a imagem o contorno é a silhueta (x de 80 a 320); com ela, a beira do chão (x de 100 a 300).
+    expect(Math.min(...xs(sem))).toBeLessThan(85);
+    expect(Math.min(...xs(com))).toBeGreaterThan(95);
+    expect(Math.max(...xs(com))).toBeLessThan(305);
+  });
+});
+
+describe("portas por lacuna", () => {
+  /** Duas salas de 100×100 ligadas por um corredor de 30 px de largura com uma LACUNA de `vao` px no meio (a célula da porta). */
+  function salasComPorta(vao: number) {
+    const w = 360;
+    const h = 160;
+    const m = new Uint8Array(w * h);
+    const encher = (x1: number, y1: number, x2: number, y2: number) => { for (let y = y1; y < y2; y++) for (let x = x1; x < x2; x++) m[y * w + x] = 1; };
+    encher(10, 30, 110, 130);
+    encher(250, 30, 350, 130);
+    encher(110, 65, 180 - vao / 2, 95);
+    encher(180 + vao / 2, 65, 250, 95);
+    return { m, w, h };
+  }
+  it("acha a porta onde o corredor tem uma lacuna do tamanho de uma célula, de lado a lado", () => {
+    const { m, w, h } = salasComPorta(24);
+    const portas = portasPorLacuna(m, w, h, 30);
+    expect(portas).toHaveLength(1);
+    const [x1, y1, x2, y2] = portas[0];
+    expect(x1).toBeCloseTo(x2, 0); // atravessa o corredor na vertical
+    expect(Math.abs(x1 - 180)).toBeLessThan(2);
+    expect(Math.abs(y2 - y1)).toBeGreaterThan(25);
+    expect(Math.abs(y2 - y1)).toBeLessThan(35);
+  });
+  it("não vê porta numa fresta fina (parede entre dois pisos) nem num vão grande demais", () => {
+    expect(portasPorLacuna(...(Object.values(salasComPorta(3)) as [Uint8Array, number, number]), 30)).toHaveLength(0);
+    expect(portasPorLacuna(...(Object.values(salasComPorta(70)) as [Uint8Array, number, number]), 30)).toHaveLength(0);
   });
 });

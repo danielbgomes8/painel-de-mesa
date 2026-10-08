@@ -36,7 +36,7 @@ function semAsTiradas(d: ResultadoDaDeteccao, tiradas: ReadonlySet<string>): Res
 }
 
 /** Baixa a imagem da cena e devolve os níveis de cinza, já reduzidos pro tamanho da análise. */
-async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturacao: Uint8Array; fundo: Uint8Array; fundoLiso: boolean; largura: number; altura: number }> {
+async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturacao: Uint8Array; fundo: Uint8Array; rgba: Uint8ClampedArray; fundoLiso: boolean; largura: number; altura: number }> {
   const resposta = await fetch(url);
   if (!resposta.ok) throw new Error(`imagem ${resposta.status}`);
   const imagem = await createImageBitmap(await resposta.blob());
@@ -52,7 +52,7 @@ async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturaca
   imagem.close();
   const { data } = ctx.getImageData(0, 0, largura, altura);
   const { distancia: fundo, fundoLiso } = distanciaDoFundo(data, largura, altura);
-  return { cinza: rgbaParaCinza(data, largura, altura), saturacao: rgbaParaSaturacao(data, largura, altura), fundo, fundoLiso, largura, altura };
+  return { cinza: rgbaParaCinza(data, largura, altura), saturacao: rgbaParaSaturacao(data, largura, altura), fundo, rgba: data, fundoLiso, largura, altura };
 }
 
 function quantas(n: number, uma: string, varias: string): string {
@@ -91,7 +91,7 @@ export function ImportarParedes({
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
   const campoArquivo = useRef<HTMLInputElement>(null);
   // A imagem em cinza e a parte pesada da detecção ficam guardadas: mexer no controle só refaz a parte barata.
-  const imagemRef = useRef<{ url: string; cinza: Uint8Array; saturacao: Uint8Array; fundo: Uint8Array; fundoLiso: boolean; largura: number; altura: number } | null>(null);
+  const imagemRef = useRef<{ url: string; cinza: Uint8Array; saturacao: Uint8Array; fundo: Uint8Array; rgba: Uint8ClampedArray; fundoLiso: boolean; largura: number; altura: number } | null>(null);
   // O Mestre já escolheu o tipo de mapa à mão? Se não, o app escolhe "contorno" quando o fundo é liso.
   const tipoEscolhidoRef = useRef(false);
   const preparadasRef = useRef(new Map<string, DeteccaoPreparada>());
@@ -152,7 +152,7 @@ export function ImportarParedes({
     // Parede clara: além do brilho, a cor (pedra clara tem menos cor que o chão em volta).
     const r =
       escolhas.linhas === "contorno"
-        ? detectarContorno(img.fundo, img.largura, img.altura, { limiarDoFundo: LIMIAR_DO_FUNDO_POR_NIVEL[escolhas.sensibilidade], maximo: Math.max(40, 385 - paredes.length) })
+        ? detectarContorno(img.fundo, img.largura, img.altura, { limiarDoFundo: LIMIAR_DO_FUNDO_POR_NIVEL[escolhas.sensibilidade], maximo: Math.max(40, 385 - paredes.length), rgba: img.rgba })
         : escolhas.linhas === "claras"
         ? aplicarComCor(
             guardada(`claras|${sufixo}`, preparar),

@@ -1972,6 +1972,42 @@ só funciona com fundo preto). **É rascunho**: o Mestre confere na prévia (`Pr
   por cima; `avaliar.py` dá recall/precisão. Precisa de `.venv-mapas/` (opencv, numpy, scikit-image; fora do Git). Gabaritos em
   `scripts/mapas/testes/`: `labirinto_trecho.json` (semiautomático, conferido a olho; **85% das paredes, 96% de precisão** com clara nível 5) e
   `taverna_paredes.json` (à mão, alguns px fora: ~65%/61%, **não serve pra ajuste fino**).
+- **Gabarito exato, sem desenhar à mão** (08/10/2026, só scripts, nada no app): `scripts/mapas/preparar_watabou.sh <pasta>`
+  baixa 9 masmorras do One Page Dungeon do Watabou (o autor libera o uso dos mapas gerados; mesma semente + estilo = mesmo mapa)
+  com o JSON de geometria que o gerador exporta (retângulos de chão + portas), e `gabarito_watabou.py` casa essa geometria com o
+  PNG (escala e deslocamento por correlação com os pixels escuros; conferido em foto, cai em cima da parede) e grava o gabarito.
+  `scripts/mapas/medir_todos.sh <pasta>/gab [nível]` roda escuras/claras/contorno do app em todos e imprime a tabela
+  (recall/precisão a 6 e 12 px, portas achadas, tempo); desenha detectado (vermelho) × gabarito (verde) em
+  `$TMPDIR/medir_todos/`. As imagens não vão pro Git (regeneráveis). **Pegadinhas**: no Chrome automatizado as duas primeiras
+  teclas depois de abrir são engolidas (aquecer e tentar de novo); a opção "girar pra caber" (R) fica salva por contexto, então
+  cada mapa abre num contexto novo; o mapa só de rotundas (círculos emendados) o gabarito não acerta e foi trocado. O gabarito
+  põe a parede na borda do CHÃO; em estilo de parede grossa o traço fica uns 6–10 px dentro, por isso se olha a 12 px.
+  **Linha de base antes de mexer (nível 3, 9 mapas, médias a 12 px):** escuras 40% de recall / 41% de precisão; claras 10% / 22%;
+  contorno 55% / 41%, portas 13%. O contorno desenhava a silhueta de FORA (borda de pedra, sombreado, parede grossa) e
+  contornava título e quadros de texto.
+  **Contorno da beira do chão** (08/10/2026, `refinarParaOChao` em `detectarContorno.ts`; o `ImportarParedes` passa `rgba`):
+  tira manchas menores que 4% da maior (título, quadros); acha a cor do chão (mediana dos pontos fundos da silhueta) e
+  contorna só o que tem essa cor; **se o que a máscara cerca é mais de 60% da própria máscara** (ou ela é só traço fino), o chão
+  tem a cor do fundo e a máscara é só parede + sombreado: ficam só os contornos dos BURACOS (sentido oposto ao da maior volta)
+  e a borda de fora é descartada. `fundoLiso` aceita até 97% de fundo (planta pequena em página branca). **Resultado: contorno
+  86% de recall / 86% de precisão, portas 24%** (pior mapa 41%/42% a 6 px, 76%/89% a 12 px: parede grossa).
+  **Tentado e descartado**: decidir "chão é a cor do fundo" por homogeneidade do miolo (derrubou 4 mapas), e refazer a máscara
+  com limiar escuro pra tirar a grade (precisão +5, recall −5: soma igual).
+  **Portas** (08/10/2026): **o gabarito de porta estava errado e inflava o problema** — no JSON do Watabou a porta É a célula
+  1×1 `(x, y)` (a `dir` é só o eixo por onde se passa), não a vizinha; com isso corrigido a base subiu de 13% pra 44% sem mexer
+  no detector. Tipos de porta do gerador: portão (símbolo desenhado), escada/entrada e **abertura sem símbolo** (só um vão de
+  uma célula). Mudanças no detector: (1) no modo "chão com a cor do fundo" a máscara passa a ser o chão (`buracosFechados`:
+  o que a parede cerca), então o miolo/corredor/portas rodam no chão e não no anel de parede + sombreado; (2) **`portasPorLacuna`**:
+  o símbolo de porta come o chão e deixa uma lacuna retangular entre dois pisos (0,25–1,3 largura de corredor ao longo, 0,5–1,6 de
+  través, com ≥50% de pixel diferente do fundo dentro); (3) porta não passa de **2,4 larguras de corredor** (a corda que cruzava
+  um cômodo virava porta). **Resultado: 55% das portas achadas, 37% das achadas são falsas** (antes 13% / —). Por mapa: 22/26,
+  13/13 e 18/32 nos melhores, 4/8, 6/16 e 9/30 nos piores. Lacuna sozinha acha só 24% e erra 57%; o método antigo sozinho
+  44% / 40% falsas; juntos se completam (lacuna pega o portão entre cômodos, o antigo pega a abertura sem símbolo).
+  **Tentado e sem ganho**: gargalo por distância (largura sobe dos dois lados), tirar bolsão de sombreado dos buracos por fração
+  de pixel sujo, exigir mais traço dentro da lacuna além de 50%. **Ainda ruim**: grade de chão forte pica o chão em quadrados
+  (d1212, precisão de parede 37% a 6 px); cômodo cujo anel de parede não fecha (hachura aberta) some do contorno; as falsas
+  restantes são sobretudo cordas diagonais e traços de mobília. Mapa pintado e caverna seguem sem gabarito (o gerador de
+  caverna não exporta JSON) — os números valem pra masmorra DESENHADA.
 - **Onde está**: bom em planta preto e branco e no labirinto de pedra clara; razoável (com limpeza na prévia) em taverna e pergaminho; **ruim** em mapa
   muito ilustrado com contorno de fio branco (o "poço"). O critério combinado com o Daniel (95% das paredes, ≤ 5% falsas) **não foi atingido** em geral.
 - **Tentado e descartado, não repetir sem motivo novo**: um sinal único pra qualquer cor de parede (piorou a taverna); tirar linha curta solta e tirar
