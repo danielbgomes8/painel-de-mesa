@@ -2,7 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { Cena } from "@/lib/cenas";
-import { TEXTO_MAXIMO_DA_IMPORTACAO, lerParedesDoTexto, pedidoDeParedes } from "@/lib/importarParedes";
+import { TEXTO_MAXIMO_DA_IMPORTACAO, contornoQueFalta, lerParedesDoTexto, pedidoDeParedes } from "@/lib/importarParedes";
+import { PAREDES_MAXIMAS } from "@/lib/paredes";
 import type { NovaParede, Parede } from "@/lib/paredes";
 import {
   FATOR_DA_COR,
@@ -226,6 +227,28 @@ export function ImportarParedes({
     setTexto(comoTextoDeImportacao(deteccao));
   }
 
+  async function fecharContorno() {
+    if (enviando) return;
+    const faltam = contornoQueFalta({ largura, altura }, paredes);
+    if (faltam.length === 0) {
+      setAviso({ texto: "A borda do mapa já está fechada dos quatro lados.", falhou: false });
+      return;
+    }
+    if (paredes.length + faltam.length > PAREDES_MAXIMAS) {
+      setAviso({ texto: `Não cabe: o mapa já tem ${paredes.length} paredes e o máximo é ${PAREDES_MAXIMAS}.`, falhou: true });
+      return;
+    }
+    setEnviando(true);
+    setAviso(null);
+    const deuCerto = await adicionar(faltam);
+    setEnviando(false);
+    setAviso(
+      deuCerto
+        ? { texto: `Borda fechada: ${quantas(faltam.length, "parede entrou", "paredes entraram")}. “↩ desfazer parede” tira.`, falhou: false }
+        : { texto: "Não fechou a borda. Confira a conexão e tente de novo.", falhou: true },
+    );
+  }
+
   async function importar() {
     if (!leitura?.ok || enviando) return;
     const { novas, paredes: nParedes, portas: nPortas } = leitura;
@@ -253,6 +276,14 @@ export function ImportarParedes({
       </button>
       {aberto && (
         <>
+          <p className="bkpexplica">
+            O mapa é cortado rente às paredes de fora (uma casa, uma taverna)? Feche a borda da imagem com quatro paredes, pra visão não vazar pra fora:
+          </p>
+          <div className="mapa-ferr">
+            <button type="button" className="btn" disabled={enviando} onClick={() => void fecharContorno()}>
+              ▭ fechar a borda do mapa
+            </button>
+          </div>
           {urlDaImagem && (
             <>
               <p className="bkpexplica">

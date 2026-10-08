@@ -109,4 +109,19 @@ describe("importar paredes", () => {
     await waitFor(() => expect(campo.value).toBe(RESPOSTA));
     expect(screen.getByText(/Prontas pra entrar: 2 paredes e 1 porta\./)).toBeTruthy();
   });
+
+  it("fechar a borda: manda as quatro paredes e só diz que fechou depois de o banco confirmar", async () => {
+    const adicionar = vi.fn(async () => true);
+    montar(adicionar);
+    fireEvent.click(screen.getByRole("button", { name: /fechar a borda do mapa/ }));
+    await waitFor(() => expect(screen.getByText(/Borda fechada: 4 paredes entraram/)).toBeTruthy());
+    expect(adicionar).toHaveBeenCalledTimes(1);
+    expect((adicionar.mock.calls[0] as unknown as [NovaParede[]])[0]).toHaveLength(4);
+  });
+
+  it("fechar a borda: se o banco recusa, avisa que não fechou", async () => {
+    montar(async () => false);
+    fireEvent.click(screen.getByRole("button", { name: /fechar a borda do mapa/ }));
+    await waitFor(() => expect(screen.getByText(/Não fechou a borda/)).toBeTruthy());
+  });
 });

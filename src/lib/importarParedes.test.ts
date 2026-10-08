@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ENCAIXE_DA_IMPORTACAO, TEXTO_MAXIMO_DA_IMPORTACAO, lerParedesDoTexto, pedidoDeParedes, soldarPontas } from "./importarParedes";
+import { ENCAIXE_DA_IMPORTACAO, TEXTO_MAXIMO_DA_IMPORTACAO, contornoQueFalta, lerParedesDoTexto, pedidoDeParedes, soldarPontas } from "./importarParedes";
 import { PAREDES_MAXIMAS, type NovaParede } from "./paredes";
 
 const cena = { largura: 760, altura: 760 };
@@ -190,5 +190,38 @@ describe("o pedido pra IA", () => {
     expect(pedido).toContain(`"largura": 1600, "altura": 900`);
     const exemplo = pedido.split("\n").at(-1)!.replaceAll("x1", "10").replaceAll("y1", "10").replaceAll("x2", "300").replaceAll("y2", "10");
     expect(certo(lerParedesDoTexto(exemplo, { largura: 1600, altura: 900 }, []))).toMatchObject({ paredes: 1, portas: 1, semMedida: false });
+  });
+});
+
+describe("fechar a borda do mapa", () => {
+  it("mapa sem parede na borda: entram os quatro lados", () => {
+    const r = contornoQueFalta({ largura: 800, altura: 600 }, []);
+    expect(r.map((p) => [p.x1, p.y1, p.x2, p.y2])).toEqual([
+      [0, 0, 800, 0],
+      [800, 0, 800, 600],
+      [0, 600, 800, 600],
+      [0, 0, 0, 600],
+    ]);
+    expect(r.every((p) => p.tipo === "parede")).toBe(true);
+  });
+
+  it("lado que já tem parede correndo junto dele não ganha outra; parede curta ou longe da borda não conta", () => {
+    const existentes = [
+      { x1: 5, y1: 4, x2: 400, y2: 4 }, // topo, em dois pedaços que juntos cobrem tudo
+      { x1: 380, y1: 6, x2: 798, y2: 6 },
+      { x1: 3, y1: 100, x2: 3, y2: 300 }, // esquerda: só um terço
+      { x1: 0, y1: 500, x2: 800, y2: 500 }, // paralela à base, mas a 100 px dela
+    ];
+    const r = contornoQueFalta({ largura: 800, altura: 600 }, existentes);
+    expect(r.map((p) => [p.x1, p.y1, p.x2, p.y2])).toEqual([
+      [800, 0, 800, 600],
+      [0, 600, 800, 600],
+      [0, 0, 0, 600],
+    ]);
+  });
+
+  it("rodar de novo depois de fechar não acrescenta nada", () => {
+    const c = { largura: 800, altura: 600 };
+    expect(contornoQueFalta(c, contornoQueFalta(c, []))).toEqual([]);
   });
 });

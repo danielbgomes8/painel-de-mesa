@@ -300,3 +300,35 @@ export function pedidoDeParedes(cena: CenaDaImportacao): string {
     `{"largura": ${cena.largura}, "altura": ${cena.altura}, "paredes": [[x1, y1, x2, y2]], "portas": [[x1, y1, x2, y2]]}`,
   ].join("\n");
 }
+
+/**
+ * As paredes da borda da imagem que ainda faltam — pra mapa cortado rente às paredes de fora
+ * (uma taverna, uma casa): sem elas a visão do grupo "vaza" pra fora do mapa. Um lado que já tem
+ * parede correndo junto dele (a até `perto` px, cobrindo quase tudo) não ganha outra.
+ */
+export function contornoQueFalta(cena: CenaDaImportacao, existentes: readonly Pontas[], perto = Math.max(cena.largura, cena.altura) * 0.02): NovaParede[] {
+  const { largura: w, altura: h } = cena;
+  const lados: NovaParede[] = [
+    { tipo: "parede", x1: 0, y1: 0, x2: w, y2: 0 },
+    { tipo: "parede", x1: w, y1: 0, x2: w, y2: h },
+    { tipo: "parede", x1: 0, y1: h, x2: w, y2: h },
+    { tipo: "parede", x1: 0, y1: 0, x2: 0, y2: h },
+  ];
+  return lados.filter((lado) => {
+    const horizontal = lado.y1 === lado.y2;
+    const total = horizontal ? w : h;
+    // Quanto do lado já está coberto por paredes paralelas coladas nele (intervalos unidos).
+    const trechos = existentes
+      .filter((p) => (horizontal ? Math.abs(p.y1 - lado.y1) <= perto && Math.abs(p.y2 - lado.y1) <= perto : Math.abs(p.x1 - lado.x1) <= perto && Math.abs(p.x2 - lado.x1) <= perto))
+      .map((p) => (horizontal ? [Math.min(p.x1, p.x2), Math.max(p.x1, p.x2)] : [Math.min(p.y1, p.y2), Math.max(p.y1, p.y2)]))
+      .sort((a, b) => a[0] - b[0]);
+    let coberto = 0;
+    let fim = 0;
+    for (const [a, b] of trechos) {
+      if (b <= fim) continue;
+      coberto += b - Math.max(a, fim);
+      fim = b;
+    }
+    return coberto < total * 0.9;
+  });
+}
