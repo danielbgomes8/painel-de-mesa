@@ -188,19 +188,113 @@ function fundir(segs: Segmento[], lado: number): { juntas: Segmento[]; vaos: Vao
   return { juntas: [...juntar(hs, "h"), ...juntar(vs, "v")], vaos };
 }
 
-/** Só vale vão que ficou DENTRO de uma parede que sobreviveu ao filtro de comprimento. */
-function portasDosVaos(vaos: Vao[], paredes: Segmento[]): Segmento[] {
+/**
+ * Só vale vão que ficou dentro de uma linha comprida (`compridas`) e perto de um
+ * trecho que passou no filtro de contraste: vão no meio de linha falsa (borda de
+ * tapete) não sobra nenhum trecho por perto e some.
+ */
+function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], perto: number): Segmento[] {
   const portas: Segmento[] = [];
   for (const v of vaos) {
-    const dentro = paredes.some((w) =>
-      v.eixo === "h"
-        ? w[1] === w[3] && Math.abs(w[1] - v.pos) <= 4 && w[0] <= v.ini + 1 && w[2] >= v.fim - 1
-        : w[0] === w[2] && Math.abs(w[0] - v.pos) <= 4 && w[1] <= v.ini + 1 && w[3] >= v.fim - 1,
-    );
-    if (!dentro) continue;
+    const naLinha = (lista: Segmento[]) =>
+      lista.filter((w) => (v.eixo === "h" ? w[1] === w[3] && Math.abs(w[1] - v.pos) <= 4 : w[0] === w[2] && Math.abs(w[0] - v.pos) <= 4));
+    const a = v.eixo === "h" ? 0 : 1;
+    const b = v.eixo === "h" ? 2 : 3;
+    const dentro = naLinha(compridas).some((w) => w[a] <= v.ini + 1 && w[b] >= v.fim - 1);
+    const sobrou = naLinha(paredes).some((w) => w[b] >= v.ini - perto && w[a] <= v.fim + perto);
+    if (!dentro || !sobrou) continue;
     portas.push(v.eixo === "h" ? [v.ini, v.pos, v.fim, v.pos] : [v.pos, v.ini, v.pos, v.fim]);
   }
   return portas;
+}
+
+/** Parede é escura NELA e clara dos lados; borda de tapete e de móvel é mais clara que isso. */
+const RAZAO_MAXIMA_PAREDE_LADO = 0.55;
+
+/**
+ * Mede a linha ponto a ponto e fica só com os trechos que parecem parede: escuros
+ * em relação ao chão ao lado. O ponto é medido no mais escuro de uma faixa de
+ * ±3 px (o detector erra um pixel ou dois) e comparado com o lado MAIS ESCURO
+ * (a 1 espessura de distância); lado fora da imagem não conta — parede na borda
+ * do mapa só tem um lado. A média corre numa janela de 1 espessura pra uma
+ * mancha não picotar a parede. Assim a parte falsa de uma linha que é meio
+ * parede, meio borda de tapete, sai sem derrubar a parte verdadeira.
+ */
+function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: Segmento[], afastamento: number, minimo: number): Segmento[] {
+  const amostra = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
+  const dentro = (x: number, y: number) => x >= 0 && x <= w - 1 && y >= 0 && y <= h - 1;
+  const saida: Segmento[] = [];
+  for (const s of paredes) {
+    const vertical = s[0] === s[2];
+    const comp = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    const n = Math.max(2, Math.floor(comp));
+    const linha = new Float32Array(n + 1);
+    const lados = [new Float32Array(n + 1), new Float32Array(n + 1)];
+    const valido = [new Uint8Array(n + 1), new Uint8Array(n + 1)];
+    for (let i = 0; i <= n; i++) {
+      const x = s[0] + ((s[2] - s[0]) * i) / n;
+      const y = s[1] + ((s[3] - s[1]) * i) / n;
+      let escuro = 255;
+      for (let o = -3; o <= 3; o++) escuro = Math.min(escuro, amostra(x + (vertical ? o : 0), y + (vertical ? 0 : o)));
+      linha[i] = escuro;
+      [-afastamento, afastamento].forEach((o, k) => {
+        const px = x + (vertical ? o : 0);
+        const py = y + (vertical ? 0 : o);
+        if (dentro(px, py)) {
+          lados[k][i] = amostra(px, py);
+          valido[k][i] = 1;
+        }
+      });
+    }
+    // Médias em janela (somas acumuladas).
+    const acum = (v: Float32Array, m?: Uint8Array) => {
+      const a = new Float64Array(n + 2);
+      const c = new Float64Array(n + 2);
+      for (let i = 0; i <= n; i++) {
+        a[i + 1] = a[i] + (m ? (m[i] ? v[i] : 0) : v[i]);
+        c[i + 1] = c[i] + (m ? m[i] : 1);
+      }
+      return (i: number) => {
+        const ini = Math.max(0, i - afastamento);
+        const fim = Math.min(n, i + afastamento) + 1;
+        const cont = c[fim] - c[ini];
+        return { media: cont ? (a[fim] - a[ini]) / cont : NaN, cont };
+      };
+    };
+    const mLinha = acum(linha);
+    const mLados = [acum(lados[0], valido[0]), acum(lados[1], valido[1])];
+    const bom = new Uint8Array(n + 1);
+    for (let i = 0; i <= n; i++) {
+      const candidatos = mLados.map((f) => f(i)).filter((r) => r.cont > afastamento * 0.5).map((r) => r.media);
+      if (candidatos.length === 0) {
+        bom[i] = 1; // sem lado pra comparar: não dá pra condenar
+        continue;
+      }
+      bom[i] = mLinha(i).media / Math.max(1, Math.min(...candidatos)) <= RAZAO_MAXIMA_PAREDE_LADO ? 1 : 0;
+    }
+    // Trechos contínuos bons, tolerando quebras curtas (uma mancha, uma emenda).
+    const quebra = afastamento;
+    let ini = -1;
+    let ultimoBom = -1;
+    const fechar = () => {
+      if (ini < 0) return;
+      const t = ((ultimoBom - ini) * comp) / n;
+      if (t >= minimo) {
+        const a = ini / n;
+        const b = ultimoBom / n;
+        saida.push([s[0] + (s[2] - s[0]) * a, s[1] + (s[3] - s[1]) * a, s[0] + (s[2] - s[0]) * b, s[1] + (s[3] - s[1]) * b]);
+      }
+      ini = -1;
+    };
+    for (let i = 0; i <= n; i++) {
+      if (bom[i]) {
+        if (ini < 0) ini = i;
+        ultimoBom = i;
+      } else if (ini >= 0 && i - ultimoBom > quebra) fechar();
+    }
+    fechar();
+  }
+  return saida;
 }
 
 const arredondar = (n: number) => Math.round(n * 10) / 10;
@@ -228,8 +322,9 @@ export function detectarParedes(cinza: Uint8Array, largura: number, altura: numb
   const brutos = [...segmentosDaMascara(hor, largura, altura, false), ...segmentosDaMascara(ver, largura, altura, true)];
   const { juntas, vaos } = fundir(brutos, lado);
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
-  const paredes = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
-  const portas = portasDosVaos(vaos, paredes);
+  const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
+  const paredes = filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6);
+  const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
   const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];
   return { largura, altura, paredes: paredes.map(r), portas: portas.map(r) };

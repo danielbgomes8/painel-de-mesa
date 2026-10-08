@@ -30,6 +30,15 @@ describe("detectarParedes", () => {
     expect(porta![3]).toBeLessThan(150);
   });
 
+  it("borda de tapete (linha só um pouco mais escura que o chão) não vira parede", () => {
+    const { g, w, h } = mapaSintetico();
+    // Uma linha comprida e fina, mas só ~35% mais escura que o chão: é o tapete, não a parede.
+    for (let x = 60; x <= 340; x++) for (let y = 200; y <= 205; y++) g[y * w + x] = 130;
+    const r = detectarParedes(g, w, h, { minimo: 0.15 });
+    expect(r.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 202.5) <= 3)).toBe(false);
+    expect(r.paredes.some((s) => s[0] === s[2] && Math.abs(s[0] - 200) <= 3)).toBe(true);
+  });
+
   it("imagem lisa não vira parede", () => {
     const g = new Uint8Array(300 * 300).fill(180);
     const r = detectarParedes(g, 300, 300);
