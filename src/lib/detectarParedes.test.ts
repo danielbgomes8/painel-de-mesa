@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { NIVEIS_DE_SENSIBILIDADE, aplicarDeteccao, comoTextoDeImportacao, detectarParedes, prepararDeteccao, rgbaParaCinza } from "./detectarParedes";
+import {
+  NIVEIS_DE_SENSIBILIDADE,
+  aplicarComCor,
+  aplicarDeteccao,
+  comoTextoDeImportacao,
+  detectarParedes,
+  prepararDeteccao,
+  rgbaParaCinza,
+  rgbaParaSaturacao,
+  unirDeteccoes,
+} from "./detectarParedes";
 
 /** Mapa de mentira: chão claro com ruído, duas salas separadas por uma parede com vão de porta. */
 function mapaSintetico(w = 400, h = 300) {
@@ -18,8 +28,10 @@ function mapaSintetico(w = 400, h = 300) {
 }
 
 describe("detectarParedes", () => {
-  it("acha as paredes retas e a porta no vão, sem depender de fundo preto", () => {
+  it("acha as paredes retas e a porta desenhada no vão, sem depender de fundo preto", () => {
     const { g, w, h } = mapaSintetico();
+    // A folha da porta: um traço fino e bem mais fraco que a parede, no vão da divisória.
+    for (let y = 112; y <= 138; y++) for (let x = 199; x <= 201; x++) g[y * w + x] = 150;
     const r = detectarParedes(g, w, h, { minimo: 0.15 });
     const vertical = r.paredes.filter((s) => s[0] === s[2]);
     expect(vertical.some((s) => Math.abs(s[0] - 200) <= 3)).toBe(true);
@@ -28,6 +40,13 @@ describe("detectarParedes", () => {
     expect(porta).toBeDefined();
     expect(porta![1]).toBeGreaterThan(100);
     expect(porta![3]).toBeLessThan(150);
+  });
+
+  it("vão de chão liso é passagem aberta: não vira porta", () => {
+    const { g, w, h } = mapaSintetico();
+    const r = detectarParedes(g, w, h, { minimo: 0.15 });
+    expect(r.paredes.filter((s) => s[0] === s[2] && Math.abs(s[0] - 200) <= 3).length).toBeGreaterThanOrEqual(1);
+    expect(r.portas.some((s) => Math.abs(s[0] - 200) <= 3)).toBe(false);
   });
 
   it("borda de tapete (linha só um pouco mais escura que o chão) não vira parede", () => {
@@ -139,5 +158,33 @@ describe("detectarParedes", () => {
     expect(naLinha.length).toBeGreaterThanOrEqual(2);
     // Nenhum trecho cobre o meio do corredor (x = 135).
     expect(naLinha.some((s) => s[0] < 130 && s[2] > 140)).toBe(false);
+  });
+
+  it("saturação: cinza dá 0, cor viva dá 255", () => {
+    expect(Array.from(rgbaParaSaturacao(new Uint8Array([120, 120, 120, 255, 200, 0, 0, 255, 200, 100, 100, 255]), 3, 1))).toEqual([0, 255, 128]);
+  });
+
+  it("unir: o trecho que repete uma parede da primeira leitura sai; o que é novo entra", () => {
+    const a = { largura: 100, altura: 100, paredes: [[10, 20, 90, 20]] as [number, number, number, number][], portas: [] };
+    const b = { largura: 100, altura: 100, paredes: [[15, 23, 80, 23], [50, 30, 50, 90], [10, 20, 10, 28]] as [number, number, number, number][], portas: [] };
+    const u = unirDeteccoes(a, b, 5);
+    expect(u.paredes).toEqual([[10, 20, 90, 20], [50, 30, 50, 90], [10, 20, 10, 28]]); // a perpendicular curtinha NÃO é repetição
+  });
+
+  it("parede com o mesmo brilho do chão, mas menos cor, sai pela leitura da cor", () => {
+    // Chão marrom vivo e parede bege: brilho igual (140), saturação 150 contra 115 — o miolo do labirinto de verdade.
+    const w = 400;
+    const h = 300;
+    const brilho = new Uint8Array(w * h).fill(140);
+    const cor = new Uint8Array(w * h);
+    for (let i = 0; i < cor.length; i++) cor[i] = 148 + ((i * 7919) % 5);
+    for (let y = 100; y <= 105; y++) for (let x = 60; x <= 340; x++) cor[y * w + x] = 115;
+    const n = NIVEIS_DE_SENSIBILIDADE[5];
+    const r = aplicarComCor(
+      prepararDeteccao(brilho, w, h, { linhas: "claras", comp: n.comp, limiar: n.limiar, limiarLocal: n.limiarLocal }),
+      prepararDeteccao(cor, w, h, { linhas: "escuras", comp: n.comp, limiar: 0.6, limiarLocal: 0.4 }),
+      { minimo: n.minimo, razao: n.razao, curvas: false },
+    );
+    expect(r.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 102.5) <= 3 && s[2] - s[0] > 200)).toBe(true);
   });
 });

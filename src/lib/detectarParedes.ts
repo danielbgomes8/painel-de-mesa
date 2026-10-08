@@ -125,6 +125,51 @@ function otsu(g: Uint8Array): number {
 }
 
 /**
+ * Limiar por região. Num mapa com luz e sombra (o clarão no meio de um salão), a parede da
+ * parte clara tem um décimo do contraste da parede contra o vazio, e um limiar só pra imagem
+ * inteira a perde. Aqui cada bloco (`bloco` px) guarda a resposta mais forte que tem; o limiar
+ * do ponto é uma `fracao` dessa resposta (interpolada entre os blocos vizinhos), nunca abaixo
+ * de `piso` — senão região lisa viraria ruído.
+ */
+function limiarPorRegiao(resp: Uint8Array, w: number, h: number, bloco: number, fracao: number, piso: number): Float32Array {
+  const bw = Math.max(1, Math.ceil(w / bloco));
+  const bh = Math.max(1, Math.ceil(h / bloco));
+  // Percentil alto (98%) do bloco, e não o máximo: um pixel estourado não manda no bloco.
+  const forte = new Float32Array(bw * bh);
+  const hist = new Uint32Array(256);
+  for (let by = 0; by < bh; by++)
+    for (let bx = 0; bx < bw; bx++) {
+      hist.fill(0);
+      let n = 0;
+      for (let y = by * bloco; y < Math.min(h, (by + 1) * bloco); y++)
+        for (let x = bx * bloco; x < Math.min(w, (bx + 1) * bloco); x++) {
+          hist[resp[y * w + x]]++;
+          n++;
+        }
+      let resto = Math.floor(n * 0.02);
+      let v = 255;
+      while (v > 0 && resto >= hist[v]) resto -= hist[v--];
+      forte[by * bw + bx] = v;
+    }
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const fy = Math.min(bh - 1, Math.max(0, y / bloco - 0.5));
+    const y0 = Math.floor(fy);
+    const y1 = Math.min(bh - 1, y0 + 1);
+    const ty = fy - y0;
+    for (let x = 0; x < w; x++) {
+      const fx = Math.min(bw - 1, Math.max(0, x / bloco - 0.5));
+      const x0 = Math.floor(fx);
+      const x1 = Math.min(bw - 1, x0 + 1);
+      const tx = fx - x0;
+      const v = (forte[y0 * bw + x0] * (1 - tx) + forte[y0 * bw + x1] * tx) * (1 - ty) + (forte[y1 * bw + x0] * (1 - tx) + forte[y1 * bw + x1] * tx) * ty;
+      out[y * w + x] = Math.max(piso, v * fracao);
+    }
+  }
+  return out;
+}
+
+/**
  * Espessura típica (px) das linhas finas da máscara: a mediana dos trechos seguidos de
  * pixels ligados, lendo linha por linha e coluna por coluna, ignorando os que passam de
  * `teto` (mancha, não linha). É o que dá a ESCALA do mapa: num labirinto de corredores
@@ -236,20 +281,41 @@ function fundir(segs: Segmento[], lado: number): { juntas: Segmento[]; vaos: Vao
 }
 
 /**
- * Só vale vão que ficou dentro de uma linha comprida (`compridas`) e perto de um
- * trecho que passou no filtro de contraste: vão no meio de linha falsa (borda de
- * tapete) não sobra nenhum trecho por perto e some.
+ * Vão que vira porta precisa de três coisas: (1) estar dentro de uma linha comprida; (2) ter
+ * parede aceita terminando perto das DUAS pontas — vão no meio de linha falsa (borda de tapete)
+ * perde um lado; (3) ter alguma coisa desenhada dentro dele (a folha da porta, o batente, o
+ * degrau): vão de chão liso é corredor aberto ou passagem, e passagem aberta fica sem nada.
  */
-function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], perto: number): Segmento[] {
+function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], perto: number, resp: Uint8Array, w: number, h: number, marca: number): Segmento[] {
   const portas: Segmento[] = [];
+  const pico = (x: number, y: number, vertical: boolean) => {
+    let m = 0;
+    for (let o = -2; o <= 2; o++) {
+      const xx = Math.min(w - 1, Math.max(0, Math.round(x + (vertical ? o : 0))));
+      const yy = Math.min(h - 1, Math.max(0, Math.round(y + (vertical ? 0 : o))));
+      m = Math.max(m, resp[yy * w + xx]);
+    }
+    return m;
+  };
   for (const v of vaos) {
     const naLinha = (lista: Segmento[]) =>
-      lista.filter((w) => (v.eixo === "h" ? w[1] === w[3] && Math.abs(w[1] - v.pos) <= 4 : w[0] === w[2] && Math.abs(w[0] - v.pos) <= 4));
+      lista.filter((s) => (v.eixo === "h" ? s[1] === s[3] && Math.abs(s[1] - v.pos) <= 4 : s[0] === s[2] && Math.abs(s[0] - v.pos) <= 4));
     const a = v.eixo === "h" ? 0 : 1;
     const b = v.eixo === "h" ? 2 : 3;
-    const dentro = naLinha(compridas).some((w) => w[a] <= v.ini + 1 && w[b] >= v.fim - 1);
-    const sobrou = naLinha(paredes).some((w) => w[b] >= v.ini - perto && w[a] <= v.fim + perto);
-    if (!dentro || !sobrou) continue;
+    if (!naLinha(compridas).some((s) => s[a] <= v.ini + 1 && s[b] >= v.fim - 1)) continue;
+    const aceitas = naLinha(paredes);
+    const antes = aceitas.some((s) => Math.abs(s[b] - v.ini) <= perto);
+    const depois = aceitas.some((s) => Math.abs(s[a] - v.fim) <= perto);
+    if (!antes || !depois) continue;
+    // O miolo do vão (sem as pontas, que ainda pegam o fim da parede).
+    const folga = (v.fim - v.ini) * 0.2;
+    let soma = 0;
+    let n = 0;
+    for (let t = v.ini + folga; t <= v.fim - folga; t++) {
+      soma += v.eixo === "h" ? pico(t, v.pos, false) : pico(v.pos, t, true);
+      n++;
+    }
+    if (n > 0 && soma / n < marca) continue;
     portas.push(v.eixo === "h" ? [v.ini, v.pos, v.fim, v.pos] : [v.pos, v.ini, v.pos, v.fim]);
   }
   return portas;
@@ -443,12 +509,12 @@ const arredondar = (n: number) => Math.round(n * 10) / 10;
  * fraca, como a parede interna de um mapa com muita luz e sombra).
  */
 export type Sensibilidade = 1 | 2 | 3 | 4 | 5;
-export const NIVEIS_DE_SENSIBILIDADE: Record<Sensibilidade, { minimo: number; razao: number; comp: number; limiar: number }> = {
-  1: { minimo: 0.2, razao: 0.4, comp: 1 / 18, limiar: 1 },
-  2: { minimo: 0.15, razao: 0.48, comp: 1 / 18, limiar: 1 },
-  3: { minimo: PAREDE_MINIMA, razao: RAZAO_PADRAO, comp: 1 / 18, limiar: 1 },
-  4: { minimo: 0.07, razao: 0.63, comp: 1 / 26, limiar: 0.8 },
-  5: { minimo: 0.035, razao: 0.72, comp: 1 / 40, limiar: 0.6 },
+export const NIVEIS_DE_SENSIBILIDADE: Record<Sensibilidade, { minimo: number; razao: number; comp: number; limiar: number; limiarLocal: number }> = {
+  1: { minimo: 0.2, razao: 0.4, comp: 1 / 18, limiar: 1, limiarLocal: 0 },
+  2: { minimo: 0.15, razao: 0.48, comp: 1 / 18, limiar: 1, limiarLocal: 0 },
+  3: { minimo: PAREDE_MINIMA, razao: RAZAO_PADRAO, comp: 1 / 18, limiar: 1, limiarLocal: 0 },
+  4: { minimo: 0.07, razao: 0.63, comp: 1 / 26, limiar: 0.8, limiarLocal: 0.5 },
+  5: { minimo: 0.035, razao: 0.72, comp: 1 / 40, limiar: 0.6, limiarLocal: 0.4 },
 };
 
 /** A parte pesada da detecção (não depende de `minimo` nem da `razao`): guarde e reaproveite ao mexer no controle. */
@@ -461,6 +527,9 @@ export type DeteccaoPreparada = {
   claras: boolean;
   /** Espessura típica das linhas finas deste mapa (px): a escala das folgas. */
   traco: number;
+  /** Resposta de linha fina (black-hat) e o limiar da imagem: pra conferir o que há dentro de um vão. */
+  resp: Uint8Array;
+  limiar: number;
   binaria: Uint8Array;
   juntas: Segmento[];
   vaos: Vao[];
@@ -470,7 +539,7 @@ export function prepararDeteccao(
   cinzaOriginal: Uint8Array,
   largura: number,
   altura: number,
-  opcoes: { linhas?: "escuras" | "claras"; espessura?: number; comp?: number; limiar?: number } = {},
+  opcoes: { linhas?: "escuras" | "claras"; espessura?: number; comp?: number; limiar?: number; limiarLocal?: number } = {},
 ): DeteccaoPreparada {
   const claras = opcoes.linhas === "claras";
   // Linha clara: inverte a imagem e cai no caso da linha escura.
@@ -487,8 +556,10 @@ export function prepararDeteccao(
   // O limiar de Otsu é puxado pelos contrastes mais fortes do mapa (a borda contra o vazio); `limiar`
   // abaixo de 1 deixa entrar também as linhas mais fracas (parede interna de labirinto, por exemplo).
   const limiar = otsu(blackhat) * (opcoes.limiar ?? 1);
+  const local = opcoes.limiarLocal ? limiarPorRegiao(blackhat, largura, altura, esp * 3, opcoes.limiarLocal, Math.max(6, limiar * 0.3)) : null;
   const binaria = new Uint8Array(largura * altura);
-  for (let i = 0; i < binaria.length; i++) binaria[i] = blackhat[i] > limiar ? 255 : 0;
+  // Com limiar local: vale o MENOR dos dois, então nada que já entrava deixa de entrar.
+  for (let i = 0; i < binaria.length; i++) binaria[i] = blackhat[i] > (local ? Math.min(limiar, local[i]) : limiar) ? 255 : 0;
 
   const comp = Math.max(12, Math.floor(lado * (opcoes.comp ?? 1 / 18)));
   const abrir = (kx: number, ky: number) => morfologia(morfologia(binaria, largura, altura, kx, ky, false), largura, altura, kx, ky, true);
@@ -498,18 +569,18 @@ export function prepararDeteccao(
   const brutos = [...segmentosDaMascara(hor, largura, altura, false), ...segmentosDaMascara(ver, largura, altura, true)];
   const { juntas, vaos } = fundir(brutos, lado);
   const traco = espessuraDoTraco(binaria, largura, altura, esp);
-  return { cinza, largura, altura, lado, esp, claras, traco, binaria, juntas, vaos };
+  return { cinza, largura, altura, lado, esp, claras, traco, resp: blackhat, limiar, binaria, juntas, vaos };
 }
 
 /** A parte barata: escolhe o que fica, dado o nível de sensibilidade (ou os números soltos). */
 export function aplicarDeteccao(p: DeteccaoPreparada, opcoes: { minimo?: number; razao?: number; curvas?: boolean } = {}): ResultadoDaDeteccao {
-  const { cinza, largura, altura, lado, esp, claras, traco, binaria, juntas, vaos } = p;
+  const { cinza, largura, altura, lado, esp, claras, traco, resp, limiar, binaria, juntas, vaos } = p;
   const lateral = Math.min(esp, Math.max(4, Math.round(traco * 2.5)));
   const razao = opcoes.razao ?? RAZAO_PADRAO;
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
   const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, lateral, minimo * 0.6, claras, razao, traco)), esp);
-  const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
+  const portas = portasDosVaos(vaos, compridas, paredes, Math.max(6, traco * 3), resp, largura, altura, limiar * 0.35);
 
   const curvas =
     opcoes.curvas === false
@@ -526,6 +597,67 @@ export function detectarParedes(cinza: Uint8Array, largura: number, altura: numb
   return aplicarDeteccao(preparada, { minimo: opcoes.minimo, curvas: opcoes.curvas });
 }
 
+/**
+ * Junta duas detecções do MESMO mapa feitas com sinais diferentes (brilho e saturação, por
+ * exemplo): fica tudo da primeira e, da segunda, só o que a primeira não tinha — um trecho
+ * da segunda que corre colado a um da primeira (mesma direção, a até `perto` px) é a mesma
+ * parede vista de novo e sai.
+ */
+export function unirDeteccoes(a: ResultadoDaDeteccao, b: ResultadoDaDeteccao, perto: number): ResultadoDaDeteccao {
+  const distancia = (px: number, py: number, s: Segmento) => {
+    const dx = s[2] - s[0];
+    const dy = s[3] - s[1];
+    const q = dx * dx + dy * dy;
+    const t = q === 0 ? 0 : Math.max(0, Math.min(1, ((px - s[0]) * dx + (py - s[1]) * dy) / q));
+    return Math.hypot(px - (s[0] + t * dx), py - (s[1] + t * dy));
+  };
+  const paralelos = (s: Segmento, o: Segmento) => {
+    const c1 = Math.hypot(s[2] - s[0], s[3] - s[1]) || 1;
+    const c2 = Math.hypot(o[2] - o[0], o[3] - o[1]) || 1;
+    return Math.abs(((s[2] - s[0]) * (o[2] - o[0]) + (s[3] - s[1]) * (o[3] - o[1])) / (c1 * c2)) > 0.94; // ~20°
+  };
+  const repetido = (s: Segmento, base: Segmento[]) => {
+    const n = Math.max(2, Math.floor(Math.hypot(s[2] - s[0], s[3] - s[1]) / 3));
+    const vizinhos = base.filter((o) => paralelos(s, o));
+    if (vizinhos.length === 0) return false;
+    let cobertos = 0;
+    for (let i = 0; i <= n; i++) {
+      const x = s[0] + ((s[2] - s[0]) * i) / n;
+      const y = s[1] + ((s[3] - s[1]) * i) / n;
+      if (vizinhos.some((o) => distancia(x, y, o) <= perto)) cobertos++;
+    }
+    return cobertos / (n + 1) >= 0.6;
+  };
+  const paredes = [...a.paredes];
+  for (const s of b.paredes) if (!repetido(s, paredes)) paredes.push(s);
+  const portas = [...a.portas];
+  for (const s of b.portas) if (!repetido(s, portas) && !repetido(s, paredes)) portas.push(s);
+  return { largura: a.largura, altura: a.altura, paredes, portas };
+}
+
+/**
+ * Parede clara num mapa colorido: junta a leitura do BRILHO (parede mais clara que o chão) com a
+ * da COR (parede menos colorida que o chão — pedra bege sobre piso marrom tem quase o mesmo brilho
+ * sob a luz, mas bem menos cor). A cor entra primeiro: ela cai em cima da parede; o brilho completa
+ * o que a cor não viu (o contorno contra o vazio escuro).
+ */
+export function aplicarComCor(brilho: DeteccaoPreparada, cor: DeteccaoPreparada, opcoes: { minimo?: number; razao?: number; curvas?: boolean } = {}): ResultadoDaDeteccao {
+  const pelaCor = aplicarDeteccao(cor, { minimo: opcoes.minimo, razao: Math.min(0.9, (opcoes.razao ?? RAZAO_PADRAO) + 0.15), curvas: false });
+  const peloBrilho = aplicarDeteccao(brilho, opcoes);
+  return unirDeteccoes(pelaCor, peloBrilho, Math.max(5, brilho.traco * 2.5));
+}
+
+/** Saturação (0 = cinza, 255 = cor viva) de cada pixel RGBA: separa pedra clara de chão colorido mesmo com o mesmo brilho. */
+export function rgbaParaSaturacao(rgba: Uint8ClampedArray | Uint8Array, largura: number, altura: number): Uint8Array {
+  const out = new Uint8Array(largura * altura);
+  for (let i = 0, j = 0; i < out.length; i++, j += 4) {
+    const maior = Math.max(rgba[j], rgba[j + 1], rgba[j + 2]);
+    const menor = Math.min(rgba[j], rgba[j + 1], rgba[j + 2]);
+    out[i] = maior === 0 ? 0 : Math.round(((maior - menor) / maior) * 255);
+  }
+  return out;
+}
+
 /** Converte RGBA (do canvas) em níveis de cinza, no peso de luminosidade usual. */
 export function rgbaParaCinza(rgba: Uint8ClampedArray | Uint8Array, largura: number, altura: number): Uint8Array {
   const out = new Uint8Array(largura * altura);
@@ -533,6 +665,15 @@ export function rgbaParaCinza(rgba: Uint8ClampedArray | Uint8Array, largura: num
     out[i] = Math.round(0.299 * rgba[j] + 0.587 * rgba[j + 1] + 0.114 * rgba[j + 2]);
   }
   return out;
+}
+
+/** Só as `n` paredes mais compridas (na ordem em que estavam); as portas ficam todas. */
+export function soAsMaiores(r: ResultadoDaDeteccao, n: number): ResultadoDaDeteccao {
+  if (r.paredes.length <= n) return r;
+  const comp = (s: Segmento) => Math.hypot(s[2] - s[0], s[3] - s[1]);
+  const corte = r.paredes.map(comp).sort((x, y) => y - x)[Math.max(0, n - 1)];
+  let sobra = n;
+  return { ...r, paredes: r.paredes.filter((s) => comp(s) >= corte && sobra-- > 0) };
 }
 
 /** O JSON no mesmo formato do "Importar paredes" (largura/altura da imagem analisada). */

@@ -7,10 +7,13 @@ import type { NovaParede, Parede } from "@/lib/paredes";
 import {
   LADO_DA_ANALISE,
   NIVEIS_DE_SENSIBILIDADE,
+  aplicarComCor,
   aplicarDeteccao,
   comoTextoDeImportacao,
   prepararDeteccao,
   rgbaParaCinza,
+  rgbaParaSaturacao,
+  soAsMaiores,
   type DeteccaoPreparada,
   type ResultadoDaDeteccao,
   type Sensibilidade,
@@ -27,7 +30,7 @@ function semAsTiradas(d: ResultadoDaDeteccao, tiradas: ReadonlySet<string>): Res
 }
 
 /** Baixa a imagem da cena e devolve os níveis de cinza, já reduzidos pro tamanho da análise. */
-async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; largura: number; altura: number }> {
+async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturacao: Uint8Array; largura: number; altura: number }> {
   const resposta = await fetch(url);
   if (!resposta.ok) throw new Error(`imagem ${resposta.status}`);
   const imagem = await createImageBitmap(await resposta.blob());
@@ -41,7 +44,8 @@ async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; largura:
   if (!ctx) throw new Error("sem canvas");
   ctx.drawImage(imagem, 0, 0, largura, altura);
   imagem.close();
-  return { cinza: rgbaParaCinza(ctx.getImageData(0, 0, largura, altura).data, largura, altura), largura, altura };
+  const { data } = ctx.getImageData(0, 0, largura, altura);
+  return { cinza: rgbaParaCinza(data, largura, altura), saturacao: rgbaParaSaturacao(data, largura, altura), largura, altura };
 }
 
 function quantas(n: number, uma: string, varias: string): string {
@@ -80,7 +84,7 @@ export function ImportarParedes({
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
   const campoArquivo = useRef<HTMLInputElement>(null);
   // A imagem em cinza e a parte pesada da detecção ficam guardadas: mexer no controle só refaz a parte barata.
-  const imagemRef = useRef<{ url: string; cinza: Uint8Array; largura: number; altura: number } | null>(null);
+  const imagemRef = useRef<{ url: string; cinza: Uint8Array; saturacao: Uint8Array; largura: number; altura: number } | null>(null);
   const preparadasRef = useRef(new Map<string, DeteccaoPreparada>());
   const relogioRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -123,26 +127,53 @@ export function ImportarParedes({
     const img = imagemRef.current;
     if (!img) return;
     const nivel = NIVEIS_DE_SENSIBILIDADE[escolhas.sensibilidade];
-    const chave = `${escolhas.linhas}|${nivel.comp.toFixed(4)}|${nivel.limiar}`;
-    let preparada = preparadasRef.current.get(chave);
-    if (!preparada) {
-      preparada = prepararDeteccao(img.cinza, img.largura, img.altura, { linhas: escolhas.linhas, comp: nivel.comp, limiar: nivel.limiar });
-      preparadasRef.current.set(chave, preparada);
-    }
-    const r = aplicarDeteccao(preparada, { minimo: nivel.minimo, razao: nivel.razao, curvas: escolhas.curvas });
+    const guardada = (chave: string, fazer: () => DeteccaoPreparada) => {
+      let p = preparadasRef.current.get(chave);
+      if (!p) {
+        p = fazer();
+        preparadasRef.current.set(chave, p);
+      }
+      return p;
+    };
+    const sufixo = `${nivel.comp.toFixed(4)}|${nivel.limiar}|${nivel.limiarLocal}`;
+    const preparada = guardada(`${escolhas.linhas}|${sufixo}`, () =>
+      prepararDeteccao(img.cinza, img.largura, img.altura, { linhas: escolhas.linhas, comp: nivel.comp, limiar: nivel.limiar, limiarLocal: nivel.limiarLocal }),
+    );
+    const ajustes = { minimo: nivel.minimo, razao: nivel.razao, curvas: escolhas.curvas };
+    // Parede clara: além do brilho, a cor (pedra clara tem menos cor que o chão em volta).
+    const r =
+      escolhas.linhas === "claras"
+        ? aplicarComCor(
+            preparada,
+            guardada(`cor|${nivel.comp.toFixed(4)}`, () =>
+              prepararDeteccao(img.saturacao, img.largura, img.altura, { linhas: "escuras", comp: nivel.comp, limiar: 0.6, limiarLocal: 0.4 }),
+            ),
+            ajustes,
+          )
+        : aplicarDeteccao(preparada, ajustes);
     if (r.paredes.length + r.portas.length === 0) {
       setDeteccao(null);
       setTexto("");
       setAviso({ texto: "Nada achado com estas escolhas. Tente “mais linhas” ou troque o tipo de parede.", falhou: true });
       return;
     }
-    setDeteccao(r);
+    // O mapa aceita no máximo 400 trechos (e fechar as frestas acrescenta alguns): se passar, ficam as
+    // paredes mais compridas — as curtinhas são as que mais erram.
+    let cabe = r;
+    for (let n = r.paredes.length; n > 20; n = Math.floor(n * 0.9)) {
+      cabe = soAsMaiores(r, n);
+      if (lerParedesDoTexto(comoTextoDeImportacao(cabe), { largura, altura }, paredes).ok) break;
+    }
+    const cortadas = r.paredes.length - cabe.paredes.length;
+    setDeteccao(cabe);
     setTiradas(new Set());
-    setTexto(comoTextoDeImportacao(r));
+    setTexto(comoTextoDeImportacao(cabe));
     setAviso(
-      primeira
-        ? { texto: "Achei sozinho. Toque nas linhas erradas pra tirá-las e depois importe. Faltou ou sobrou muita linha? Mexa no controle de “mais/menos linhas”.", falhou: false }
-        : null,
+      cortadas > 0
+        ? { texto: `Achei mais do que cabe num mapa: deixei de fora as ${cortadas} paredes mais curtas. Se faltar muita coisa, use “menos linhas”.`, falhou: false }
+        : primeira
+          ? { texto: "Achei sozinho. Toque nas linhas erradas pra tirá-las e depois importe. Faltou ou sobrou muita linha? Mexa no controle de “mais/menos linhas”.", falhou: false }
+          : null,
     );
   }
 
@@ -235,8 +266,8 @@ export function ImportarParedes({
                 </label>
                 <br />
                 <label>
-                  <input type="radio" name="linhas-da-parede" checked={linhas === "claras"} onChange={() => refazerComEscolhas({ linhas: "claras" })} /> contorno claro em volta de
-                  fundo escuro
+                  <input type="radio" name="linhas-da-parede" checked={linhas === "claras"} onChange={() => refazerComEscolhas({ linhas: "claras" })} /> parede clara (pedra, contorno branco) sobre
+                  chão ou fundo mais escuro
                 </label>
               </fieldset>
               <label className="mapa-dica">
