@@ -40,3 +40,4 @@ next-env.d.ts
 # relatórios do robô de tela (Playwright, `npm run e2e`)
 /test-results/
 /playwright-report/
+.venv-mapas/

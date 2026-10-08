@@ -1,0 +1,250 @@
+/**
+ * Detectar paredes e portas numa imagem de mapa, no próprio aparelho.
+ *
+ * Parede de mapa é uma linha escura e fina em cima de um chão mais claro. O
+ * "black-hat" (fechamento menos a imagem) realça justamente isso: escuro e mais
+ * fino que o núcleo. Funciona com fundo de papel, madeira ou textura — não
+ * depende de o fundo ser preto. Depois só ficam as linhas retas (horizontais e
+ * verticais) e compridas, e cada VAO de largura de porta no meio de uma parede
+ * vira uma porta.
+ *
+ * É um RASCUNHO: móvel, tapete e quadriculado ainda enganam, e parede curva ou
+ * diagonal não sai. O Mestre confere no mapa e corrige. Regras puras, sem DOM:
+ * recebem os níveis de cinza e devolvem segmentos em px da imagem analisada.
+ */
+
+export type Segmento = [number, number, number, number];
+
+export type ResultadoDaDeteccao = {
+  largura: number;
+  altura: number;
+  paredes: Segmento[];
+  portas: Segmento[];
+};
+
+export type OpcoesDaDeteccao = {
+  /** Comprimento mínimo de uma parede, em fração do lado maior. */
+  minimo?: number;
+  /** Largura do núcleo do black-hat (px); padrão: lado / 28. */
+  espessura?: number;
+};
+
+/** Lado maior em que a imagem é analisada: acima disso só custa tempo. */
+export const LADO_DA_ANALISE = 1000;
+
+const PAREDE_MINIMA = 0.12;
+
+/** Janela deslizante em uma linha (máximo ou mínimo): O(n·k), simples e sem alocação por pixel. */
+function janela(origem: Uint8Array, destino: Uint8Array, n: number, passo: number, fora: number, k: number, maximo: boolean) {
+  const r = k >> 1;
+  for (let i = 0; i < n; i++) {
+    let v = maximo ? 0 : 255;
+    const ini = Math.max(0, i - r);
+    const fim = Math.min(n - 1, i + r);
+    for (let j = ini; j <= fim; j++) {
+      const p = origem[fora + j * passo];
+      if (maximo ? p > v : p < v) v = p;
+    }
+    destino[fora + i * passo] = v;
+  }
+}
+
+/** Dilata (máximo) ou erode (mínimo) com janela retangular `kx × ky`, em duas passadas. */
+function morfologia(g: Uint8Array, w: number, h: number, kx: number, ky: number, maximo: boolean): Uint8Array {
+  const meio = new Uint8Array(w * h);
+  const saida = new Uint8Array(w * h);
+  if (kx > 1) for (let y = 0; y < h; y++) janela(g, meio, w, 1, y * w, kx, maximo);
+  else meio.set(g);
+  if (ky > 1) for (let x = 0; x < w; x++) janela(meio, saida, h, w, x, ky, maximo);
+  else saida.set(meio);
+  return saida;
+}
+
+function borrar(g: Uint8Array, w: number, h: number): Uint8Array {
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let soma = 0;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          soma += g[yy * w + xx];
+          n++;
+        }
+      }
+      out[y * w + x] = Math.round(soma / n);
+    }
+  }
+  return out;
+}
+
+function otsu(g: Uint8Array): number {
+  const hist = new Array<number>(256).fill(0);
+  for (const v of g) hist[v]++;
+  const total = g.length;
+  let somaTotal = 0;
+  for (let i = 0; i < 256; i++) somaTotal += i * hist[i];
+  let somaFundo = 0;
+  let pesoFundo = 0;
+  let melhor = 0;
+  let melhorVar = -1;
+  for (let t = 0; t < 256; t++) {
+    pesoFundo += hist[t];
+    if (pesoFundo === 0) continue;
+    const pesoFrente = total - pesoFundo;
+    if (pesoFrente === 0) break;
+    somaFundo += t * hist[t];
+    const mFundo = somaFundo / pesoFundo;
+    const mFrente = (somaTotal - somaFundo) / pesoFrente;
+    const v = pesoFundo * pesoFrente * (mFundo - mFrente) ** 2;
+    if (v > melhorVar) {
+      melhorVar = v;
+      melhor = t;
+    }
+  }
+  return melhor;
+}
+
+/** Segmentos (centro da caixa) das componentes ligadas cuja caixa é bem mais comprida que larga. */
+function segmentosDaMascara(m: Uint8Array, w: number, h: number, vertical: boolean): Segmento[] {
+  const visto = new Uint8Array(w * h);
+  const out: Segmento[] = [];
+  const pilha: number[] = [];
+  for (let i = 0; i < w * h; i++) {
+    if (!m[i] || visto[i]) continue;
+    let minX = w, maxX = 0, minY = h, maxY = 0;
+    pilha.length = 0;
+    pilha.push(i);
+    visto[i] = 1;
+    while (pilha.length) {
+      const p = pilha.pop()!;
+      const x = p % w;
+      const y = (p - x) / w;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          const q = yy * w + xx;
+          if (m[q] && !visto[q]) {
+            visto[q] = 1;
+            pilha.push(q);
+          }
+        }
+      }
+    }
+    const ww = maxX - minX + 1;
+    const hh = maxY - minY + 1;
+    if (vertical) {
+      if (hh < ww * 3) continue;
+      const cx = minX + ww / 2;
+      out.push([cx, minY, cx, maxY + 1]);
+    } else {
+      if (ww < hh * 3) continue;
+      const cy = minY + hh / 2;
+      out.push([minX, cy, maxX + 1, cy]);
+    }
+  }
+  return out;
+}
+
+type Vao = { eixo: "h" | "v"; pos: number; ini: number; fim: number };
+
+/** Junta segmentos na mesma linha; cada vão de largura de porta entre dois pedaços vira candidato a porta. */
+function fundir(segs: Segmento[], lado: number): { juntas: Segmento[]; vaos: Vao[] } {
+  const folgaOff = 4;
+  const folgaVao = lado * 0.09;
+  const vaoMinimo = lado * 0.025;
+  const hs = segs.filter((s) => s[1] === s[3]).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  const vs = segs.filter((s) => s[0] === s[2]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const vaos: Vao[] = [];
+  const juntar = (lista: Segmento[], eixo: "h" | "v"): Segmento[] => {
+    const off = eixo === "h" ? 1 : 0;
+    const a = eixo === "h" ? 0 : 1;
+    const b = eixo === "h" ? 2 : 3;
+    const out: Segmento[] = [];
+    for (const s of lista) {
+      const o = out.find((o) => Math.abs(o[off] - s[off]) <= folgaOff && s[a] <= o[b] + folgaVao && s[b] >= o[a] - folgaVao);
+      if (!o) {
+        out.push([...s] as Segmento);
+        continue;
+      }
+      if (s[a] - o[b] >= vaoMinimo) vaos.push({ eixo, pos: (o[off] + s[off]) / 2, ini: o[b], fim: s[a] });
+      o[a] = Math.min(o[a], s[a]);
+      o[b] = Math.max(o[b], s[b]);
+      o[off] = o[off + 2] = (o[off] + s[off]) / 2;
+    }
+    return out;
+  };
+  return { juntas: [...juntar(hs, "h"), ...juntar(vs, "v")], vaos };
+}
+
+/** Só vale vão que ficou DENTRO de uma parede que sobreviveu ao filtro de comprimento. */
+function portasDosVaos(vaos: Vao[], paredes: Segmento[]): Segmento[] {
+  const portas: Segmento[] = [];
+  for (const v of vaos) {
+    const dentro = paredes.some((w) =>
+      v.eixo === "h"
+        ? w[1] === w[3] && Math.abs(w[1] - v.pos) <= 4 && w[0] <= v.ini + 1 && w[2] >= v.fim - 1
+        : w[0] === w[2] && Math.abs(w[0] - v.pos) <= 4 && w[1] <= v.ini + 1 && w[3] >= v.fim - 1,
+    );
+    if (!dentro) continue;
+    portas.push(v.eixo === "h" ? [v.ini, v.pos, v.fim, v.pos] : [v.pos, v.ini, v.pos, v.fim]);
+  }
+  return portas;
+}
+
+const arredondar = (n: number) => Math.round(n * 10) / 10;
+
+/** `cinza`: um byte por pixel (0 = preto), `largura × altura`. */
+export function detectarParedes(cinza: Uint8Array, largura: number, altura: number, opcoes: OpcoesDaDeteccao = {}): ResultadoDaDeteccao {
+  const lado = Math.max(largura, altura);
+  const borrada = borrar(cinza, largura, altura);
+
+  const esp = (opcoes.espessura ?? Math.max(5, Math.floor(lado / 28))) | 1;
+  // Fechamento = dilatar e depois erodir com a mesma janela.
+  const fechamento = morfologia(morfologia(borrada, largura, altura, esp, esp, true), largura, altura, esp, esp, false);
+  const blackhat = new Uint8Array(largura * altura);
+  for (let i = 0; i < blackhat.length; i++) blackhat[i] = Math.max(0, fechamento[i] - borrada[i]);
+
+  const limiar = otsu(blackhat);
+  const binaria = new Uint8Array(largura * altura);
+  for (let i = 0; i < binaria.length; i++) binaria[i] = blackhat[i] > limiar ? 255 : 0;
+
+  const comp = Math.max(15, Math.floor(lado / 18));
+  const abrir = (kx: number, ky: number) => morfologia(morfologia(binaria, largura, altura, kx, ky, false), largura, altura, kx, ky, true);
+  const hor = abrir(comp, 1);
+  const ver = abrir(1, comp);
+
+  const brutos = [...segmentosDaMascara(hor, largura, altura, false), ...segmentosDaMascara(ver, largura, altura, true)];
+  const { juntas, vaos } = fundir(brutos, lado);
+  const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
+  const paredes = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
+  const portas = portasDosVaos(vaos, paredes);
+
+  const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];
+  return { largura, altura, paredes: paredes.map(r), portas: portas.map(r) };
+}
+
+/** Converte RGBA (do canvas) em níveis de cinza, no peso de luminosidade usual. */
+export function rgbaParaCinza(rgba: Uint8ClampedArray | Uint8Array, largura: number, altura: number): Uint8Array {
+  const out = new Uint8Array(largura * altura);
+  for (let i = 0, j = 0; i < out.length; i++, j += 4) {
+    out[i] = Math.round(0.299 * rgba[j] + 0.587 * rgba[j + 1] + 0.114 * rgba[j + 2]);
+  }
+  return out;
+}
+
+/** O JSON no mesmo formato do "Importar paredes" (largura/altura da imagem analisada). */
+export function comoTextoDeImportacao(r: ResultadoDaDeteccao): string {
+  return JSON.stringify({ largura: r.largura, altura: r.altura, paredes: r.paredes, portas: r.portas });
+}

@@ -5061,3 +5061,58 @@ input.fj-score:focus-visible {
 .alvo-atalho {
   scroll-margin-top: 56px;
 }
+
+/* Prévia das paredes achadas sozinho (PreviaDeParedes.tsx): a imagem com as linhas por cima. */
+.previa-paredes {
+  position: relative;
+  width: 100%;
+  max-height: 70vh;
+  margin: 8px 0;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.previa-paredes img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.75;
+  user-select: none;
+}
+.previa-paredes svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.previa-linha {
+  stroke-width: 3px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.previa-linha.parede {
+  stroke: #ff3b30;
+}
+.previa-linha.porta {
+  stroke: #ffd60a;
+  stroke-width: 5px;
+}
+.previa-linha.fora {
+  stroke: #9a9a9a;
+  stroke-dasharray: 4 5;
+  opacity: 0.8;
+}
+.previa-toque {
+  stroke: transparent;
+  stroke-width: 34px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.previa-toque:focus-visible {
+  stroke: rgba(255, 255, 255, 0.35);
+  outline: none;
+}

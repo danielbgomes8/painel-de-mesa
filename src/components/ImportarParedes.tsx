@@ -4,6 +4,41 @@ import { useMemo, useRef, useState } from "react";
 import type { Cena } from "@/lib/cenas";
 import { TEXTO_MAXIMO_DA_IMPORTACAO, lerParedesDoTexto, pedidoDeParedes } from "@/lib/importarParedes";
 import type { NovaParede, Parede } from "@/lib/paredes";
+import {
+  LADO_DA_ANALISE,
+  comoTextoDeImportacao,
+  detectarParedes,
+  rgbaParaCinza,
+  type ResultadoDaDeteccao,
+} from "@/lib/detectarParedes";
+import { PreviaDeParedes, chaveDaParede, chaveDaPorta } from "@/components/PreviaDeParedes";
+
+/** O que sobra da detecção depois de o Mestre tirar as linhas erradas na prévia. */
+function semAsTiradas(d: ResultadoDaDeteccao, tiradas: ReadonlySet<string>): ResultadoDaDeteccao {
+  return {
+    ...d,
+    paredes: d.paredes.filter((_, i) => !tiradas.has(chaveDaParede(i))),
+    portas: d.portas.filter((_, i) => !tiradas.has(chaveDaPorta(i))),
+  };
+}
+
+/** Baixa a imagem da cena e devolve os níveis de cinza, já reduzidos pro tamanho da análise. */
+async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; largura: number; altura: number }> {
+  const resposta = await fetch(url);
+  if (!resposta.ok) throw new Error(`imagem ${resposta.status}`);
+  const imagem = await createImageBitmap(await resposta.blob());
+  const escala = Math.min(1, LADO_DA_ANALISE / Math.max(imagem.width, imagem.height));
+  const largura = Math.max(1, Math.round(imagem.width * escala));
+  const altura = Math.max(1, Math.round(imagem.height * escala));
+  const tela = document.createElement("canvas");
+  tela.width = largura;
+  tela.height = altura;
+  const ctx = tela.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("sem canvas");
+  ctx.drawImage(imagem, 0, 0, largura, altura);
+  imagem.close();
+  return { cinza: rgbaParaCinza(ctx.getImageData(0, 0, largura, altura).data, largura, altura), largura, altura };
+}
 
 function quantas(n: number, uma: string, varias: string): string {
   return `${n} ${n === 1 ? uma : varias}`;
@@ -18,10 +53,13 @@ function quantas(n: number, uma: string, varias: string): string {
  */
 export function ImportarParedes({
   cena,
+  urlDaImagem,
   paredes,
   adicionar,
 }: {
   cena: Pick<Cena, "largura" | "altura">;
+  /** Endereço da imagem da cena (pra detectar sozinho); sem ele o botão some. */
+  urlDaImagem: string | null;
   paredes: readonly Parede[];
   adicionar: (novas: NovaParede[]) => Promise<boolean>;
 }) {
@@ -29,6 +67,9 @@ export function ImportarParedes({
   const [texto, setTexto] = useState("");
   const [pedidoAVista, setPedidoAVista] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [detectando, setDetectando] = useState(false);
+  const [deteccao, setDeteccao] = useState<ResultadoDaDeteccao | null>(null);
+  const [tiradas, setTiradas] = useState<ReadonlySet<string>>(new Set());
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
   const campoArquivo = useRef<HTMLInputElement>(null);
 
@@ -66,6 +107,47 @@ export function ImportarParedes({
     }
   }
 
+  async function detectarSozinho() {
+    if (!urlDaImagem || detectando) return;
+    setDetectando(true);
+    setAviso(null);
+    try {
+      const { cinza, largura: l, altura: a } = await cinzaDaImagem(urlDaImagem);
+      // Deixa a tela pintar o "detectando…" antes de a conta (que trava a página por um instante) começar.
+      await new Promise((ok) => setTimeout(ok, 30));
+      const r = detectarParedes(cinza, l, a);
+      if (r.paredes.length + r.portas.length === 0) {
+        setAviso({ texto: "Não achei paredes neste mapa. Tente o caminho da IA, logo abaixo.", falhou: true });
+      } else {
+        setDeteccao(r);
+        setTiradas(new Set());
+        setTexto(comoTextoDeImportacao(r));
+        setAviso({ texto: "Achei sozinho. Toque nas linhas erradas pra tirá-las e depois importe.", falhou: false });
+      }
+    } catch (e) {
+      console.warn("detectar paredes", e);
+      setAviso({ texto: "Não consegui ler a imagem do mapa. Confira a conexão e tente de novo.", falhou: true });
+    } finally {
+      setDetectando(false);
+    }
+  }
+
+  function alternarLinha(chave: string) {
+    if (!deteccao) return;
+    const novas = new Set(tiradas);
+    if (!novas.delete(chave)) novas.add(chave);
+    setTiradas(novas);
+    setAviso(null);
+    const resto = semAsTiradas(deteccao, novas);
+    setTexto(resto.paredes.length + resto.portas.length ? comoTextoDeImportacao(resto) : "");
+  }
+
+  function voltarTodas() {
+    if (!deteccao) return;
+    setTiradas(new Set());
+    setTexto(comoTextoDeImportacao(deteccao));
+  }
+
   async function importar() {
     if (!leitura?.ok || enviando) return;
     const { novas, paredes: nParedes, portas: nPortas } = leitura;
@@ -78,6 +160,8 @@ export function ImportarParedes({
       return;
     }
     setTexto("");
+    setDeteccao(null);
+    setTiradas(new Set());
     setAviso({
       texto: `Entraram ${quantas(nParedes, "parede", "paredes")} e ${quantas(nPortas, "porta", "portas")}. Confira no mapa: se não ficou bom, “↩ desfazer parede” tira todas de uma vez.`,
       falhou: false,
@@ -91,7 +175,38 @@ export function ImportarParedes({
       </button>
       {aberto && (
         <>
-          <p className="bkpexplica">Pra não desenhar tudo à mão, uma IA que enxergue imagens marca as paredes e as portas pra você:</p>
+          {urlDaImagem && (
+            <>
+              <p className="bkpexplica">
+                O jeito mais rápido: o app procura sozinho as paredes e as portas na imagem. Funciona melhor em mapa com paredes retas;
+                curva, móvel e tapete podem enganar. Entra como <b>rascunho</b>.
+              </p>
+              <div className="mapa-ferr">
+                <button type="button" className="btn primary" disabled={detectando} onClick={() => void detectarSozinho()}>
+                  {detectando ? "procurando…" : "🔍 achar paredes e portas sozinho"}
+                </button>
+              </div>
+            </>
+          )}
+          {deteccao && urlDaImagem && (
+            <>
+              <PreviaDeParedes url={urlDaImagem} deteccao={deteccao} tiradas={tiradas} aoAlternar={alternarLinha} />
+              <p className="mapa-dica">
+                <span style={{ color: "#ff6b60" }}>▬</span> parede · <span style={{ color: "#ffd60a" }}>▬</span> porta · <span style={{ color: "#9a9a9a" }}>╌</span>{" "}
+                tirada. Toque numa linha pra tirar ou pôr de volta.
+                {tiradas.size > 0 && (
+                  <>
+                    {" "}
+                    {quantas(tiradas.size, "linha tirada", "linhas tiradas")}.{" "}
+                    <button type="button" className="minilink" onClick={voltarTodas}>
+                      pôr todas de volta
+                    </button>
+                  </>
+                )}
+              </p>
+            </>
+          )}
+          <p className="bkpexplica">Ou, pra não desenhar tudo à mão, uma IA que enxergue imagens marca as paredes e as portas pra você:</p>
           <ol className="mapa-passos">
             <li>
               Toque em <b>copiar o pedido pra IA</b>.
@@ -137,6 +252,8 @@ export function ImportarParedes({
               maxLength={TEXTO_MAXIMO_DA_IMPORTACAO}
               onChange={(e) => {
                 setAviso(null);
+                // Texto mexido à mão deixa de ser o que a prévia mostra.
+                setDeteccao(null);
                 setTexto(e.target.value);
               }}
             />

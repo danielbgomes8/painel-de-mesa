@@ -1115,7 +1115,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                       )}
                     </div>
                     <VaosViramPortas cena={cena} paredes={muros.paredes} adicionar={muros.adicionar} />
-                    <ImportarParedes cena={cena} paredes={muros.paredes} adicionar={muros.adicionar} />
+                    <ImportarParedes cena={cena} urlDaImagem={cenas.urlDaImagem(cena)} paredes={muros.paredes} adicionar={muros.adicionar} />
                   </>
                 )}
               </SecaoRecolhivel>

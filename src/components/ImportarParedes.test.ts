@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 function montar(adicionar: (novas: NovaParede[]) => Promise<boolean> = async () => true) {
-  render(createElement(ImportarParedes, { cena, paredes: [], adicionar }));
+  render(createElement(ImportarParedes, { cena, urlDaImagem: null, paredes: [], adicionar }));
   fireEvent.click(screen.getByRole("button", { name: /importar paredes de um arquivo/ }));
   return {
     campo: screen.getByLabelText("Resposta da IA com as paredes") as HTMLTextAreaElement,
@@ -31,7 +31,7 @@ function montar(adicionar: (novas: NovaParede[]) => Promise<boolean> = async () 
 
 describe("importar paredes", () => {
   it("abre fechado: nada de campo na tela até o Mestre tocar", () => {
-    render(createElement(ImportarParedes, { cena, paredes: [], adicionar: async () => true }));
+    render(createElement(ImportarParedes, { cena, urlDaImagem: null, paredes: [], adicionar: async () => true }));
     expect(screen.queryByLabelText("Resposta da IA com as paredes")).toBeNull();
     expect(screen.getByRole("button", { name: /importar paredes de um arquivo/ }).getAttribute("aria-expanded")).toBe("false");
   });
