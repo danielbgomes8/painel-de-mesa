@@ -170,7 +170,8 @@ export function BackupSala({ sala, codigo, rotulo }: { sala: Sala; codigo: strin
         {baixando ? "juntando tudo…" : "⬇ baixar backup completo"}
       </button>
 
-      <h3 className="bkptitulo">Restaurar de um arquivo</h3>
+      <details className="gavetarestaurar" open={estado.fase !== "parado"}>
+      <summary>Restaurar de um arquivo</summary>
       <p className="bkpexplica">
         Põe o arquivo no lugar do que está na sala hoje. <b>O que está aqui agora se perde</b> — por isso
         eu baixo um backup de segurança antes de trocar qualquer coisa.
@@ -236,6 +237,8 @@ export function BackupSala({ sala, codigo, rotulo }: { sala: Sala; codigo: strin
       )}
 
       {estado.fase === "restaurando" && <p className="bkpexplica">Restaurando… não feche o app.</p>}
+
+      </details>
 
       <p className={aviso?.falhou ? "catcopiado falhou" : "catcopiado"} aria-live="polite">
         {aviso?.texto ?? ""}

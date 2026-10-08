@@ -22,17 +22,15 @@ import { COR_PING_MESTRE, corDoJogador } from "@/lib/ping";
 import type { QuemPinga } from "@/hooks/usePing";
 import { horaCurta } from "@/lib/offline";
 import { definirContextoDoErro, relatarErro } from "@/lib/relatarErro";
-import { BackupSala, baixarBackupDaSala } from "@/components/BackupSala";
+import { baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
 import { AcoesEmMassa } from "@/components/AcoesEmMassa";
-import { NotasDoMestre } from "@/components/NotasDoMestre";
+import { AbaMestre } from "@/components/AbaMestre";
 import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
 import { BannerMapaNaMesa } from "@/components/BannerMapaNaMesa";
 import { LogCombate } from "@/components/LogCombate";
-import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
-import { EncontrosPreparados } from "@/components/EncontrosPreparados";
 import { AbaCampanha } from "@/components/AbaCampanha";
 import { DestaqueDoCartao } from "@/components/QuadroCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
@@ -428,12 +426,15 @@ function PainelSala({ codigo }: { codigo: string }) {
         />}
 
       {abaEfetiva === "mestre" && souMestre && (
-        <>
-          <EncontrosPreparados sala={sala} />
-          <BibliotecaNpcs sala={sala} />
-          <NotasDoMestre valor={sala.notasMestre} onSalvar={sala.definirNotasMestre} />
-          <BackupSala sala={sala} codigo={codigo} rotulo={rotulo} />
-        </>
+        <AbaMestre
+          sala={sala}
+          codigo={codigo}
+          rotulo={rotulo}
+          aoAbrirTelao={() => {
+            setTelaoAberto(true);
+            window.scrollTo({ top: 0 });
+          }}
+        />
       )}
 
       {abaEfetiva === "fichas" &&

@@ -5342,3 +5342,61 @@ input.fj-score:focus-visible {
     max-width: calc(100% - 440px);
   }
 }
+
+/* ---------- aba Mestre: seletor de seções ---------- */
+.segmentos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  margin-bottom: 14px;
+}
+.segmentos button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-height: 44px;
+  padding: 8px 2px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.segmentos button:last-child {
+  border-right: 0;
+}
+.segmentos button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.segmentos button em {
+  font-style: normal;
+  font-family: var(--f-mono);
+  font-size: 10px;
+}
+.segmentos button[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+/* Restaurar o backup: apaga dados, então fica numa gaveta fechada. */
+.gavetarestaurar {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.gavetarestaurar > summary {
+  cursor: pointer;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  font-family: var(--f-display);
+  font-size: 15px;
+  touch-action: manipulation;
+}
