@@ -1940,88 +1940,28 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   (o Mestre passa; o companheiro não, como o jogador). Robô: 2º cenário de `companheirosNoMapa.e2e.ts` (conferido que falha sem a trava: o Pip vai a 495).
 - **Não cobre**: peões de companheiros não se desviam um do outro ao seguir o dono.
 
-## Achar paredes e portas sozinho (08/10/2026, sem migration)
+## Detecção automática de paredes: REMOVIDA (08/10/2026)
 
-Em Mapa → Paredes e portas → "importar paredes de um arquivo": **🔍 achar paredes e portas sozinho** roda um detector NO APARELHO (sem servidor,
-sem chave) e preenche o mesmo campo do importador; **▭ fechar a borda do mapa** põe as quatro paredes da borda (`contornoQueFalta` em
-`lib/importarParedes.ts`), pra mapa cortado rente. Nasceu de um script Python que um amigo do Daniel mandou (`scripts/mapas/detectar_topologia.py`,
-só funciona com fundo preto). **É rascunho**: o Mestre confere na prévia (`PreviaDeParedes.tsx`: tocar numa linha tira/põe de volta) e corrige.
+O botão "🔍 achar paredes e portas sozinho" (detector no aparelho, três modos: linha escura, parede clara, contorno dos
+cômodos) e tudo que era só dele — `detectarParedes`/`detectarCurvas`/`detectarContorno`, a `PreviaDeParedes`, o CSS da prévia e a
+pasta `scripts/mapas` (medição, gabaritos do Watabou, `gerar_paredes.sh`) — **saíram do app por decisão do Daniel**: o resultado
+não servia em mapa de verdade e ele preferiu abandonar a automação por enquanto. **Não recriar sem ele pedir.** O código e as
+medições estão no Git: o último commit com tudo é `d7702a4` (`git show d7702a4:src/lib/detectarContorno.ts`; `git log --stat` na
+pasta `scripts/mapas` mostra os scripts).
 
-- **Como acha** (`lib/detectarParedes.ts`, `lib/detectarCurvas.ts`, testados): black-hat (linha escura e fina sobre chão claro) → só retas
-  horizontais/verticais compridas → filtro de contraste ponto a ponto (corta a parte falsa de uma linha, tapete/móvel) → pontas recuam até o canto →
-  sai a moldura de papel → curvas (o que sobra, afinado por Zhang-Suen e simplificado). Porta = vão com parede nas DUAS pontas, largura de porta
-  (≤ 8× o traço) e **algo desenhado dentro** — vão de chão liso é passagem aberta.
-- **`prepararDeteccao` (pesada) × `aplicarDeteccao` (barata)**: o controle "menos linhas ↔ mais linhas" (`NIVEIS_DE_SENSIBILIDADE`, 1 a 5) só
-  refaz a barata. A imagem é analisada a no máximo 1.400 px (`LADO_DA_ANALISE`).
-- **As folgas saem da espessura do traço do próprio mapa** (`espessuraDoTraco`), não do tamanho da imagem: com folga por tamanho a linha
-  atravessava corredor e juntava duas paredes.
-- **"Parede clara"** (pedra/contorno claro sobre chão ou fundo escuro) lê DUAS vezes: brilho e **saturação** (`aplicarComCor`). Pedra bege sobre piso
-  marrom tem o mesmo brilho sob um clarão, mas menos cor — foi o que destravou o labirinto. A razão de contraste da parede clara é medida no brilho
-  de verdade (lado ÷ linha), não na imagem invertida (era o defeito que fazia a opção não achar nada). A leitura pela cor ignora o vazio escuro.
-- **Contorno dos cômodos** (`lib/detectarContorno.ts`, 7 testes; 3ª opção do tipo de mapa, **escolhida sozinha quando o fundo é liso** —
-  `distanciaDoFundo().fundoLiso`): é o método do script do amigo do Daniel, no aparelho. Máscara = cor longe da cor dos cantos; a borda de cada
-  mancha vira parede (contorno simplificado até caber em 385 trechos, afinando a folga por bisseção); porta = a seção mais estreita onde um corredor
-  encosta num cômodo (miolo = longe das paredes; corte no MEIO entre a largura típica de corredor e de cômodo, não no Otsu puro, que cola no
-  corredor), e só vale se **atravessa** (anda pros dois lados) e **separa dois espaços** (com ela fechada cada lado tem área de cômodo: tira nicho e
-  torrinha de canto). Medido contra o resultado do script na imagem original (`scripts/mapas/contorno_no_app.sh imagem saida.png 16
-  scripts/mapas/exemplo_resultado.json`): **20 das 25 portas dele, 3 a mais**, 362 paredes, 0,5 s. O pedido do Daniel (08/10) foi exatamente este:
-  parede por FORA do cômodo, formando a figura, e a saída dela como porta — as leituras por linha (abaixo) ele achou ruins nesse tipo de mapa.
-- **O Mestre escolhe** escura × clara: escolher sozinho pelo total de linhas erra (a moldura do pergaminho faz a clara parecer melhor).
-- Passou do limite de 400 trechos: ficam as paredes mais compridas (`soAsMaiores`) e a tela avisa.
-- **Medir, não achar**: `scripts/mapas/como_no_app.sh imagem saida.png [escuras|claras] [nível] [gabarito]` roda o MESMO código da tela e desenha
-  por cima; `avaliar.py` dá recall/precisão. Precisa de `.venv-mapas/` (opencv, numpy, scikit-image; fora do Git). Gabaritos em
-  `scripts/mapas/testes/`: `labirinto_trecho.json` (semiautomático, conferido a olho; **85% das paredes, 96% de precisão** com clara nível 5) e
-  `taverna_paredes.json` (à mão, alguns px fora: ~65%/61%, **não serve pra ajuste fino**).
-- **Gabarito exato, sem desenhar à mão** (08/10/2026, só scripts, nada no app): `scripts/mapas/preparar_watabou.sh <pasta>`
-  baixa 9 masmorras do One Page Dungeon do Watabou (o autor libera o uso dos mapas gerados; mesma semente + estilo = mesmo mapa)
-  com o JSON de geometria que o gerador exporta (retângulos de chão + portas), e `gabarito_watabou.py` casa essa geometria com o
-  PNG (escala e deslocamento por correlação com os pixels escuros; conferido em foto, cai em cima da parede) e grava o gabarito.
-  `scripts/mapas/medir_todos.sh <pasta>/gab [nível]` roda escuras/claras/contorno do app em todos e imprime a tabela
-  (recall/precisão a 6 e 12 px, portas achadas, tempo); desenha detectado (vermelho) × gabarito (verde) em
-  `$TMPDIR/medir_todos/`. As imagens não vão pro Git (regeneráveis). **Pegadinhas**: no Chrome automatizado as duas primeiras
-  teclas depois de abrir são engolidas (aquecer e tentar de novo); a opção "girar pra caber" (R) fica salva por contexto, então
-  cada mapa abre num contexto novo; o mapa só de rotundas (círculos emendados) o gabarito não acerta e foi trocado. O gabarito
-  põe a parede na borda do CHÃO; em estilo de parede grossa o traço fica uns 6–10 px dentro, por isso se olha a 12 px.
-  **Linha de base antes de mexer (nível 3, 9 mapas, médias a 12 px):** escuras 40% de recall / 41% de precisão; claras 10% / 22%;
-  contorno 55% / 41%, portas 13%. O contorno desenhava a silhueta de FORA (borda de pedra, sombreado, parede grossa) e
-  contornava título e quadros de texto.
-  **Contorno da beira do chão** (08/10/2026, `refinarParaOChao` em `detectarContorno.ts`; o `ImportarParedes` passa `rgba`):
-  tira manchas menores que 4% da maior (título, quadros); acha a cor do chão (mediana dos pontos fundos da silhueta) e
-  contorna só o que tem essa cor; **se o que a máscara cerca é mais de 60% da própria máscara** (ou ela é só traço fino), o chão
-  tem a cor do fundo e a máscara é só parede + sombreado: ficam só os contornos dos BURACOS (sentido oposto ao da maior volta)
-  e a borda de fora é descartada. `fundoLiso` aceita até 97% de fundo (planta pequena em página branca). **Resultado: contorno
-  86% de recall / 86% de precisão, portas 24%** (pior mapa 41%/42% a 6 px, 76%/89% a 12 px: parede grossa).
-  **Tentado e descartado**: decidir "chão é a cor do fundo" por homogeneidade do miolo (derrubou 4 mapas), e refazer a máscara
-  com limiar escuro pra tirar a grade (precisão +5, recall −5: soma igual).
-  **Portas** (08/10/2026): **o gabarito de porta estava errado e inflava o problema** — no JSON do Watabou a porta É a célula
-  1×1 `(x, y)` (a `dir` é só o eixo por onde se passa), não a vizinha; com isso corrigido a base subiu de 13% pra 44% sem mexer
-  no detector. Tipos de porta do gerador: portão (símbolo desenhado), escada/entrada e **abertura sem símbolo** (só um vão de
-  uma célula). Mudanças no detector: (1) no modo "chão com a cor do fundo" a máscara passa a ser o chão (`buracosFechados`:
-  o que a parede cerca), então o miolo/corredor/portas rodam no chão e não no anel de parede + sombreado; (2) **`portasPorLacuna`**:
-  o símbolo de porta come o chão e deixa uma lacuna retangular entre dois pisos (0,25–1,3 largura de corredor ao longo, 0,5–1,6 de
-  través, com ≥50% de pixel diferente do fundo dentro); (3) porta não passa de **2,4 larguras de corredor** (a corda que cruzava
-  um cômodo virava porta). **Resultado: 55% das portas achadas, 37% das achadas são falsas** (antes 13% / —). Por mapa: 22/26,
-  13/13 e 18/32 nos melhores, 4/8, 6/16 e 9/30 nos piores. Lacuna sozinha acha só 24% e erra 57%; o método antigo sozinho
-  44% / 40% falsas; juntos se completam (lacuna pega o portão entre cômodos, o antigo pega a abertura sem símbolo).
-  **Tentado e sem ganho**: gargalo por distância (largura sobe dos dois lados), tirar bolsão de sombreado dos buracos por fração
-  de pixel sujo, exigir mais traço dentro da lacuna além de 50%. **Ainda ruim**: grade de chão forte pica o chão em quadrados
-  (d1212, precisão de parede 37% a 6 px); cômodo cujo anel de parede não fecha (hachura aberta) some do contorno; as falsas
-  restantes são sobretudo cordas diagonais e traços de mobília. Mapa pintado e caverna seguem sem gabarito (o gerador de
-  caverna não exporta JSON) — os números valem pra masmorra DESENHADA.
-- **Importar Universal VTT** (08/10/2026, sem migration; `lib/uvtt.ts`, 5 testes; no mesmo "escolher arquivo…" do importador): o
-  Dungeondraft e o Dungeon Scrawl exportam `.dd2vtt`/`.uvtt`/`.df2vtt` com as paredes e portas EXATAS do desenho (em
-  quadradinhos, `line_of_sight`, `objects_line_of_sight` e `portals`) e a imagem em base64 (vários MB). `uvttParaImportacao` descarta a
-  imagem, passa os pontos pra px (`× pixels_per_grid`, menos a origem), junta pontos de trecho reto, **corta a parede que passa por baixo
-  de uma porta** (a porta vale ali) e devolve o texto no formato do importador, que escala pra cena e solda frestas como sempre.
-  Porta `closed: false` entra aberta. Avisa se a proporção do mapa do arquivo difere da cena em mais de 3%. **Não foi visto na tela e
-  não foi testado com arquivo de verdade** (o formato veio da especificação e de leituras, não de um `.dd2vtt` real): só teste de
-  unidade. Quem tiver um arquivo real deve testar em sala própria e conferir portas, janelas (viram portas) e o `map_origin`.
-- **Onde está**: bom em planta preto e branco e no labirinto de pedra clara; razoável (com limpeza na prévia) em taverna e pergaminho; **ruim** em mapa
-  muito ilustrado com contorno de fio branco (o "poço"). O critério combinado com o Daniel (95% das paredes, ≤ 5% falsas) **não foi atingido** em geral.
-- **Tentado e descartado, não repetir sem motivo novo**: um sinal único pra qualquer cor de parede (piorou a taverna); tirar linha curta solta e tirar
-  "ilhas" de linhas sem ligação (derruba parede de verdade: móvel fica ligado à parede); moldura na imagem pra pegar parede da beirada (piorou o
-  labirinto); "segunda chance" por contraste regional (trouxe linha em corredor); detector por fio (quebra nos cruzamentos).
-- **Não medido**: tempo no celular (no notebook: ~0,1 s num mapa pequeno, ~1,5 s no labirinto com parede clara; a tela para nesse tempo) e a
-  detecção num aparelho de verdade. IA de visão com chave do Mestre foi oferecida e o Daniel recusou.
-- Teste em sala própria (`teste-detector`; ficou no banco, apagar pelo SQL Editor). Duas sessões mexeram no mesmo checkout nesse dia: commitar só
-  os próprios arquivos, com `git add <caminhos>`.
+O que ficou, e é o caminho de paredes hoje:
+- **Desenhar à mão** (ferramenta "Paredes e portas": parede, curva, porta, cômodo, apagar; ver "Mapas com névoa de guerra").
+- **Importar de arquivo** (seção "importar paredes de um arquivo", `ImportarParedes.tsx`): resposta de IA de visão (JSON, com o
+  "pedido" que o app copia), **arquivo Universal VTT** do Dungeondraft/Dungeon Scrawl (`lib/uvtt.ts`, 5 testes; descarta a imagem
+  embutida, corta a parede por baixo de cada porta, avisa se a proporção do mapa difere; **nunca testado com `.dd2vtt` real**) e
+  **▭ fechar a borda do mapa**. Mais o botão de marcar vãos como portas (`lib/vaos.ts`). Entra tudo como rascunho, numa escrita só,
+  e "↩ desfazer parede" tira a importação inteira.
+
+Lições que valem se um dia voltar (o resto está nos commits):
+- **Gabarito exato sem desenhar à mão**: o One Page Dungeon do Watabou (uso livre dos mapas gerados) exporta JSON de geometria
+  (tecla J; PNG na tecla E). A porta dele é a célula 1×1 `(x, y)`; `dir` é só o eixo. No Chrome automatizado as duas primeiras teclas
+  depois de abrir são engolidas, e a opção "girar pra caber" (R) fica salva por contexto.
+- Medido só em masmorra DESENHADA (9 mapas): contorno 89% das paredes achadas / 86% certas, portas 55% achadas / 37% falsas. Mapa
+  pintado, caverna e foto nunca foram medidos — e foi aí que o Daniel viu o resultado ruim.
+- Detecção por contraste/cor de pixel, contorno de silhueta, gargalo por distância e lacuna entre pisos já foram tentados; não há
+  ganho barato sem mapas reais de teste (o Daniel é jogador e não tem os mapas das campanhas).
