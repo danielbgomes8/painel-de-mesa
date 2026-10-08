@@ -39,7 +39,8 @@ export function distanciaDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number
     distancia[i] = Math.min(255, Math.round(d));
   }
   // Liso = quase todos os pixels dos cantos têm a cor do fundo, e o fundo ocupa um bom pedaço da imagem
-  // (até 97%: planta pequena numa página branca, com título e quadros de texto, tem muito fundo).
+  // (até 85%. Chegou a 97% pra pegar planta pequena em página branca, mas isso ligou o contorno sozinho em mapa que ele
+  // não resolve bem — medido só em masmorra de linha limpa — e voltou pra 85%.)
   let cantosIguais = 0;
   let cantos = 0;
   for (const [cx, cy] of [[0, 0], [w - lado, 0], [0, h - lado], [w - lado, h - lado]])
@@ -50,7 +51,7 @@ export function distanciaDoFundo(rgba: Uint8ClampedArray | Uint8Array, w: number
       }
   for (let i = 0; i < distancia.length; i += 3) if (distancia[i] <= 16) longe++;
   const fracaoDeFundo = longe / Math.ceil(distancia.length / 3);
-  return { distancia, fundoLiso: cantosIguais / cantos > 0.9 && fracaoDeFundo > 0.15 && fracaoDeFundo < 0.97 };
+  return { distancia, fundoLiso: cantosIguais / cantos > 0.9 && fracaoDeFundo > 0.15 && fracaoDeFundo < 0.85 };
 }
 
 /** Rotula as manchas (vizinhança de 4) de uma máscara 0/1. Devolve o rótulo de cada pixel (0 = fora) e a área de cada rótulo. */
