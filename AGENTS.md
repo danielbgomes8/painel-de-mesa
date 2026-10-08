@@ -2008,6 +2008,14 @@ só funciona com fundo preto). **É rascunho**: o Mestre confere na prévia (`Pr
   (d1212, precisão de parede 37% a 6 px); cômodo cujo anel de parede não fecha (hachura aberta) some do contorno; as falsas
   restantes são sobretudo cordas diagonais e traços de mobília. Mapa pintado e caverna seguem sem gabarito (o gerador de
   caverna não exporta JSON) — os números valem pra masmorra DESENHADA.
+- **Importar Universal VTT** (08/10/2026, sem migration; `lib/uvtt.ts`, 5 testes; no mesmo "escolher arquivo…" do importador): o
+  Dungeondraft e o Dungeon Scrawl exportam `.dd2vtt`/`.uvtt`/`.df2vtt` com as paredes e portas EXATAS do desenho (em
+  quadradinhos, `line_of_sight`, `objects_line_of_sight` e `portals`) e a imagem em base64 (vários MB). `uvttParaImportacao` descarta a
+  imagem, passa os pontos pra px (`× pixels_per_grid`, menos a origem), junta pontos de trecho reto, **corta a parede que passa por baixo
+  de uma porta** (a porta vale ali) e devolve o texto no formato do importador, que escala pra cena e solda frestas como sempre.
+  Porta `closed: false` entra aberta. Avisa se a proporção do mapa do arquivo difere da cena em mais de 3%. **Não foi visto na tela e
+  não foi testado com arquivo de verdade** (o formato veio da especificação e de leituras, não de um `.dd2vtt` real): só teste de
+  unidade. Quem tiver um arquivo real deve testar em sala própria e conferir portas, janelas (viram portas) e o `map_origin`.
 - **Onde está**: bom em planta preto e branco e no labirinto de pedra clara; razoável (com limpeza na prévia) em taverna e pergaminho; **ruim** em mapa
   muito ilustrado com contorno de fio branco (o "poço"). O critério combinado com o Daniel (95% das paredes, ≤ 5% falsas) **não foi atingido** em geral.
 - **Tentado e descartado, não repetir sem motivo novo**: um sinal único pra qualquer cor de parede (piorou a taverna); tirar linha curta solta e tirar

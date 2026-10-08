@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { Cena } from "@/lib/cenas";
 import { TEXTO_MAXIMO_DA_IMPORTACAO, contornoQueFalta, lerParedesDoTexto, pedidoDeParedes } from "@/lib/importarParedes";
+import { TAMANHO_MAXIMO_DO_UVTT, pareceArquivoUvtt, uvttParaImportacao } from "@/lib/uvtt";
 import { PAREDES_MAXIMAS } from "@/lib/paredes";
 import type { NovaParede, Parede } from "@/lib/paredes";
 import {
@@ -120,6 +121,33 @@ export function ImportarParedes({
     if (campoArquivo.current) campoArquivo.current.value = "";
     if (!arquivo) return;
     setAviso(null);
+    if (pareceArquivoUvtt(arquivo.name)) {
+      // Dungeondraft / Dungeon Scrawl: as paredes já vêm prontas; a imagem embutida (pesada) é descartada.
+      if (arquivo.size > TAMANHO_MAXIMO_DO_UVTT) {
+        setAviso({ texto: "Esse arquivo é grande demais pra ser um mapa de mesa.", falhou: true });
+        return;
+      }
+      try {
+        const lido = uvttParaImportacao(await arquivo.text());
+        if (!lido.ok) {
+          setAviso({ texto: lido.erro, falhou: true });
+          return;
+        }
+        setDeteccao(null);
+        setTexto(lido.texto);
+        const desproporcao = Math.abs(lido.largura / lido.altura - largura / altura) / (largura / altura);
+        setAviso({
+          texto:
+            desproporcao > 0.03
+              ? "Arquivo lido, mas o mapa dele tem outra proporção que a imagem desta cena: confira se é o mesmo mapa antes de importar."
+              : `Arquivo lido: ${quantas(lido.paredes, "parede", "paredes")} e ${quantas(lido.portas, "porta", "portas")} do próprio desenho.`,
+          falhou: desproporcao > 0.03,
+        });
+      } catch {
+        setAviso({ texto: "Não consegui abrir esse arquivo.", falhou: true });
+      }
+      return;
+    }
     if (arquivo.size > TEXTO_MAXIMO_DA_IMPORTACAO) {
       setAviso({ texto: "Esse arquivo é grande demais pra ser uma lista de paredes.", falhou: true });
       return;
@@ -369,6 +397,10 @@ export function ImportarParedes({
               </p>
             </>
           )}
+          <p className="bkpexplica">
+            Se o mapa foi feito no <b>Dungeondraft</b> ou no <b>Dungeon Scrawl</b>, exporte como <b>Universal VTT</b> (.dd2vtt / .uvtt) e
+            toque em <b>escolher arquivo…</b> abaixo: as paredes e as portas entram exatas, do jeito que o autor desenhou, sem IA.
+          </p>
           <p className="bkpexplica">Ou, pra não desenhar tudo à mão, uma IA que enxergue imagens marca as paredes e as portas pra você:</p>
           <ol className="mapa-passos">
             <li>
@@ -397,7 +429,7 @@ export function ImportarParedes({
               <input
                 ref={campoArquivo}
                 type="file"
-                accept="application/json,text/plain,.json,.txt"
+                accept="application/json,text/plain,.json,.txt,.dd2vtt,.uvtt,.df2vtt"
                 onChange={(e) => void escolherArquivo(e.target.files?.[0] ?? null)}
               />
             </label>
