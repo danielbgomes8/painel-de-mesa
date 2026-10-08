@@ -172,7 +172,7 @@ function segmentosDaMascara(m: Uint8Array, w: number, h: number, vertical: boole
   return out;
 }
 
-type Vao = { eixo: "h" | "v"; pos: number; ini: number; fim: number };
+export type Vao = { eixo: "h" | "v"; pos: number; ini: number; fim: number };
 
 /** Junta segmentos na mesma linha; cada vão de largura de porta entre dois pedaços vira candidato a porta. */
 function fundir(segs: Segmento[], lado: number): { juntas: Segmento[]; vaos: Vao[] } {
@@ -224,7 +224,7 @@ function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], 
 }
 
 /** Parede é escura NELA e clara dos lados; borda de tapete e de móvel é mais clara que isso. */
-const RAZAO_MAXIMA_PAREDE_LADO = 0.55;
+const RAZAO_PADRAO = 0.55;
 
 /**
  * Mede a linha ponto a ponto e fica só com os trechos que parecem parede: escuros
@@ -235,7 +235,7 @@ const RAZAO_MAXIMA_PAREDE_LADO = 0.55;
  * mancha não picotar a parede. Assim a parte falsa de uma linha que é meio
  * parede, meio borda de tapete, sai sem derrubar a parte verdadeira.
  */
-function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: Segmento[], afastamento: number, minimo: number, ladoClaro = false): Segmento[] {
+function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: Segmento[], afastamento: number, minimo: number, ladoClaro = false, razaoMaxima = RAZAO_PADRAO): Segmento[] {
   const amostra = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
   const dentro = (x: number, y: number) => x >= 0 && x <= w - 1 && y >= 0 && y <= h - 1;
   const saida: Segmento[] = [];
@@ -287,7 +287,7 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
         continue;
       }
       const referencia = ladoClaro ? Math.max(...candidatos) : Math.min(...candidatos);
-      bom[i] = mLinha(i).media / Math.max(1, referencia) <= RAZAO_MAXIMA_PAREDE_LADO ? 1 : 0;
+      bom[i] = mLinha(i).media / Math.max(1, referencia) <= razaoMaxima ? 1 : 0;
     }
     // Trechos contínuos bons, tolerando quebras curtas (uma mancha, uma emenda).
     const quebra = Math.max(3, Math.round(afastamento * 0.3));
@@ -389,8 +389,41 @@ function tirarMoldura(cinza: Uint8Array, w: number, h: number, paredes: Segmento
 
 const arredondar = (n: number) => Math.round(n * 10) / 10;
 
-/** `cinza`: um byte por pixel (0 = preto), `largura × altura`. */
-export function detectarParedes(cinzaOriginal: Uint8Array, largura: number, altura: number, opcoes: OpcoesDaDeteccao = {}): ResultadoDaDeteccao {
+/**
+ * Níveis do controle "menos linhas ↔ mais linhas". O padrão (3) é o comportamento de sempre.
+ * `minimo`: comprimento mínimo da parede (fração do lado maior); `razao`: o quanto a linha
+ * precisa ser mais escura que o chão ao lado (maior = aceita linha mais fraca); `comp`: o
+ * núcleo que corta linhas curtas (fração do lado maior; menor = acha parede curta, como
+ * as de um labirinto).
+ */
+export type Sensibilidade = 1 | 2 | 3 | 4 | 5;
+export const NIVEIS_DE_SENSIBILIDADE: Record<Sensibilidade, { minimo: number; razao: number; comp: number }> = {
+  1: { minimo: 0.2, razao: 0.4, comp: 1 / 18 },
+  2: { minimo: 0.15, razao: 0.48, comp: 1 / 18 },
+  3: { minimo: PAREDE_MINIMA, razao: RAZAO_PADRAO, comp: 1 / 18 },
+  4: { minimo: 0.07, razao: 0.63, comp: 1 / 26 },
+  5: { minimo: 0.035, razao: 0.72, comp: 1 / 40 },
+};
+
+/** A parte pesada da detecção (não depende de `minimo` nem da `razao`): guarde e reaproveite ao mexer no controle. */
+export type DeteccaoPreparada = {
+  cinza: Uint8Array;
+  largura: number;
+  altura: number;
+  lado: number;
+  esp: number;
+  claras: boolean;
+  binaria: Uint8Array;
+  juntas: Segmento[];
+  vaos: Vao[];
+};
+
+export function prepararDeteccao(
+  cinzaOriginal: Uint8Array,
+  largura: number,
+  altura: number,
+  opcoes: { linhas?: "escuras" | "claras"; espessura?: number; comp?: number } = {},
+): DeteccaoPreparada {
   const claras = opcoes.linhas === "claras";
   // Linha clara: inverte a imagem e cai no caso da linha escura.
   const cinza = claras ? cinzaOriginal.map((v) => 255 - v) : cinzaOriginal;
@@ -407,22 +440,38 @@ export function detectarParedes(cinzaOriginal: Uint8Array, largura: number, altu
   const binaria = new Uint8Array(largura * altura);
   for (let i = 0; i < binaria.length; i++) binaria[i] = blackhat[i] > limiar ? 255 : 0;
 
-  const comp = Math.max(15, Math.floor(lado / 18));
+  const comp = Math.max(12, Math.floor(lado * (opcoes.comp ?? 1 / 18)));
   const abrir = (kx: number, ky: number) => morfologia(morfologia(binaria, largura, altura, kx, ky, false), largura, altura, kx, ky, true);
   const hor = abrir(comp, 1);
   const ver = abrir(1, comp);
 
   const brutos = [...segmentosDaMascara(hor, largura, altura, false), ...segmentosDaMascara(ver, largura, altura, true)];
   const { juntas, vaos } = fundir(brutos, lado);
+  return { cinza, largura, altura, lado, esp, claras, binaria, juntas, vaos };
+}
+
+/** A parte barata: escolhe o que fica, dado o nível de sensibilidade (ou os números soltos). */
+export function aplicarDeteccao(p: DeteccaoPreparada, opcoes: { minimo?: number; razao?: number; curvas?: boolean } = {}): ResultadoDaDeteccao {
+  const { cinza, largura, altura, lado, esp, claras, binaria, juntas, vaos } = p;
+  const razao = opcoes.razao ?? RAZAO_PADRAO;
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
-  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6, claras)), esp);
+  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6, claras, razao)), esp);
   const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
-  const curvas = opcoes.curvas === false ? [] : tirarMoldura(cinza, largura, altura, detectarCurvas(binaria, cinza, largura, altura, [...paredes, ...portas], { lado, espessura: esp, ladoClaro: claras }));
+  const curvas =
+    opcoes.curvas === false
+      ? []
+      : tirarMoldura(cinza, largura, altura, detectarCurvas(binaria, cinza, largura, altura, [...paredes, ...portas], { lado, espessura: esp, ladoClaro: claras, razao: razao + 0.05 }));
 
   const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];
   return { largura, altura, paredes: [...paredes, ...curvas].map(r), portas: portas.map(r) };
+}
+
+/** `cinza`: um byte por pixel (0 = preto), `largura × altura`. Atalho: prepara e aplica de uma vez. */
+export function detectarParedes(cinza: Uint8Array, largura: number, altura: number, opcoes: OpcoesDaDeteccao = {}): ResultadoDaDeteccao {
+  const preparada = prepararDeteccao(cinza, largura, altura, { linhas: opcoes.linhas, espessura: opcoes.espessura });
+  return aplicarDeteccao(preparada, { minimo: opcoes.minimo, curvas: opcoes.curvas });
 }
 
 /** Converte RGBA (do canvas) em níveis de cinza, no peso de luminosidade usual. */

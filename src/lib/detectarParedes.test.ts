@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { comoTextoDeImportacao, detectarParedes, rgbaParaCinza } from "./detectarParedes";
+import { NIVEIS_DE_SENSIBILIDADE, aplicarDeteccao, comoTextoDeImportacao, detectarParedes, prepararDeteccao, rgbaParaCinza } from "./detectarParedes";
 
 /** Mapa de mentira: chão claro com ruído, duas salas separadas por uma parede com vão de porta. */
 function mapaSintetico(w = 400, h = 300) {
@@ -95,5 +95,17 @@ describe("detectarParedes", () => {
 
   it("converte RGBA em cinza", () => {
     expect(Array.from(rgbaParaCinza(new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255]), 2, 1))).toEqual([255, 0]);
+  });
+
+  it("sensibilidade: níveis mais altos aceitam mais linhas, e a parte pesada se reaproveita", () => {
+    const { g, w, h } = mapaSintetico();
+    // Uma parede curta (35 px) entre as salas: só o nível alto enxerga.
+    for (let y = 150; y <= 154; y++) for (let x = 250; x <= 285; x++) g[y * w + x] = 40;
+    const pesada = prepararDeteccao(g, w, h, { comp: NIVEIS_DE_SENSIBILIDADE[5].comp });
+    const baixo = aplicarDeteccao(pesada, { minimo: NIVEIS_DE_SENSIBILIDADE[2].minimo, razao: NIVEIS_DE_SENSIBILIDADE[2].razao, curvas: false });
+    const alto = aplicarDeteccao(pesada, { minimo: NIVEIS_DE_SENSIBILIDADE[5].minimo, razao: NIVEIS_DE_SENSIBILIDADE[5].razao, curvas: false });
+    expect(alto.paredes.length).toBeGreaterThan(baixo.paredes.length);
+    expect(alto.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 152.5) <= 3)).toBe(true);
+    expect(baixo.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 152.5) <= 3)).toBe(false);
   });
 });
