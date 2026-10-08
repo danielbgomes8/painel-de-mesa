@@ -65,7 +65,7 @@ function janela(origem: Uint8Array, destino: Uint8Array, n: number, passo: numbe
 }
 
 /** Dilata (máximo) ou erode (mínimo) com janela retangular `kx × ky`, em duas passadas. */
-function morfologia(g: Uint8Array, w: number, h: number, kx: number, ky: number, maximo: boolean): Uint8Array {
+export function morfologia(g: Uint8Array, w: number, h: number, kx: number, ky: number, maximo: boolean): Uint8Array {
   const meio = new Uint8Array(w * h);
   const saida = new Uint8Array(w * h);
   if (kx > 1) for (let y = 0; y < h; y++) janela(g, meio, w, 1, y * w, kx, maximo);
@@ -97,7 +97,7 @@ function borrar(g: Uint8Array, w: number, h: number): Uint8Array {
   return out;
 }
 
-function otsu(g: Uint8Array): number {
+export function otsu(g: Uint8Array): number {
   const hist = new Array<number>(256).fill(0);
   for (const v of g) hist[v]++;
   const total = g.length;

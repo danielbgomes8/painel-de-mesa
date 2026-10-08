@@ -1958,6 +1958,14 @@ só funciona com fundo preto). **É rascunho**: o Mestre confere na prévia (`Pr
 - **"Parede clara"** (pedra/contorno claro sobre chão ou fundo escuro) lê DUAS vezes: brilho e **saturação** (`aplicarComCor`). Pedra bege sobre piso
   marrom tem o mesmo brilho sob um clarão, mas menos cor — foi o que destravou o labirinto. A razão de contraste da parede clara é medida no brilho
   de verdade (lado ÷ linha), não na imagem invertida (era o defeito que fazia a opção não achar nada). A leitura pela cor ignora o vazio escuro.
+- **Contorno dos cômodos** (`lib/detectarContorno.ts`, 7 testes; 3ª opção do tipo de mapa, **escolhida sozinha quando o fundo é liso** —
+  `distanciaDoFundo().fundoLiso`): é o método do script do amigo do Daniel, no aparelho. Máscara = cor longe da cor dos cantos; a borda de cada
+  mancha vira parede (contorno simplificado até caber em 385 trechos, afinando a folga por bisseção); porta = a seção mais estreita onde um corredor
+  encosta num cômodo (miolo = longe das paredes; corte no MEIO entre a largura típica de corredor e de cômodo, não no Otsu puro, que cola no
+  corredor), e só vale se **atravessa** (anda pros dois lados) e **separa dois espaços** (com ela fechada cada lado tem área de cômodo: tira nicho e
+  torrinha de canto). Medido contra o resultado do script na imagem original (`scripts/mapas/contorno_no_app.sh imagem saida.png 16
+  scripts/mapas/exemplo_resultado.json`): **20 das 25 portas dele, 3 a mais**, 362 paredes, 0,5 s. O pedido do Daniel (08/10) foi exatamente este:
+  parede por FORA do cômodo, formando a figura, e a saída dela como porta — as leituras por linha (abaixo) ele achou ruins nesse tipo de mapa.
 - **O Mestre escolhe** escura × clara: escolher sozinho pelo total de linhas erra (a moldura do pergaminho faz a clara parecer melhor).
 - Passou do limite de 400 trechos: ficam as paredes mais compridas (`soAsMaiores`) e a tela avisa.
 - **Medir, não achar**: `scripts/mapas/como_no_app.sh imagem saida.png [escuras|claras] [nível] [gabarito]` roda o MESMO código da tela e desenha

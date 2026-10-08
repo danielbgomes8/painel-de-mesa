@@ -20,7 +20,11 @@ import {
   type ResultadoDaDeteccao,
   type Sensibilidade,
 } from "@/lib/detectarParedes";
+import { LIMIAR_DO_FUNDO_POR_NIVEL, detectarContorno, distanciaDoFundo } from "@/lib/detectarContorno";
 import { PreviaDeParedes, chaveDaParede, chaveDaPorta } from "@/components/PreviaDeParedes";
+
+/** Como procurar: linha escura, parede clara, ou o contorno dos cômodos (mapa sobre fundo liso). */
+type TipoDeMapa = "escuras" | "claras" | "contorno";
 
 /** O que sobra da detecção depois de o Mestre tirar as linhas erradas na prévia. */
 function semAsTiradas(d: ResultadoDaDeteccao, tiradas: ReadonlySet<string>): ResultadoDaDeteccao {
@@ -32,7 +36,7 @@ function semAsTiradas(d: ResultadoDaDeteccao, tiradas: ReadonlySet<string>): Res
 }
 
 /** Baixa a imagem da cena e devolve os níveis de cinza, já reduzidos pro tamanho da análise. */
-async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturacao: Uint8Array; largura: number; altura: number }> {
+async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturacao: Uint8Array; fundo: Uint8Array; fundoLiso: boolean; largura: number; altura: number }> {
   const resposta = await fetch(url);
   if (!resposta.ok) throw new Error(`imagem ${resposta.status}`);
   const imagem = await createImageBitmap(await resposta.blob());
@@ -47,7 +51,8 @@ async function cinzaDaImagem(url: string): Promise<{ cinza: Uint8Array; saturaca
   ctx.drawImage(imagem, 0, 0, largura, altura);
   imagem.close();
   const { data } = ctx.getImageData(0, 0, largura, altura);
-  return { cinza: rgbaParaCinza(data, largura, altura), saturacao: rgbaParaSaturacao(data, largura, altura), largura, altura };
+  const { distancia: fundo, fundoLiso } = distanciaDoFundo(data, largura, altura);
+  return { cinza: rgbaParaCinza(data, largura, altura), saturacao: rgbaParaSaturacao(data, largura, altura), fundo, fundoLiso, largura, altura };
 }
 
 function quantas(n: number, uma: string, varias: string): string {
@@ -79,14 +84,16 @@ export function ImportarParedes({
   const [enviando, setEnviando] = useState(false);
   const [detectando, setDetectando] = useState(false);
   const [comCurvas, setComCurvas] = useState(true);
-  const [linhas, setLinhas] = useState<"escuras" | "claras">("escuras");
+  const [linhas, setLinhas] = useState<TipoDeMapa>("escuras");
   const [sensibilidade, setSensibilidade] = useState<Sensibilidade>(3);
   const [deteccao, setDeteccao] = useState<ResultadoDaDeteccao | null>(null);
   const [tiradas, setTiradas] = useState<ReadonlySet<string>>(new Set());
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
   const campoArquivo = useRef<HTMLInputElement>(null);
   // A imagem em cinza e a parte pesada da detecção ficam guardadas: mexer no controle só refaz a parte barata.
-  const imagemRef = useRef<{ url: string; cinza: Uint8Array; saturacao: Uint8Array; largura: number; altura: number } | null>(null);
+  const imagemRef = useRef<{ url: string; cinza: Uint8Array; saturacao: Uint8Array; fundo: Uint8Array; fundoLiso: boolean; largura: number; altura: number } | null>(null);
+  // O Mestre já escolheu o tipo de mapa à mão? Se não, o app escolhe "contorno" quando o fundo é liso.
+  const tipoEscolhidoRef = useRef(false);
   const preparadasRef = useRef(new Map<string, DeteccaoPreparada>());
   const relogioRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -125,7 +132,7 @@ export function ImportarParedes({
   }
 
   /** Roda a detecção com as escolhas dadas, em cima da imagem já lida (e da parte pesada já guardada). */
-  function rodarDeteccao(escolhas: { linhas: "escuras" | "claras"; sensibilidade: Sensibilidade; curvas: boolean }, primeira: boolean) {
+  function rodarDeteccao(escolhas: { linhas: TipoDeMapa; sensibilidade: Sensibilidade; curvas: boolean }, primeira: boolean) {
     const img = imagemRef.current;
     if (!img) return;
     const nivel = NIVEIS_DE_SENSIBILIDADE[escolhas.sensibilidade];
@@ -138,21 +145,23 @@ export function ImportarParedes({
       return p;
     };
     const sufixo = `${nivel.comp.toFixed(4)}|${nivel.limiar}|${nivel.limiarLocal}`;
-    const preparada = guardada(`${escolhas.linhas}|${sufixo}`, () =>
-      prepararDeteccao(img.cinza, img.largura, img.altura, { linhas: escolhas.linhas, comp: nivel.comp, limiar: nivel.limiar, limiarLocal: nivel.limiarLocal }),
-    );
+    const linhasDoBrilho = escolhas.linhas === "claras" ? "claras" : "escuras";
+    const preparar = () =>
+      prepararDeteccao(img.cinza, img.largura, img.altura, { linhas: linhasDoBrilho, comp: nivel.comp, limiar: nivel.limiar, limiarLocal: nivel.limiarLocal });
     const ajustes = { minimo: nivel.minimo, razao: nivel.razao, curvas: escolhas.curvas };
     // Parede clara: além do brilho, a cor (pedra clara tem menos cor que o chão em volta).
     const r =
-      escolhas.linhas === "claras"
+      escolhas.linhas === "contorno"
+        ? detectarContorno(img.fundo, img.largura, img.altura, { limiarDoFundo: LIMIAR_DO_FUNDO_POR_NIVEL[escolhas.sensibilidade], maximo: Math.max(40, 385 - paredes.length) })
+        : escolhas.linhas === "claras"
         ? aplicarComCor(
-            preparada,
+            guardada(`claras|${sufixo}`, preparar),
             guardada(`cor|${nivel.comp.toFixed(4)}`, () =>
               prepararDeteccao(img.saturacao, img.largura, img.altura, { linhas: "escuras", comp: nivel.comp * FATOR_DA_COR, limiar: 0.6, limiarLocal: 0.4 }),
             ),
             { ...ajustes, minimoDaCor: nivel.minimo * FATOR_DA_COR },
           )
-        : aplicarDeteccao(preparada, ajustes);
+          : aplicarDeteccao(guardada(`escuras|${sufixo}`, preparar), ajustes);
     if (r.paredes.length + r.portas.length === 0) {
       setDeteccao(null);
       setTexto("");
@@ -180,7 +189,7 @@ export function ImportarParedes({
   }
 
   /** Refaz a detecção depois de mexer numa escolha, sem baixar a imagem de novo. */
-  function refazerComEscolhas(novas: Partial<{ linhas: "escuras" | "claras"; sensibilidade: Sensibilidade; curvas: boolean }>) {
+  function refazerComEscolhas(novas: Partial<{ linhas: TipoDeMapa; sensibilidade: Sensibilidade; curvas: boolean }>) {
     const escolhas = { linhas, sensibilidade, curvas: comCurvas, ...novas };
     if (novas.linhas) setLinhas(novas.linhas);
     if (novas.sensibilidade) setSensibilidade(novas.sensibilidade);
@@ -188,6 +197,11 @@ export function ImportarParedes({
     if (!imagemRef.current) return; // ainda não detectou: só guarda a escolha
     if (relogioRef.current) clearTimeout(relogioRef.current);
     relogioRef.current = setTimeout(() => rodarDeteccao(escolhas, false), 250);
+  }
+
+  function escolherTipo(tipo: TipoDeMapa) {
+    tipoEscolhidoRef.current = true;
+    refazerComEscolhas({ linhas: tipo });
   }
 
   async function detectarSozinho() {
@@ -199,6 +213,11 @@ export function ImportarParedes({
         const lida = await cinzaDaImagem(urlDaImagem);
         imagemRef.current = { url: urlDaImagem, ...lida };
         preparadasRef.current.clear();
+        if (lida.fundoLiso && !tipoEscolhidoRef.current) {
+          setLinhas("contorno");
+          rodarDeteccao({ linhas: "contorno", sensibilidade, curvas: comCurvas }, true);
+          return;
+        }
       }
       // Deixa a tela pintar o "detectando…" antes de a conta (que trava a página por um instante) começar.
       await new Promise((ok) => setTimeout(ok, 30));
@@ -293,13 +312,18 @@ export function ImportarParedes({
               <fieldset className="mapa-dica" style={{ border: 0, padding: 0, margin: "6px 0" }}>
                 <legend style={{ padding: 0 }}>Como a parede aparece neste mapa:</legend>
                 <label>
-                  <input type="radio" name="linhas-da-parede" checked={linhas === "escuras"} onChange={() => refazerComEscolhas({ linhas: "escuras" })} /> linha escura sobre o chão
+                  <input type="radio" name="linhas-da-parede" checked={linhas === "escuras"} onChange={() => escolherTipo("escuras")} /> linha escura sobre o chão
                   claro (a maioria)
                 </label>
                 <br />
                 <label>
-                  <input type="radio" name="linhas-da-parede" checked={linhas === "claras"} onChange={() => refazerComEscolhas({ linhas: "claras" })} /> parede clara (pedra, contorno branco) sobre
+                  <input type="radio" name="linhas-da-parede" checked={linhas === "claras"} onChange={() => escolherTipo("claras")} /> parede clara (pedra, contorno branco) sobre
                   chão ou fundo mais escuro
+                </label>
+                <br />
+                <label>
+                  <input type="radio" name="linhas-da-parede" checked={linhas === "contorno"} onChange={() => escolherTipo("contorno")} /> mapa sobre fundo liso
+                  (preto em volta): contorna cada cômodo e marca as saídas como portas
                 </label>
               </fieldset>
               <label className="mapa-dica">
