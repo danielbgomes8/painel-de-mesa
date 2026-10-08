@@ -108,4 +108,36 @@ describe("detectarParedes", () => {
     expect(alto.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 152.5) <= 3)).toBe(true);
     expect(baixo.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 152.5) <= 3)).toBe(false);
   });
+
+  it("parede clara de contraste modesto (pedra bege sobre chão marrom) sai com linhas: \"claras\"", () => {
+    // Os números do labirinto de verdade: chão ~85, parede ~136 (só 1,6× mais clara).
+    const w = 400;
+    const h = 300;
+    const g = new Uint8Array(w * h);
+    for (let i = 0; i < g.length; i++) g[i] = 82 + ((i * 7919) % 7);
+    const traco = (x1: number, y1: number, x2: number, y2: number) => {
+      for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) g[y * w + x] = 136;
+    };
+    traco(40, 60, 360, 65);
+    traco(40, 60, 45, 240);
+    const n = NIVEIS_DE_SENSIBILIDADE[4];
+    const r = aplicarDeteccao(prepararDeteccao(g, w, h, { linhas: "claras", comp: n.comp, limiar: n.limiar }), { minimo: n.minimo, razao: n.razao, curvas: false });
+    expect(r.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 62.5) <= 3)).toBe(true);
+    expect(r.paredes.some((s) => s[0] === s[2] && Math.abs(s[0] - 42.5) <= 3)).toBe(true);
+  });
+
+  it("duas paredes na mesma linha, com um corredor entre elas, não viram uma parede só", () => {
+    const { g, w, h } = mapaSintetico();
+    // Mesma altura (y = 150), separadas por 30 px de chão: é um corredor, a linha não pode atravessar.
+    for (let y = 148; y <= 152; y++) {
+      for (let x = 60; x <= 120; x++) g[y * w + x] = 40;
+      for (let x = 150; x <= 190; x++) g[y * w + x] = 40;
+    }
+    const n = NIVEIS_DE_SENSIBILIDADE[5];
+    const r = aplicarDeteccao(prepararDeteccao(g, w, h, { comp: n.comp, limiar: n.limiar }), { minimo: n.minimo, razao: n.razao, curvas: false });
+    const naLinha = r.paredes.filter((s) => s[1] === s[3] && Math.abs(s[1] - 150) <= 3);
+    expect(naLinha.length).toBeGreaterThanOrEqual(2);
+    // Nenhum trecho cobre o meio do corredor (x = 135).
+    expect(naLinha.some((s) => s[0] < 130 && s[2] > 140)).toBe(false);
+  });
 });

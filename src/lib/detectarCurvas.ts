@@ -228,5 +228,7 @@ function escuraEmRelacaoAoChao(cinza: Uint8Array, w: number, h: number, segs: Se
   const medias = lados.map((v, k) => (validos[k] > n * 0.5 ? v / validos[k] : Infinity));
   const lado = ladoClaro ? Math.max(...medias.filter(Number.isFinite)) : Math.min(...medias);
   if (!Number.isFinite(lado)) return true;
-  return linha / n / Math.max(1, lado) <= razao;
+  // Linha clara (imagem invertida): mede no brilho de verdade, lado ÷ linha.
+  const valor = ladoClaro ? (255 - lado) / Math.max(1, 255 - linha / n) : linha / n / Math.max(1, lado);
+  return valor <= razao;
 }

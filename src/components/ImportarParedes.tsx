@@ -123,10 +123,10 @@ export function ImportarParedes({
     const img = imagemRef.current;
     if (!img) return;
     const nivel = NIVEIS_DE_SENSIBILIDADE[escolhas.sensibilidade];
-    const chave = `${escolhas.linhas}|${nivel.comp.toFixed(4)}`;
+    const chave = `${escolhas.linhas}|${nivel.comp.toFixed(4)}|${nivel.limiar}`;
     let preparada = preparadasRef.current.get(chave);
     if (!preparada) {
-      preparada = prepararDeteccao(img.cinza, img.largura, img.altura, { linhas: escolhas.linhas, comp: nivel.comp });
+      preparada = prepararDeteccao(img.cinza, img.largura, img.altura, { linhas: escolhas.linhas, comp: nivel.comp, limiar: nivel.limiar });
       preparadasRef.current.set(chave, preparada);
     }
     const r = aplicarDeteccao(preparada, { minimo: nivel.minimo, razao: nivel.razao, curvas: escolhas.curvas });

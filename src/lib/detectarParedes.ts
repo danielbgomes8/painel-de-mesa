@@ -45,7 +45,7 @@ export type OpcoesDaDeteccao = {
 };
 
 /** Lado maior em que a imagem é analisada: acima disso só custa tempo. */
-export const LADO_DA_ANALISE = 1000;
+export const LADO_DA_ANALISE = 1400;
 
 const PAREDE_MINIMA = 0.12;
 
@@ -122,6 +122,38 @@ function otsu(g: Uint8Array): number {
     }
   }
   return melhor;
+}
+
+/**
+ * Espessura típica (px) das linhas finas da máscara: a mediana dos trechos seguidos de
+ * pixels ligados, lendo linha por linha e coluna por coluna, ignorando os que passam de
+ * `teto` (mancha, não linha). É o que dá a ESCALA do mapa: num labirinto de corredores
+ * estreitos a parede tem 4 px e o corredor 25; num mapa grande, 12 e 80. As folgas do
+ * filtro saem daqui, e não do tamanho da imagem.
+ */
+function espessuraDoTraco(m: Uint8Array, w: number, h: number, teto: number): number {
+  const hist = new Uint32Array(teto + 1);
+  const contar = (n: number, passo: number, inicio: number) => {
+    let seguido = 0;
+    for (let i = 0; i <= n; i++) {
+      if (i < n && m[inicio + i * passo]) seguido++;
+      else {
+        if (seguido >= 2 && seguido <= teto) hist[seguido]++;
+        seguido = 0;
+      }
+    }
+  };
+  for (let y = 0; y < h; y += 2) contar(w, 1, y * w);
+  for (let x = 0; x < w; x += 2) contar(h, w, x);
+  let total = 0;
+  for (let i = 2; i <= teto; i++) total += hist[i];
+  if (total === 0) return Math.max(3, teto / 4);
+  let acumulado = 0;
+  for (let i = 2; i <= teto; i++) {
+    acumulado += hist[i];
+    if (acumulado * 2 >= total) return i;
+  }
+  return teto;
 }
 
 /** Segmentos (centro da caixa) das componentes ligadas cuja caixa é bem mais comprida que larga. */
@@ -235,11 +267,21 @@ const RAZAO_PADRAO = 0.55;
  * mancha não picotar a parede. Assim a parte falsa de uma linha que é meio
  * parede, meio borda de tapete, sai sem derrubar a parte verdadeira.
  */
-function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: Segmento[], afastamento: number, minimo: number, ladoClaro = false, razaoMaxima = RAZAO_PADRAO): Segmento[] {
+function filtrarPorContraste(
+  cinza: Uint8Array,
+  w: number,
+  h: number,
+  paredes: Segmento[],
+  afastamento: number,
+  minimo: number,
+  ladoClaro = false,
+  razaoMaxima = RAZAO_PADRAO,
+  traco = afastamento * 0.4,
+): Segmento[] {
   const amostra = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
   const dentro = (x: number, y: number) => x >= 0 && x <= w - 1 && y >= 0 && y <= h - 1;
   const saida: Segmento[] = [];
-  const janelaMedia = Math.max(2, Math.round(afastamento * 0.4));
+  const janelaMedia = Math.max(2, Math.round(traco));
   for (const s of paredes) {
     const vertical = s[0] === s[2];
     const comp = Math.hypot(s[2] - s[0], s[3] - s[1]);
@@ -287,10 +329,13 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
         continue;
       }
       const referencia = ladoClaro ? Math.max(...candidatos) : Math.min(...candidatos);
-      bom[i] = mLinha(i).media / Math.max(1, referencia) <= razaoMaxima ? 1 : 0;
+      // Linha clara: a imagem veio invertida, mas a razão tem de ser medida no brilho de verdade
+      // (lado ÷ linha), senão um contraste de 85 pra 136 vira 119 ÷ 170 e parece fraco.
+      const razaoAqui = ladoClaro ? (255 - referencia) / Math.max(1, 255 - mLinha(i).media) : mLinha(i).media / Math.max(1, referencia);
+      bom[i] = razaoAqui <= razaoMaxima ? 1 : 0;
     }
     // Trechos contínuos bons, tolerando quebras curtas (uma mancha, uma emenda).
-    const quebra = Math.max(3, Math.round(afastamento * 0.3));
+    const quebra = Math.max(2, Math.round(traco));
     let ini = -1;
     let ultimoBom = -1;
     const fechar = () => {
@@ -394,15 +439,16 @@ const arredondar = (n: number) => Math.round(n * 10) / 10;
  * `minimo`: comprimento mínimo da parede (fração do lado maior); `razao`: o quanto a linha
  * precisa ser mais escura que o chão ao lado (maior = aceita linha mais fraca); `comp`: o
  * núcleo que corta linhas curtas (fração do lado maior; menor = acha parede curta, como
- * as de um labirinto).
+ * as de um labirinto); `limiar`: fração do limiar automático da imagem (menor = entra linha mais
+ * fraca, como a parede interna de um mapa com muita luz e sombra).
  */
 export type Sensibilidade = 1 | 2 | 3 | 4 | 5;
-export const NIVEIS_DE_SENSIBILIDADE: Record<Sensibilidade, { minimo: number; razao: number; comp: number }> = {
-  1: { minimo: 0.2, razao: 0.4, comp: 1 / 18 },
-  2: { minimo: 0.15, razao: 0.48, comp: 1 / 18 },
-  3: { minimo: PAREDE_MINIMA, razao: RAZAO_PADRAO, comp: 1 / 18 },
-  4: { minimo: 0.07, razao: 0.63, comp: 1 / 26 },
-  5: { minimo: 0.035, razao: 0.72, comp: 1 / 40 },
+export const NIVEIS_DE_SENSIBILIDADE: Record<Sensibilidade, { minimo: number; razao: number; comp: number; limiar: number }> = {
+  1: { minimo: 0.2, razao: 0.4, comp: 1 / 18, limiar: 1 },
+  2: { minimo: 0.15, razao: 0.48, comp: 1 / 18, limiar: 1 },
+  3: { minimo: PAREDE_MINIMA, razao: RAZAO_PADRAO, comp: 1 / 18, limiar: 1 },
+  4: { minimo: 0.07, razao: 0.63, comp: 1 / 26, limiar: 0.8 },
+  5: { minimo: 0.035, razao: 0.72, comp: 1 / 40, limiar: 0.6 },
 };
 
 /** A parte pesada da detecção (não depende de `minimo` nem da `razao`): guarde e reaproveite ao mexer no controle. */
@@ -413,6 +459,8 @@ export type DeteccaoPreparada = {
   lado: number;
   esp: number;
   claras: boolean;
+  /** Espessura típica das linhas finas deste mapa (px): a escala das folgas. */
+  traco: number;
   binaria: Uint8Array;
   juntas: Segmento[];
   vaos: Vao[];
@@ -422,7 +470,7 @@ export function prepararDeteccao(
   cinzaOriginal: Uint8Array,
   largura: number,
   altura: number,
-  opcoes: { linhas?: "escuras" | "claras"; espessura?: number; comp?: number } = {},
+  opcoes: { linhas?: "escuras" | "claras"; espessura?: number; comp?: number; limiar?: number } = {},
 ): DeteccaoPreparada {
   const claras = opcoes.linhas === "claras";
   // Linha clara: inverte a imagem e cai no caso da linha escura.
@@ -436,7 +484,9 @@ export function prepararDeteccao(
   const blackhat = new Uint8Array(largura * altura);
   for (let i = 0; i < blackhat.length; i++) blackhat[i] = Math.max(0, fechamento[i] - borrada[i]);
 
-  const limiar = otsu(blackhat);
+  // O limiar de Otsu é puxado pelos contrastes mais fortes do mapa (a borda contra o vazio); `limiar`
+  // abaixo de 1 deixa entrar também as linhas mais fracas (parede interna de labirinto, por exemplo).
+  const limiar = otsu(blackhat) * (opcoes.limiar ?? 1);
   const binaria = new Uint8Array(largura * altura);
   for (let i = 0; i < binaria.length; i++) binaria[i] = blackhat[i] > limiar ? 255 : 0;
 
@@ -447,16 +497,18 @@ export function prepararDeteccao(
 
   const brutos = [...segmentosDaMascara(hor, largura, altura, false), ...segmentosDaMascara(ver, largura, altura, true)];
   const { juntas, vaos } = fundir(brutos, lado);
-  return { cinza, largura, altura, lado, esp, claras, binaria, juntas, vaos };
+  const traco = espessuraDoTraco(binaria, largura, altura, esp);
+  return { cinza, largura, altura, lado, esp, claras, traco, binaria, juntas, vaos };
 }
 
 /** A parte barata: escolhe o que fica, dado o nível de sensibilidade (ou os números soltos). */
 export function aplicarDeteccao(p: DeteccaoPreparada, opcoes: { minimo?: number; razao?: number; curvas?: boolean } = {}): ResultadoDaDeteccao {
-  const { cinza, largura, altura, lado, esp, claras, binaria, juntas, vaos } = p;
+  const { cinza, largura, altura, lado, esp, claras, traco, binaria, juntas, vaos } = p;
+  const lateral = Math.min(esp, Math.max(4, Math.round(traco * 2.5)));
   const razao = opcoes.razao ?? RAZAO_PADRAO;
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
-  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6, claras, razao)), esp);
+  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, lateral, minimo * 0.6, claras, razao, traco)), esp);
   const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
   const curvas =
