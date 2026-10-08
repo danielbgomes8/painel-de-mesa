@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { bancoConfigurado, coletarErros, combateDoBanco, criarFicha, entrarComoMestre, fichaDoBanco, limparSala, porNaIniciativa, rest, SALA } from "./apoio";
+import { bancoConfigurado, coletarErros, abrirMontagem, combateDoBanco, criarFicha, entrarComoMestre, fichaDoBanco, limparSala, porNaIniciativa, rest, SALA } from "./apoio";
 
 /**
  * Encerrar combate (XP dos derrotados dividido), ações lendárias (gastar, resistência, voltam no turno do monstro) e
@@ -27,6 +27,7 @@ test("encerrar combate: XP do Goblin derrotado dividido entre os jogadores, orde
   ]);
   await entrarComoMestre(page);
   await page.getByRole("button", { name: "Combate", exact: true }).click();
+  await abrirMontagem(page);
   await page.getByRole("button", { name: "🏁 Encerrar combate" }).click();
 
   await expect(page.locator(".fim-resumo")).toContainText("1 inimigo a 0 PV");
@@ -83,6 +84,7 @@ test("emboscada: o jogador marcado como surpreso entra na ordem e o log diz", as
   await criarFicha("ana-robo", "Ana Robô", { hp: 20, hp_max: 20 });
   await entrarComoMestre(page);
   await page.getByRole("button", { name: "Combate", exact: true }).click();
+  await abrirMontagem(page);
   await page.getByText("💥 Emboscada").click();
   await page.locator(".emb").getByRole("button", { name: "Ana Robô", exact: true }).click();
   await expect(page.getByText("💥 Emboscada · 1 surpreso")).toBeVisible();

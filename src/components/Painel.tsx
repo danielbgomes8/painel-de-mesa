@@ -26,6 +26,7 @@ import { baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
 import { AcoesEmMassa } from "@/components/AcoesEmMassa";
+import { MenuDoTopo } from "@/components/MenuDoTopo";
 import { AbaMestre } from "@/components/AbaMestre";
 import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
@@ -277,49 +278,31 @@ function PainelSala({ codigo }: { codigo: string }) {
   return (
     <>
       <div className="topbar">
-        <div className="brand">
-          <h1>Painel de Mesa</h1>
-          <span className="tag">{rotulo}</span>
-          {tempo.tempo && <span className="tag tag-dia">🗓 {rotuloCurtoDoDia(tempo.tempo)}</span>}
-        </div>
-        <div className="whoami">
-          <span className={`synctag${sala.semInternet ? " semrede" : sala.conectado ? " on" : ""}`}>
+        <h1 className="brand-nome">
+          <span className="visually-hidden">Painel de Mesa · </span>
+          {rotulo}
+        </h1>
+        <div className="topbar-estado">
+          {tempo.tempo && <span className="pilula pilula-dia">🗓 {rotuloCurtoDoDia(tempo.tempo)}</span>}
+          <span className={`pilula synctag${sala.semInternet ? " semrede" : sala.conectado ? " on" : ""}`}>
             {sala.semInternet
               ? `sem internet${sala.esperando > 0 ? ` · ${sala.esperando} esperando` : ""}`
               : sala.conectado
                 ? "sincronizado"
                 : "offline"}
           </span>
-          <span>
-            Entrou como <b>{quem}</b>
-          </span>
-          {souMestre && (
-            <>
-              <button
-                className="linkbtn"
-                type="button"
-                aria-expanded={telaoAberto}
-                onClick={() => setTelaoAberto((v) => !v)}
-              >
-                📺 modo telão
-              </button>
-              <button className="linkbtn" type="button" onClick={baixarBackup} disabled={baixandoBackup}>
-                {baixandoBackup ? "⬇ juntando…" : "⬇ backup"}
-              </button>
-            </>
-          )}
-          <button className="linkbtn" type="button" onClick={trocar}>
-            trocar
-          </button>
-          <button
-            className="linkbtn"
-            type="button"
-            aria-expanded={trocandoCampanha}
-            onClick={() => setTrocandoCampanha((v) => !v)}
-          >
-            ⇄ trocar campanha
-          </button>
         </div>
+        <MenuDoTopo
+          souMestre={souMestre}
+          quem={quem}
+          telaoAberto={telaoAberto}
+          trocandoCampanha={trocandoCampanha}
+          baixandoBackup={baixandoBackup}
+          aoTelao={() => setTelaoAberto((v) => !v)}
+          aoBackup={baixarBackup}
+          aoTrocarCampanha={() => setTrocandoCampanha((v) => !v)}
+          aoTrocar={trocar}
+        />
       </div>
 
       {souMestre && telaoAberto && (
@@ -411,8 +394,28 @@ function PainelSala({ codigo }: { codigo: string }) {
       {abaEfetiva === "combate" && (
         <>
           <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} cenaNaMesa={cenas.naMesa} />
-          {souMestre && <AcoesEmMassa sala={sala} tempo={tempo} />}
-          <LogCombate log={sala.log} />
+          {souMestre ? (
+            <>
+              <details className="gavetacombate gavetacartao">
+                <summary>
+                  Ações em massa
+                  <span className="dica">PV · condição · descanso · XP</span>
+                </summary>
+                <AcoesEmMassa sala={sala} tempo={tempo} />
+              </details>
+              {sala.log.length > 0 && (
+                <details className="gavetacombate gavetacartao">
+                  <summary>
+                    O que aconteceu
+                    <span className="dica">{sala.log.length === 1 ? "1 linha" : `${sala.log.length} linhas`}</span>
+                  </summary>
+                  <LogCombate log={sala.log} />
+                </details>
+              )}
+            </>
+          ) : (
+            <LogCombate log={sala.log} />
+          )}
         </>
       )}
 

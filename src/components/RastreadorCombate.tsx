@@ -608,23 +608,19 @@ export function RastreadorCombate({
               Próximo turno →
             </button>
           </div>
-          <div className="combatctrls" style={{ marginTop: 12 }}>
-            <button type="button" className="btn" disabled={combate.order.length === 0} onClick={() => setEncerrando(true)}>
-              🏁 Encerrar combate
-            </button>
-            <button type="button" className="btn" onClick={reiniciar}>
-              Reiniciar combate
-            </button>
-          </div>
-
           {encerrando && <EncerrarCombate sala={sala} onFechar={() => setEncerrando(false)} />}
 
+          <details className="gavetacombate" open={combate.order.length === 0}>
+            <summary>
+              Montar o combate
+              <span className="dica">adicionar · encontro</span>
+            </summary>
+            <div className="gavetacorpo">
           {jogadoresDeFora.length > 0 && (
             <button
               type="button"
               className="btn"
-              style={{ marginTop: 12 }}
-              onClick={porTodosOsJogadores}
+                            onClick={porTodosOsJogadores}
               disabled={ocupado}
             >
               🎲 Pôr {jogadoresDeFora.length === 1 ? "1 jogador" : `os ${jogadoresDeFora.length} jogadores`} na ordem
@@ -710,6 +706,16 @@ export function RastreadorCombate({
               ))}
             </div>
           )}
+          <div className="combatctrls">
+            <button type="button" className="btn" disabled={combate.order.length === 0} onClick={() => setEncerrando(true)}>
+              🏁 Encerrar combate
+            </button>
+            <button type="button" className="btn" onClick={reiniciar}>
+              Reiniciar combate
+            </button>
+          </div>
+            </div>
+          </details>
         </>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   SALA,
+  abrirMontagem,
   bancoConfigurado,
   cenaDoBanco,
   coletarErros,
@@ -69,6 +70,7 @@ test("inimigo que entra na iniciativa ganha peão oculto; o que sai leva o peão
   await page.getByRole("button", { name: "Combate", exact: true }).click();
 
   // Um NPC novo, pelo formulário: peão de 1 quadradinho, oculto.
+  await abrirMontagem(page);
   await page.getByPlaceholder("nome do NPC/monstro").fill("Goblin do Robô");
   await page.getByPlaceholder("PV máx").fill("7");
   await page.getByPlaceholder("CA").fill("15");
@@ -79,6 +81,7 @@ test("inimigo que entra na iniciativa ganha peão oculto; o que sai leva o peão
   expect(goblin).toMatchObject({ oculto: true, tamanho: 1 });
 
   // Uma ficha que já existia ("Gigante grande"): peão de 2×2, também oculto.
+  await abrirMontagem(page);
   await page.locator(".addcombatant select").selectOption({ label: "Ogro do Robô (NPC)" });
   await page.getByPlaceholder("iniciativa").fill("14");
   await page.getByRole("button", { name: "Adicionar à ordem" }).click();

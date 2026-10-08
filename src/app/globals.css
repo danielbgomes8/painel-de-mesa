@@ -5400,3 +5400,183 @@ input.fj-score:focus-visible {
   font-size: 15px;
   touch-action: manipulation;
 }
+
+/* ---------- topo enxuto + menu ⋯ ---------- */
+.topbar {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 10px;
+}
+.brand-nome {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.topbar-estado {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.pilula {
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 3px 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.pilula-dia {
+  color: var(--accent);
+  font-family: var(--f-mono);
+}
+.menutopo {
+  position: relative;
+  flex: none;
+}
+.menutopo-botao {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.menutopo-botao:focus-visible,
+.menutopo-lista button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.menutopo-lista {
+  position: absolute;
+  right: 0;
+  top: 46px;
+  z-index: 20;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.menutopo-quem {
+  margin: 0;
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.menutopo-quem b {
+  color: var(--ink);
+}
+.menutopo-lista button {
+  text-align: left;
+  min-height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.menutopo-lista button:hover {
+  background: var(--surface2);
+}
+.menutopo-lista button:disabled {
+  color: var(--dim);
+  cursor: default;
+}
+@media (max-width: 400px) {
+  /* Telas estreitas: o dia vai pra baixo do nome, a sincronização fica. */
+  .topbar {
+    flex-wrap: wrap;
+  }
+  .brand-nome {
+    flex-basis: calc(100% - 52px);
+    order: 1;
+  }
+  .menutopo {
+    order: 2;
+  }
+  .topbar-estado {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+/* ---------- gavetas do combate (montar, ações em massa, log) ---------- */
+.gavetacombate {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.gavetacombate > summary {
+  list-style: none;
+  min-height: 46px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-family: var(--f-display);
+  font-size: 14px;
+  touch-action: manipulation;
+}
+.gavetacombate > summary::-webkit-details-marker {
+  display: none;
+}
+.gavetacombate > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.gavetacombate > summary .dica {
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: right;
+}
+.gavetacombate[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+.gavetacorpo {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* O cartão de dentro (Ações em massa, Log) perde moldura e título: a gaveta já é o título. */
+.gavetacartao > .combat {
+  border: 0;
+  box-shadow: none;
+  background: none;
+  margin: 0;
+  padding: 12px;
+}
+.gavetacartao > .combat > .combat-head {
+  display: none;
+}

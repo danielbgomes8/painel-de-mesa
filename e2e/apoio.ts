@@ -254,3 +254,10 @@ export async function abrirMesa(page: Page): Promise<void> {
   const ativo = (await botao.getAttribute("aria-pressed")) === "true";
   if (!ativo || !(await page.locator(".palco-painel").isVisible())) await botao.click();
 }
+
+/** Abre a gaveta "Montar o combate" da aba Combate (ela abre sozinha só com a
+ *  ordem vazia). Não faz nada se já estiver aberta. */
+export async function abrirMontagem(page: Page): Promise<void> {
+  const gaveta = page.locator("details.gavetacombate", { hasText: "Montar o combate" });
+  if (!(await gaveta.evaluate((d) => (d as HTMLDetailsElement).open))) await gaveta.locator(":scope > summary").click();
+}
