@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 
 /** A sala de teste do robô. Fixa: depois da migration 0020 ninguém apaga sala
  *  pelo app, então uma sala por execução deixaria lixo; esta é limpa a cada vez. */
-export const SALA = "ci-teste";
+export const SALA = process.env.E2E_SALA ?? "ci-teste";
 
 try {
   // Local: lê o .env.local (o Playwright não lê). No CI as variáveis já vêm do ambiente.
@@ -218,4 +218,39 @@ export function pngDeTeste(largura: number, altura: number): Buffer {
     bloco("IDAT", deflateSync(linhas)),
     bloco("IEND", Buffer.alloc(0)),
   ]);
+}
+
+/**
+ * Escolhe uma ferramenta da barra de ícones do mapa (o nome é o do ícone: "Mover", "Névoa", "Medir",
+ * "Desenhar", "Peões", "Paredes e portas", "Cena e grade") e deixa o painel dela aberto. O Mestre troca de
+ * fase antes quando precisa: paredes e grade só existem em "preparar", medir só em "jogar".
+ */
+export async function abrirFerramenta(page: Page, ferramenta: string, fase?: "preparar" | "jogar"): Promise<void> {
+  if (fase) {
+    const botaoFase = page.getByRole("group", { name: "Modo" }).getByRole("button", { name: fase === "preparar" ? "Preparar" : "Jogar", exact: true });
+    if ((await botaoFase.getAttribute("aria-pressed")) !== "true") await botaoFase.click();
+  }
+  const botao = page.getByRole("toolbar", { name: "Ferramentas do mapa" }).getByRole("button", { name: ferramenta, exact: true });
+  const ativo = (await botao.getAttribute("aria-pressed")) === "true";
+  if (!ativo || !(await page.locator(".palco-painel").isVisible())) await botao.click();
+}
+
+/** Fecha o painel flutuante: ele cobre um pedaço do mapa, então quem vai tocar no mapa fecha antes. */
+export async function fecharPainelDoMapa(page: Page): Promise<void> {
+  const fechar = page.getByRole("button", { name: "Fechar o painel" });
+  if (await fechar.isVisible()) await fechar.click();
+}
+
+/** Escolhe uma opção do painel de uma ferramenta (abre o painel, toca na opção e fecha o painel, que cobre o mapa). */
+export async function escolherNoPainel(page: Page, ferramenta: string, grupo: string | RegExp, nome: string, fase?: "preparar" | "jogar"): Promise<void> {
+  await abrirFerramenta(page, ferramenta, fase);
+  await page.getByRole("group", { name: grupo }).getByRole("button", { name: nome }).click();
+  await fecharPainelDoMapa(page);
+}
+
+/** Abre o painel "A mesa" (o alvo embaixo do mapa): o que a mesa vê e pra onde olha. */
+export async function abrirMesa(page: Page): Promise<void> {
+  const botao = page.getByRole("button", { name: "A mesa", exact: true });
+  const ativo = (await botao.getAttribute("aria-pressed")) === "true";
+  if (!ativo || !(await page.locator(".palco-painel").isVisible())) await botao.click();
 }

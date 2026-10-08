@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { decodificarMascara } from "../src/lib/visao";
 import {
+  abrirFerramenta,
+  abrirMesa,
+  escolherNoPainel,
+  fecharPainelDoMapa,
   SALA,
   apagarPecasDoBanco,
   cenaDoBanco,
@@ -79,7 +83,7 @@ test("mapa: sobe a imagem, ela carrega (a política de segurança deixa), vai pr
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
 
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   // Jogador (outro navegador, outra pessoa): o aviso aparece e o mapa abre.
   const jogador = await browser.newContext();
@@ -100,6 +104,7 @@ test("mapa: sobe a imagem, ela carrega (a política de segurança deixa), vai pr
   await expect(paginaTelao.locator(".telao--mapa .cena-canvas")).toBeVisible();
 
   // O Mestre tira o mapa da mesa e o jogador perde a aba, ao vivo.
+  await abrirMesa(page);
   await page.getByRole("button", { name: "tirar o mapa da mesa" }).click();
   await expect(paginaJogador.getByRole("button", { name: "Mapa", exact: true })).toHaveCount(0);
 
@@ -127,10 +132,10 @@ test("peões: o Mestre põe o grupo e os inimigos, oculta um, e o jogador põe o
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   // A seção existe e a tabela está ligada (senão ela diz "falta rodar a migration").
-  await page.locator(".fc-sechead", { hasText: "Peões" }).click();
+  await abrirFerramenta(page, "Peões");
   await expect(page.getByText("Falta rodar a migration 0019")).toHaveCount(0);
 
   // Grupo e inimigos: cada um num peão; o inimigo entra OCULTO.
@@ -205,7 +210,7 @@ test("régua: o Mestre mede na grade (diagonal vale 1 quadrado) e o jogador vê 
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   const contexto = await browser.newContext();
   const jogador = await contexto.newPage();
@@ -216,7 +221,8 @@ test("régua: o Mestre mede na grade (diagonal vale 1 quadrado) e o jogador vê 
   await expect(jogador.locator(".cena-canvas")).toBeVisible();
   await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
 
-  await page.getByRole("button", { name: /régua/ }).click();
+  await abrirFerramenta(page, "Medir", "jogar");
+  await fecharPainelDoMapa(page);
   const canvas = page.locator(".cena-canvas");
   await canvas.scrollIntoViewIfNeeded();
   const caixa = (await canvas.boundingBox())!;
@@ -247,7 +253,9 @@ test("régua: o Mestre mede na grade (diagonal vale 1 quadrado) e o jogador vê 
 
   // Em linha reta: 3 quadrados na diagonal viram 4,2 quadrados (a diagonal de verdade).
   await page.waitForTimeout(900);
+  await abrirFerramenta(page, "Medir");
   await page.getByRole("button", { name: "em linha reta" }).click();
+  await fecharPainelDoMapa(page);
   await medir([165, 165], [255, 255]);
   await expect.poll(async () => (await textosDe(jogador)).some((t) => /^Mestre: 4,2 quadrados · 6,4 m$/.test(t))).toBe(true);
 
@@ -288,11 +296,12 @@ test("condições no peão: o ícone é desenhado pra mesa, e o do inimigo ocult
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
-  await page.locator(".fc-sechead", { hasText: "Peões" }).click();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
+  await abrirFerramenta(page, "Peões");
   await page.getByRole("button", { name: "pôr o grupo no mapa" }).click();
   await page.getByRole("button", { name: "pôr os inimigos da iniciativa" }).click();
   await expect.poll(async () => (await pecasDoBanco()).length).toBe(2);
+  await fecharPainelDoMapa(page);
   // O dragão entrou oculto: a mesa não o vê.
   expect((await pecasDoBanco()).find((p) => p.slug === "dragao-robo")?.oculto).toBe(true);
 
@@ -361,7 +370,7 @@ test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, 
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   const contexto = await browser.newContext();
   const jogador = await contexto.newPage();
@@ -375,6 +384,7 @@ test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, 
   // A barra de tamanhos muda de altura conforme a forma e empurra o mapa: a
   // posição do canvas é medida de novo a cada arrasto.
   const arrastar = async (quem: typeof page, de: [number, number], para: [number, number]) => {
+    await fecharPainelDoMapa(quem);
     const canvas = quem.locator(".cena-canvas");
     await canvas.scrollIntoViewIfNeeded();
     const c = (await canvas.boundingBox())!;
@@ -390,7 +400,8 @@ test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, 
   };
 
   // ── Mestre ──
-  await page.getByRole("button", { name: /área/ }).click();
+  await abrirFerramenta(page, "Medir", "jogar");
+  await page.getByRole("group", { name: "O que medir" }).getByRole("button", { name: "Área de magia" }).click();
   // Esfera é o padrão: raio de 6 m (4 quadrados).
   await expect(page.getByText("Esfera: raio de 6 m (4 quadrados).")).toBeVisible();
   await arrastar(page, [300, 300], [300, 300]);
@@ -399,6 +410,7 @@ test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, 
 
   // Cone de 9 m (tamanho pronto), apontando pra direita.
   await page.waitForTimeout(900);
+  await abrirFerramenta(page, "Medir");
   await page.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Cone" }).click();
   await page.getByRole("group", { name: /Tamanho/ }).getByRole("button", { name: "9 m" }).click();
   await arrastar(page, [150, 150], [450, 150]);
@@ -406,17 +418,20 @@ test("modelos de magia: o Mestre e o jogador marcam esfera, cone, cubo e linha, 
 
   // Linha de 30 m por 1,5 m e cubo de 4,5 m (um tamanho que o Mestre digita).
   await page.waitForTimeout(900);
+  await abrirFerramenta(page, "Medir");
   await page.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Linha" }).click();
   await arrastar(page, [150, 450], [500, 450]);
   await expect.poll(async () => (await textosDe(jogador)).includes("Mestre: Linha · 30 m × 1,5 m")).toBe(true);
   await page.waitForTimeout(900);
+  await abrirFerramenta(page, "Medir");
   await page.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Cubo" }).click();
   await page.getByLabel(/Outro tamanho/).fill("7,5");
   await arrastar(page, [600, 300], [800, 300]);
   await expect.poll(async () => (await textosDe(jogador)).includes("Mestre: Cubo · lado 7,5 m")).toBe(true);
 
   // ── Jogador ── (a barra dele tem "✨ área", e o Mestre vê o nome dele)
-  await jogador.getByRole("button", { name: /área/ }).click();
+  await abrirFerramenta(jogador, "Medir");
+  await jogador.getByRole("group", { name: "O que medir" }).getByRole("button", { name: "Área de magia" }).click();
   await jogador.getByRole("group", { name: "Forma da magia" }).getByRole("button", { name: "Cone" }).click();
   await jogador.getByRole("group", { name: /Tamanho/ }).getByRole("button", { name: "18 m" }).click();
   await arrastar(jogador, [150, 300], [450, 300]);
@@ -454,12 +469,13 @@ test("paredes e visão: a névoa abre sozinha pelo grupo, a porta decide, e a me
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   // A seção está ligada (senão ela diz "falta rodar a migration 0021").
-  await page.locator(".fc-sechead", { hasText: "Paredes e visão" }).click();
+  await abrirFerramenta(page, "Paredes e portas", "preparar");
   await expect(page.getByText("Falta rodar a migration 0021")).toHaveCount(0);
   await page.getByLabel(/visão automática/).check();
+  await fecharPainelDoMapa(page);
   const cena = await cenaDoBanco();
   await expect.poll(async () => (await cenaDoBanco()).visao_ligada).toBe(true);
 
@@ -492,7 +508,7 @@ test("paredes e visão: a névoa abre sozinha pelo grupo, a porta decide, e a me
   await expect(jogador.getByRole("button", { name: "pôr meu peão no mapa" })).toHaveCount(0);
 
   // O Mestre abre a porta (tocando nela, com a ferramenta de mover): o dragão aparece.
-  await page.getByRole("button", { name: /mover/ }).first().click();
+  await abrirFerramenta(page, "Mover", "jogar");
   const canvas = page.locator(".cena-canvas");
   await canvas.scrollIntoViewIfNeeded();
   const c = (await canvas.boundingBox())!;
@@ -548,9 +564,10 @@ test("paredes: o Mestre desenha parede, porta e cômodo, apaga, e escolhe onde o
     await page.mouse.move(b.x, b.y, { steps: 8 });
     await page.mouse.up();
   };
-  const modo = (nome: string) => page.getByRole("group", { name: "O que desenhar" }).getByRole("button", { name: nome });
+  const modo = (nome: string) => ({ click: () => escolherNoPainel(page, "Paredes e portas", "O que desenhar", nome, "preparar") });
 
-  await page.getByRole("button", { name: "🧱 paredes" }).click();
+  await abrirFerramenta(page, "Paredes e portas", "preparar");
+  await fecharPainelDoMapa(page);
   // Parede: as pontas encaixam no cruzamento da grade (o lado vem da cena, não é chute).
   const lado = Number((await cenaDoBanco()).grade_px);
   await modo("parede").click();
@@ -579,14 +596,16 @@ test("paredes: o Mestre desenha parede, porta e cômodo, apaga, e escolhe onde o
 
   // Desfazer tira o último DESENHO inteiro: as quatro paredes do cômodo saem
   // juntas (era uma por toque — com parede em curva, seriam dezenas de toques).
-  await page.locator(".fc-sechead", { hasText: "Paredes e visão" }).click();
+  await abrirFerramenta(page, "Paredes e portas", "preparar");
   await page.getByRole("button", { name: "↩ desfazer parede" }).click();
+  await fecharPainelDoMapa(page);
   await expect.poll(async () => (await paredesDoBanco()).length).toBe(1);
   expect((await paredesDoBanco())[0].tipo).toBe("porta");
 
   // Onde o grupo entra: o Mestre toca no mapa e os peões se agrupam em volta do ponto.
-  await page.locator(".fc-sechead", { hasText: "Peões" }).click();
+  await abrirFerramenta(page, "Peões");
   await page.getByRole("button", { name: "grupo onde eu tocar" }).click();
+  await fecharPainelDoMapa(page);
   await expect(page.getByText("Toque no mapa no lugar onde o grupo entra")).toBeVisible();
   await arrastar([700, 120], [700, 120]);
   await expect.poll(async () => (await pecasDoBanco()).length).toBe(1);
@@ -609,7 +628,7 @@ test("visão: se as paredes demoram a chegar, a memória não ganha o que estava
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
   const cena = await cenaDoBanco();
   // Parede inteira no meio (x = 450), sem alcance: sem a parede, o grupo "veria" o mapa todo.
   await criarParedes(cena.id, [{ tipo: "parede", x1: 450, y1: 0, x2: 450, y2: 600 }]);
@@ -680,7 +699,7 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
   // Sem névoa por cima: o que se confere aqui é o desenho, não a névoa.
   await mudarCena((await cenaDoBanco()).id, { nevoa_ligada: false });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   const arrastar = async (de: [number, number], para: [number, number]) => {
     const canvas = page.locator(".cena-canvas");
@@ -695,9 +714,10 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
     await page.mouse.move(b.x, b.y, { steps: 10 });
     await page.mouse.up();
   };
-  const modo = (nome: string) => page.getByRole("group", { name: "O que marcar" }).getByRole("button", { name: nome });
+  const modo = (nome: string) => ({ click: () => escolherNoPainel(page, "Desenhar", "O que marcar", nome) });
 
-  await page.getByRole("button", { name: "✏️ desenhar" }).click();
+  await abrirFerramenta(page, "Desenhar");
+  await fecharPainelDoMapa(page);
 
   // Traço livre: acompanha o movimento (uma diagonal vira um traço de poucos pontos).
   await modo("✏️ livre").click();
@@ -764,12 +784,16 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
 
   // Nota escondida da mesa (a primeira) e nota liberada (a segunda).
   await modo("📌 nota").click();
+  await abrirFerramenta(page, "Desenhar");
   await page.getByRole("button", { name: "👁 a mesa vê" }).click(); // vira "só eu vejo"
+  await fecharPainelDoMapa(page);
   await arrastar([500, 150], [500, 150]);
   await page.getByLabel("Texto da nota").fill("segredo do mestre");
   await page.getByRole("button", { name: "pôr nota" }).click();
   await expect.poll(async () => (await marcasDoBanco()).length).toBe(3);
+  await abrirFerramenta(page, "Desenhar");
   await page.getByRole("button", { name: "🔒 só eu vejo" }).click(); // volta pra "a mesa vê"
+  await fecharPainelDoMapa(page);
   await arrastar([700, 400], [700, 400]);
   await page.getByLabel("Texto da nota").fill("armadilha na ponte");
   await page.getByLabel("Texto da nota").press("Enter");
@@ -778,7 +802,7 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
   expect(notas.map((n) => [n.texto, n.visivel])).toEqual([["segredo do mestre", false], ["armadilha na ponte", true]]);
 
   // Mestre: as duas notas na lista, numeradas 1 e 2.
-  await page.locator(".fc-sechead", { hasText: "Desenhos e notas" }).click();
+  await abrirFerramenta(page, "Desenhar");
   await expect(page.locator(".mapa-notas .mapa-nota")).toHaveCount(2);
 
   // Jogador: só a nota liberada, e ela é a nº 1 (sem buraco onde há nota escondida).
@@ -841,6 +865,7 @@ test("desenhos e notas: o Mestre risca e anota, a mesa só vê o liberado, e a b
   expect((await marcasDoBanco()).some((m) => m.id === traco.id)).toBe(false);
 
   // Apagar a nota pela lista.
+  await abrirFerramenta(page, "Desenhar");
   await page.getByRole("button", { name: "Apagar a nota 1" }).click();
   await expect.poll(async () => (await marcasDoBanco()).length).toBe(2);
   await expect(paginaJogador.locator(".mapa-notas .mapa-nota")).toHaveCount(1);

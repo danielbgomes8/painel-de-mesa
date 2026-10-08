@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  abrirFerramenta,
+  fecharPainelDoMapa,
   SALA,
   bancoConfigurado,
   cenaDoBanco,
@@ -59,7 +61,7 @@ test("área: conta quem a mesa vê; o oculto só aparece pro Mestre, à parte", 
   // Sem névoa por cima: o que se confere aqui é a contagem, não a névoa.
   await mudarCena(cena.id, { nevoa_ligada: false });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   await criarFicha("jogador-robo", "Jogador Robô");
   // Dentro da esfera de 6 m (120 px) centrada em (180, 180): dois à vista e um OCULTO. Um longe.
@@ -78,8 +80,10 @@ test("área: conta quem a mesa vê; o oculto só aparece pro Mestre, à parte", 
   await expect(jogador.locator(".cena-canvas")).toBeVisible();
   await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   // Os peões chegam do banco um instante depois do mapa: espera aparecerem no desenho do Mestre.
-  await page.getByRole("button", { name: /área/ }).click();
+  await abrirFerramenta(page, "Medir", "jogar");
+  await page.getByRole("group", { name: "O que medir" }).getByRole("button", { name: "Área de magia" }).click();
   await expect(page.getByText("Esfera: raio de 6 m (4 quadrados).")).toBeVisible();
+  await fecharPainelDoMapa(page);
 
   // Esfera no cruzamento (180, 180): pega A, B e C — C está oculto.
   await expect(async () => {

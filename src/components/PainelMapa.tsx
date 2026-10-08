@@ -6,38 +6,38 @@ import type { Sala } from "@/hooks/useSala";
 import { useNevoa } from "@/hooks/useNevoa";
 import { useParedes } from "@/hooks/useParedes";
 import { useMarcas } from "@/hooks/useMarcas";
-import { ControlesDeMarca, EditorDeDesenho, ListaDeNotas, NovaNota, resumoDasMarcas } from "@/components/MarcasDoMapa";
+import { EditorDeDesenho, ListaDeNotas, NovaNota } from "@/components/MarcasDoMapa";
 import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
-import { montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca, type TamanhoPeca } from "@/lib/pecas";
-import { PAREDES_MAXIMAS, cabemParedes, segmentosQueBloqueiam, ultimoDesenho, type ModoParede, type NovaParede, type Parede } from "@/lib/paredes";
-import { vaosDePorta } from "@/lib/vaos";
+import { montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
+import { segmentosQueBloqueiam, type ModoParede, type Parede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
 import {
   cameraValida,
-  gradePxParaQuadrados,
   gradeUsavel,
   nomeDaCenaPeloArquivo,
-  quadradosNaLargura,
   type Cena,
   type Ponto,
   type ModoNevoa,
   type TamanhoPincel,
 } from "@/lib/cenas";
-import { BotaoRemover } from "@/components/BotaoRemover";
-import { CampoNumero } from "@/components/CampoNumero";
-import { CampoTexto } from "@/components/CampoTexto";
 import { CartaoDoPeao } from "@/components/CartaoDoPeao";
 import { CenaMapa, type CenaMapaApi, type Ferramenta } from "@/components/CenaMapa";
-import { ControlesDeArea } from "@/components/ControlesDeArea";
-import { ImportarParedes } from "@/components/ImportarParedes";
+import { IconeMapa } from "@/components/IconesMapa";
 import { LegendaIconesPeao } from "@/components/LegendaIconesPeao";
-import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
+import { PalcoDoMapa, type FerramentaDoPalco } from "@/components/PalcoDoMapa";
+import {
+  PainelCena,
+  PainelDesenhos,
+  PainelMedir,
+  PainelMesa,
+  PainelNevoa,
+  PainelParedes,
+  PainelPecas,
+} from "@/components/PainelMapaPaineis";
 
-/** O peão com o cartão de ações aberto e a ficha dele — só se ainda existem
- *  (peão tirado, ficha apagada ou marcador avulso: nada a abrir). */
 /** Move um peão e, se `juntos`, os dos companheiros dele o mesmo tanto (`pecasQueAcompanham`). */
 function moverPeao(
   banco: ReturnType<typeof usePecas>,
@@ -56,34 +56,8 @@ function moverPeao(
   for (const c of seguem) void banco.atualizar(c.id, { x: c.x, y: c.y });
 }
 
-/** Onde duas paredes quase se encontram na mesma linha, com uma abertura de passagem (`vaosDePorta`), vira porta ABERTA
- *  numa escrita só: nada muda na vista até o Mestre fechar; "↩ desfazer parede" tira todas de uma vez. */
-function VaosViramPortas({ cena, paredes, adicionar }: { cena: Cena; paredes: Parede[]; adicionar: (novas: NovaParede[]) => Promise<boolean> }) {
-  const vaos = useMemo(() => vaosDePorta(paredes, cena), [paredes, cena]);
-  const [ocupado, setOcupado] = useState(false);
-  if (vaos.length === 0 || !cabemParedes(paredes.length, vaos.length)) return null;
-  return (
-    <div className="mapa-ferr">
-      <button
-        type="button"
-        className="btn"
-        disabled={ocupado}
-        onClick={async () => {
-          setOcupado(true);
-          await adicionar(vaos);
-          setOcupado(false);
-        }}
-      >
-        🚪 marcar {vaos.length} {vaos.length === 1 ? "vão" : "vãos"} como {vaos.length === 1 ? "porta" : "portas"}
-      </button>
-      <p className="fc-sub">
-        Achei {vaos.length} {vaos.length === 1 ? "abertura" : "aberturas"} entre paredes do tamanho de uma passagem. Entram como portas abertas
-        (a vista passa); toque numa com ✋ mover pra fechar.
-      </p>
-    </div>
-  );
-}
-
+/** O peão com o cartão de ações aberto e a ficha dele — só se ainda existem
+ *  (peão tirado, ficha apagada ou marcador avulso: nada a abrir). */
 function cartaoAberto(id: string | null, pecas: readonly Peca[], sala: Sala) {
   const peca = id ? pecas.find((p) => p.id === id) : undefined;
   const ficha = peca?.slug ? sala.personagens.find((f) => f.slug === peca.slug) : undefined;
@@ -95,6 +69,8 @@ function cartaoAberto(id: string | null, pecas: readonly Peca[], sala: Sala) {
     naOrdem: sala.combate.order.some((o) => o.slug === ficha.slug),
   };
 }
+
+const ZOOM_PASSO = 1.3;
 
 /**
  * A mesa vendo o mapa: o que o Mestre pôs na tela, com a névoa. Usado na aba
@@ -126,10 +102,11 @@ export function VisorDaMesa({
   const muros = useParedes(cena.id, codigo);
   const desenhos = useMarcas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
-  // O que o toque faz no mapa: mexer, medir (régua) ou marcar uma área de magia.
-  const [uso, setUso] = useState<"mover" | "regua" | "area">("mover");
+  // O que o toque faz no mapa: mexer, medir (régua ou área de magia) ou pingar.
+  const [uso, setUso] = useState<"mover" | "medir" | "ping">("mover");
+  const [painelAberto, setPainelAberto] = useState(true);
+  const [medirQue, setMedirQue] = useState<"regua" | "area">("regua");
   const [juntos, setJuntos] = useState(true);
-  const medindo = uso === "regua";
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
   // O jogador só consegue tocar no próprio peão (ver CenaMapa), então o cartão é sempre o dele.
@@ -152,117 +129,159 @@ export function VisorDaMesa({
   );
   const minhaFicha = meuSlug ? sala.personagens.find((p) => p.slug === meuSlug) : undefined;
   const semMeuPeao = Boolean(minhaFicha) && !banco.pecas.some((p) => p.slug === meuSlug);
+  const temCompanheiros = sala.personagens.some((f) => f.dono);
+  const ferramentaMapa: Ferramenta = uso === "medir" ? medirQue : uso;
 
   function porMeuPeao() {
     if (!minhaFicha) return;
     const [x, y] = posicoesIniciais(cena, 1, mapaRef.current?.regiaoVisivel() ?? null, banco.pecas.map((p) => [p.x, p.y]))[0];
     void banco.adicionar([{ slug: minhaFicha.slug, nome: "", x, y }]);
   }
-  return (
-    <div className={telao ? "mapa-visor mapa-visor--telao" : "mapa-visor"}>
-      <CenaMapa
-        ref={mapaRef}
-        cena={cena}
-        imagemUrl={urlDaImagem(cena)}
-        regras={nevoa.regras}
-        mestre={false}
-        interativo={!telao}
-        seguirCamera
-        pings={ping.pings}
-        aoPingar={quem ? ping.enviar : undefined}
-        ferramenta={uso}
-        modoRegua={modoRegua}
-        corRegua={quem?.cor}
-        reguas={ping.reguas}
-        aoMedir={quem ? ping.enviarRegua : undefined}
-        modeloArea={modeloArea}
-        areas={ping.areas}
-        aoAreaar={quem ? ping.enviarArea : undefined}
-        paredes={muros.paredes}
-        marcas={desenhos.marcas}
-        visaoPronta={!muros.carregando && !banco.carregando}
-        pecas={pecas}
-        aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
-        aoAbrirPeca={telao ? undefined : setCartao}
-      />
-      {telao && <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />}
-      {!telao && (
-        <>
-          <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} />
-          {aberto && aberto.ficha.slug === meuSlug && (
-            <CartaoDoPeao
-              key={aberto.peca.id}
-              sala={sala}
-              personagem={aberto.ficha}
-              souMestre={false}
-              vez={aberto.vez}
-              naOrdem={aberto.naOrdem}
-              aura={aberto.peca.aura}
-              aoMudarAura={(m) => void banco.atualizar(aberto.peca.id, { aura: m })}
-              aoFechar={() => setCartao(null)}
+
+  const mapa = (
+    <CenaMapa
+      ref={mapaRef}
+      cena={cena}
+      imagemUrl={urlDaImagem(cena)}
+      regras={nevoa.regras}
+      mestre={false}
+      interativo={!telao}
+      seguirCamera
+      pings={ping.pings}
+      aoPingar={quem ? ping.enviar : undefined}
+      ferramenta={telao ? "mover" : ferramentaMapa}
+      modoRegua={modoRegua}
+      corRegua={quem?.cor}
+      reguas={ping.reguas}
+      aoMedir={quem ? ping.enviarRegua : undefined}
+      modeloArea={modeloArea}
+      areas={ping.areas}
+      aoAreaar={quem ? ping.enviarArea : undefined}
+      paredes={muros.paredes}
+      marcas={desenhos.marcas}
+      visaoPronta={!muros.carregando && !banco.carregando}
+      pecas={pecas}
+      aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
+      aoAbrirPeca={telao ? undefined : setCartao}
+    />
+  );
+
+  if (telao) {
+    return (
+      <div className="mapa-visor mapa-visor--telao">
+        {mapa}
+        <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />
+      </div>
+    );
+  }
+
+  const ferramentas: FerramentaDoPalco[] = [{ id: "mover", rotulo: "Mover", icone: "mover" }];
+  if (quem) ferramentas.push({ id: "medir", rotulo: "Medir", icone: "medir" });
+
+  const painel =
+    uso === "medir"
+      ? {
+          titulo: "Medir",
+          conteudo: (
+            <PainelMedir
+              oQue={medirQue}
+              aoMudarOQue={setMedirQue}
+              modoRegua={modoRegua}
+              aoMudarRegua={setModoRegua}
+              modeloArea={modeloArea}
+              aoMudarArea={setModeloArea}
+              metrosPorQuadrado={cena.metros}
             />
-          )}
-          <div className="mapa-visor-barra">
-            <span className="mapa-visor-nome">{cena.nome || "Mapa"}</span>
-            <div className="mapa-visor-botoes">
-              {semMeuPeao && !cena.visao_ligada && (
-                <button type="button" className="btn" onClick={porMeuPeao}>
-                  pôr meu peão no mapa
-                </button>
-              )}
-              {quem && (
-                <>
-                  <button type="button" className="chip alvo" aria-pressed={medindo} onClick={() => setUso(medindo ? "mover" : "regua")}>
-                    📏 medir
-                  </button>
-                  <button type="button" className="chip alvo" aria-pressed={uso === "area"} onClick={() => setUso(uso === "area" ? "mover" : "area")}>
-                    ✨ área
-                  </button>
-                </>
-              )}
-              {quem && sala.personagens.some((f) => f.dono) && (
+          ),
+        }
+      : uso === "mover" && quem && temCompanheiros
+        ? {
+            titulo: "Mover",
+            conteudo: (
+              <div className="mapa-ferr">
                 <button type="button" className="chip alvo" aria-pressed={juntos} onClick={() => setJuntos(!juntos)}>
                   🐾 companheiros junto
                 </button>
-              )}
-              <button type="button" className="btn" onClick={() => mapaRef.current?.reenquadrar()}>
-                voltar à visão da mesa
+              </div>
+            ),
+          }
+        : null;
+
+  const dica =
+    uso === "ping"
+      ? "Toque no mapa pra mostrar um ponto pra mesa."
+      : uso === "medir"
+        ? medirQue === "regua"
+          ? "Arraste de um ponto a outro. Começando no seu peão, diz se cabe no seu deslocamento."
+          : "Escolha a forma e arraste no mapa. A mesa vê a figura por alguns segundos."
+        : "Arraste o seu peão. Toque nele pra dano, cura e passar a vez. Segure o dedo parado pra pingar.";
+
+  return (
+    <div className="mapa-visor">
+      <PalcoDoMapa
+        mapa={mapa}
+        nome={cena.nome || "Mapa"}
+        estado="Na mesa"
+        cantoAlto={Boolean(quem) && semMeuPeao && !cena.visao_ligada}
+        canto={
+          <>
+            {quem && (
+              <div className="palco-voce palco-vidro">
+                <span className="mapa-cor" style={{ background: quem.cor }} aria-hidden="true" />
+                Sua cor
+              </div>
+            )}
+            {semMeuPeao && !cena.visao_ligada && (
+              <button type="button" className="btn palco-vidro" onClick={porMeuPeao}>
+                pôr meu peão no mapa
               </button>
-            </div>
-          </div>
-          {medindo && (
-            <div className="mapa-ferr" role="group" aria-label="Como medir">
-              <button type="button" className="chip alvo" aria-pressed={modoRegua === "grade"} onClick={() => setModoRegua("grade")}>
-                na grade
-              </button>
-              <button type="button" className="chip alvo" aria-pressed={modoRegua === "reta"} onClick={() => setModoRegua("reta")}>
-                em linha reta
-              </button>
-            </div>
-          )}
-          {semMeuPeao && cena.visao_ligada && (
-            <p className="fc-sub">Com a visão automática ligada, quem põe o seu peão no mapa é o Mestre: o lugar dele abre a névoa.</p>
-          )}
-          {uso === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
-          {banco.aviso && (
-            <p className="mapa-erro" role="alert">
-              {banco.aviso}
-            </p>
-          )}
-          {quem && (
-            <p className="mapa-dica">
-              <span className="mapa-cor" style={{ background: quem.cor }} aria-hidden="true" />
-              <b>Sua cor.</b> Segure o dedo parado no mapa pra mostrar um ponto pra todo mundo: o pulso aparece com o seu
-              nome na TV e nos outros celulares. {medindo
-                ? "Medindo: arraste de um ponto a outro. Começando no seu peão, diz se cabe no seu deslocamento."
-                : uso === "area"
-                  ? "Área de magia: escolha a forma e o tamanho e arraste no mapa. A mesa vê a figura por alguns segundos."
-                  : "Toque no seu peão pra dano, cura, condições e passar a vez; em 📏 medir pra ver a distância em metros; ou em ✨ área pra mostrar o alcance de uma magia."}
-            </p>
-          )}
-          <LegendaIconesPeao />
-        </>
+            )}
+          </>
+        }
+        ferramentas={ferramentas}
+        ativa={uso}
+        aoEscolher={(id) => {
+          if (id === uso) setPainelAberto((a) => !a);
+          else {
+            setUso(id as "mover" | "medir");
+            setPainelAberto(true);
+          }
+        }}
+        painel={painel}
+        painelAberto={painelAberto}
+        aoFecharPainel={() => setPainelAberto(false)}
+        ping={quem ? { ativo: uso === "ping", aoAlternar: () => setUso(uso === "ping" ? "mover" : "ping") } : undefined}
+        zoom={{
+          aproximar: () => mapaRef.current?.aproximar(ZOOM_PASSO),
+          afastar: () => mapaRef.current?.aproximar(1 / ZOOM_PASSO),
+          enquadrar: () => mapaRef.current?.reenquadrar(),
+          rotuloEnquadrar: "Voltar à visão da mesa",
+        }}
+        dica={dica}
+      />
+      <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} />
+      {aberto && aberto.ficha.slug === meuSlug && (
+        <CartaoDoPeao
+          key={aberto.peca.id}
+          sala={sala}
+          personagem={aberto.ficha}
+          souMestre={false}
+          vez={aberto.vez}
+          naOrdem={aberto.naOrdem}
+          aura={aberto.peca.aura}
+          aoMudarAura={(m) => void banco.atualizar(aberto.peca.id, { aura: m })}
+          aoFechar={() => setCartao(null)}
+        />
       )}
+      {semMeuPeao && cena.visao_ligada && (
+        <p className="fc-sub">Com a visão automática ligada, quem põe o seu peão no mapa é o Mestre: o lugar dele abre a névoa.</p>
+      )}
+      {banco.aviso && (
+        <p className="mapa-erro" role="alert">
+          {banco.aviso}
+        </p>
+      )}
+      <LegendaIconesPeao />
     </div>
   );
 }
@@ -325,50 +344,29 @@ export function PainelMapa({
   return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
 }
 
-/** Número com vírgula ou ponto ("1,5"), pros metros por quadrado. */
-function CampoMetros({
-  valor,
-  onCommit,
-  aria = "Metros por quadrado",
-  maximo = 100,
-}: {
-  valor: number;
-  onCommit: (n: number) => void;
-  aria?: string;
-  maximo?: number;
-}) {
-  const [rascunho, setRascunho] = useState(String(valor).replace(".", ","));
-  const [focado, setFocado] = useState(false);
-  const mostrado = focado ? rascunho : String(valor).replace(".", ",");
-  return (
-    <input
-      className="mapa-num"
-      type="text"
-      inputMode="decimal"
-      aria-label={aria}
-      value={mostrado}
-      onFocus={() => {
-        setRascunho(String(valor).replace(".", ","));
-        setFocado(true);
-      }}
-      onChange={(e) => setRascunho(e.target.value)}
-      onBlur={() => {
-        setFocado(false);
-        const n = Number.parseFloat(rascunho.replace(",", "."));
-        if (Number.isFinite(n) && n > 0 && n <= maximo && n !== valor) onCommit(Math.round(n * 100) / 100);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-    />
-  );
-}
+type Uso = "mover" | "nevoa" | "medir" | "desenhar" | "peoes" | "paredes" | "grade" | "ping" | "mesa";
+type FormaNevoa = "pincel" | "retangulo" | "quadradinhos";
+
+const ROTULO_DO_USO: Record<Exclude<Uso, "ping" | "mesa">, FerramentaDoPalco> = {
+  mover: { id: "mover", rotulo: "Mover", icone: "mover" },
+  nevoa: { id: "nevoa", rotulo: "Névoa", icone: "nevoa" },
+  medir: { id: "medir", rotulo: "Medir", icone: "medir" },
+  desenhar: { id: "desenhar", rotulo: "Desenhar", icone: "desenhar" },
+  peoes: { id: "peoes", rotulo: "Peões", icone: "peoes" },
+  paredes: { id: "paredes", rotulo: "Paredes e portas", icone: "paredes" },
+  grade: { id: "grade", rotulo: "Cena e grade", icone: "grade" },
+};
 
 function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: string; quem: QuemPinga | null; sala: Sala }) {
   const [escolhida, setEscolhida] = useState<string | null>(null);
   const cena = cenas.cenas.find((c) => c.id === escolhida) ?? cenas.naMesa ?? cenas.cenas[0] ?? null;
 
-  const [ferramenta, setFerramenta] = useState<Ferramenta>("mover");
+  /** Preparar (antes da sessão) × Jogar (durante). Sem escolha, segue o mapa: na mesa = Jogar. */
+  const [fase, setFase] = useState<"preparar" | "jogar" | null>(null);
+  const [uso, setUso] = useState<Uso>("mover");
+  const [painelAberto, setPainelAberto] = useState(true);
+  const [formaNevoa, setFormaNevoa] = useState<FormaNevoa>("pincel");
+  const [medirQue, setMedirQue] = useState<"regua" | "area">("regua");
   const [modo, setModo] = useState<ModoNevoa>("revelar");
   const [pincel, setPincel] = useState<TamanhoPincel>("m");
   const [enviando, setEnviando] = useState<string | null>(null);
@@ -401,7 +399,6 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const aberto = cartaoAberto(cartao, banco.pecas, sala);
   const [modoRegua, setModoRegua] = useState<ModoRegua>("grade");
   const [modeloArea, setModeloArea] = useState<ModeloArea>(MODELO_INICIAL);
-  const [nomeMarcador, setNomeMarcador] = useState("");
   const pecas = useMemo(
     () =>
       cena
@@ -463,17 +460,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     setColocando(null);
   }
 
-  function porMarcador() {
+  function porMarcador(nomeDigitado: string) {
     if (!cena) return;
-    const nome = nomeMarcador.trim().slice(0, 30);
+    const nome = nomeDigitado.trim().slice(0, 30);
     if (!nome) return;
     const [x, y] = posicoesIniciais(cena, 1, regiaoAtual(), lugaresOcupados())[0];
     void banco.adicionar([{ slug: null, nome, x, y }]);
-    setNomeMarcador("");
-  }
-
-  function proximoTamanho(t: TamanhoPeca): TamanhoPeca {
-    return (t >= 3 ? 1 : t + 1) as TamanhoPeca;
   }
 
   async function aoEscolherArquivo(arquivos: FileList | null) {
@@ -491,7 +483,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     // O nome vem do arquivo; o Mestre troca depois, se quiser.
     await cenas.atualizarCena(r.cena.id, { nome: nomeDaCenaPeloArquivo(arquivo.name) });
     setEscolhida(r.cena.id);
-    setFerramenta("mover");
+    setUso("mover");
+    setFase("preparar");
   }
 
   async function levarCamera(tudo: boolean) {
@@ -522,17 +515,219 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   }
 
   const podeQuadradinhos = cena ? gradeUsavel(cena) : false;
-  // Sem grade, "quadradinhos" não existe: cai no pincel em vez de ficar sem ferramenta.
-  const ferramentaAtiva: Ferramenta = ferramenta === "quadradinhos" && !podeQuadradinhos ? "pincel" : ferramenta;
-  const desenhoSelecionado = ferramentaAtiva === "marca" && modoMarca === "editar" ? (desenhos.marcas.find((m) => m.tipo === "traco" && m.id === idSelecionado) ?? null) : null;
-  /** Trocar de ferramenta desiste de "onde eu toco". */
-  function escolherFerramenta(f: Ferramenta) {
+  const faseAtual = fase ?? (cena?.na_mesa ? "jogar" : "preparar");
+
+  // As ferramentas de cada fase. Paredes e desenhos somem quando o banco ainda não tem as tabelas.
+  const idsDaFase: Exclude<Uso, "ping" | "mesa">[] =
+    faseAtual === "jogar" ? ["mover", "nevoa", "medir", "desenhar", "peoes"] : ["mover", "nevoa", "paredes", "peoes", "desenhar", "grade"];
+  const idsVisiveis = idsDaFase.filter((id) => !(id === "desenhar" && desenhos.indisponivel) && !(id === "paredes" && muros.indisponivel));
+  const usoAtivo: Uso = uso === "ping" || uso === "mesa" || (idsVisiveis as Uso[]).includes(uso) ? uso : "mover";
+
+  // O que o toque faz no mapa (as ferramentas internas do CenaMapa) a partir do ícone escolhido.
+  const formaDaNevoa: FormaNevoa = formaNevoa === "quadradinhos" && !podeQuadradinhos ? "pincel" : formaNevoa;
+  const ferramentaMapa: Ferramenta =
+    colocando || movendoNota
+      ? "colocar"
+      : usoAtivo === "nevoa"
+        ? formaDaNevoa
+        : usoAtivo === "medir"
+          ? medirQue
+          : usoAtivo === "desenhar"
+            ? "marca"
+            : usoAtivo === "paredes"
+              ? "parede"
+              : usoAtivo === "ping"
+                ? "ping"
+                : "mover";
+  const desenhoSelecionado = ferramentaMapa === "marca" && modoMarca === "editar" ? (desenhos.marcas.find((m) => m.tipo === "traco" && m.id === idSelecionado) ?? null) : null;
+
+  /** Trocar de ferramenta desiste de "onde eu toco"; tocar na que já está ativa abre/fecha o painel. */
+  function escolher(id: Uso) {
     setColocando(null);
     setNotaPendente(null);
     setMovendoNota(null);
-    setFerramenta(f);
+    if (id === usoAtivo) setPainelAberto((a) => !a);
+    else {
+      setUso(id);
+      setPainelAberto(true);
+    }
   }
-  const avisos = [cenas.aviso, nevoa.aviso].filter((a): a is string => Boolean(a));
+  function trocarFase(f: "preparar" | "jogar") {
+    setFase(f);
+    setColocando(null);
+    setNotaPendente(null);
+    setMovendoNota(null);
+  }
+  const avisos = [cenas.aviso, nevoa.aviso, banco.aviso, desenhos.aviso, muros.aviso].filter((a): a is string => Boolean(a));
+
+  const painel = (() => {
+    if (!cena) return null;
+    switch (usoAtivo) {
+      case "mover":
+        return sala.personagens.some((f) => f.dono)
+          ? {
+              titulo: "Mover",
+              conteudo: (
+                <div className="mapa-ferr">
+                  <button type="button" className="chip alvo" aria-pressed={juntos} onClick={() => setJuntos(!juntos)}>
+                    🐾 companheiros junto
+                  </button>
+                </div>
+              ),
+            }
+          : null;
+      case "nevoa":
+        return {
+          titulo: "Névoa",
+          conteudo: (
+            <PainelNevoa
+              forma={formaDaNevoa}
+              aoMudarForma={setFormaNevoa}
+              podeQuadradinhos={podeQuadradinhos}
+              modo={modo}
+              aoMudarModo={setModo}
+              pincel={pincel}
+              aoMudarPincel={setPincel}
+              temRegras={nevoa.regras.length > 0}
+              aoDesfazer={() => void nevoa.desfazerUltima()}
+              aoRevelarTudo={() => void revelarTudo()}
+              aoCobrirTudo={() => void cobrirTudo()}
+            />
+          ),
+        };
+      case "medir":
+        return {
+          titulo: "Medir",
+          conteudo: (
+            <PainelMedir
+              oQue={medirQue}
+              aoMudarOQue={setMedirQue}
+              modoRegua={modoRegua}
+              aoMudarRegua={setModoRegua}
+              modeloArea={modeloArea}
+              aoMudarArea={setModeloArea}
+              metrosPorQuadrado={cena.metros}
+            />
+          ),
+        };
+      case "desenhar":
+        return {
+          titulo: "Desenhar",
+          larga: true,
+          conteudo: (
+            <PainelDesenhos
+              desenhos={desenhos}
+              modo={modoMarca}
+              aoMudarModo={(m) => {
+                setModoMarca(m);
+                setNotaPendente(null);
+                setIdSelecionado(null);
+              }}
+              cor={corMarca}
+              aoMudarCor={setCorMarca}
+              paraMesa={marcaParaMesa}
+              aoMudarParaMesa={setMarcaParaMesa}
+              movendoNota={movendoNota}
+              aoMoverNota={setMovendoNota}
+            />
+          ),
+        };
+      case "peoes":
+        return {
+          titulo: "Peões",
+          larga: true,
+          conteudo: (
+            <PainelPecas
+              banco={banco}
+              pecas={pecas}
+              pecaSelecionada={pecaSelecionada}
+              aoSelecionar={setPecaSelecionada}
+              aoAbrirCartao={setCartao}
+              colocando={colocando}
+              aoColocando={setColocando}
+              juntos={juntos}
+              aoJuntos={setJuntos}
+              temCompanheiros={sala.personagens.some((f) => f.dono)}
+              aoPorGrupo={() => porOGrupo()}
+              aoPorInimigos={() => porOsInimigos()}
+              aoPorMarcador={porMarcador}
+            />
+          ),
+        };
+      case "paredes":
+        return {
+          titulo: "Paredes e visão",
+          larga: true,
+          conteudo: (
+            <PainelParedes
+              cena={cena}
+              cenas={cenas}
+              muros={muros}
+              modoParede={modoParede}
+              aoMudarModoParede={setModoParede}
+              verInimigos={verInimigos}
+              aoVerInimigos={setVerInimigos}
+              aoCobrirExplorado={() => {
+                mapaRef.current?.reiniciarMemoria();
+                void cenas.atualizarCena(cena.id, { explorado: "" });
+              }}
+            />
+          ),
+        };
+      case "grade":
+        return { titulo: "Cena e grade", larga: true, conteudo: <PainelCena cena={cena} cenas={cenas} /> };
+      case "mesa":
+        return {
+          titulo: "A mesa",
+          conteudo: <PainelMesa cena={cena} cenas={cenas} aoLevarCamera={(tudo) => void levarCamera(tudo)} aoVerTudo={() => mapaRef.current?.enquadrarTudo()} />,
+        };
+      default:
+        return null;
+    }
+  })();
+
+  const dica = (() => {
+    if (colocando) return `Toque no mapa no lugar onde ${colocando === "grupo" ? "o grupo entra" : "os inimigos entram"}.`;
+    if (movendoNota) return "Toque no mapa no lugar novo da nota.";
+    switch (ferramentaMapa) {
+      case "ping":
+        return "Toque num ponto: a mesa vê um pulso ali, com o seu nome.";
+      case "pincel":
+        return `Passe o dedo no mapa pra ${modo === "revelar" ? "revelar" : "esconder"}. A mesa vê na hora.`;
+      case "retangulo":
+        return `Arraste um retângulo pra ${modo === "revelar" ? "revelar" : "esconder"}.`;
+      case "quadradinhos":
+        return `Toque ou arraste sobre os quadradinhos pra ${modo === "revelar" ? "revelar" : "esconder"}.`;
+      case "regua":
+        return "Arraste de um ponto a outro. A mesa vê a distância. Começando num peão, diz se cabe no deslocamento.";
+      case "area":
+        return "Arraste no mapa: a mesa vê a figura por alguns segundos, com o seu nome.";
+      case "parede":
+        return modoParede === "apagar"
+          ? "Toque numa parede ou porta pra apagar, ou passe o dedo por cima de várias."
+          : modoParede === "curva"
+            ? "Passe o dedo acompanhando a curva: o traço vira uma parede de vários trechos."
+            : modoParede === "comodo"
+              ? "Arraste de um canto ao canto oposto: saem as quatro paredes."
+              : `Arraste de um ponto a outro pra desenhar ${modoParede === "porta" ? "uma porta" : "uma parede"}. A mesa nunca vê.`;
+      case "marca":
+        return modoMarca === "apagar"
+          ? "Toque num desenho ou nota pra apagar, ou passe o dedo por cima de vários."
+          : modoMarca === "editar"
+            ? "Toque num desenho e arraste pra mover. Alças: canto = tamanho, bolinha = girar."
+            : modoMarca === "nota"
+              ? "Toque no ponto do mapa e escreva a nota."
+              : "Arraste no mapa pra desenhar. Dois dedos movem o mapa sem riscar.";
+      case "mover":
+        if (usoAtivo === "peoes") return "Arraste um peão (ele encaixa no quadradinho). Toque nele pra abrir as ações.";
+        if (usoAtivo === "grade" || usoAtivo === "mesa") return undefined;
+        return "Arraste os peões ou o mapa. Toque num peão pra dano, condições e a vez. Toque numa porta pra abrir.";
+      default:
+        return undefined;
+    }
+  })();
+
+  const ferramentas: FerramentaDoPalco[] = idsVisiveis.map((id) => ROTULO_DO_USO[id]);
 
   return (
     <section className="combat" aria-label="Mapa">
@@ -542,13 +737,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
           <button type="button" className="btn primary" disabled={enviando !== null} onClick={() => arquivoRef.current?.click()}>
             {enviando ?? "+ nova cena"}
           </button>
-          <input
-            ref={arquivoRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => void aoEscolherArquivo(e.target.files)}
-          />
+          <input ref={arquivoRef} type="file" accept="image/*" hidden onChange={(e) => void aoEscolherArquivo(e.target.files)} />
         </div>
       </div>
 
@@ -572,209 +761,123 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
         </p>
       ) : (
         <>
-          <div className="mapa-cenas" role="group" aria-label="Cenas">
-            {cenas.cenas.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className="chip alvo"
-                aria-pressed={c.id === cena?.id}
-                onClick={() => setEscolhida(c.id)}
-              >
-                {c.nome || "Sem nome"}
-                {c.na_mesa ? " · na mesa" : ""}
-              </button>
-            ))}
-          </div>
+          {cenas.cenas.length > 1 && (
+            <div className="mapa-cenas" role="group" aria-label="Cenas">
+              {cenas.cenas.map((c) => (
+                <button key={c.id} type="button" className="chip alvo" aria-pressed={c.id === cena?.id} onClick={() => setEscolhida(c.id)}>
+                  {c.nome || "Sem nome"}
+                  {c.na_mesa ? " · na mesa" : ""}
+                </button>
+              ))}
+            </div>
+          )}
 
           {cena && (
             <>
-              <div className="mapa-linha">
-                <CampoTexto valor={cena.nome} maxLength={60} placeholder="nome da cena" onCommit={(v) => void cenas.atualizarCena(cena.id, { nome: v })} />
-                <BotaoRemover
-                  aria={`apagar a cena ${cena.nome || "sem nome"}`}
-                  confirmar={`Apagar a cena "${cena.nome || "sem nome"}"? A imagem e a névoa dela são apagadas de vez.`}
-                  onConfirmar={() => void cenas.apagarCena(cena.id)}
-                />
-              </div>
-
-              <div className="mapa-mesa">
-                {cena.na_mesa ? (
+              <PalcoDoMapa
+                nome={cena.nome || "Sem nome"}
+                estado={cena.na_mesa ? "Na mesa" : "Em preparo"}
+                estadoLigado={cena.na_mesa}
+                cantoAlto={!cena.na_mesa}
+                canto={
                   <>
-                    <span className="mapa-mesa-ok">✓ A mesa está vendo este mapa</span>
-                    <button type="button" className="btn" onClick={() => void cenas.mandarParaMesa(null)}>
-                      tirar o mapa da mesa
-                    </button>
+                    <div className="palco-modo palco-vidro" role="group" aria-label="Modo">
+                      <button type="button" aria-pressed={faseAtual === "preparar"} onClick={() => trocarFase("preparar")}>
+                        Preparar
+                      </button>
+                      <button type="button" aria-pressed={faseAtual === "jogar"} onClick={() => trocarFase("jogar")}>
+                        Jogar
+                      </button>
+                    </div>
+                    {!cena.na_mesa && (
+                      <button type="button" className="btn primary" onClick={() => void cenas.mandarParaMesa(cena.id)}>
+                        levar a mesa pra este mapa
+                      </button>
+                    )}
                   </>
-                ) : (
-                  <button type="button" className="btn primary" onClick={() => void cenas.mandarParaMesa(cena.id)}>
-                    levar a mesa pra este mapa
-                  </button>
-                )}
-              </div>
-
-              <div className="mapa-ferr" role="group" aria-label="Ferramenta">
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "mover"} onClick={() => escolherFerramenta("mover")}>
-                  ✋ mover
-                </button>
-                {sala.personagens.some((f) => f.dono) && (
-                  <button type="button" className="chip alvo" aria-pressed={juntos} onClick={() => setJuntos(!juntos)}>
-                    🐾 companheiros junto
-                  </button>
-                )}
-                {podeQuadradinhos && (
+                }
+                ferramentas={ferramentas}
+                ativa={usoAtivo}
+                aoEscolher={(id) => escolher(id as Uso)}
+                painel={painel}
+                painelAberto={painelAberto}
+                aoFecharPainel={() => setPainelAberto(false)}
+                ping={quem ? { ativo: usoAtivo === "ping", aoAlternar: () => setUso(usoAtivo === "ping" ? "mover" : "ping") } : undefined}
+                zoom={{
+                  aproximar: () => mapaRef.current?.aproximar(ZOOM_PASSO),
+                  afastar: () => mapaRef.current?.aproximar(1 / ZOOM_PASSO),
+                  enquadrar: () => mapaRef.current?.enquadrarTudo(),
+                  rotuloEnquadrar: "Ver o mapa todo",
+                }}
+                extraEmbaixo={
                   <button
                     type="button"
-                    className="chip alvo"
-                    aria-pressed={ferramentaAtiva === "quadradinhos"}
-                    onClick={() => escolherFerramenta("quadradinhos")}
+                    className="palco-ferr pequeno"
+                    title="A mesa: o que ela vê e pra onde olha"
+                    aria-label="A mesa"
+                    aria-pressed={usoAtivo === "mesa"}
+                    onClick={() => {
+                      setColocando(null);
+                      setUso(usoAtivo === "mesa" ? "mover" : "mesa");
+                      setPainelAberto(true);
+                    }}
                   >
-                    ▦ quadradinhos
+                    <IconeMapa nome="mesa" />
                   </button>
-                )}
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "pincel"} onClick={() => escolherFerramenta("pincel")}>
-                  🖌 pincel
-                </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "retangulo"} onClick={() => escolherFerramenta("retangulo")}>
-                  ▭ retângulo
-                </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "ping"} onClick={() => escolherFerramenta("ping")}>
-                  📍 ping
-                </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "regua"} onClick={() => escolherFerramenta("regua")}>
-                  📏 régua
-                </button>
-                <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "area"} onClick={() => escolherFerramenta("area")}>
-                  ✨ área
-                </button>
-                {!desenhos.indisponivel && (
-                  <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "marca"} onClick={() => escolherFerramenta("marca")}>
-                    ✏️ desenhar
-                  </button>
-                )}
-                {!muros.indisponivel && (
-                  <button type="button" className="chip alvo" aria-pressed={ferramentaAtiva === "parede"} onClick={() => escolherFerramenta("parede")}>
-                    🧱 paredes
-                  </button>
-                )}
-              </div>
-
-              {ferramentaAtiva === "parede" && (
-                <div className="mapa-ferr" role="group" aria-label="O que desenhar">
-                  {([["parede", "parede"], ["curva", "curva"], ["porta", "porta"], ["comodo", "cômodo"], ["apagar", "apagar"]] as const).map(([modo, rotulo]) => (
-                    <button key={modo} type="button" className="chip alvo" aria-pressed={modoParede === modo} onClick={() => setModoParede(modo)}>
-                      {rotulo}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {ferramentaAtiva === "area" && <ControlesDeArea modelo={modeloArea} aoMudar={setModeloArea} metrosPorQuadrado={cena.metros} />}
-
-              {ferramentaAtiva === "marca" && (
-                <ControlesDeMarca
-                  modo={modoMarca}
-                  aoMudarModo={(m) => {
-                    setModoMarca(m);
-                    setNotaPendente(null);
-                    setIdSelecionado(null);
-                  }}
-                  cor={corMarca}
-                  aoMudarCor={setCorMarca}
-                  paraMesa={marcaParaMesa}
-                  aoMudarParaMesa={setMarcaParaMesa}
-                />
-              )}
-
-              {ferramentaAtiva === "regua" && (
-                <div className="mapa-ferr" role="group" aria-label="Como medir">
-                  <button type="button" className="chip alvo" aria-pressed={modoRegua === "grade"} onClick={() => setModoRegua("grade")}>
-                    na grade
-                  </button>
-                  <button type="button" className="chip alvo" aria-pressed={modoRegua === "reta"} onClick={() => setModoRegua("reta")}>
-                    em linha reta
-                  </button>
-                </div>
-              )}
-
-              {ferramentaAtiva !== "mover" && ferramentaAtiva !== "ping" && ferramentaAtiva !== "regua" && ferramentaAtiva !== "area" && ferramentaAtiva !== "parede" && ferramentaAtiva !== "marca" && (
-                <div className="mapa-ferr" role="group" aria-label="Opções da névoa">
-                  <button type="button" className="chip alvo" aria-pressed={modo === "revelar"} onClick={() => setModo("revelar")}>
-                    revelar
-                  </button>
-                  <button type="button" className="chip alvo" aria-pressed={modo === "esconder"} onClick={() => setModo("esconder")}>
-                    esconder
-                  </button>
-                  {ferramentaAtiva === "pincel" &&
-                    (["p", "m", "g"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        className="chip alvo"
-                        aria-pressed={pincel === t}
-                        aria-label={`Pincel ${t === "p" ? "pequeno" : t === "m" ? "médio" : "grande"}`}
-                        onClick={() => setPincel(t)}
-                      >
-                        {t === "p" ? "P" : t === "m" ? "M" : "G"}
-                      </button>
-                    ))}
-                </div>
-              )}
-
-              <CenaMapa
-                ref={mapaRef}
-                cena={cena}
-                imagemUrl={cenas.urlDaImagem(cena)}
-                regras={nevoa.regras}
-                mestre
-                ferramenta={colocando || movendoNota ? "colocar" : ferramentaAtiva}
-                modoNevoa={modo}
-                pincel={pincel}
-                aoPintar={(nova) => void nevoa.adicionar(nova)}
-                pings={ping.pings}
-                aoPingar={quem ? ping.enviar : undefined}
-                modoRegua={modoRegua}
-                corRegua={quem?.cor}
-                reguas={ping.reguas}
-                aoMedir={quem ? ping.enviarRegua : undefined}
-                modeloArea={modeloArea}
-                areas={ping.areas}
-                aoAreaar={quem ? ping.enviarArea : undefined}
-                paredes={muros.paredes}
-                modoParede={modoParede}
-                aoCriarParedes={(novas) => void muros.adicionar(novas)}
-                aoApagarParede={(id) => void muros.remover(id)}
-                marcas={desenhos.marcas}
-                modoMarca={modoMarca}
-                corMarca={corMarca}
-                aoCriarTraco={(pontos) => void desenhos.adicionar({ tipo: "traco", cor: corMarca, pontos, visivel: marcaParaMesa })}
-                aoEscolherNota={setNotaPendente}
-                aoApagarMarca={(id) => void desenhos.remover(id)}
-                marcaSelecionada={desenhoSelecionado?.id ?? null}
-                aoSelecionarMarca={setIdSelecionado}
-                aoTransformarMarca={(id, pontos) => void desenhos.atualizar(id, { pontos })}
-                aoAlternarPorta={(id) => void muros.alternarPorta(id)}
-                verVisaoDosInimigos={verInimigos}
-                visaoPronta={!muros.carregando && !banco.carregando}
-                aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
-                aoEscolherPonto={colocarOnde}
-                pecas={pecas}
-                aoMoverPeca={(id, x, y) => cena && moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
-                aoTocarPeca={setPecaSelecionada}
-                aoAbrirPeca={setCartao}
+                }
+                dica={dica}
+                mapa={
+                  <CenaMapa
+                    ref={mapaRef}
+                    cena={cena}
+                    imagemUrl={cenas.urlDaImagem(cena)}
+                    regras={nevoa.regras}
+                    mestre
+                    ferramenta={ferramentaMapa}
+                    modoNevoa={modo}
+                    pincel={pincel}
+                    aoPintar={(nova) => void nevoa.adicionar(nova)}
+                    pings={ping.pings}
+                    aoPingar={quem ? ping.enviar : undefined}
+                    modoRegua={modoRegua}
+                    corRegua={quem?.cor}
+                    reguas={ping.reguas}
+                    aoMedir={quem ? ping.enviarRegua : undefined}
+                    modeloArea={modeloArea}
+                    areas={ping.areas}
+                    aoAreaar={quem ? ping.enviarArea : undefined}
+                    paredes={muros.paredes}
+                    modoParede={modoParede}
+                    aoCriarParedes={(novas) => void muros.adicionar(novas)}
+                    aoApagarParede={(id) => void muros.remover(id)}
+                    marcas={desenhos.marcas}
+                    modoMarca={modoMarca}
+                    corMarca={corMarca}
+                    aoCriarTraco={(pontos) => void desenhos.adicionar({ tipo: "traco", cor: corMarca, pontos, visivel: marcaParaMesa })}
+                    aoEscolherNota={setNotaPendente}
+                    aoApagarMarca={(id) => void desenhos.remover(id)}
+                    marcaSelecionada={desenhoSelecionado?.id ?? null}
+                    aoSelecionarMarca={setIdSelecionado}
+                    aoTransformarMarca={(id, pontos) => void desenhos.atualizar(id, { pontos })}
+                    aoAlternarPorta={(id) => void muros.alternarPorta(id)}
+                    verVisaoDosInimigos={verInimigos}
+                    visaoPronta={!muros.carregando && !banco.carregando}
+                    aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
+                    aoEscolherPonto={colocarOnde}
+                    pecas={pecas}
+                    aoMoverPeca={(id, x, y) => cena && moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
+                    aoTocarPeca={setPecaSelecionada}
+                    aoAbrirPeca={setCartao}
+                  />
+                }
               />
               <EditorDeDesenho marca={desenhoSelecionado} edicao={desenhos} aoFechar={() => setIdSelecionado(null)} />
-              {notaPendente && ferramentaAtiva === "marca" && (
+              {notaPendente && ferramentaMapa === "marca" && (
                 <NovaNota
                   ponto={notaPendente}
                   aoPor={(texto) => desenhos.adicionar({ tipo: "nota", cor: corMarca, x: notaPendente[0], y: notaPendente[1], texto, visivel: marcaParaMesa })}
                   aoCancelar={() => setNotaPendente(null)}
                 />
-              )}
-              {desenhos.aviso && (
-                <p className="mapa-erro" role="alert">
-                  {desenhos.aviso}
-                </p>
               )}
               {aberto && (
                 <CartaoDoPeao
@@ -791,411 +894,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                   aoFechar={() => setCartao(null)}
                 />
               )}
-              <p className="mapa-dica">
-                {ferramentaAtiva === "mover"
-                  ? "Arraste com um dedo e use a pinça pra dar zoom. Toque num peão sem arrastar pra abrir as ações dele (dano, condições, a vez). Segure o dedo parado pra mostrar um ponto pra mesa (ping). A névoa aparece meio transparente pra você; pra mesa ela é preta."
-                  : ferramentaAtiva === "ping"
-                    ? "Toque num ponto: a mesa vê um pulso dourado ali, com o seu nome. Com dois dedos você mexe no mapa."
-                    : ferramentaAtiva === "parede"
-                      ? modoParede === "apagar"
-                        ? "Toque numa parede ou porta pra apagá-la, ou passe o dedo por cima de várias (borracha). Pra tirar o último desenho inteiro, use “↩ desfazer parede” em “Paredes e visão”."
-                        : modoParede === "curva"
-                          ? "Passe o dedo acompanhando a curva (parede de caverna, torre redonda, corredor torto): o traço vira uma parede de vários trechos curtos, sem encaixar na grade. As pontas grudam em outra parede que esteja perto, e voltando ao começo a volta se fecha. Dê zoom pra curvas apertadas."
-                        : modoParede === "comodo"
-                          ? "Arraste de um canto ao canto oposto: saem as quatro paredes do cômodo."
-                          : `Arraste de um ponto a outro pra desenhar ${modoParede === "porta" ? "uma porta" : "uma parede"}. As pontas encaixam nos cantos do quadradinho e nas pontas de outras paredes, pra não ficar fresta.`
-                    : ferramentaAtiva === "marca"
-                      ? modoMarca === "apagar"
-                        ? "Toque num desenho ou numa nota pra apagá-lo, ou passe o dedo por cima de vários (borracha)."
-                        : modoMarca === "editar"
-                          ? "Toque num desenho e arraste pra mover. A caixa branca tem duas alças: o quadradinho do canto de baixo redimensiona e a bolinha de cima gira. Cor e 🔒 só eu vejo mudam nos botões. Notas se editam na lista embaixo do mapa."
-                        : modoMarca === "nota"
-                          ? "Toque no ponto do mapa e escreva a nota: aparece uma bolinha numerada ali e o texto na lista embaixo do mapa. 🔒 só eu vejo deixa a nota escondida da mesa até você liberar."
-                          : modoMarca === "linha"
-                            ? "Arraste de um ponto a outro pra traçar uma linha reta (rota, alcance, setas). Com dois dedos você mexe no mapa sem riscar."
-                            : modoMarca === "circulo"
-                              ? "Arraste do centro até a borda: o círculo aparece enquanto você arrasta (zona de perigo, alcance de uma aura). Com dois dedos você mexe no mapa sem riscar."
-                              : modoMarca === "retangulo"
-                                ? "Arraste de um canto ao canto oposto pra marcar um retângulo (um cômodo, uma área). Com dois dedos você mexe no mapa sem riscar."
-                            : "Passe o dedo pra riscar o mapa (uma rota, um círculo em volta de algo). Com dois dedos você mexe no mapa sem riscar. O desenho fica gravado no mapa e a mesa vê na hora, a menos que esteja em 🔒 só eu vejo."
-                    : ferramentaAtiva === "area"
-                      ? "Escolha a forma e o tamanho e arraste no mapa: a origem encaixa no canto do quadradinho e a mesa vê a figura por alguns segundos, com o seu nome. Esfera: toque onde cai o centro. Cone, cubo e linha: arraste pra onde apontam."
-                      : ferramentaAtiva === "regua"
-                      ? `Arraste de um ponto a outro: a mesa vê a linha com a distância (${modoRegua === "grade" ? "diagonal vale 1 quadrado, como na regra" : "em linha reta"}). Começando num peão, diz se cabe no deslocamento dele. O valor do quadradinho está em "Grade e névoa".`
-                      : "Passe o dedo pra pintar. Com dois dedos você mexe no mapa sem pintar. A mesa vê na hora."}
-              </p>
               <LegendaIconesPeao />
-
-              <div className="mapa-ferr">
-                <button type="button" className="btn" disabled={nevoa.regras.length === 0} onClick={() => void nevoa.desfazerUltima()}>
-                  ↩ desfazer
-                </button>
-                <button type="button" className="btn" onClick={() => void revelarTudo()}>
-                  revelar tudo
-                </button>
-                <button type="button" className="btn" onClick={() => void cobrirTudo()}>
-                  cobrir tudo
-                </button>
-              </div>
-
-              <SecaoRecolhivel
-                abertoInicial={false}
-                titulo={<h4>Peões</h4>}
-                cabecalhoExtra={<span className="fc-sub">{banco.indisponivel ? "ainda não ligados" : `${banco.pecas.length} no mapa`}</span>}
-              >
-                {banco.indisponivel ? (
-                  <p className="fc-sub">
-                    Falta rodar a migration 0019_pecas.sql no SQL Editor do Supabase pra ligar os peões. O resto do mapa funciona sem eles.
-                  </p>
-                ) : (
-                  <>
-                    <p className="fc-sub">
-                      Arraste um peão com um dedo (ele encaixa no quadradinho); toque sem arrastar pra abrir as ações dele. Cada
-                      jogador move só o dele. Inimigos entram ocultos; a mesa vê “?” no peão de inimigo que ainda não foi revelado.
-                      Com um mapa na mesa, o inimigo que entra na iniciativa ganha peão oculto sozinho, e o que sai da ordem sai
-                      do mapa (desfazer devolve). Reiniciar o combate não mexe nos peões.
-                    </p>
-                    <div className="mapa-ferr">
-                      <button type="button" className="btn" onClick={() => porOGrupo()}>
-                        pôr o grupo no mapa
-                      </button>
-                      <button type="button" className="btn" onClick={() => porOsInimigos()}>
-                        pôr os inimigos da iniciativa
-                      </button>
-                    </div>
-                    <div className="mapa-ferr" role="group" aria-label="Escolher onde entram">
-                      <span className="fc-sub">ou escolha o lugar:</span>
-                      <button type="button" className="chip alvo" aria-pressed={colocando === "grupo"} onClick={() => setColocando(colocando === "grupo" ? null : "grupo")}>
-                        grupo onde eu tocar
-                      </button>
-                      <button type="button" className="chip alvo" aria-pressed={colocando === "inimigos"} onClick={() => setColocando(colocando === "inimigos" ? null : "inimigos")}>
-                        inimigos onde eu tocar
-                      </button>
-                    </div>
-                    {colocando && (
-                      <p className="fc-sub" role="status">
-                        Toque no mapa no lugar onde {colocando === "grupo" ? "o grupo entra" : "os inimigos entram"}: eles se agrupam em volta do ponto.
-                      </p>
-                    )}
-                    <div className="mapa-linha">
-                      <input
-                        className="campotexto"
-                        value={nomeMarcador}
-                        maxLength={30}
-                        placeholder="nome do marcador"
-                        aria-label="Nome do marcador avulso"
-                        onChange={(e) => setNomeMarcador(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") porMarcador();
-                        }}
-                      />
-                      <button type="button" className="btn" onClick={porMarcador}>
-                        + marcador
-                      </button>
-                    </div>
-                    {banco.aviso && (
-                      <p className="mapa-erro" role="alert">
-                        {banco.aviso}
-                      </p>
-                    )}
-                    <div className="mapa-pecas">
-                      {banco.pecas.map((p) => {
-                        const naTela = pecas.find((x) => x.id === p.id);
-                        return (
-                          <div key={p.id} className={`mapa-peca${p.id === pecaSelecionada ? " sel" : ""}`}>
-                            <button
-                              type="button"
-                              className="mapa-peca-nome"
-                              onClick={() => {
-                                const escolher = p.id !== pecaSelecionada;
-                                setPecaSelecionada(escolher ? p.id : null);
-                                setCartao(escolher ? p.id : null);
-                              }}
-                            >
-                              <span className="mapa-cor" style={{ background: naTela?.cor }} aria-hidden="true" />
-                              {naTela?.nome ?? p.nome}
-                              {naTela?.vez ? " · vez" : ""}
-                            </button>
-                            <button
-                              type="button"
-                              className="chip alvo"
-                              aria-pressed={p.oculto}
-                              aria-label={`${p.oculto ? "Mostrar" : "Ocultar"} o peão ${naTela?.nome ?? p.nome} pra mesa`}
-                              onClick={() => void banco.atualizar(p.id, { oculto: !p.oculto })}
-                            >
-                              {p.oculto ? "oculto" : "visível"}
-                            </button>
-                            <button
-                              type="button"
-                              className="chip"
-                              aria-label={`Tamanho do peão ${naTela?.nome ?? p.nome}: ${p.tamanho}. Tocar muda.`}
-                              onClick={() => void banco.atualizar(p.id, { tamanho: proximoTamanho(p.tamanho) })}
-                            >
-                              tam {p.tamanho}
-                            </button>
-                            <BotaoRemover
-                              aria={`tirar o peão ${naTela?.nome ?? p.nome} do mapa`}
-                              onConfirmar={() => {
-                                if (pecaSelecionada === p.id) setPecaSelecionada(null);
-                                void banco.remover(p.id);
-                              }}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {banco.pecas.length > 0 && (
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => {
-                          if (confirm("Tirar todos os peões deste mapa?")) {
-                            setPecaSelecionada(null);
-                            void banco.removerTodas();
-                          }
-                        }}
-                      >
-                        tirar todos os peões
-                      </button>
-                    )}
-                  </>
-                )}
-              </SecaoRecolhivel>
-
-              <SecaoRecolhivel
-                abertoInicial={false}
-                titulo={<h4>Desenhos e notas</h4>}
-                cabecalhoExtra={<span className="fc-sub">{desenhos.indisponivel ? "ainda não ligados" : `${desenhos.marcas.length} no mapa`}</span>}
-              >
-                {desenhos.indisponivel ? (
-                  <p className="fc-sub">
-                    Falta rodar a migration 0022_marcas.sql no SQL Editor do Supabase pra ligar os desenhos e as notas. O resto do mapa
-                    funciona sem eles.
-                  </p>
-                ) : (
-                  <>
-                    <p className="fc-sub">
-                      {resumoDasMarcas(desenhos.marcas)}. Risque e anote com a ferramenta ✏️ desenhar. O que fica em 🔒 só eu vejo aparece
-                      tracejado pra você e não aparece pra mesa, nem no telão. Os jogadores só enxergam desenho e nota onde a névoa já abriu.
-                    </p>
-                    <ListaDeNotas marcas={desenhos.marcas} edicao={desenhos} movendoId={movendoNota} aoMover={setMovendoNota} />
-                    {movendoNota && <p className="fc-sub">Toque no mapa no lugar novo da nota. Abra o mapa acima se ele estiver fora da tela.</p>}
-                    <div className="mapa-ferr">
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={desenhos.marcas.length === 0}
-                        onClick={() => {
-                          const ultima = [...desenhos.marcas].reverse().find((m) => m.created_at !== "");
-                          if (ultima) void desenhos.remover(ultima.id);
-                        }}
-                      >
-                        ↩ desfazer a última
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={desenhos.marcas.length === 0}
-                        onClick={() => {
-                          if (confirm("Apagar todos os desenhos e notas deste mapa?")) void desenhos.removerTodas();
-                        }}
-                      >
-                        apagar tudo
-                      </button>
-                    </div>
-                  </>
-                )}
-              </SecaoRecolhivel>
-
-              <SecaoRecolhivel
-                abertoInicial={false}
-                titulo={<h4>Paredes e visão</h4>}
-                cabecalhoExtra={
-                  <span className="fc-sub">{muros.indisponivel ? "ainda não ligadas" : cena.visao_ligada ? "visão automática ligada" : "desligada"}</span>
-                }
-              >
-                {muros.indisponivel ? (
-                  <p className="fc-sub">
-                    Falta rodar a migration 0021_paredes.sql no SQL Editor do Supabase pra ligar as paredes e a visão automática. O resto do
-                    mapa funciona sem elas.
-                  </p>
-                ) : (
-                  <>
-                    <label className="checklabel">
-                      <input
-                        type="checkbox"
-                        checked={cena.visao_ligada}
-                        onChange={(e) => void cenas.atualizarCena(cena.id, { visao_ligada: e.target.checked })}
-                      />
-                      visão automática: a névoa se abre sozinha pelo que os jogadores enxergam
-                    </label>
-                    {cena.visao_ligada && (
-                      <>
-                        <label className="checklabel">
-                          <input
-                            type="checkbox"
-                            checked={cena.visao_alcance !== null}
-                            onChange={(e) => void cenas.atualizarCena(cena.id, { visao_alcance: e.target.checked ? 18 : null })}
-                          />
-                          limitar o alcance da visão
-                        </label>
-                        {cena.visao_alcance !== null && (
-                          <div className="mapa-grade">
-                            <label>
-                              alcance (metros)
-                              <CampoMetros
-                                aria="Alcance da visão, em metros"
-                                maximo={1000}
-                                valor={cena.visao_alcance}
-                                onCommit={(n) => void cenas.atualizarCena(cena.id, { visao_alcance: n })}
-                              />
-                            </label>
-                          </div>
-                        )}
-                        <label className="checklabel">
-                          <input type="checkbox" checked={verInimigos} onChange={(e) => setVerInimigos(e.target.checked)} />
-                          ver o que os inimigos enxergam (só você vê, em vermelho)
-                        </label>
-                        {!cena.nevoa_ligada && (
-                          <p className="fc-sub">A cena não começa coberta de névoa (veja “Grade e névoa”), então não há o que a visão abrir.</p>
-                        )}
-                      </>
-                    )}
-                    <p className="fc-sub">
-                      {muros.paredes.filter((w) => w.tipo === "parede").length} paredes · {muros.paredes.filter((w) => w.tipo === "porta").length} portas
-                      (cabem {PAREDES_MAXIMAS} por mapa; cada trecho de uma curva conta como uma). Desenhe com a ferramenta 🧱 paredes. Pra abrir ou fechar uma porta, toque nela com a ferramenta de mover.
-                    </p>
-                    <p className="fc-sub">
-                      Os jogadores nunca veem as paredes nem as portas: só o desenho do mapa e a névoa se abrindo. Mas elas
-                      seguram o peão deles: jogador não atravessa parede nem porta fechada (você, sim). Uma passagem secreta é uma
-                      porta fechada onde o mapa mostra uma parede comum; abra quando eles a descobrirem. Só o peão de jogador abre a névoa, e
-                      o que o grupo já viu só é guardado com o mapa na mesa.
-                    </p>
-                    {muros.aviso && (
-                      <p className="mapa-erro" role="alert">
-                        {muros.aviso}
-                      </p>
-                    )}
-                    <div className="mapa-ferr">
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={muros.paredes.length === 0}
-                        onClick={() => {
-                          // O último desenho inteiro: a curva toda, o cômodo todo (ou a parede, se foi uma só).
-                          const ultimas = ultimoDesenho(muros.paredes);
-                          if (ultimas.length > 0) void muros.removerVarias(ultimas.map((p) => p.id));
-                        }}
-                      >
-                        ↩ desfazer parede
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={muros.paredes.length === 0}
-                        onClick={() => {
-                          if (confirm("Apagar todas as paredes e portas deste mapa?")) void muros.removerTodas();
-                        }}
-                      >
-                        apagar todas
-                      </button>
-                      {cena.visao_ligada && (
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            if (confirm("Cobrir de novo tudo que o grupo já explorou neste mapa?")) {
-                              mapaRef.current?.reiniciarMemoria();
-                              void cenas.atualizarCena(cena.id, { explorado: "" });
-                            }
-                          }}
-                        >
-                          cobrir de novo o explorado
-                        </button>
-                      )}
-                    </div>
-                    <VaosViramPortas cena={cena} paredes={muros.paredes} adicionar={muros.adicionar} />
-                    <ImportarParedes cena={cena} urlDaImagem={cenas.urlDaImagem(cena)} paredes={muros.paredes} adicionar={muros.adicionar} />
-                  </>
-                )}
-              </SecaoRecolhivel>
-
-              <SecaoRecolhivel abertoInicial={false} titulo={<h4>Visão da mesa</h4>}>
-                <p className="fc-sub">
-                  O telão e os celulares abrem enquadrados no pedaço que você escolher aqui (e os jogadores podem dar
-                  zoom por conta própria).
-                </p>
-                <div className="mapa-ferr">
-                  <button type="button" className="btn" onClick={() => void levarCamera(false)}>
-                    levar a mesa pra esta visão
-                  </button>
-                  <button type="button" className="btn" onClick={() => void levarCamera(true)}>
-                    mesa vê o mapa todo
-                  </button>
-                  <button type="button" className="btn" onClick={() => mapaRef.current?.enquadrarTudo()}>
-                    ver o mapa todo (só eu)
-                  </button>
-                </div>
-                <p className="fc-sub">{cena.camera ? "A mesa está enquadrada num pedaço do mapa." : "A mesa vê o mapa todo."}</p>
-              </SecaoRecolhivel>
-
-              <SecaoRecolhivel abertoInicial={false} titulo={<h4>Grade e névoa</h4>}>
-                <label className="checklabel">
-                  <input
-                    type="checkbox"
-                    checked={cena.grade_ligada}
-                    onChange={(e) => void cenas.atualizarCena(cena.id, { grade_ligada: e.target.checked })}
-                  />
-                  mostrar a grade (os quadradinhos)
-                </label>
-                {cena.grade_ligada && (
-                  <div className="mapa-grade">
-                    <label>
-                      quadrados na largura
-                      <CampoNumero
-                        className="mapa-num"
-                        valor={Math.round(quadradosNaLargura(cena))}
-                        onCommit={(n) => {
-                          if (n >= 1 && n <= 300) void cenas.atualizarCena(cena.id, { grade_px: gradePxParaQuadrados(cena.largura, n) });
-                        }}
-                      />
-                    </label>
-                    <label>
-                      começa em x
-                      <CampoNumero
-                        className="mapa-num"
-                        valor={Math.round(cena.grade_dx)}
-                        onCommit={(n) => void cenas.atualizarCena(cena.id, { grade_dx: Math.max(0, Math.min(n, Math.round(cena.grade_px))) })}
-                      />
-                    </label>
-                    <label>
-                      começa em y
-                      <CampoNumero
-                        className="mapa-num"
-                        valor={Math.round(cena.grade_dy)}
-                        onCommit={(n) => void cenas.atualizarCena(cena.id, { grade_dy: Math.max(0, Math.min(n, Math.round(cena.grade_px))) })}
-                      />
-                    </label>
-                    <label>
-                      metros por quadrado
-                      <CampoMetros valor={cena.metros} onCommit={(n) => void cenas.atualizarCena(cena.id, { metros: n })} />
-                    </label>
-                  </div>
-                )}
-                <p className="fc-sub">
-                  Conte quantos quadradinhos cabem na largura do mapa e digite acima; “começa em x/y” (em pixels) alinha
-                  a grade com a do desenho. A grade só ajuda a pintar: a névoa que você já fez não se mexe se você
-                  ajustar depois.
-                </p>
-                <label className="checklabel">
-                  <input
-                    type="checkbox"
-                    checked={cena.nevoa_ligada}
-                    onChange={(e) => void cenas.atualizarCena(cena.id, { nevoa_ligada: e.target.checked })}
-                  />
-                  a cena começa coberta de névoa
-                </label>
-              </SecaoRecolhivel>
             </>
           )}
         </>

@@ -1349,6 +1349,29 @@ Decisões que não estão no código à primeira vista:
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).
 
+## Palco do mapa: layout novo (08/10/2026, sem migration)
+
+O Daniel achou o painel do mapa complexo (9 ferramentas numa fileira, 5 seções recolhíveis, tudo com o mesmo peso). O layout foi
+validado num protótipo (Artifact) antes de portar — **mostrar o arranjo antes de portar** continua valendo. Nenhuma regra mudou:
+só a apresentação dos controles. Os estados, o `CenaMapa` e os hooks são os de antes.
+- **Peças**: `PalcoDoMapa.tsx` (casca visual: mapa em tela cheia, barra de ícones à esquerda, painel flutuante com as opções da
+  ferramenta ativa, zoom embaixo, ping como botão grande, dica curta que some em ~6 s), `IconesMapa.tsx` (ícones de traço),
+  `PainelMapaPaineis.tsx` (o conteúdo de cada painel: as antigas seções e barras de opções, movidas quase sem mudar) e `PainelMapa.tsx`
+  (estado e lógica; `EditorDoMestre` e `VisorDaMesa`). O telão não usa o palco: `VisorDaMesa telao` devolve só o `CenaMapa`.
+- **Mestre**: **Preparar × Jogar** (`fase`; sem escolha segue o mapa: na mesa = Jogar). Jogar: Mover, Névoa, Medir, Desenhar, Peões.
+  Preparar: Mover, Névoa, Paredes e portas, Peões, Desenhar, Cena e grade. (A névoa ficou nas duas fases: preparar a sessão inclui
+  pré-revelar a entrada — decisão minha em cima do protótipo, que só tinha 5 ícones em Preparar.) O botão de baixo à esquerda com
+  o alvo ("A mesa") abre o painel da visão da mesa (levar a câmera, tirar o mapa da mesa). "levar a mesa pra este mapa" fica no
+  canto de cima enquanto o mapa não está na mesa. **Jogador**: só Mover e Medir (régua ou área de magia), mais o ping.
+- **Ícone → ferramenta do `CenaMapa`** (`ferramentaMapa` em `EditorDoMestre`): Névoa = pincel/retângulo/quadradinhos (escolha dentro do
+  painel), Medir = régua/área, Desenhar = marca, Paredes = parede, Peões/Mover/Cena/A mesa = mover; esperando "onde eu toco" = colocar.
+  Tocar no ícone já ativo abre/fecha o painel; no celular (< 700 px) tocar no mapa fecha o painel (ele cobre boa parte do mapa).
+- **Painel não repete texto da dica**: o aviso "Toque no mapa no lugar onde…" vive só na dica flutuante (dois `role=status` iguais
+  confundem leitor de tela e o robô, que acusa texto duplicado).
+- **Robô**: botões antigos ("🧱 paredes", "✏️ desenhar", "✨ área", seções "Peões"/"Paredes e visão") não existem mais. `e2e/apoio.ts` tem
+  `abrirFerramenta(page, "Paredes e portas", "preparar")`, `escolherNoPainel`, `fecharPainelDoMapa` (o painel cobre o canto de cima
+  do mapa: quem vai tocar no mapa fecha antes) e `abrirMesa`.
+
 ## Robô de tela, trava de sala e restauração do backup (01/10/2026)
 
 - **Robô de tela** (`e2e/*.e2e.ts`, `playwright.config.ts`,

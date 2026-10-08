@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { bancoConfigurado, cenaDoBanco, coletarErros, criarParedes, entrarComoMestre, limparSala, paredesDoBanco, pngDeTeste } from "./apoio";
+import {
+  abrirFerramenta,
+  bancoConfigurado,
+  cenaDoBanco,
+  coletarErros,
+  criarParedes,
+  entrarComoMestre,
+  limparSala,
+  paredesDoBanco,
+  pngDeTeste,
+} from "./apoio";
 
 /**
  * Duas paredes na mesma linha com um quadradinho de abertura: o botão "marcar vãos como portas" cria uma porta
@@ -27,7 +37,7 @@ test("vão entre paredes vira porta aberta, e desfazer tira", async ({ page }) =
     { tipo: "parede", x1: 390 + g, y1: 300, x2: 630, y2: 300 },
   ]);
 
-  await page.locator("h4", { hasText: "Paredes e visão" }).click();
+  await abrirFerramenta(page, "Paredes e portas", "preparar");
   const botao = page.getByRole("button", { name: /marcar 1 vão como porta/ });
   await expect(botao).toBeVisible({ timeout: 30_000 });
   await botao.click();

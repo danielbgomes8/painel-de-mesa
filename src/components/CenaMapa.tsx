@@ -102,6 +102,8 @@ export type CenaMapaApi = {
   reenquadrar: () => void;
   /** O pedaço do mapa que a tela mostra agora, em px da imagem. */
   regiaoVisivel: () => Regiao | null;
+  /** Aproxima (fator > 1) ou afasta (< 1) em torno do centro da tela: os botões de zoom. */
+  aproximar: (fator: number) => void;
 };
 
 type Props = {
@@ -504,6 +506,15 @@ export function CenaMapa({
       regiaoVisivel: () => {
         const { w, h } = tamanhoRef.current;
         return w === 0 ? null : regiaoVisivel(vistaRef.current, w, h);
+      },
+      aproximar: (fator) => {
+        const { w, h } = tamanhoRef.current;
+        const c = propsRef.current.cena;
+        if (w === 0 || c.largura <= 0) return;
+        const v = zoomEm(vistaRef.current, w / 2, h / 2, fator, escalaMinima(c, w, h), ZOOM_MAXIMO);
+        vistaRef.current = limitarVista(v, c, w, h);
+        tocouRef.current = true;
+        pedirQuadro();
       },
     }),
     [pedirQuadro, aplicarEnquadre, recomporNevoa],

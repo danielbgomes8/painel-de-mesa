@@ -1,5 +1,17 @@
 import { expect, test } from "@playwright/test";
-import { SALA, bancoConfigurado, cenaDoBanco, coletarErros, entrarComoMestre, limparSala, marcasDoBanco, mudarCena, pngDeTeste, rest } from "./apoio";
+import {
+  escolherNoPainel,
+  SALA,
+  bancoConfigurado,
+  cenaDoBanco,
+  coletarErros,
+  entrarComoMestre,
+  limparSala,
+  marcasDoBanco,
+  mudarCena,
+  pngDeTeste,
+  rest,
+} from "./apoio";
 
 /**
  * Editar um desenho que já existe (modo "✋ editar" da ferramenta de desenhar): tocar seleciona,
@@ -55,8 +67,7 @@ test("editar desenho: mover, redimensionar, girar, cor, só eu vejo e apagar", a
   });
 
   await expect.poll(async () => (await marcasDoBanco()).length).toBe(1);
-  await page.getByRole("button", { name: "✏️ desenhar" }).click();
-  await page.getByRole("group", { name: "O que marcar" }).getByRole("button", { name: "✋ editar" }).click();
+  await escolherNoPainel(page, "Desenhar", "O que marcar", "✋ editar");
   // Posição na PÁGINA (a rolagem muda a da janela): o painel de edição não pode mudá-la.
   const alturaDoCanvas = () => canvas.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
   const topoAntes = await alturaDoCanvas();
@@ -64,8 +75,11 @@ test("editar desenho: mover, redimensionar, girar, cor, só eu vejo e apagar", a
   // Tocar no vazio não seleciona nada; tocar na borda seleciona (e abre os botões).
   await arrastar([700, 500], [700, 500]);
   await expect(page.getByRole("group", { name: "Editar o desenho selecionado" })).toHaveCount(0);
-  await arrastar([350, 200], [350, 200]);
-  await expect(page.getByRole("group", { name: "Editar o desenho selecionado" })).toBeVisible();
+  // O desenho chega do banco um instante depois do mapa: toca até ele ser selecionado.
+  await expect(async () => {
+    await arrastar([350, 200], [350, 200]);
+    await expect(page.getByRole("group", { name: "Editar o desenho selecionado" })).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 30_000 });
   expect(await pontos()).toEqual(quadrado); // só tocar não grava nada
   expect(await alturaDoCanvas()).toBe(topoAntes); // e o painel de edição não empurra o mapa (o desenho pularia debaixo do dedo)
 

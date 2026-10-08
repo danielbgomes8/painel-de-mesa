@@ -5116,3 +5116,284 @@ input.fj-score:focus-visible {
   stroke: rgba(255, 255, 255, 0.35);
   outline: none;
 }
+
+/* ---------- palco do mapa (novo layout, 08/10/2026) ----------
+   O mapa ocupa o palco todo e os controles flutuam por cima: barra de ícones à esquerda,
+   painel só com as opções da ferramenta ativa, zoom embaixo e o ping como botão grande.
+   As cores vêm dos tokens do app, então vale nos dois temas. */
+.palco {
+  --topo: 66px;
+  --vidro: color-mix(in srgb, var(--surface) 84%, transparent);
+  position: relative;
+  width: 100%;
+  height: clamp(440px, 76vh, 780px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0d0b09;
+}
+.palco[data-canto-alto="sim"] {
+  --topo: 110px;
+}
+.palco .cena-caixa {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.palco-vidro {
+  background: var(--vidro);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+}
+.palco-ic {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.palco-nome {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  max-width: calc(100% - 190px);
+  padding: 7px 12px;
+  border-radius: 14px;
+  line-height: 1.25;
+  pointer-events: none;
+}
+.palco-nome b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--f-display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+.palco-nome span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.palco-ponto {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.palco-ponto.desligado {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--muted);
+}
+.palco-canto {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.palco-canto .btn {
+  min-height: 36px;
+}
+.palco-modo {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+}
+.palco-modo button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.palco-modo button[aria-pressed="true"] {
+  background: var(--surface2);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.palco-voce {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+.palco-barra {
+  position: absolute;
+  left: 10px;
+  top: var(--topo);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 16px;
+}
+.palco-ferr {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.palco-ferr.pequeno {
+  width: 40px;
+  height: 40px;
+}
+.palco-ferr:hover {
+  color: var(--ink);
+}
+.palco-ferr[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.palco-ferr:focus-visible,
+.palco-modo button:focus-visible,
+.palco-ping:focus-visible,
+.palco-fechar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.palco-painel {
+  position: absolute;
+  left: 68px;
+  top: var(--topo);
+  width: 232px;
+  max-width: calc(100% - 80px);
+  max-height: calc(100% - var(--topo) - 92px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.palco-painel.larga {
+  width: min(340px, calc(100% - 80px));
+}
+.palco-painel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 6px 4px 14px;
+}
+.palco-painel h4 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.palco-fechar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.palco-fechar .palco-ic {
+  width: 18px;
+  height: 18px;
+}
+.palco-painel-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 14px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.palco-painel .mapa-ferr,
+.palco-painel .mapa-mesa,
+.palco-painel .mapa-linha {
+  margin: 0;
+}
+.palco-painel .mapa-grade {
+  margin: 0;
+  grid-template-columns: 1fr 1fr;
+}
+.palco-zoom {
+  position: absolute;
+  left: 10px;
+  bottom: 12px;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+}
+.palco-ping {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.8), 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.palco-ping .palco-ic {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2;
+}
+.palco-ping[aria-pressed="true"] {
+  box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.8), 0 0 0 6px color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.palco-dica {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+}
+@media (min-width: 700px) {
+  .palco-dica {
+    bottom: 14px;
+    max-width: calc(100% - 440px);
+  }
+}

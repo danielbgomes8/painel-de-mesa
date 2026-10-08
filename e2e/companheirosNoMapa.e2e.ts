@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  abrirFerramenta,
+  fecharPainelDoMapa,
   SALA,
   bancoConfigurado,
   cenaDoBanco,
@@ -62,11 +64,12 @@ test("o companheiro anda junto com o dono; desligado, fica; o telão diz de quem
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   const cena = await cenaDoBanco();
   await criarPeca(cena.id, "ana-robo", 255, 315);
   await criarPeca(cena.id, "pip-robo", 315, 315);
+  await fecharPainelDoMapa(page);
   // Os peões chegam à tela do Mestre pelo tempo real, um instante depois do banco: toca até o cartão abrir.
   await expect(async () => {
     await tocar(page, [255, 315]);
@@ -80,10 +83,12 @@ test("o companheiro anda junto com o dono; desligado, fica; o telão diz de quem
   await expect.poll(() => lugar("pip-robo")).toEqual([435, 315]);
 
   // Botão desligado: a Ana anda e o Pip fica onde estava.
+  await abrirFerramenta(page, "Mover");
   const botao = page.getByRole("button", { name: "🐾 companheiros junto" });
   await expect(botao).toHaveAttribute("aria-pressed", "true");
   await botao.click();
   await expect(botao).toHaveAttribute("aria-pressed", "false");
+  await fecharPainelDoMapa(page);
   await arrastar(page, [375, 315], [255, 315]);
   await expect.poll(async () => (await lugar("ana-robo"))[0]).toBe(255);
   expect(await lugar("pip-robo")).toEqual([435, 315]);
@@ -126,7 +131,7 @@ test("o companheiro não atravessa parede atrás do dono (nem o Mestre passando 
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   const cena = await cenaDoBanco();
   // Parede vertical de cima a baixo em x = 345, entre os dois peões e o destino.

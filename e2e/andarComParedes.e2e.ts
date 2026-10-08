@@ -1,5 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  abrirFerramenta,
+  escolherNoPainel,
+  fecharPainelDoMapa,
   SALA,
   bancoConfigurado,
   cenaDoBanco,
@@ -65,7 +68,7 @@ test("o jogador não atravessa parede nem porta fechada; porta aberta passa, e o
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 
   // Uma parede de cima a baixo em x = 450, com uma porta FECHADA no meio; o
   // jogador começa do lado esquerdo, de frente pra porta (grade de 30 px).
@@ -137,8 +140,9 @@ test("parede em curva: o traço vira trechos emendados sem fresta, desfazer tira
     .setInputFiles({ name: "mapa-curva.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
-  await page.getByRole("button", { name: "🧱 paredes" }).click();
-  const modo = (nome: string) => page.getByRole("group", { name: "O que desenhar" }).getByRole("button", { name: nome });
+  await abrirFerramenta(page, "Paredes e portas", "preparar");
+  const modo = (nome: string) => ({ click: () => escolherNoPainel(page, "Paredes e portas", "O que desenhar", nome, "preparar") });
+  await fecharPainelDoMapa(page);
 
   /** Passa o mouse apertado por uma fileira de pontos da imagem (o caminho do dedo). */
   const riscar = async (pontos: [number, number][]) => {
@@ -175,8 +179,9 @@ test("parede em curva: o traço vira trechos emendados sem fresta, desfazer tira
   expect([...vezes.values()].every((n) => n <= 2)).toBe(true);
 
   // Desfazer tira a curva inteira de uma vez.
-  await page.locator(".fc-sechead", { hasText: "Paredes e visão" }).click();
+  await abrirFerramenta(page, "Paredes e portas", "preparar");
   await page.getByRole("button", { name: "↩ desfazer parede" }).click();
+  await fecharPainelDoMapa(page);
   await expect.poll(async () => (await paredesDoBanco()).length).toBe(0);
 
   // De novo, e a borracha: passando o dedo de lado a lado, saem os trechos por onde ele passa (o arco é cruzado duas vezes).
