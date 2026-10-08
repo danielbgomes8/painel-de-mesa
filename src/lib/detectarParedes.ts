@@ -29,6 +29,13 @@ export type ResultadoDaDeteccao = {
 };
 
 export type OpcoesDaDeteccao = {
+  /**
+   * Como a parede foi desenhada: "escuras" (padrão) = linha escura sobre chão mais claro;
+   * "claras" = contorno claro (branco) entre o chão e um fundo escuro, como nos mapas de
+   * ficção científica ou de caverna escura. No segundo caso a imagem é invertida e a linha
+   * só precisa se destacar de UM dos lados (o do vazio), não dos dois.
+   */
+  linhas?: "escuras" | "claras";
   /** Procurar também paredes curvas e diagonais (padrão: sim). */
   curvas?: boolean;
   /** Comprimento mínimo de uma parede, em fração do lado maior. */
@@ -228,7 +235,7 @@ const RAZAO_MAXIMA_PAREDE_LADO = 0.55;
  * mancha não picotar a parede. Assim a parte falsa de uma linha que é meio
  * parede, meio borda de tapete, sai sem derrubar a parte verdadeira.
  */
-function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: Segmento[], afastamento: number, minimo: number): Segmento[] {
+function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: Segmento[], afastamento: number, minimo: number, ladoClaro = false): Segmento[] {
   const amostra = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
   const dentro = (x: number, y: number) => x >= 0 && x <= w - 1 && y >= 0 && y <= h - 1;
   const saida: Segmento[] = [];
@@ -279,7 +286,8 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
         bom[i] = 1; // sem lado pra comparar: não dá pra condenar
         continue;
       }
-      bom[i] = mLinha(i).media / Math.max(1, Math.min(...candidatos)) <= RAZAO_MAXIMA_PAREDE_LADO ? 1 : 0;
+      const referencia = ladoClaro ? Math.max(...candidatos) : Math.min(...candidatos);
+      bom[i] = mLinha(i).media / Math.max(1, referencia) <= RAZAO_MAXIMA_PAREDE_LADO ? 1 : 0;
     }
     // Trechos contínuos bons, tolerando quebras curtas (uma mancha, uma emenda).
     const quebra = Math.max(3, Math.round(afastamento * 0.3));
@@ -382,7 +390,10 @@ function tirarMoldura(cinza: Uint8Array, w: number, h: number, paredes: Segmento
 const arredondar = (n: number) => Math.round(n * 10) / 10;
 
 /** `cinza`: um byte por pixel (0 = preto), `largura × altura`. */
-export function detectarParedes(cinza: Uint8Array, largura: number, altura: number, opcoes: OpcoesDaDeteccao = {}): ResultadoDaDeteccao {
+export function detectarParedes(cinzaOriginal: Uint8Array, largura: number, altura: number, opcoes: OpcoesDaDeteccao = {}): ResultadoDaDeteccao {
+  const claras = opcoes.linhas === "claras";
+  // Linha clara: inverte a imagem e cai no caso da linha escura.
+  const cinza = claras ? cinzaOriginal.map((v) => 255 - v) : cinzaOriginal;
   const lado = Math.max(largura, altura);
   const borrada = borrar(cinza, largura, altura);
 
@@ -405,10 +416,10 @@ export function detectarParedes(cinza: Uint8Array, largura: number, altura: numb
   const { juntas, vaos } = fundir(brutos, lado);
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
-  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6)), esp);
+  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6, claras)), esp);
   const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
-  const curvas = opcoes.curvas === false ? [] : tirarMoldura(cinza, largura, altura, detectarCurvas(binaria, cinza, largura, altura, [...paredes, ...portas], { lado, espessura: esp }));
+  const curvas = opcoes.curvas === false ? [] : tirarMoldura(cinza, largura, altura, detectarCurvas(binaria, cinza, largura, altura, [...paredes, ...portas], { lado, espessura: esp, ladoClaro: claras }));
 
   const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];
   return { largura, altura, paredes: [...paredes, ...curvas].map(r), portas: portas.map(r) };

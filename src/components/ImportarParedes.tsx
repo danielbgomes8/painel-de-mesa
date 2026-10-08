@@ -69,6 +69,7 @@ export function ImportarParedes({
   const [enviando, setEnviando] = useState(false);
   const [detectando, setDetectando] = useState(false);
   const [comCurvas, setComCurvas] = useState(true);
+  const [linhas, setLinhas] = useState<"escuras" | "claras">("escuras");
   const [deteccao, setDeteccao] = useState<ResultadoDaDeteccao | null>(null);
   const [tiradas, setTiradas] = useState<ReadonlySet<string>>(new Set());
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
@@ -116,7 +117,7 @@ export function ImportarParedes({
       const { cinza, largura: l, altura: a } = await cinzaDaImagem(urlDaImagem);
       // Deixa a tela pintar o "detectando…" antes de a conta (que trava a página por um instante) começar.
       await new Promise((ok) => setTimeout(ok, 30));
-      const r = detectarParedes(cinza, l, a, { curvas: comCurvas });
+      const r = detectarParedes(cinza, l, a, { curvas: comCurvas, linhas });
       if (r.paredes.length + r.portas.length === 0) {
         setAviso({ texto: "Não achei paredes neste mapa. Tente o caminho da IA, logo abaixo.", falhou: true });
       } else {
@@ -182,6 +183,18 @@ export function ImportarParedes({
                 O jeito mais rápido: o app procura sozinho as paredes e as portas na imagem. Funciona melhor em mapa com paredes retas;
                 curva, móvel e tapete podem enganar. Entra como <b>rascunho</b>.
               </p>
+              <fieldset className="mapa-dica" style={{ border: 0, padding: 0, margin: "6px 0" }}>
+                <legend style={{ padding: 0 }}>Como a parede aparece neste mapa:</legend>
+                <label>
+                  <input type="radio" name="linhas-da-parede" checked={linhas === "escuras"} onChange={() => setLinhas("escuras")} /> linha escura sobre o chão
+                  claro (a maioria)
+                </label>
+                <br />
+                <label>
+                  <input type="radio" name="linhas-da-parede" checked={linhas === "claras"} onChange={() => setLinhas("claras")} /> contorno claro em volta de
+                  fundo escuro
+                </label>
+              </fieldset>
               <label className="mapa-dica">
                 <input type="checkbox" checked={comCurvas} onChange={(e) => setComCurvas(e.target.checked)} /> procurar também paredes curvas (salas redondas,
                 cavernas — traz mais linhas pra conferir)

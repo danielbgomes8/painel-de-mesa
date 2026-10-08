@@ -127,7 +127,7 @@ function ramos(fio: Uint8Array, w: number, h: number, minimoPx: number): [number
   return saida;
 }
 
-export type OpcoesDeCurvas = { lado: number; espessura: number; maximo?: number };
+export type OpcoesDeCurvas = { lado: number; espessura: number; maximo?: number; ladoClaro?: boolean };
 
 /**
  * @param binaria  máscara (0/255) das linhas escuras e finas (black-hat limiarizado)
@@ -140,7 +140,7 @@ export function detectarCurvas(
   w: number,
   h: number,
   retas: Segmento[],
-  { lado, espessura, maximo = 150 }: OpcoesDeCurvas,
+  { lado, espessura, maximo = 150, ladoClaro = false }: OpcoesDeCurvas,
 ): Segmento[] {
   const resto = new Uint8Array(w * h);
   for (let i = 0; i < resto.length; i++) resto[i] = binaria[i] ? 1 : 0;
@@ -183,7 +183,7 @@ export function detectarCurvas(
     if (Math.max(...xs) < margem || Math.min(...xs) > w - margem || Math.max(...ys) < margem || Math.min(...ys) > h - margem) continue;
     const segs: Segmento[] = [];
     for (let k = 0; k < ap.length - 1; k++) segs.push([ap[k][0], ap[k][1], ap[k + 1][0], ap[k + 1][1]]);
-    if (!escuraEmRelacaoAoChao(cinza, w, h, segs, espessura)) continue;
+    if (!escuraEmRelacaoAoChao(cinza, w, h, segs, espessura, ladoClaro)) continue;
     candidatas.push({ segs, comp });
   }
   candidatas.sort((a, b) => b.comp - a.comp);
@@ -196,7 +196,7 @@ export function detectarCurvas(
 }
 
 /** Mesma conta do filtro das retas, mas na normal de cada trecho (a curva não é horizontal nem vertical). */
-function escuraEmRelacaoAoChao(cinza: Uint8Array, w: number, h: number, segs: Segmento[], afastamento: number): boolean {
+function escuraEmRelacaoAoChao(cinza: Uint8Array, w: number, h: number, segs: Segmento[], afastamento: number, ladoClaro: boolean): boolean {
   const amostra = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
   const dentro = (x: number, y: number) => x >= 0 && x <= w - 1 && y >= 0 && y <= h - 1;
   let linha = 0;
@@ -226,7 +226,7 @@ function escuraEmRelacaoAoChao(cinza: Uint8Array, w: number, h: number, segs: Se
     }
   }
   const medias = lados.map((v, k) => (validos[k] > n * 0.5 ? v / validos[k] : Infinity));
-  const lado = Math.min(...medias);
+  const lado = ladoClaro ? Math.max(...medias.filter(Number.isFinite)) : Math.min(...medias);
   if (!Number.isFinite(lado)) return true;
   return linha / n / Math.max(1, lado) <= 0.6;
 }

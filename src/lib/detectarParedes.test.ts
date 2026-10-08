@@ -63,6 +63,24 @@ describe("detectarParedes", () => {
     expect(r.paredes.some((s) => s[1] === s[3] && s[1] < 10)).toBe(true);
   });
 
+  it("contorno claro sobre fundo escuro: só sai com linhas: \"claras\"", () => {
+    const w = 400;
+    const h = 300;
+    const g = new Uint8Array(w * h).fill(45);
+    const traco = (x1: number, y1: number, x2: number, y2: number) => {
+      for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) g[y * w + x] = 225;
+    };
+    traco(60, 50, 340, 54); // topo
+    traco(60, 246, 340, 250); // base
+    traco(60, 50, 64, 250); // esquerda
+    traco(336, 50, 340, 250); // direita
+    const claras = detectarParedes(g, w, h, { minimo: 0.15, linhas: "claras" });
+    expect(claras.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 52.5) <= 3)).toBe(true);
+    expect(claras.paredes.some((s) => s[0] === s[2] && Math.abs(s[0] - 62.5) <= 3)).toBe(true);
+    const escuras = detectarParedes(g, w, h, { minimo: 0.15 });
+    expect(escuras.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 52.5) <= 3)).toBe(false);
+  });
+
   it("imagem lisa não vira parede", () => {
     const g = new Uint8Array(300 * 300).fill(180);
     const r = detectarParedes(g, 300, 300);
