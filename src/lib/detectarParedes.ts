@@ -341,6 +341,36 @@ function recortarPontas(paredes: Segmento[], alcance: number): Segmento[] {
   });
 }
 
+/**
+ * Moldura de pergaminho ou papel em volta do mapa: linha fina paralela à borda da
+ * imagem, com a faixa entre ela e a borda CLARA (papel). Parede que encosta no
+ * limite da imagem (a faixa de fora é a própria parede, escura) não é moldura.
+ */
+function tirarMoldura(cinza: Uint8Array, w: number, h: number, paredes: Segmento[]): Segmento[] {
+  const margem = Math.max(w, h) * 0.05;
+  const px = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
+  return paredes.filter((s) => {
+    const horizontal = s[1] === s[3];
+    const pos = horizontal ? s[1] : s[0];
+    const lim = horizontal ? h : w;
+    const dist = Math.min(pos, lim - pos);
+    if (dist > margem || dist < Math.max(8, Math.max(w, h) * 0.015)) return true;
+    const alta = pos < lim - pos ? 0 : lim - 1; // a borda da imagem mais perto
+    const comp = Math.hypot(s[2] - s[0], s[3] - s[1]);
+    const n = Math.max(2, Math.floor(comp));
+    let linha = 0;
+    let fora = 0;
+    for (let i = 0; i <= n; i++) {
+      const x = s[0] + ((s[2] - s[0]) * i) / n;
+      const y = s[1] + ((s[3] - s[1]) * i) / n;
+      linha += horizontal ? px(x, y) : px(x, y);
+      // Ponto no meio da faixa entre a linha e a borda.
+      fora += horizontal ? px(x, (y + alta) / 2) : px((x + alta) / 2, y);
+    }
+    return fora / linha <= 1.8;
+  });
+}
+
 const arredondar = (n: number) => Math.round(n * 10) / 10;
 
 /** `cinza`: um byte por pixel (0 = preto), `largura × altura`. */
@@ -367,7 +397,7 @@ export function detectarParedes(cinza: Uint8Array, largura: number, altura: numb
   const { juntas, vaos } = fundir(brutos, lado);
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
-  const paredes = recortarPontas(filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6), esp);
+  const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6)), esp);
   const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
   const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];

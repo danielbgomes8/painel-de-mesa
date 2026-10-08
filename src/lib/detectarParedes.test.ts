@@ -39,6 +39,30 @@ describe("detectarParedes", () => {
     expect(r.paredes.some((s) => s[0] === s[2] && Math.abs(s[0] - 200) <= 3)).toBe(true);
   });
 
+  it("moldura de papel (linha fina longe da borda, com papel claro por fora) não vira parede", () => {
+    const w = 500;
+    const h = 400;
+    const g = new Uint8Array(w * h).fill(210);
+    const traco = (x1: number, y1: number, x2: number, y2: number) => {
+      for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) g[y * w + x] = 40;
+    };
+    traco(30, 20, 470, 24); // moldura de cima: 20 px da borda, com papel por fora
+    traco(120, 150, 124, 330); // uma parede de verdade, no meio
+    traco(120, 150, 300, 154);
+    const r = detectarParedes(g, w, h, { minimo: 0.12 });
+    expect(r.paredes.some((s) => s[1] === s[3] && s[1] < 60)).toBe(false);
+    expect(r.paredes.some((s) => s[0] === s[2] && Math.abs(s[0] - 122) <= 3)).toBe(true);
+  });
+
+  it("parede que encosta na borda da imagem fica (não é moldura)", () => {
+    const w = 500;
+    const h = 400;
+    const g = new Uint8Array(w * h).fill(210);
+    for (let y = 0; y <= 5; y++) for (let x = 0; x < w; x++) g[y * w + x] = 40; // parede colada no topo
+    const r = detectarParedes(g, w, h, { minimo: 0.12 });
+    expect(r.paredes.some((s) => s[1] === s[3] && s[1] < 10)).toBe(true);
+  });
+
   it("imagem lisa não vira parede", () => {
     const g = new Uint8Array(300 * 300).fill(180);
     const r = detectarParedes(g, 300, 300);
