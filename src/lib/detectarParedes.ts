@@ -286,7 +286,7 @@ function fundir(segs: Segmento[], lado: number): { juntas: Segmento[]; vaos: Vao
  * perde um lado; (3) ter alguma coisa desenhada dentro dele (a folha da porta, o batente, o
  * degrau): vão de chão liso é corredor aberto ou passagem, e passagem aberta fica sem nada.
  */
-function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], perto: number, resp: Uint8Array, w: number, h: number, marca: number): Segmento[] {
+function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], perto: number, resp: Uint8Array, w: number, h: number, marca: number, larguraMaxima: number): Segmento[] {
   const portas: Segmento[] = [];
   const pico = (x: number, y: number, vertical: boolean) => {
     let m = 0;
@@ -298,6 +298,7 @@ function portasDosVaos(vaos: Vao[], compridas: Segmento[], paredes: Segmento[], 
     return m;
   };
   for (const v of vaos) {
+    if (v.fim - v.ini > larguraMaxima) continue; // largo demais pra porta: é sala ou corredor
     const naLinha = (lista: Segmento[]) =>
       lista.filter((s) => (v.eixo === "h" ? s[1] === s[3] && Math.abs(s[1] - v.pos) <= 4 : s[0] === s[2] && Math.abs(s[0] - v.pos) <= 4));
     const a = v.eixo === "h" ? 0 : 1;
@@ -580,7 +581,7 @@ export function aplicarDeteccao(p: DeteccaoPreparada, opcoes: { minimo?: number;
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
   const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, lateral, minimo * 0.6, claras, razao, traco)), esp);
-  const portas = portasDosVaos(vaos, compridas, paredes, Math.max(6, traco * 3), resp, largura, altura, limiar * 0.35);
+  const portas = portasDosVaos(vaos, compridas, paredes, Math.max(6, traco * 3), resp, largura, altura, limiar * 0.35, Math.max(14, traco * 8));
 
   const curvas =
     opcoes.curvas === false
@@ -641,10 +642,45 @@ export function unirDeteccoes(a: ResultadoDaDeteccao, b: ResultadoDaDeteccao, pe
  * sob a luz, mas bem menos cor). A cor entra primeiro: ela cai em cima da parede; o brilho completa
  * o que a cor não viu (o contorno contra o vazio escuro).
  */
-export function aplicarComCor(brilho: DeteccaoPreparada, cor: DeteccaoPreparada, opcoes: { minimo?: number; razao?: number; curvas?: boolean } = {}): ResultadoDaDeteccao {
-  const pelaCor = aplicarDeteccao(cor, { minimo: opcoes.minimo, razao: Math.min(0.9, (opcoes.razao ?? RAZAO_PADRAO) + 0.15), curvas: false });
+/**
+ * Na leitura pela cor a parede cai bem em cima do desenho e quase não há linha falsa, então dá
+ * pra aceitar trechos mais curtos que na leitura pelo brilho: o comprimento mínimo e o núcleo que
+ * corta linha curta são multiplicados por isto (medido no trecho do labirinto: de 74% pra 84% das
+ * paredes, com a precisão subindo de 85% pra 92%).
+ */
+export const FATOR_DA_COR = 0.57;
+
+export function aplicarComCor(
+  brilho: DeteccaoPreparada,
+  cor: DeteccaoPreparada,
+  opcoes: { minimo?: number; razao?: number; curvas?: boolean; minimoDaCor?: number; razaoDaCor?: number } = {},
+): ResultadoDaDeteccao {
+  const pelaCor = aplicarDeteccao(cor, {
+    minimo: opcoes.minimoDaCor ?? opcoes.minimo,
+    razao: opcoes.razaoDaCor ?? Math.min(0.9, (opcoes.razao ?? RAZAO_PADRAO) + 0.15),
+    curvas: false,
+  });
   const peloBrilho = aplicarDeteccao(brilho, opcoes);
-  return unirDeteccoes(pelaCor, peloBrilho, Math.max(5, brilho.traco * 2.5));
+  // No vazio escuro em volta do mapa a cor é só ruído (preto não tem cor que se meça): sai o trecho
+  // lido pela cor que passa por um lugar com menos da metade do brilho típico da imagem.
+  const { largura: w, altura: h } = brilho;
+  const real = (i: number) => (brilho.claras ? 255 - brilho.cinza[i] : brilho.cinza[i]);
+  const hist = new Uint32Array(256);
+  for (let i = 0; i < w * h; i += 7) hist[real(i)]++;
+  let mediana = 0;
+  for (let soma = 0, meio = Math.ceil((w * h) / 14); mediana < 255 && (soma += hist[mediana]) < meio; mediana++);
+  const noMapa = (s: Segmento) => {
+    const n = Math.max(2, Math.floor(Math.hypot(s[2] - s[0], s[3] - s[1]) / 2));
+    let soma = 0;
+    for (let i = 0; i <= n; i++) {
+      const x = Math.min(w - 1, Math.max(0, Math.round(s[0] + ((s[2] - s[0]) * i) / n)));
+      const y = Math.min(h - 1, Math.max(0, Math.round(s[1] + ((s[3] - s[1]) * i) / n)));
+      soma += real(y * w + x);
+    }
+    return soma / (n + 1) >= mediana * 0.5;
+  };
+  const corNoMapa = { ...pelaCor, paredes: pelaCor.paredes.filter(noMapa), portas: pelaCor.portas.filter(noMapa) };
+  return unirDeteccoes(corNoMapa, peloBrilho, Math.max(5, brilho.traco * 2.5));
 }
 
 /** Saturação (0 = cinza, 255 = cor viva) de cada pixel RGBA: separa pedra clara de chão colorido mesmo com o mesmo brilho. */

@@ -187,4 +187,44 @@ describe("detectarParedes", () => {
     );
     expect(r.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 102.5) <= 3 && s[2] - s[0] > 200)).toBe(true);
   });
+
+  it("leitura pela cor: linha no vazio escuro em volta do mapa não entra", () => {
+    const w = 400;
+    const h = 300;
+    // Metade de cima: mapa (brilho 140). Metade de baixo: vazio (brilho 30).
+    const brilho = new Uint8Array(w * h);
+    for (let i = 0; i < brilho.length; i++) brilho[i] = i < w * 150 ? 140 : 30;
+    const cor = new Uint8Array(w * h).fill(150);
+    for (let y = 60; y <= 65; y++) for (let x = 60; x <= 340; x++) cor[y * w + x] = 115; // parede, no mapa
+    for (let y = 240; y <= 245; y++) for (let x = 60; x <= 340; x++) cor[y * w + x] = 115; // ruído, no vazio
+    const n = NIVEIS_DE_SENSIBILIDADE[5];
+    const r = aplicarComCor(
+      prepararDeteccao(brilho, w, h, { linhas: "claras", comp: n.comp }),
+      prepararDeteccao(cor, w, h, { linhas: "escuras", comp: n.comp, limiar: 0.6 }),
+      { minimo: n.minimo, razao: n.razao, curvas: false },
+    );
+    expect(r.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 62.5) <= 3)).toBe(true);
+    expect(r.paredes.some((s) => s[1] === s[3] && Math.abs(s[1] - 242.5) <= 3)).toBe(false);
+  });
+
+  it("vão largo demais pra ser porta (um corredor inteiro) não vira porta, mesmo com algo desenhado nele", () => {
+    // Paredes finas (4 px) num mapa largo: porta de até ~32 px; o vão aqui tem 60.
+    const w = 800;
+    const h = 300;
+    const g = new Uint8Array(w * h);
+    for (let i = 0; i < g.length; i++) g[i] = 200 + ((i * 7919) % 17);
+    const traco = (x1: number, y1: number, x2: number, y2: number, v = 40) => {
+      for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) g[y * w + x] = v;
+    };
+    traco(40, 40, 760, 43);
+    traco(40, 256, 760, 259);
+    traco(40, 40, 43, 259);
+    traco(757, 40, 760, 259);
+    traco(100, 150, 370, 153); // parede do meio, lado esquerdo
+    traco(430, 150, 700, 153); // lado direito: vão de 60 px entre as duas
+    traco(372, 151, 428, 152, 150); // algo riscado no vão
+    const r = detectarParedes(g, w, h, { minimo: 0.1, curvas: false });
+    expect(r.paredes.filter((s) => s[1] === s[3] && Math.abs(s[1] - 151.5) <= 3).length).toBeGreaterThanOrEqual(2);
+    expect(r.portas.some((s) => s[1] === s[3] && Math.abs(s[1] - 151.5) <= 3)).toBe(false);
+  });
 });

@@ -26,7 +26,7 @@ it("app", () => {
   const p = prepararDeteccao(new Uint8Array(readFileSync("$T/cinza.raw")), $W, $H, { linhas: "$LIN", comp: n.comp, limiar: n.limiar, limiarLocal: n.limiarLocal });
   const aj = { minimo: n.minimo, razao: n.razao };
   const r = "$LIN" === "claras"
-    ? aplicarComCor(p, prepararDeteccao(new Uint8Array(readFileSync("$T/sat.raw")), $W, $H, { linhas: "escuras", comp: n.comp, limiar: 0.6, limiarLocal: 0.4 }), aj)
+    ? aplicarComCor(p, prepararDeteccao(new Uint8Array(readFileSync("$T/sat.raw")), $W, $H, { linhas: "escuras", comp: ${CC:-n.comp * 0.57}, limiar: ${CL:-0.6}, limiarLocal: ${CLL:-0.4} }), { ...aj, minimoDaCor: ${CM:-n.minimo * 0.57}, razaoDaCor: ${CR:-Math.min(0.9, n.razao + 0.15)} })
     : aplicarDeteccao(p, aj);
   writeFileSync("$T/r.json", JSON.stringify({ ...r, ms: Math.round(performance.now() - t0) }));
 });

@@ -5,6 +5,7 @@ import type { Cena } from "@/lib/cenas";
 import { TEXTO_MAXIMO_DA_IMPORTACAO, lerParedesDoTexto, pedidoDeParedes } from "@/lib/importarParedes";
 import type { NovaParede, Parede } from "@/lib/paredes";
 import {
+  FATOR_DA_COR,
   LADO_DA_ANALISE,
   NIVEIS_DE_SENSIBILIDADE,
   aplicarComCor,
@@ -146,9 +147,9 @@ export function ImportarParedes({
         ? aplicarComCor(
             preparada,
             guardada(`cor|${nivel.comp.toFixed(4)}`, () =>
-              prepararDeteccao(img.saturacao, img.largura, img.altura, { linhas: "escuras", comp: nivel.comp, limiar: 0.6, limiarLocal: 0.4 }),
+              prepararDeteccao(img.saturacao, img.largura, img.altura, { linhas: "escuras", comp: nivel.comp * FATOR_DA_COR, limiar: 0.6, limiarLocal: 0.4 }),
             ),
-            ajustes,
+            { ...ajustes, minimoDaCor: nivel.minimo * FATOR_DA_COR },
           )
         : aplicarDeteccao(preparada, ajustes);
     if (r.paredes.length + r.portas.length === 0) {

@@ -22,4 +22,12 @@ def carregar(f):
 if __name__=="__main__":
     tol=float(sys.argv[sys.argv.index('--tol')+1]) if '--tol' in sys.argv else 6
     det,gab=carregar(sys.argv[1]),carregar(sys.argv[2])
+    rec=json.load(open(sys.argv[2])).get('recorte')
+    if rec:
+        # Gabarito de um trecho: so conta o pedaco de cada linha detectada que cai dentro dele.
+        x0,y0,x1,y1=rec; novo=[]
+        for s in det:
+            dentro=[p for p in pts(s,1) if x0<=p[0]<=x1 and y0<=p[1]<=y1]
+            if len(dentro)>=6: novo.append([dentro[0][0],dentro[0][1],dentro[-1][0],dentro[-1][1]])
+        det=novo
     print(f"recall {cobertura(gab,det,tol):.0%}  precisao {cobertura(det,gab,tol):.0%}  ({len(det)} detectados)")
