@@ -224,6 +224,7 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
   const amostra = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
   const dentro = (x: number, y: number) => x >= 0 && x <= w - 1 && y >= 0 && y <= h - 1;
   const saida: Segmento[] = [];
+  const janelaMedia = Math.max(2, Math.round(afastamento * 0.4));
   for (const s of paredes) {
     const vertical = s[0] === s[2];
     const comp = Math.hypot(s[2] - s[0], s[3] - s[1]);
@@ -255,8 +256,8 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
         c[i + 1] = c[i] + (m ? m[i] : 1);
       }
       return (i: number) => {
-        const ini = Math.max(0, i - afastamento);
-        const fim = Math.min(n, i + afastamento) + 1;
+        const ini = Math.max(0, i - janelaMedia);
+        const fim = Math.min(n, i + janelaMedia) + 1;
         const cont = c[fim] - c[ini];
         return { media: cont ? (a[fim] - a[ini]) / cont : NaN, cont };
       };
@@ -265,7 +266,7 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
     const mLados = [acum(lados[0], valido[0]), acum(lados[1], valido[1])];
     const bom = new Uint8Array(n + 1);
     for (let i = 0; i <= n; i++) {
-      const candidatos = mLados.map((f) => f(i)).filter((r) => r.cont > afastamento * 0.5).map((r) => r.media);
+      const candidatos = mLados.map((f) => f(i)).filter((r) => r.cont > janelaMedia * 0.5).map((r) => r.media);
       if (candidatos.length === 0) {
         bom[i] = 1; // sem lado pra comparar: não dá pra condenar
         continue;
@@ -273,7 +274,7 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
       bom[i] = mLinha(i).media / Math.max(1, Math.min(...candidatos)) <= RAZAO_MAXIMA_PAREDE_LADO ? 1 : 0;
     }
     // Trechos contínuos bons, tolerando quebras curtas (uma mancha, uma emenda).
-    const quebra = afastamento;
+    const quebra = Math.max(3, Math.round(afastamento * 0.3));
     let ini = -1;
     let ultimoBom = -1;
     const fechar = () => {
