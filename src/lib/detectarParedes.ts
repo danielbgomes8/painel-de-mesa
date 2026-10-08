@@ -279,6 +279,13 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
     let ultimoBom = -1;
     const fechar = () => {
       if (ini < 0) return;
+      // Aparar as pontas: o detector passa alguns px do canto (o núcleo do black-hat
+      // estica a linha). Enquanto o ponto da ponta for bem mais claro que a parede
+      // que ele mesmo mediu, é chão, não parede.
+      const dentro = Array.from(linha.slice(ini, ultimoBom + 1)).sort((x, y) => x - y);
+      const corte = Math.max(70, dentro[Math.floor(dentro.length / 2)] * 1.8 + 10);
+      while (ini < ultimoBom && linha[ini] > corte) ini++;
+      while (ultimoBom > ini && linha[ultimoBom] > corte) ultimoBom--;
       const t = ((ultimoBom - ini) * comp) / n;
       if (t >= minimo) {
         const a = ini / n;
@@ -296,6 +303,42 @@ function filtrarPorContraste(cinza: Uint8Array, w: number, h: number, paredes: S
     fechar();
   }
   return saida;
+}
+
+/**
+ * Pontas que passam do canto: o núcleo do black-hat estica a linha alguns pixels
+ * além de onde a parede perpendicular a corta. Se a ponta passa (até `alcance`)
+ * do eixo de uma parede perpendicular que cobre aquela linha, recua até o eixo.
+ */
+function recortarPontas(paredes: Segmento[], alcance: number): Segmento[] {
+  const horizontais = paredes.filter((s) => s[1] === s[3]);
+  const verticais = paredes.filter((s) => s[0] === s[2]);
+  const folga = 3;
+  return paredes.map((s) => {
+    const horizontal = s[1] === s[3];
+    const cruzam = horizontal ? verticais : horizontais;
+    const [a, b, fixo] = horizontal ? [0, 2, 1] : [1, 3, 0];
+    const eixoDe = (c: Segmento) => (horizontal ? c[0] : c[1]);
+    const cobre = (c: Segmento) => (horizontal ? c[1] - folga <= s[fixo] && c[3] + folga >= s[fixo] : c[0] - folga <= s[fixo] && c[2] + folga >= s[fixo]);
+    const nova: Segmento = [...s] as Segmento;
+    let melhorFim = 0;
+    let melhorIni = 0;
+    for (const c of cruzam) {
+      if (!cobre(c)) continue;
+      const e = eixoDe(c);
+      const passouFim = s[b] - e; // ponta do fim passou do eixo?
+      if (passouFim > 0.5 && passouFim <= alcance && s[a] < e - 4 && (melhorFim === 0 || passouFim < melhorFim)) {
+        melhorFim = passouFim;
+        nova[b] = e;
+      }
+      const passouIni = e - s[a];
+      if (passouIni > 0.5 && passouIni <= alcance && s[b] > e + 4 && (melhorIni === 0 || passouIni < melhorIni)) {
+        melhorIni = passouIni;
+        nova[a] = e;
+      }
+    }
+    return nova;
+  });
 }
 
 const arredondar = (n: number) => Math.round(n * 10) / 10;
@@ -324,7 +367,7 @@ export function detectarParedes(cinza: Uint8Array, largura: number, altura: numb
   const { juntas, vaos } = fundir(brutos, lado);
   const minimo = lado * (opcoes.minimo ?? PAREDE_MINIMA);
   const compridas = juntas.filter((s) => Math.hypot(s[2] - s[0], s[3] - s[1]) >= minimo);
-  const paredes = filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6);
+  const paredes = recortarPontas(filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6), esp);
   const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
   const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];
