@@ -68,6 +68,7 @@ export function ImportarParedes({
   const [pedidoAVista, setPedidoAVista] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [detectando, setDetectando] = useState(false);
+  const [comCurvas, setComCurvas] = useState(true);
   const [deteccao, setDeteccao] = useState<ResultadoDaDeteccao | null>(null);
   const [tiradas, setTiradas] = useState<ReadonlySet<string>>(new Set());
   const [aviso, setAviso] = useState<{ texto: string; falhou: boolean } | null>(null);
@@ -115,7 +116,7 @@ export function ImportarParedes({
       const { cinza, largura: l, altura: a } = await cinzaDaImagem(urlDaImagem);
       // Deixa a tela pintar o "detectando…" antes de a conta (que trava a página por um instante) começar.
       await new Promise((ok) => setTimeout(ok, 30));
-      const r = detectarParedes(cinza, l, a);
+      const r = detectarParedes(cinza, l, a, { curvas: comCurvas });
       if (r.paredes.length + r.portas.length === 0) {
         setAviso({ texto: "Não achei paredes neste mapa. Tente o caminho da IA, logo abaixo.", falhou: true });
       } else {
@@ -181,6 +182,10 @@ export function ImportarParedes({
                 O jeito mais rápido: o app procura sozinho as paredes e as portas na imagem. Funciona melhor em mapa com paredes retas;
                 curva, móvel e tapete podem enganar. Entra como <b>rascunho</b>.
               </p>
+              <label className="mapa-dica">
+                <input type="checkbox" checked={comCurvas} onChange={(e) => setComCurvas(e.target.checked)} /> procurar também paredes curvas (salas redondas,
+                cavernas — traz mais linhas pra conferir)
+              </label>
               <div className="mapa-ferr">
                 <button type="button" className="btn primary" disabled={detectando} onClick={() => void detectarSozinho()}>
                   {detectando ? "procurando…" : "🔍 achar paredes e portas sozinho"}

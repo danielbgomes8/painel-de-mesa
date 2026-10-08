@@ -1,3 +1,5 @@
+import { detectarCurvas } from "./detectarCurvas";
+
 /**
  * Detectar paredes e portas numa imagem de mapa, no próprio aparelho.
  *
@@ -8,8 +10,12 @@
  * verticais) e compridas, e cada VAO de largura de porta no meio de uma parede
  * vira uma porta.
  *
- * É um RASCUNHO: móvel, tapete e quadriculado ainda enganam, e parede curva ou
- * diagonal não sai. O Mestre confere no mapa e corrige. Regras puras, sem DOM:
+ * Parede curva ou diagonal sai de `detectarCurvas` (o que sobra das linhas escuras
+ * depois de tirar as retas, afinado e simplificado em trechos retos).
+ *
+ * É um RASCUNHO: móvel, tapete e quadriculado ainda enganam, e as curvas trazem mais
+ * linhas falsas que as retas (contorno de mesa redonda, por exemplo). O Mestre
+ * confere no mapa e corrige. Regras puras, sem DOM:
  * recebem os níveis de cinza e devolvem segmentos em px da imagem analisada.
  */
 
@@ -23,6 +29,8 @@ export type ResultadoDaDeteccao = {
 };
 
 export type OpcoesDaDeteccao = {
+  /** Procurar também paredes curvas e diagonais (padrão: sim). */
+  curvas?: boolean;
   /** Comprimento mínimo de uma parede, em fração do lado maior. */
   minimo?: number;
   /** Largura do núcleo do black-hat (px); padrão: lado / 28. */
@@ -350,8 +358,8 @@ function tirarMoldura(cinza: Uint8Array, w: number, h: number, paredes: Segmento
   const margem = Math.max(w, h) * 0.05;
   const px = (x: number, y: number) => cinza[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
   return paredes.filter((s) => {
-    const horizontal = s[1] === s[3];
-    const pos = horizontal ? s[1] : s[0];
+    const horizontal = Math.abs(s[2] - s[0]) >= Math.abs(s[3] - s[1]);
+    const pos = horizontal ? (s[1] + s[3]) / 2 : (s[0] + s[2]) / 2;
     const lim = horizontal ? h : w;
     const dist = Math.min(pos, lim - pos);
     if (dist > margem || dist < Math.max(8, Math.max(w, h) * 0.015)) return true;
@@ -400,8 +408,10 @@ export function detectarParedes(cinza: Uint8Array, largura: number, altura: numb
   const paredes = recortarPontas(tirarMoldura(cinza, largura, altura, filtrarPorContraste(cinza, largura, altura, compridas, esp, minimo * 0.6)), esp);
   const portas = portasDosVaos(vaos, compridas, paredes, esp * 2);
 
+  const curvas = opcoes.curvas === false ? [] : tirarMoldura(cinza, largura, altura, detectarCurvas(binaria, cinza, largura, altura, [...paredes, ...portas], { lado, espessura: esp }));
+
   const r = (s: Segmento): Segmento => [arredondar(s[0]), arredondar(s[1]), arredondar(s[2]), arredondar(s[3])];
-  return { largura, altura, paredes: paredes.map(r), portas: portas.map(r) };
+  return { largura, altura, paredes: [...paredes, ...curvas].map(r), portas: portas.map(r) };
 }
 
 /** Converte RGBA (do canvas) em níveis de cinza, no peso de luminosidade usual. */
