@@ -179,7 +179,7 @@ export type Sala = {
   registrarLogBastiao: (texto: string) => Promise<void>;
   /** Devolve o encontro criado, ou null quando a escrita falha. */
   criarEncontro: (nome: string) => Promise<Encontro | null>;
-  atualizarEncontro: (id: string, patch: Partial<Pick<Encontro, "name" | "grupos">>) => Promise<void>;
+  atualizarEncontro: (id: string, patch: Partial<Pick<Encontro, "name" | "grupos" | "eventos">>) => Promise<void>;
   removerEncontro: (id: string) => Promise<void>;
   /** Relê a sala inteira do banco agora (o mesmo que acontece quando o app
    *  volta pra tela). Serve pra quem precisa comparar com o banco de verdade
@@ -1708,7 +1708,7 @@ export function useSala(codigo: string): Sala {
   );
 
   const atualizarEncontro = useCallback(
-    async (id: string, patch: Partial<Pick<Encontro, "name" | "grupos">>) => {
+    async (id: string, patch: Partial<Pick<Encontro, "name" | "grupos" | "eventos">>) => {
       const anterior = ref.current.encontros;
       setEncontros((atual) => atual.map((e) => (e.id === id ? { ...e, ...patch } : e)));
       const { error } = await supabase.from("encontros").update(patch).eq("id", id);

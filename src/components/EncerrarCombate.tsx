@@ -16,12 +16,14 @@ import {
 } from "@/lib/fimDoCombate";
 import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 import { registrarUso } from "@/lib/registrarUso";
+import { useEventosDoCombate } from "@/hooks/useEventos";
 
 /** Encerrar o combate (só o Mestre): mostra o resumo, sugere o XP dos inimigos derrotados (o Mestre confirma
  *  quem conta e pode digitar o XP de quem o catálogo não conhece), divide entre os jogadores que lutaram e
  *  limpa a ordem. Vai pro log e dá pra desfazer inteiro. As contas moram em `lib/fimDoCombate.ts`. */
 export function EncerrarCombate({ sala, onFechar }: { sala: Sala; onFechar: () => void }) {
   const { catalogo, falhou, tentarDeNovo } = useCatalogoMonstros();
+  const avisos = useEventosDoCombate();
   const { order, round } = sala.combate;
   const derrotados = useMemo(() => inimigosDerrotados(order, sala.personagens), [order, sala.personagens]);
   const jogadores = useMemo(() => jogadoresDoCombate(order, sala.personagens), [order, sala.personagens]);
@@ -97,6 +99,8 @@ export function EncerrarCombate({ sala, onFechar }: { sala: Sala; onFechar: () =
       setOcupado(false);
       return;
     }
+    // Os avisos programados eram deste combate: acabou, saem junto (melhor esforço).
+    await avisos.limparTodos();
     const fim = linhaDeFimDoCombate(round, marcados.length, partilha, destinatarios.length);
     sala.registrarVariosLogs([fim, ...textos]);
     sala.lembrarDesfazer({

@@ -142,7 +142,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
     }),
   },
   { tabela: "bastiao_log", colunas: colunas<LinhaLogBastiao>({ id: true, room_code: true, text: true, created_at: true }) },
-  { tabela: "encontros", colunas: colunas<Encontro>({ id: true, room_code: true, name: true, grupos: true, created_at: true }) },
+  { tabela: "encontros", colunas: colunas<Encontro>({ id: true, room_code: true, name: true, grupos: true, eventos: true, created_at: true }) },
   {
     tabela: "cenas",
     colunas: colunas<Cena>({
@@ -227,6 +227,8 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
     colunas: ["id", "created_at", "room_code", "quem", "onde", "mensagem", "detalhe", "endereco", "navegador", "versao"],
   },
   // O que a mesa usa (lib/registrarUso.ts monta a linha à mão).
+  // Avisos programados do combate (hooks/useEventos.ts).
+  { tabela: "combate_eventos", colunas: ["id", "room_code", "tipo", "rodada", "slugs", "pct", "texto", "publico", "feito", "created_at"] },
   { tabela: "uso", colunas: ["id", "created_at", "room_code", "papel", "tela", "abertura"] },
 ];
 

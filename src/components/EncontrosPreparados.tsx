@@ -21,6 +21,9 @@ import {
 } from "@/lib/regras";
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
+import { EventosDoEncontro } from "@/components/EventosDoCombate";
+import { useEventosDoCombate } from "@/hooks/useEventos";
+import { eventosAoTirarGrupo, eventosParaOCombate, normalizarPreparados } from "@/lib/eventosCombate";
 
 function contarMonstros(n: number): string {
   return n === 1 ? "1 monstro" : `${n} monstros`;
@@ -108,7 +111,11 @@ function CartaoEncontro({ encontro: e, sala }: { encontro: Encontro; sala: Sala 
   }
 
   function tirarGrupo(i: number) {
-    salvarGrupos(e.grupos.filter((_, idx) => idx !== i));
+    // Os avisos de PV do grupo que sai vão junto, e os dos grupos seguintes passam a apontar pro índice certo.
+    sala.atualizarEncontro(e.id, {
+      grupos: e.grupos.filter((_, idx) => idx !== i),
+      eventos: eventosAoTirarGrupo(normalizarPreparados(e.eventos), i),
+    });
   }
 
   return (
@@ -178,6 +185,7 @@ function CartaoEncontro({ encontro: e, sala }: { encontro: Encontro; sala: Sala 
       <p className="catcopiado" aria-live="polite">
         {adicionando ? aviso : ""}
       </p>
+      <EventosDoEncontro encontro={{ ...e, eventos: normalizarPreparados(e.eventos) }} sala={sala} />
     </div>
   );
 }
@@ -295,6 +303,7 @@ export function ComecarEncontro({
   inimigosSurpresos?: boolean;
 }) {
   const [ocupado, setOcupado] = useState(false);
+  const avisos = useEventosDoCombate();
   const prontos = sala.encontros.filter((e) => totalDoEncontro(e.grupos) > 0);
   if (prontos.length === 0) return null;
 
@@ -325,6 +334,8 @@ export function ComecarEncontro({
     // Quem joga vê "Inimigo N" na ordem, como com qualquer NPC não revelado.
     const linha = `${entraram === 1 ? "1 inimigo entrou no combate" : `${entraram} inimigos entraram no combate`}${inimigosSurpresos ? " (surpresos)" : ""}`;
     sala.registrarLog(linha);
+    // Os avisos programados do encontro passam a valer neste combate (melhor esforço: o combate já começou).
+    await avisos.criar(eventosParaOCombate(normalizarPreparados(e.eventos), e.grupos, criados));
     // Com mapa na mesa, cada monstro ganha peão oculto (o Mestre arruma e mostra).
     const pecas = await porPecasDosQueEntram(cenaNaMesa, criados);
     setOcupado(false);

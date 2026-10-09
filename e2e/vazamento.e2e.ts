@@ -137,7 +137,13 @@ test("o que é segredo da mesa não aparece pro jogador nem no telão (e o Mestr
   await inserir("diario", { room_code: SALA, title: "Sessão pública", text: "o que todos viram", cartoes: [escondido.id, pessoal.id] });
   await rest("dm_notes", { method: "POST", body: JSON.stringify({ room_code: SALA, text: "ISCA_NOTAS_MESTRE" }), headers: { Prefer: "resolution=merge-duplicates" } });
   await inserir("npc_templates", { room_code: SALA, name: "ISCA_BIBLIOTECA", cls: "ISCA_BIB_TIPO", notes: "ISCA_BIB_NOTA", ataque: "" });
-  await inserir("encontros", { room_code: SALA, name: "ISCA_ENCONTRO", grupos: [] });
+  await inserir("encontros", {
+    room_code: SALA,
+    name: "ISCA_ENCONTRO",
+    grupos: [],
+    eventos: [{ id: "iv", tipo: "rodada", rodada: 2, grupo: null, pct: null, texto: "ISCA_EVENTO_PREPARADO", publico: false }],
+  });
+  await inserir("combate_eventos", { room_code: SALA, tipo: "rodada", rodada: 1, slugs: [], texto: "ISCA_EVENTO_ATIVO", publico: false });
 
   // ---- O Mestre sobe um mapa, põe na mesa e dá dano no inimigo oculto (gera o log público) ----
   const mestre: string[] = [];
@@ -181,7 +187,7 @@ test("o que é segredo da mesa não aparece pro jogador nem no telão (e o Mestr
     await recolher(page, mestre);
   }
   const vistasPeloMestre = iscasEm(mestre);
-  for (const isca of ["ISCA_NPC_NOME", "ISCA_ESC_TITULO", "ISCA_ESC_SEGREDO", "ISCA_REV_SEGREDO", "ISCA_BIBLIOTECA", "ISCA_ENCONTRO", "ISCA_NOTAS_MESTRE"]) {
+  for (const isca of ["ISCA_NPC_NOME", "ISCA_ESC_TITULO", "ISCA_ESC_SEGREDO", "ISCA_REV_SEGREDO", "ISCA_BIBLIOTECA", "ISCA_ENCONTRO", "ISCA_NOTAS_MESTRE", "ISCA_EVENTO_ATIVO"]) {
     expect(vistasPeloMestre, `o Mestre deveria ver ${isca} (controle do teste)`).toContain(isca);
   }
 

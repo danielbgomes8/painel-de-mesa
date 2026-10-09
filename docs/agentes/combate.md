@@ -288,3 +288,22 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   e usa `andarComParedes` — ele encosta, desliza, e se nem assim dá fica onde está, **mesmo que o Mestre tenha passado o dono por cima da parede**
   (o Mestre passa; o companheiro não, como o jogador). Robô: 2º cenário de `companheirosNoMapa.e2e.ts` (conferido que falha sem a trava: o Pip vai a 495).
 - **Não cobre**: peões de companheiros não se desviam um do outro ao seguir o dono.
+
+- **Eventos do combate** (09/10/2026, migration `0034_eventos_do_combate.sql`; regras puras em `lib/eventosCombate.ts`, 15 testes; hook
+  `hooks/useEventos.ts`, que chega às telas por **contexto** (`EventosContext`, sem passar prop pelo `RastreadorCombate`); telas em
+  `EventosDoCombate.tsx`). O Mestre programa avisos — "rodada 3: o teto desaba", "quando o Chefe chegar a 50% de PV: ele foge" — que aparecem
+  sozinhos no topo da aba Combate (**só pro Mestre**; o celular vibra uma vez por aviso novo). Duas tabelas/colunas: `encontros.eventos` (modelo
+  preparado: por rodada, ou por PV de um GRUPO do encontro pelo índice) e `combate_eventos` (os valendo agora). Ao **começar o encontro**
+  (`ComecarEncontro`), `eventosParaOCombate` copia os modelos trocando "grupo N" pelos slugs dos monstros criados (a faixa de cada grupo usa a mesma
+  conta de `npcsDoEncontro`: `limitarQuantidade`, grupo por grupo); aviso de PV de grupo que sumiu é descartado, e tirar um grupo do encontro leva
+  seus avisos e reaponta os dos seguintes (`eventosAoTirarGrupo`). Também há avisos avulsos na gaveta "Eventos do combate".
+  - **Disparar é decidido na tela, não guardado**: `disparou`/`pendentes` olham a rodada e o PV de agora (rodada >=; PV <= pct% de qualquer um dos
+    monstros; 0% = a 0 PV; sem ninguém na ordem nada dispara). Assim o aviso não se perde se o turno pula a rodada ou o PV cai de 80% a 20% de uma
+    vez. `feito` é só "já tratei": o UPDATE leva `.eq("feito", false)`, então dois toques não contam duas vezes.
+  - **"Contar à mesa"** (`publico`): o texto só vai pro **log público** (`📜 …`) DEPOIS que o banco aceitou o `feito`, nunca ao disparar.
+  - Reiniciar e encerrar o combate apagam os avisos (`limparTodos`, melhor esforço, fora do desfazer). A tabela fica FORA do backup diário
+    (estado de um combate); os modelos vão no backup junto com o encontro. Sem a migration, o app abre normal e a gaveta diz "falta rodar a 0034".
+  - Robô: `e2e/eventosDoCombate.e2e.ts` (encontro → avisos entram com os slugs certos → rodada 2/3, PV do chefe e de um goblin → "Feito" e "contar à
+    mesa" → o jogador não vê nenhum → aviso avulso → reiniciar leva tudo; conferido que falha com `>` no lugar de `>=`) e iscas no
+    `e2e/vazamento.e2e.ts` (conferido que falha se o aviso aparece pra todo mundo). **Não cobre:** ação automática ao disparar (pôr condição,
+    chamar reforço), aviso por turno de um monstro, e desfazer a criação/apagamento dos avisos.

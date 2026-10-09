@@ -354,7 +354,21 @@ export type Encontro = {
   room_code: string;
   name: string;
   grupos: GrupoEncontro[];
+  /** Avisos programados pro combate deste encontro (migration 0034). Ausente em linha de antes dela. */
+  eventos?: EventoPreparado[];
   created_at: string;
+};
+
+/** Aviso preparado junto do encontro: por rodada, ou por PV de um GRUPO dele (índice em `grupos`). */
+export type EventoPreparado = {
+  id: string;
+  tipo: "rodada" | "pv";
+  rodada: number | null;
+  /** Só `pv`: índice do grupo do encontro cujos monstros o gatilho olha. */
+  grupo: number | null;
+  pct: number | null;
+  texto: string;
+  publico: boolean;
 };
 
 /** Uma linha do log curto de combate (dano/cura, rodadas, entradas na ordem). */

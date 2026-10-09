@@ -35,6 +35,7 @@ import {
 import { textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 import { LendariasNaLinha } from "@/components/LendariasNaLinha";
 import { EncerrarCombate } from "@/components/EncerrarCombate";
+import { useEventosDoCombate } from "@/hooks/useEventos";
 import { comCompanheiros, companheirosQueSaemJunto, ehDoJogador, linhaDeCompanheiro } from "@/lib/companheiros";
 import { horaDoCovil, recuperarAcoesLendarias, temCovil } from "@/lib/lendarias";
 
@@ -116,6 +117,7 @@ export function RastreadorCombate({
   cenaNaMesa?: Cena | null;
 }) {
   const { combate, personagens } = sala;
+  const avisos = useEventosDoCombate();
   // Sem internet o mapa não funciona: nem tenta mexer nos peões.
   const mapa = sala.semInternet ? null : cenaNaMesa;
 
@@ -316,6 +318,8 @@ export function RastreadorCombate({
   async function reiniciar() {
     const feito = await sala.definirCombate({ round: 1, turn: 0, order: [] });
     if (!feito) return;
+    // Os avisos programados eram deste combate (melhor esforço).
+    await avisos.limparTodos();
     sala.registrarLog("Combate reiniciado");
     sala.lembrarDesfazer({
       rotulo: "Combate reiniciado",
