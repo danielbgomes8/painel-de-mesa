@@ -307,3 +307,25 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
     mesa" → o jogador não vê nenhum → aviso avulso → reiniciar leva tudo; conferido que falha com `>` no lugar de `>=`) e iscas no
     `e2e/vazamento.e2e.ts` (conferido que falha se o aviso aparece pra todo mundo). **Não cobre:** ação automática ao disparar (pôr condição,
     chamar reforço), aviso por turno de um monstro, e desfazer a criação/apagamento dos avisos.
+
+- **Simulador de encontro** (09/10/2026, sem migration; `lib/simulador.ts`, 17 testes; tela `SimuladorDeEncontro.tsx`, em Mestre → Encontros →
+  "🎲 simular este encontro"). Luta o encontro preparado contra o grupo da sala **1000 vezes** (~12 ms por simulação) e mostra a dificuldade em
+  uma palavra (Tranquilo / Médio / Difícil / Mortal — os cortes em `dificuldade()` são combinados com a mesa, não do livro: perder todos ≥25% =
+  mortal; ≥5% ou alguém cair em ≥70% = difícil; alguém cair em ≥30% = médio), a chance de alguém cair, de cair o grupo inteiro, rodadas
+  típicas, PV gastos e a chance de cada um cair. **É um termômetro, não uma previsão — e a tela diz isso.** Não grava nada.
+  - **Calibrado contra o livro** (4 de nível 3, 28 PV, CA 16, ataque +5 1d8+3): 4 goblins = tranquilo; 1 ogro = tranquilo (8% de alguém cair);
+    2 ogros = difícil (7% de perder todos); 4 ogros = mortal. Bate com as faixas de XP do DMG.
+  - **O que a conta usa:** CA, PV de agora (com o temporário; "grupo descansado" usa o máximo; quem está a 0 fica de fora), bônus de iniciativa e os
+    ataques lidos do texto (`lerAtaquesRolaveis`, o mesmo do ataque rolado na iniciativa), com 20 natural = crítico e 1 natural = erro. Cada um age
+    uma vez por rodada; sem "N ataques:" escolhe o ataque de maior dano médio; o grupo mira no inimigo de menos PV, os monstros em alguém do grupo ao
+    acaso; quem chega a 0 PV sai (sem teste de morte nem cura). Companheiros (NPC com dono) lutam do lado do grupo. Ataque sem bônus ("Sopro: CD 13,
+    4d6 fogo") é tratado como salvaguarda: sempre causa dano, e metade em metade das vezes.
+  - **O que NÃO entra (a conta fica otimista pro grupo e subestima chefe):** magias, Ataque Extra, ações bônus, reações, terreno, vantagem, resistências,
+    condições; sopro/magia/ações lendárias do monstro só contam se escritos no campo de ataque. Quem não tem ataque legível causa 0 de dano e a tela lista o
+    nome (monstro do catálogo e jogador com ataque escrito como "Espada +5, 1d8+3"). Por isso 4 de nível 7 contra um dragão jovem dão "tranquilo": o
+    sopro dele não está no texto. Se um dia quiserem mais fidelidade, o caminho é ler ações especiais (CD + dano) do catálogo e as magias da ficha.
+  - Robô: `e2e/simulador.e2e.ts` (extremos de propósito: um rato contra grupo forte = tranquilo 100%; um dragão contra grupo fraco = mortal; quem está a 0
+    PV fica de fora; "PV cheio" traz Caio de volta; sem ataque avisa; nada é gravado).
+  - **Lição desta rodada:** o robô do GitHub falhou no `mapaIniciativa` depois dos eventos do combate porque o formulário novo reusava a classe
+    `.addcombatant` e o teste antigo escolhia `.addcombatant select` (agora há dois). Classe de formulário nova ganha nome próprio (`.evcampos`).
+    **Rode `npx playwright test` inteiro (48 testes, ~7 min, com o GitHub parado) antes de subir mudança de tela**, não só os testes novos.

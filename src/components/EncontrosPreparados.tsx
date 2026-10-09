@@ -22,6 +22,7 @@ import {
 import { CampoTexto } from "@/components/CampoTexto";
 import { BotaoRemover } from "@/components/BotaoRemover";
 import { EventosDoEncontro } from "@/components/EventosDoCombate";
+import { SimuladorDeEncontro } from "@/components/SimuladorDeEncontro";
 import { useEventosDoCombate } from "@/hooks/useEventos";
 import { eventosAoTirarGrupo, eventosParaOCombate, normalizarPreparados } from "@/lib/eventosCombate";
 
@@ -186,6 +187,7 @@ function CartaoEncontro({ encontro: e, sala }: { encontro: Encontro; sala: Sala 
         {adicionando ? aviso : ""}
       </p>
       <EventosDoEncontro encontro={{ ...e, eventos: normalizarPreparados(e.eventos) }} sala={sala} />
+      <SimuladorDeEncontro encontro={e} sala={sala} />
     </div>
   );
 }

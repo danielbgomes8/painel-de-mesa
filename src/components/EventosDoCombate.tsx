@@ -140,7 +140,7 @@ function FormEvento({
 
   return (
     <div className="evform">
-      <div className="addcombatant">
+      <div className="evcampos">
         <select aria-label="Quando o aviso aparece" value={tipo} onChange={(e) => setTipo(e.target.value as "rodada" | "pv")}>
           <option value="rodada">na rodada…</option>
           <option value="pv">quando o PV chegar a…</option>

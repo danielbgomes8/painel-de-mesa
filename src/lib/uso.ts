@@ -46,6 +46,7 @@ export const TELAS_DE_USO: Record<string, string> = {
   "acao:rolar-ataque": "Rolar ataque na iniciativa",
   "acao:salvaguarda-massa": "Salvaguarda em massa",
   "acao:evento-combate": "Aviso de evento do combate (Feito)",
+  "acao:simulador": "Simulador de encontro",
   "acao:recap": "Recap da sessão",
   "acao:subir-nivel": "Subir de nível",
   "acao:encerrar-combate": "Encerrar combate",

@@ -918,7 +918,8 @@ body:has(.desfazerbarra) .proximoturno {
   font-size: 13px;
   padding: 8px 2px;
 }
-.addcombatant {
+.addcombatant,
+.evcampos {
   display: flex;
   gap: 8px;
   margin-top: 12px;
@@ -926,7 +927,9 @@ body:has(.desfazerbarra) .proximoturno {
   align-items: center;
 }
 .addcombatant select,
-.addcombatant input {
+.addcombatant input,
+.evcampos select,
+.evcampos input {
   background: var(--surface2);
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -935,7 +938,8 @@ body:has(.desfazerbarra) .proximoturno {
   font-family: inherit;
   font-size: 13px;
 }
-.addcombatant input.num {
+.addcombatant input.num,
+.evcampos input.num {
   /* Cabe "iniciativa" e "desl. (m)" inteiros: a 84px o placeholder saía
      cortado ("iniciati") no celular. */
   width: 108px;
@@ -945,19 +949,22 @@ body:has(.desfazerbarra) .proximoturno {
   /* Campo de texto do formulário ocupa a linha toda: nome/ataque com
      placeholder longo ("ataque (ex.: Cimitarra +4, 1d6+2)") não cabem no
      tamanho padrão de um input a 375px. Os numéricos seguem lado a lado. */
-  .addcombatant input:not(.num):not([type="checkbox"]) {
+  .addcombatant input:not(.num):not([type="checkbox"]),
+  .evcampos input:not(.num):not([type="checkbox"]) {
     flex: 1 1 100%;
     min-width: 0;
   }
 }
 /* A caixinha ("estou surpreso") herdava o estilo de campo de texto e, a 375px,
    esticava pela linha toda, longe do rótulo. O rótulo inteiro é o alvo de toque. */
-.addcombatant label.inv-mag {
+.addcombatant label.inv-mag,
+.evcampos label.inv-mag {
   flex: 1 1 100%;
   min-height: 32px;
   gap: 8px;
 }
-.addcombatant input[type="checkbox"] {
+.addcombatant input[type="checkbox"],
+.evcampos input[type="checkbox"] {
   width: 18px;
   height: 18px;
   padding: 0;
@@ -5827,4 +5834,83 @@ input.fj-score:focus-visible {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed var(--line);
+}
+
+/* ---------- Simulador de encontro (Mestre → Encontros) ---------- */
+.simulador {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.simresultado {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.simveredito {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-left-width: 5px;
+  background: var(--surface2);
+  font-size: 14px;
+}
+.simveredito--tranquilo {
+  border-left-color: var(--ok);
+}
+.simveredito--medio {
+  border-left-color: var(--gold, var(--accent));
+}
+.simveredito--dificil {
+  border-left-color: var(--warn);
+}
+.simveredito--mortal {
+  border-left-color: var(--danger);
+}
+.simnumeros,
+.simbarras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.simnumeros li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.simnumeros li:last-child {
+  border-bottom: 0;
+}
+.simbarras li {
+  display: grid;
+  grid-template-columns: minmax(96px, 38%) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.simnome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.simbarra {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+.simbarra > span {
+  display: block;
+  height: 100%;
+  background: var(--danger);
 }
