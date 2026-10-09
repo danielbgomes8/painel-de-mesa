@@ -144,6 +144,8 @@ test("o que é segredo da mesa não aparece pro jogador nem no telão (e o Mestr
     eventos: [{ id: "iv", tipo: "rodada", rodada: 2, grupo: null, pct: null, texto: "ISCA_EVENTO_PREPARADO", publico: false }],
   });
   await inserir("combate_eventos", { room_code: SALA, tipo: "rodada", rodada: 1, slugs: [], texto: "ISCA_EVENTO_ATIVO", publico: false });
+  // Efeito com duração num inimigo oculto: o nome do efeito entregaria quem ele é.
+  await inserir("combate_efeitos", { room_code: SALA, nome: "ISCA_EFEITO_OCULTO", alvo_slug: "dragao-oculto", lancador_slug: "dragao-oculto", termina_rodada: 9 });
 
   // ---- O Mestre sobe um mapa, põe na mesa e dá dano no inimigo oculto (gera o log público) ----
   const mestre: string[] = [];
@@ -187,7 +189,7 @@ test("o que é segredo da mesa não aparece pro jogador nem no telão (e o Mestr
     await recolher(page, mestre);
   }
   const vistasPeloMestre = iscasEm(mestre);
-  for (const isca of ["ISCA_NPC_NOME", "ISCA_ESC_TITULO", "ISCA_ESC_SEGREDO", "ISCA_REV_SEGREDO", "ISCA_BIBLIOTECA", "ISCA_ENCONTRO", "ISCA_NOTAS_MESTRE", "ISCA_EVENTO_ATIVO"]) {
+  for (const isca of ["ISCA_NPC_NOME", "ISCA_ESC_TITULO", "ISCA_ESC_SEGREDO", "ISCA_REV_SEGREDO", "ISCA_BIBLIOTECA", "ISCA_ENCONTRO", "ISCA_NOTAS_MESTRE", "ISCA_EVENTO_ATIVO", "ISCA_EFEITO_OCULTO"]) {
     expect(vistasPeloMestre, `o Mestre deveria ver ${isca} (controle do teste)`).toContain(isca);
   }
 

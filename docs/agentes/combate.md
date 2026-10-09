@@ -300,8 +300,9 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   efeito de inimigo não revelado (o nome "Forma de Dragão" entregaria quem é); o log usa `nomeNoLog`. Encerrar e reiniciar o combate apagam tudo
   (`limparTodos`); a tabela fica FORA do backup. Sem a migration o app abre normal e o painel diz "falta rodar a 0035".
   - **Ainda não faz**: concentração não derruba o efeito sozinha; efeito em vários alvos de uma vez (é um por alvo); fora de combate (a
-    contagem em dias é `campanha_efeitos`, do tempo da campanha); não entra no desfazer; sem isca no `vazamento.e2e.ts` nem robô próprio —
-    **falta**, pois a tabela ainda não existia no banco real quando foi feito.
+    contagem em dias é `campanha_efeitos`, do tempo da campanha); não entra no desfazer.
+  - Robô: `e2e/efeitosDoCombate.e2e.ts` (criar na linha → acaba só no turno de quem lançou → contar à mesa → inimigo oculto segue "Um inimigo" no log →
+    reiniciar leva tudo) e a isca `ISCA_EFEITO_OCULTO` no `vazamento.e2e.ts`. Passaram contra o banco real em 09/10/2026.
 - **Eventos do combate** (09/10/2026, migration `0034_eventos_do_combate.sql`; regras puras em `lib/eventosCombate.ts`, 15 testes; hook
   `hooks/useEventos.ts`, que chega às telas por **contexto** (`EventosContext`, sem passar prop pelo `RastreadorCombate`); telas em
   `EventosDoCombate.tsx`). O Mestre programa avisos — "rodada 3: o teto desaba", "quando o Chefe chegar a 50% de PV: ele foge" — que aparecem
