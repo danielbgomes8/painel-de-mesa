@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import { EncontrosPreparados } from "@/components/EncontrosPreparados";
 import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { NotasDoMestre } from "@/components/NotasDoMestre";
 import { BackupSala } from "@/components/BackupSala";
+import { UsoDaMesa } from "@/components/UsoDaMesa";
+import { registrarUso } from "@/lib/registrarUso";
 
 type Secao = "encontros" | "npcs" | "notas" | "sala";
 
@@ -24,6 +26,9 @@ export function AbaMestre({
   aoAbrirTelao: () => void;
 }) {
   const [secao, setSecao] = useState<Secao>("encontros");
+  useEffect(() => {
+    registrarUso(`mestre:${secao}`);
+  }, [secao]);
 
   const secoes: { id: Secao; rotulo: string; qtd?: number }[] = [
     { id: "encontros", rotulo: "Encontros", qtd: sala.encontros.length },
@@ -63,6 +68,7 @@ export function AbaMestre({
               📺 abrir o modo telão
             </button>
           </div>
+          <UsoDaMesa codigo={codigo} />
           <BackupSala sala={sala} codigo={codigo} rotulo={rotulo} />
         </>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Cenas } from "@/hooks/useCenas";
 import type { Sala } from "@/hooks/useSala";
 import { useNevoa } from "@/hooks/useNevoa";
@@ -28,6 +28,7 @@ import { CenaMapa, type CenaMapaApi, type Ferramenta } from "@/components/CenaMa
 import { IconeMapa } from "@/components/IconesMapa";
 import { LegendaIconesPeao } from "@/components/LegendaIconesPeao";
 import { PalcoDoMapa, type FerramentaDoPalco } from "@/components/PalcoDoMapa";
+import { registrarUso } from "@/lib/registrarUso";
 import {
   PainelCena,
   PainelDesenhos,
@@ -104,6 +105,9 @@ export function VisorDaMesa({
   const mapaRef = useRef<CenaMapaApi>(null);
   // O que o toque faz no mapa: mexer, medir (régua ou área de magia) ou pingar.
   const [uso, setUso] = useState<"mover" | "medir" | "ping">("mover");
+  useEffect(() => {
+    registrarUso(`mapa:${uso}`);
+  }, [uso]);
   const [painelAberto, setPainelAberto] = useState(true);
   const [medirQue, setMedirQue] = useState<"regua" | "area">("regua");
   const [juntos, setJuntos] = useState(true);
@@ -522,6 +526,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     faseAtual === "jogar" ? ["mover", "nevoa", "medir", "desenhar", "peoes"] : ["mover", "nevoa", "paredes", "peoes", "desenhar", "grade"];
   const idsVisiveis = idsDaFase.filter((id) => !(id === "desenhar" && desenhos.indisponivel) && !(id === "paredes" && muros.indisponivel));
   const usoAtivo: Uso = uso === "ping" || uso === "mesa" || (idsVisiveis as Uso[]).includes(uso) ? uso : "mover";
+  useEffect(() => {
+    registrarUso(`mapa:${usoAtivo}`);
+  }, [usoAtivo]);
 
   // O que o toque faz no mapa (as ferramentas internas do CenaMapa) a partir do ícone escolhido.
   const formaDaNevoa: FormaNevoa = formaNevoa === "quadradinhos" && !podeQuadradinhos ? "pincel" : formaNevoa;

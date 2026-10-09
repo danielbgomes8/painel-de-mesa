@@ -5639,3 +5639,37 @@ input.fj-score:focus-visible {
 .qd-filtros .chip {
   flex: none;
 }
+
+/* ---------- O que a mesa usa (Mestre → Sala) ---------- */
+.usolista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.usolista li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.usolista li:last-child {
+  border-bottom: 0;
+}
+.usonome {
+  font-size: 14px;
+}
+.usonum {
+  font-family: var(--f-mono);
+  font-size: 14px;
+  color: var(--accent);
+  text-align: right;
+}
+.usodetalhe {
+  grid-column: 1 / -1;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+}

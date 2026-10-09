@@ -4,6 +4,7 @@ import { useState } from "react";
 import { lerHistoricoDoLog } from "@/hooks/lerHistoricoDoLog";
 import type { CartaoVisto } from "@/lib/quadro";
 import { detectarSessoes, resumirSessao, textoDoRecap, tituloDoRecap, type SessaoDetectada } from "@/lib/recap";
+import { registrarUso } from "@/lib/registrarUso";
 
 /** Quantas sessões a lista oferece (a mais recente primeiro). */
 const SESSOES_NA_LISTA = 6;
@@ -50,6 +51,7 @@ export function RecapDaSessao({
   }
 
   function gerar(s: SessaoDetectada) {
+    registrarUso("acao:recap");
     const de = Date.parse(s.inicio);
     const ate = Date.parse(s.fim) + FOLGA_DOS_CARTOES_MS;
     const mostrados = cartoes

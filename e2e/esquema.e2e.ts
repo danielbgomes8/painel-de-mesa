@@ -226,6 +226,8 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
     tabela: "erros",
     colunas: ["id", "created_at", "room_code", "quem", "onde", "mensagem", "detalhe", "endereco", "navegador", "versao"],
   },
+  // O que a mesa usa (lib/registrarUso.ts monta a linha à mão).
+  { tabela: "uso", colunas: ["id", "created_at", "room_code", "papel", "tela", "abertura"] },
 ];
 
 test("toda coluna que o código espera existe no banco", async () => {

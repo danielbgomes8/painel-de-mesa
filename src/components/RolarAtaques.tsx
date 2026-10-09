@@ -10,6 +10,7 @@ import {
   type ModoRolagem,
   type ResultadoAtaque,
 } from "@/lib/regras";
+import { registrarUso } from "@/lib/registrarUso";
 
 const MODOS: ModoRolagem[] = ["normal", "vantagem", "desvantagem"];
 
@@ -27,6 +28,7 @@ export function RolarAtaques({ texto }: { texto: string }) {
   if (ataques.length === 0) return null;
 
   function rolar(ataque: AtaqueRolavel) {
+    registrarUso("acao:rolar-ataque");
     // "2x Dilacerar" rola os dois de uma vez.
     setResultados(Array.from({ length: ataque.vezes }, () => ({ ataque, r: resolverAtaque(ataque, modo, rolarDado) })));
   }

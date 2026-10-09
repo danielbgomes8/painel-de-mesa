@@ -597,7 +597,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **GitHub**: [danielbgomes8/painel-de-mesa](https://github.com/danielbgomes8/painel-de-mesa)
   (privado), conectado ao Vercel — push na `main` já republica sozinho.
 - **Supabase**: projeto próprio na org "Daniel Lima projetos" (região São
-  Paulo), separado do gb-reserva. Migrations `0001` a `0032` (a 0029 não existe; a 0020 é a trava de apagar sala) e o `seed.sql`
+  Paulo), separado do gb-reserva. Migrations `0001` a `0033` (a 0029 não existe; a 0020 é a trava de apagar sala) e o `seed.sql`
   já rodadas — o banco tem `rooms` mais treze filhas (as dez de antes, `cenas`,
   `cena_nevoa` e `cena_pecas`), todas com `on delete cascade` ligado em `rooms`,
   fora a `erros`, e o bucket de imagens `mapas`. (A 0020, que tira do `anon` o
@@ -1348,6 +1348,28 @@ Decisões que não estão no código à primeira vista:
 - Medido: a primeira abertura do app cresceu ~31 KB sem compactar com o código
   do mapa (estático em `Painel`). Se pesar, dá pra carregar `PainelMapa` sob
   demanda como o catálogo de monstros (`import()` dinâmico).
+
+## O que a mesa usa e teste de vazamento (09/10/2026)
+
+- **Contador de uso** (migration `0033_uso.sql`; `lib/uso.ts` regras puras, 11 testes; `lib/registrarUso.ts` quem manda;
+  `UsoDaMesa.tsx` a leitura, em Mestre → Sala → "📊 O que a mesa usa"). Cada aparelho marca UMA vez por abertura do app cada tela
+  ou ação que usou (`registrarUso("aba:combate")`): abas, partes da Campanha, seções do Mestre, ferramentas do mapa, telão e cinco
+  ações (desfazer, rolar ataque, recap, subir de nível, encerrar combate). Guarda só sala, papel (mestre/jogador/telão), nome da
+  tela e um sorteio por abertura — **nada de nome de pessoa nem conteúdo**. Mesmo molde do relato de erro: só no build de produção,
+  nunca atrapalha, sem internet nem tenta, tabela ausente (`PGRST205`/`42P01`) para de tentar, sem ligação com `rooms`, fora do
+  backup (`TABELAS_FORA_DO_BACKUP`). O resumo olha 30 dias, conta aberturas distintas por tela e lista as telas do catálogo que
+  ninguém abriu. **Tela ou ação nova: acrescente em `TELAS_DE_USO` (rótulo) e chame `registrarUso`**; sem o rótulo ela aparece
+  com o nome cru, e sem estar no catálogo nunca aparece como "ninguém abriu". Para limpar dado de teste: `delete from uso where room_code = '...'`.
+- **Teste de vazamento** (`e2e/vazamento.e2e.ts`): semeia uma ISCA (`ISCA_<CAMPO>`) em cada lugar secreto — NPC oculto (nome, tipo,
+  notas, ataque, PV), cartão escondido/silhueta/pessoal do Quadro, segredo de cartão revelado, ligação e nota ligadas a cartão
+  escondido, sessão do diário que cita cartão escondido, notas do Mestre, biblioteca, encontro preparado, nota 🔒 do mapa, peão
+  oculto — e passeia como jogador e como telão por todas as telas (abrindo cada cartão, cada gaveta, cada linha da iniciativa),
+  conferindo HTML inteiro (atributos incluídos), valor de campos, texto desenhado nos canvas e o PV do inimigo. Controles provam que
+  o robô enxerga: o Mestre tem de ver as iscas e o jogador o que é público. **Conferido plantando 5 defeitos** (cartão escondido
+  visível, nome real no log, peão oculto desenhado, nota 🔒 visível, e o nome do inimigo) — os 5 quebram o teste. Armadilhas
+  achadas: (1) com a névoa ligada ela esconde os peões sozinha e mascara o `oculto` (o teste desliga a névoa da cena);
+  (2) `pecaVisivel` em `lib/pecas.ts` só é usada nos testes — o filtro de verdade do mapa está em `desenharCena.ts`.
+  **Tela nova com dado secreto: semeie uma isca nova aqui** em vez de escrever outro teste.
 
 ## Palco do mapa: layout novo (08/10/2026, sem migration)
 

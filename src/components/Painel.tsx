@@ -22,6 +22,7 @@ import { COR_PING_MESTRE, corDoJogador } from "@/lib/ping";
 import type { QuemPinga } from "@/hooks/usePing";
 import { horaCurta } from "@/lib/offline";
 import { definirContextoDoErro, relatarErro } from "@/lib/relatarErro";
+import { definirContextoDeUso, registrarUso } from "@/lib/registrarUso";
 import { baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
 import { RastreadorCombate } from "@/components/RastreadorCombate";
@@ -214,6 +215,15 @@ function PainelSala({ codigo }: { codigo: string }) {
   useEffect(() => {
     definirContextoDoErro(codigo, quemUsa);
   }, [codigo, quemUsa]);
+  // O que a mesa usa (lib/registrarUso.ts): só o papel, nunca o nome.
+  const papelDeUso = telao ? "telao" : identidade?.tipo === "mestre" ? "mestre" : identidade?.tipo === "jogador" ? "jogador" : null;
+  useEffect(() => {
+    definirContextoDeUso(codigo, papelDeUso);
+    if (papelDeUso === "telao") registrarUso("telao");
+  }, [codigo, papelDeUso]);
+  useEffect(() => {
+    if (papelDeUso && papelDeUso !== "telao") registrarUso(`aba:${abaEfetiva === "diario" ? "campanha" : abaEfetiva}`);
+  }, [papelDeUso, abaEfetiva]);
 
   // A sala vai pro endereço mesmo quando veio da "última sala" (ver
   // escolherSala): recarregar fica na mesma, e o link copiado dali leva

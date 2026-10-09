@@ -15,6 +15,7 @@ import {
   xpDoInimigo,
 } from "@/lib/fimDoCombate";
 import { mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
+import { registrarUso } from "@/lib/registrarUso";
 
 /** Encerrar o combate (só o Mestre): mostra o resumo, sugere o XP dos inimigos derrotados (o Mestre confirma
  *  quem conta e pode digitar o XP de quem o catálogo não conhece), divide entre os jogadores que lutaram e
@@ -47,6 +48,7 @@ export function EncerrarCombate({ sala, onFechar }: { sala: Sala; onFechar: () =
   const partilha = partilharXp(marcados.map((d) => lerXpDigitado(xpDe(d.slug, d.name))), destinatarios.length);
 
   async function encerrar() {
+    registrarUso("acao:encerrar-combate");
     if (ocupado) return;
     setOcupado(true);
     setAviso(null);

@@ -14,6 +14,7 @@ import {
   type PedidoSubida,
 } from "@/lib/subirDeNivel";
 import type { Atributo, Personagem } from "@/lib/tipos";
+import { registrarUso } from "@/lib/registrarUso";
 
 const ATRIBUTOS: { chave: Atributo; nome: string }[] = [
   { chave: "for", nome: "Força" },
@@ -76,6 +77,7 @@ export function SubirDeNivel({
   const previa = subirDeNivel(p, pedido, habilidadesNovas);
 
   async function confirmar() {
+    registrarUso("acao:subir-nivel");
     if (!previa.ok || ocupado) return;
     setOcupado(true);
     setErro(null);

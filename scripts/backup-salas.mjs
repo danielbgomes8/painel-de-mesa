@@ -27,8 +27,9 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Tabelas das migrations que NÃO entram na cópia: não são dado da campanha.
- *  `erros` (0017) é o relato do que deu errado nos aparelhos. */
-export const TABELAS_FORA_DO_BACKUP = ["erros"];
+ *  `erros` (0017) é o relato do que deu errado nos aparelhos; `uso` (0033), o
+ *  que a mesa abre (telas e ações, sem conteúdo). */
+export const TABELAS_FORA_DO_BACKUP = ["erros", "uso"];
 
 /** Todas as tabelas penduradas em `rooms` (a própria `rooms` vai à parte). */
 export const TABELAS_COM_SALA = [

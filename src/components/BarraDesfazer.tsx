@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
+import { registrarUso } from "@/lib/registrarUso";
 
 /**
  * Desfazer a última ação deste aparelho (ver lib/desfazer.ts). Fica presa no
@@ -25,6 +26,7 @@ export function BarraDesfazer({ sala }: { sala: Sala }) {
 
   async function desfazer() {
     if (ocupado) return;
+    registrarUso("acao:desfazer");
     setOcupado(true);
     const r = await sala.desfazer();
     setOcupado(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Quadro } from "@/hooks/useQuadro";
 import type { Bau } from "@/hooks/useBau";
@@ -11,6 +11,7 @@ import { QuadroCampanha } from "@/components/QuadroCampanha";
 import { BauDoGrupo } from "@/components/BauDoGrupo";
 import { TempoDaCampanha } from "@/components/TempoDaCampanha";
 import { AUTOR_MESTRE, cartoesVisiveis } from "@/lib/quadro";
+import { registrarUso } from "@/lib/registrarUso";
 
 type Parte = "quadro" | "bau" | "tempo" | "sessoes";
 
@@ -34,6 +35,9 @@ export function AbaCampanha({
   const [parte, setParte] = useState<Parte>("quadro");
   // O cartão aberto mora aqui: a lista de sessões também abre cartões.
   const [aberto, setAberto] = useState<string | null>(null);
+  useEffect(() => {
+    registrarUso(`campanha:${parte}`);
+  }, [parte]);
   const vistos = useMemo(() => cartoesVisiveis(quadro.cartoes, identidade), [quadro.cartoes, identidade]);
   const nomeDoAutor = (autor: string) =>
     autor === AUTOR_MESTRE ? "Mestre" : (sala.personagens.find((p) => p.slug === autor)?.name ?? "Alguém");

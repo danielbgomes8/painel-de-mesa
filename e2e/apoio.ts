@@ -50,7 +50,7 @@ async function limparImagens(): Promise<void> {
 export async function limparSala(): Promise<void> {
   if (!bancoConfigurado) return;
   await limparImagens();
-  for (const tabela of ["campanha_efeitos", "campanha_tempo", "bau_itens", "quadro_notas", "quadro_ligacoes", "quadro_cartoes", "cena_marcas", "cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates"]) {
+  for (const tabela of ["campanha_efeitos", "campanha_tempo", "bau_itens", "quadro_notas", "quadro_ligacoes", "quadro_cartoes", "cena_marcas", "cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates", "uso"]) {
     // Tabela que ainda não existe (migration por rodar) não é erro aqui.
     await rest(`${tabela}?room_code=eq.${SALA}`, { method: "DELETE" });
   }
