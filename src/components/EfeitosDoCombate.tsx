@@ -76,7 +76,7 @@ export function AvisosDeEfeitos({ sala, meuSlug }: { sala: Sala; meuSlug: string
         const alvo = sala.personagens.find((p) => p.slug === e.alvo_slug);
         return (
           <div key={e.id} className="evaviso">
-            <p className="evgatilho">⏳ Efeito acabou{alvo ? ` · ${meuSlug === null ? nomeNoLog(alvo) : alvo.name}` : ""}</p>
+            <p className="evgatilho">⏳ Efeito acabou{alvo ? ` · ${meuSlug === null ? alvo.name : nomeNoLog(alvo)}` : ""}</p>
             <p className="evtexto">{e.nome}</p>
             <button type="button" className="btn primary" disabled={ocupado === e.id} onClick={() => void acabou(e.id, e.nome, e.alvo_slug)}>
               Acabou · contar à mesa
@@ -107,7 +107,7 @@ export function EfeitosNaLinha({ sala, personagem: p, souMestre }: { sala: Sala;
 }
 
 /** No painel da linha: efeitos deste personagem (com ✕ pra tirar à mão) e o formulário pra criar um. */
-export function EfeitosDoPersonagem({ sala, personagem: p }: { sala: Sala; personagem: Personagem }) {
+export function EfeitosDoPersonagem({ sala, personagem: p, souMestre }: { sala: Sala; personagem: Personagem; souMestre: boolean }) {
   const { efeitos, indisponivel, criar, remover } = useEfeitosDoCombate();
   const situacao = useSituacao(sala);
   const [aberto, setAberto] = useState(false);
@@ -120,7 +120,7 @@ export function EfeitosDoPersonagem({ sala, personagem: p }: { sala: Sala; perso
   const meus = efeitos.filter((e) => e.alvo_slug === p.slug);
   const quemLanca = situacao.order.map((o) => {
     const q = sala.personagens.find((x) => x.slug === o.slug);
-    return { slug: o.slug, nome: q ? nomeNoLog(q) : o.slug };
+    return { slug: o.slug, nome: q ? (souMestre ? q.name : nomeNoLog(q)) : o.slug };
   });
 
   async function adicionar() {

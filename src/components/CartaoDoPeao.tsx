@@ -123,6 +123,7 @@ export function CartaoDoPeao({
         sala={sala}
         personagem={p}
         naVez={vez}
+        souMestre={souMestre}
         focarAoAbrir={false}
         onAplicar={aplicar}
         onFechar={aoFechar}

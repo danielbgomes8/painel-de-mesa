@@ -584,6 +584,7 @@ export function RastreadorCombate({
                   sala={sala}
                   personagem={pv}
                   naVez={i === combate.turn}
+                  souMestre={souMestre}
                   onAplicar={(delta) => aplicarAjuste(pv, delta)}
                   onFechar={() => setAjustando(null)}
                 />
@@ -744,6 +745,7 @@ export function AcoesNaLinha({
   onAplicar,
   onFechar,
   focarAoAbrir = true,
+  souMestre,
 }: {
   sala: Sala;
   personagem: Personagem;
@@ -754,6 +756,8 @@ export function AcoesNaLinha({
   /** Põe o cursor no campo de dano ao abrir. No mapa, não: o teclado do
    *  celular subiria por cima do mapa a cada toque num peão. */
   focarAoAbrir?: boolean;
+  /** Pro nome do inimigo oculto: o Mestre vê o nome real, os outros só "Um inimigo". */
+  souMestre: boolean;
 }) {
   // Na vez de quem tem ataque pra rolar, abrir a linha é pra atacar, não pra
   // tomar dano: sem o cursor no campo de PV, o teclado do celular não sobe
@@ -838,7 +842,7 @@ export function AcoesNaLinha({
         <ChipsCondicao sala={sala} personagem={p} editavel />
         <PrazosCondicao sala={sala} personagem={p} />
       </div>
-      <EfeitosDoPersonagem sala={sala} personagem={p} />
+      <EfeitosDoPersonagem sala={sala} personagem={p} souMestre={souMestre} />
     </div>
   );
 }
