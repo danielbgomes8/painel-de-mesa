@@ -8,6 +8,7 @@ import { aplicarDescansoLongo, condicaoComLog, curaComLog, danoComLog } from "@/
 import type { Tempo } from "@/hooks/useTempo";
 import { XP_MAXIMO, dividirXp, formatarXp, linhaDeXp, normalizarXp } from "@/lib/experiencia";
 import { efeitosQueVenceram, linhasDoAvanco, plural } from "@/lib/tempoCampanha";
+import { SalvaguardaEmMassa } from "@/components/SalvaguardaEmMassa";
 import { contarAlvos, mudancaDe, textoDesfeito, type MudancaPersonagem } from "@/lib/desfazer";
 
 /** Área de efeito: seleciona vários personagens/NPCs e aplica dano, cura ou
@@ -241,6 +242,12 @@ export function AcoesEmMassa({ sala, tempo }: { sala: Sala; tempo: Tempo }) {
           {aviso}
         </p>
       )}
+
+      <SalvaguardaEmMassa
+        sala={sala}
+        selecionados={selecionados}
+        aoSelecionar={(ids) => setAlvos(Object.fromEntries(ids.map((id) => [id, true])))}
+      />
 
       <p className="empty-note">
         {n === 0

@@ -44,6 +44,7 @@ export const TELAS_DE_USO: Record<string, string> = {
   "mapa:mesa": "Mapa → A mesa (levar a visão)",
   "acao:desfazer": "Desfazer",
   "acao:rolar-ataque": "Rolar ataque na iniciativa",
+  "acao:salvaguarda-massa": "Salvaguarda em massa",
   "acao:recap": "Recap da sessão",
   "acao:subir-nivel": "Subir de nível",
   "acao:encerrar-combate": "Encerrar combate",

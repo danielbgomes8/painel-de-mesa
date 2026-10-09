@@ -5673,3 +5673,86 @@ input.fj-score:focus-visible {
   font-size: 10.5px;
   color: var(--muted);
 }
+
+/* ---------- Salvaguarda em massa (Ações em massa) ---------- */
+.salvaguarda {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.masstools input.salvdano {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.salvresultado {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.salvlista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.salvlista li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+.salvlista li:last-child {
+  border-bottom: 0;
+}
+.salvnome {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.salvconta {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.salvbotao {
+  min-height: 36px;
+  touch-action: manipulation;
+}
+.salvbotao.passou {
+  border-color: var(--ok, #4caf7a);
+}
+.salvbotao.falhou {
+  border-color: var(--danger, #e0626b);
+}
+.salvlista input.num {
+  width: 64px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  padding: 8px 8px;
+  min-height: 36px;
+  font-size: 13px;
+  font-family: var(--f-mono);
+}
+@media (max-width: 520px) {
+  .salvlista li {
+    grid-template-columns: 1fr auto auto;
+    row-gap: 2px;
+    padding: 6px 0;
+  }
+  .salvnome {
+    grid-column: 1 / -1;
+  }
+  .salvconta {
+    grid-column: 1;
+  }
+}

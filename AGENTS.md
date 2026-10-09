@@ -1371,6 +1371,21 @@ Decisões que não estão no código à primeira vista:
   (2) `pecaVisivel` em `lib/pecas.ts` só é usada nos testes — o filtro de verdade do mapa está em `desenharCena.ts`.
   **Tela nova com dado secreto: semeie uma isca nova aqui** em vez de escrever outro teste.
 
+## Salvaguarda em massa (09/10/2026, sem migration)
+
+Em Combate → Ações em massa (só o Mestre): escolhe os alvos, o atributo, a CD, o dano ("8d6 fogo", "2d8+4", "12" ou vazio = sem dano)
+e se quem passa leva metade, nada ou tudo. **Rolar** tira um d20 por alvo (bônus = o `save_*` do cartão, que manda; NPC sem ficha de
+atributos fica com 0 e o Mestre corrige) e rola o dano **uma vez só**, igual pra todos (`lib/salvaguarda.ts`, 12 testes; tela em
+`SalvaguardaEmMassa.tsx`). Regras 2024: passa quem chega na CD; **20 e 1 naturais não passam nem falham sozinhos** (isso é só do teste
+de morte); metade arredonda pra baixo (`metadeDoDano`). O Mestre vê uma linha por alvo — "🎲 11 +5 = 16", passou/falhou (toque troca e
+recalcula o dano) e o dano editável (resistência, imunidade e dado rolado na mesa são texto livre na ficha, que o app não lê) — e só
+então "Aplicar o dano": passa por `danoComLog` (concentração, PV temporário, log anti-spoiler) numa escrita só e entra no ↩ Desfazer.
+**A linha pública do log só tem a contagem** ("🎲 Salvaguarda de Destreza (CD 15): 1 passou, 1 falhou"), sem nome: NPC oculto continua
+"Um inimigo" nas linhas de dano. "Selecionar quem falhou" deixa só eles marcados, pra usar "Adicionar condição" (Contido, Atordoado...).
+Efeito sem dano tem "Registrar no log". Robô: `e2e/salvaguardaEmMassa.e2e.ts` (fixa `Math.random` **depois** de abrir o app: fixar antes
+quebra a abertura; conferido que falha se a metade vira dano cheio). **Não cobre:** vantagem/desvantagem por alvo, condição aplicada
+direto a quem falhou, cobertura/Evasão.
+
 ## Palco do mapa: layout novo (08/10/2026, sem migration)
 
 O Daniel achou o painel do mapa complexo (9 ferramentas numa fileira, 5 seções recolhíveis, tudo com o mesmo peso). O layout foi
