@@ -12,7 +12,7 @@
 # Isso não esconde alerta de segurança — o `ignore` só vale pras
 # atualizações de rotina.
 #
-# Pra aplicar um pedido do robô: ver AGENTS.md ("Robô de atualizações") —
+# Pra aplicar um pedido do robô: ver docs/agentes/infra.md ("Robô de atualizações") —
 # o commit que vai pro ar precisa ter o Daniel como autor, senão o Vercel
 # bloqueia o deploy.
 

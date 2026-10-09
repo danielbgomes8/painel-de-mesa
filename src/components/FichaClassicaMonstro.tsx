@@ -60,7 +60,7 @@ export function dadosDoMonstro(m: MonstroCompleto, nd: string): DadosFichaMonstr
 /** A ficha de monstro no desenho clássico do livro (nome, tipo, CA/PV/
  *  deslocamento, os seis atributos, perícias/sentidos/idiomas/ND, ataques),
  *  na paleta do app. O texto corrido das ações não existe aqui (ver
- *  AGENTS.md): `ataque` e `notes` são o resumo. `onCopiar` (só no catálogo)
+ *  docs/agentes/monstros.md): `ataque` e `notes` são o resumo. `onCopiar` (só no catálogo)
  *  liga o botão de copiar; `embutida` tira a moldura, pra ficha morar dentro
  *  de outro cartão (a biblioteca do Mestre). */
 export function FichaClassicaMonstro({

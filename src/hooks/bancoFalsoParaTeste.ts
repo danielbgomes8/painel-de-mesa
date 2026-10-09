@@ -14,7 +14,7 @@
  *   aviso de tempo real chegar (`avisar: false` = o aviso ainda não chegou);
  * - `semRede = true`: todo pedido falha com o MESMO erro que o supabase-js dá
  *   quando a internet cai (`{ message: "TypeError: Failed to fetch", code: "" }`,
- *   conferido no AGENTS.md) — é ele que o `ehFalhaDeRede` reconhece.
+ *   conferido em docs/agentes/infra.md) — é ele que o `ehFalhaDeRede` reconhece.
  */
 
 type Linha = Record<string, unknown>;

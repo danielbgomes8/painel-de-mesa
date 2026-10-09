@@ -37,8 +37,8 @@ function fetchComPrazo(entrada: RequestInfo | URL, init: RequestInit = {}): Prom
       : (init.signal ?? prazo ?? undefined);
   // `fetch` resolvido a cada chamada (a biblioteca guardaria o da hora em que
   // o cliente nasce): é o que deixa simular queda de internet no teste
-  // manual trocando `window.fetch` no console — ver "Sem internet" no
-  // AGENTS.md.
+  // manual trocando `window.fetch` no console — ver "Sem internet" em
+  // docs/agentes/infra.md.
   return fetch(entrada, { ...init, signal: sinal });
 }
 

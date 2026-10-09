@@ -80,7 +80,7 @@ function ehPonto(v: unknown): v is Ponto {
 }
 
 // ── Validação do que vem do banco ─────────────────────────────────────────
-// Ficha estragada já derrubou o app inteiro uma vez (AGENTS.md): linha de mapa
+// Ficha estragada já derrubou o app inteiro uma vez (docs/agentes/infra.md): linha de mapa
 // com formato torto vira "ignorar", nunca um erro na tela.
 
 function regiaoValida(v: unknown): Regiao | null {
