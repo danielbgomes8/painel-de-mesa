@@ -148,7 +148,7 @@ test("quadro: foto, revelação em três estados, ligação, anotação, sessão
   await page.locator(".qd-cartao", { hasText: "Barão Vael" }).click();
   await page.getByRole("button", { name: "Suspeitos", exact: true }).click();
   await page.getByRole("button", { name: "Fechar o cartão" }).click();
-  await page.getByRole("button", { name: "☰ Colunas" }).click();
+  await page.getByRole("button", { name: "Colunas", exact: true }).click();
   await expect(page.locator('[data-coluna="Suspeitos"] .qd-cartao')).toContainText("Barão Vael");
   await expect.poll(async () => (await cartoesDoBanco())[0].coluna).toBe("Suspeitos");
 

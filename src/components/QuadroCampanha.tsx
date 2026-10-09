@@ -139,15 +139,15 @@ export function QuadroCampanha({
   return (
     <div className="qd">
       <div className="qd-topo">
-        <div className="qd-vistas" role="group" aria-label="Jeito de ver os cartões">
-          <button type="button" className="chip" aria-pressed={vista === "galeria"} onClick={() => mudarVista("galeria")}>
-            ▦ Galeria
+        <div className="qd-vistas qd-vistas-icones" role="group" aria-label="Jeito de ver os cartões">
+          <button type="button" aria-label="Galeria" title="Galeria" aria-pressed={vista === "galeria"} onClick={() => mudarVista("galeria")}>
+            ▦
           </button>
-          <button type="button" className="chip" aria-pressed={vista === "colunas"} onClick={() => mudarVista("colunas")}>
-            ☰ Colunas
+          <button type="button" aria-label="Colunas" title="Colunas" aria-pressed={vista === "colunas"} onClick={() => mudarVista("colunas")}>
+            ☰
           </button>
-          <button type="button" className="chip" aria-pressed={vista === "mapa"} onClick={() => mudarVista("mapa")}>
-            🕸 Mapa
+          <button type="button" aria-label="Mapa de ligações" title="Mapa de ligações" aria-pressed={vista === "mapa"} onClick={() => mudarVista("mapa")}>
+            🕸
           </button>
         </div>
         {quem && (
@@ -178,11 +178,11 @@ export function QuadroCampanha({
       {tiposPresentes.size > 1 && (
         <div className="qd-filtros" role="group" aria-label="Filtrar por tipo">
           <button type="button" className="chip" aria-pressed={tipoAtivo === null} onClick={() => setTipo(null)}>
-            Todos
+            Todos · {visiveis.length}
           </button>
           {TIPOS_DE_CARTAO.filter((t) => tiposPresentes.has(t.id)).map((t) => (
             <button key={t.id} type="button" className="chip" aria-pressed={tipoAtivo === t.id} onClick={() => setTipo(t.id)}>
-              {t.emoji} {t.rotulo}
+              {t.emoji} {t.rotulo} · {visiveis.filter((v) => v.cartao.tipo === t.id).length}
             </button>
           ))}
         </div>

@@ -5580,3 +5580,62 @@ input.fj-score:focus-visible {
 .gavetacartao > .combat > .combat-head {
   display: none;
 }
+
+/* ---------- Campanha: seletor de partes, vistas em ícone e tira de tipos ---------- */
+.segmentos-campanha {
+  grid-template-columns: repeat(4, 1fr);
+}
+.segmentos-campanha button {
+  flex-direction: row;
+  justify-content: center;
+  padding: 8px 4px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.segmentos button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.qd-vistas-icones {
+  flex-wrap: nowrap;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.qd-vistas-icones button {
+  width: 44px;
+  height: 40px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.qd-vistas-icones button:last-child {
+  border-right: 0;
+}
+.qd-vistas-icones button[aria-pressed="true"] {
+  background: var(--surface2);
+  color: var(--accent);
+}
+.qd-vistas-icones button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* Uma linha só que rola de lado, em vez de quebrar em várias. */
+.qd-filtros {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.qd-filtros::-webkit-scrollbar {
+  display: none;
+}
+.qd-filtros .chip {
+  flex: none;
+}

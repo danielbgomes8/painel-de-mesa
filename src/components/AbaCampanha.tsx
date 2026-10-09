@@ -39,22 +39,19 @@ export function AbaCampanha({
     autor === AUTOR_MESTRE ? "Mestre" : (sala.personagens.find((p) => p.slug === autor)?.name ?? "Alguém");
   return (
     <div className="combat">
-      <div className="combat-head">
-        <h2>Campanha</h2>
-        <div className="qd-vistas" role="group" aria-label="Parte da campanha">
-          <button type="button" className="chip" aria-pressed={parte === "quadro"} onClick={() => setParte("quadro")}>
-            🗂 Quadro
-          </button>
-          <button type="button" className="chip" aria-pressed={parte === "bau"} onClick={() => setParte("bau")}>
-            🎒 Baú
-          </button>
-          <button type="button" className="chip" aria-pressed={parte === "tempo"} onClick={() => setParte("tempo")}>
-            🗓 {tempo.tempo ? `Dia ${tempo.tempo.dia}` : "Tempo"}
-          </button>
-          <button type="button" className="chip" aria-pressed={parte === "sessoes"} onClick={() => setParte("sessoes")}>
-            📖 Sessões
-          </button>
-        </div>
+      <div className="segmentos segmentos-campanha" role="group" aria-label="Parte da campanha">
+        <button type="button" aria-pressed={parte === "quadro"} onClick={() => setParte("quadro")}>
+          🗂 Quadro
+        </button>
+        <button type="button" aria-pressed={parte === "bau"} onClick={() => setParte("bau")}>
+          🎒 Baú
+        </button>
+        <button type="button" aria-pressed={parte === "tempo"} onClick={() => setParte("tempo")}>
+          🗓 {tempo.tempo ? `Dia ${tempo.tempo.dia}` : "Tempo"}
+        </button>
+        <button type="button" aria-pressed={parte === "sessoes"} onClick={() => setParte("sessoes")}>
+          📖 Sessões
+        </button>
       </div>
       {parte === "tempo" ? (
         <TempoDaCampanha tempo={tempo} sala={sala} souMestre={identidade?.tipo === "mestre"} />
