@@ -30,8 +30,9 @@ import { fileURLToPath } from "node:url";
  *  `erros` (0017) é o relato do que deu errado nos aparelhos; `uso` (0033), o
  *  que a mesa abre (telas e ações, sem conteúdo); `combate_eventos` (0034), os
  *  avisos do combate de agora (estado de um combate; os preparados vivem em
- *  `encontros.eventos` e vão no backup com o encontro). */
-export const TABELAS_FORA_DO_BACKUP = ["erros", "uso", "combate_eventos"];
+ *  `encontros.eventos` e vão no backup com o encontro); `combate_efeitos` (0035),
+ *  os efeitos com duração do combate de agora. */
+export const TABELAS_FORA_DO_BACKUP = ["erros", "uso", "combate_eventos", "combate_efeitos"];
 
 /** Todas as tabelas penduradas em `rooms` (a própria `rooms` vai à parte). */
 export const TABELAS_COM_SALA = [

@@ -24,6 +24,8 @@ import { horaCurta } from "@/lib/offline";
 import { definirContextoDoErro, relatarErro } from "@/lib/relatarErro";
 import { definirContextoDeUso, registrarUso } from "@/lib/registrarUso";
 import { EventosContext, useEventos } from "@/hooks/useEventos";
+import { EfeitosContext, useEfeitos } from "@/hooks/useEfeitos";
+import { AvisosDeEfeitos } from "@/components/EfeitosDoCombate";
 import { AvisosDoCombate, GavetaDeEventos } from "@/components/EventosDoCombate";
 import { baixarBackupDaSala } from "@/components/BackupSala";
 import { Portao } from "@/components/Portao";
@@ -116,6 +118,8 @@ function PainelSala({ codigo }: { codigo: string }) {
   const tempo = useTempo(codigo);
   // Os avisos programados do combate (só o Mestre vê); chegam às telas do combate e do encontro por contexto.
   const eventos = useEventos(codigo);
+  // Os efeitos com duração ("Bênção, 10 rodadas"): Mestre e jogadores criam e veem; contexto, como os avisos.
+  const efeitos = useEfeitos(codigo);
   // Saiu uma versão nova depois de abrir? O telão (que ninguém toca) recarrega sozinho; nos
   // celulares aparece um aviso e a pessoa decide a hora (não no meio de um combate).
   const versaoNova = useVersaoNova(telao);
@@ -291,6 +295,7 @@ function PainelSala({ codigo }: { codigo: string }) {
 
   return (
     <EventosContext.Provider value={eventos}>
+      <EfeitosContext.Provider value={efeitos}>
       <div className="topbar">
         <h1 className="brand-nome">
           <span className="visually-hidden">Painel de Mesa · </span>
@@ -408,6 +413,7 @@ function PainelSala({ codigo }: { codigo: string }) {
       {abaEfetiva === "combate" && (
         <>
           {souMestre && <AvisosDoCombate sala={sala} />}
+          <AvisosDeEfeitos sala={sala} meuSlug={identidade.tipo === "jogador" ? identidade.slug : null} />
           <RastreadorCombate sala={sala} souMestre={souMestre} meuPersonagem={meuPersonagem} cenaNaMesa={cenas.naMesa} />
           {souMestre ? (
             <>
@@ -491,6 +497,7 @@ function PainelSala({ codigo }: { codigo: string }) {
       {quadro.destaque && (
         <DestaqueDoCartao cartao={quadro.destaque} url={quadro.urlDaFoto(quadro.destaque)} aoFechar={quadro.dispensarDestaque} />
       )}
+      </EfeitosContext.Provider>
     </EventosContext.Provider>
   );
 }

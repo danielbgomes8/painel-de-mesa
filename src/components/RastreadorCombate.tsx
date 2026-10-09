@@ -36,6 +36,8 @@ import { textoEfetivoDeAtaques } from "@/lib/ataquesFicha";
 import { LendariasNaLinha } from "@/components/LendariasNaLinha";
 import { EncerrarCombate } from "@/components/EncerrarCombate";
 import { useEventosDoCombate } from "@/hooks/useEventos";
+import { useEfeitosDoCombate } from "@/hooks/useEfeitos";
+import { EfeitosDoPersonagem, EfeitosNaLinha } from "@/components/EfeitosDoCombate";
 import { comCompanheiros, companheirosQueSaemJunto, ehDoJogador, linhaDeCompanheiro } from "@/lib/companheiros";
 import { horaDoCovil, recuperarAcoesLendarias, temCovil } from "@/lib/lendarias";
 
@@ -118,6 +120,7 @@ export function RastreadorCombate({
 }) {
   const { combate, personagens } = sala;
   const avisos = useEventosDoCombate();
+  const efeitos = useEfeitosDoCombate();
   // Sem internet o mapa não funciona: nem tenta mexer nos peões.
   const mapa = sala.semInternet ? null : cenaNaMesa;
 
@@ -320,6 +323,7 @@ export function RastreadorCombate({
     if (!feito) return;
     // Os avisos programados eram deste combate (melhor esforço).
     await avisos.limparTodos();
+    await efeitos.limparTodos();
     sala.registrarLog("Combate reiniciado");
     sala.lembrarDesfazer({
       rotulo: "Combate reiniciado",
@@ -559,6 +563,7 @@ export function RastreadorCombate({
                   onFechar={() => setExplicando(null)}
                 />
               )}
+              {pv && <EfeitosNaLinha sala={sala} personagem={pv} souMestre={souMestre} />}
               {pv && explicacaoAqui === "Exaustão" && exaustao > 0 && (
                 <ExplicacaoExaustao nivel={exaustao} onFechar={() => setExplicando(null)} />
               )}
@@ -833,6 +838,7 @@ export function AcoesNaLinha({
         <ChipsCondicao sala={sala} personagem={p} editavel />
         <PrazosCondicao sala={sala} personagem={p} />
       </div>
+      <EfeitosDoPersonagem sala={sala} personagem={p} />
     </div>
   );
 }

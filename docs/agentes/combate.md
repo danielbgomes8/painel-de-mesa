@@ -289,6 +289,19 @@ já revelada** (`is_npc`, `revealed`) com `dono` = o slug do personagem. O dono 
   (o Mestre passa; o companheiro não, como o jogador). Robô: 2º cenário de `companheirosNoMapa.e2e.ts` (conferido que falha sem a trava: o Pip vai a 495).
 - **Não cobre**: peões de companheiros não se desviam um do outro ao seguir o dono.
 
+- **Efeitos com duração** (09/10/2026, migration `0035_efeitos_do_combate.sql`; regras puras em `lib/efeitosCombate.ts`, 14 testes; hook
+  `hooks/useEfeitos.ts` por **contexto** (`EfeitosContext`, no `Painel`); telas em `EfeitosDoCombate.tsx`). "Bênção, 10 rodadas": relógio preso a
+  um personagem da ordem, **pra o que NÃO é condição** (condição já tem prazo próprio em `cond_prazo`, que sai na virada da rodada). Mestre **e
+  jogador** criam, pelo botão "+ Efeito" no painel que abre ao tocar na linha (`AcoesNaLinha`, então também no cartão do peão). Guarda a rodada
+  em que ACABA (`termina_rodada`), nunca uma contagem; acaba no início do turno de quem lançou (`acabou`: depois da rodada final, ou nela quando
+  `turn >= índice do lançador`; sem lançador na ordem, no início da rodada). Chip `⏳ Bênção · 7 rod.` na linha; quando acaba, o aviso
+  (`AvisosDeEfeitos`) aparece pro Mestre e pra quem lançou ou está sob o efeito, e "Acabou · contar à mesa" apaga a linha e SÓ DEPOIS põe
+  `⏳ … acabou` no log (o `delete ... select` devolve true só pra quem apagou: dois toques não duplicam). Segredo: `efeitoVisivel` — jogador não vê
+  efeito de inimigo não revelado (o nome "Forma de Dragão" entregaria quem é); o log usa `nomeNoLog`. Encerrar e reiniciar o combate apagam tudo
+  (`limparTodos`); a tabela fica FORA do backup. Sem a migration o app abre normal e o painel diz "falta rodar a 0035".
+  - **Ainda não faz**: concentração não derruba o efeito sozinha; efeito em vários alvos de uma vez (é um por alvo); fora de combate (a
+    contagem em dias é `campanha_efeitos`, do tempo da campanha); não entra no desfazer; sem isca no `vazamento.e2e.ts` nem robô próprio —
+    **falta**, pois a tabela ainda não existia no banco real quando foi feito.
 - **Eventos do combate** (09/10/2026, migration `0034_eventos_do_combate.sql`; regras puras em `lib/eventosCombate.ts`, 15 testes; hook
   `hooks/useEventos.ts`, que chega às telas por **contexto** (`EventosContext`, sem passar prop pelo `RastreadorCombate`); telas em
   `EventosDoCombate.tsx`). O Mestre programa avisos — "rodada 3: o teto desaba", "quando o Chefe chegar a 50% de PV: ele foge" — que aparecem

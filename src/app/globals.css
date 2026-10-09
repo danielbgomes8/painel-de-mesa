@@ -5914,3 +5914,59 @@ input.fj-score:focus-visible {
   height: 100%;
   background: var(--danger);
 }
+
+/* ---------- Efeitos com duração no combate ---------- */
+.efeitotag {
+  color: var(--accent);
+  cursor: default;
+}
+.efeitolista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.efeitolista li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.efeitoform {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.efeitoform input[type="text"],
+.efeitoform select {
+  min-height: 36px;
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 4px 10px;
+  font: inherit;
+}
+.efeitorapido,
+.efeitoacoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.efeitorapido .btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.efeitocampo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -229,6 +229,8 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
   // O que a mesa usa (lib/registrarUso.ts monta a linha à mão).
   // Avisos programados do combate (hooks/useEventos.ts).
   { tabela: "combate_eventos", colunas: ["id", "room_code", "tipo", "rodada", "slugs", "pct", "texto", "publico", "feito", "created_at"] },
+  // Efeitos com duração do combate (hooks/useEfeitos.ts).
+  { tabela: "combate_efeitos", colunas: ["id", "room_code", "nome", "alvo_slug", "lancador_slug", "termina_rodada", "created_at"] },
   { tabela: "uso", colunas: ["id", "created_at", "room_code", "papel", "tela", "abertura"] },
 ];
 
