@@ -1532,6 +1532,7 @@ da aba continua `"diario"` (`BarraAbas.tsx`); só o rótulo mudou.
   círculo não pode ficar grudado. Nomes ficam numa camada própria sem captar toque, senão o nome de um
   cartão tapa o círculo do vizinho. O desenho tem largura máxima (1,7×) — em tela larga ele passava de
   1000 px de altura.
+- **O Mestre arrasta entre colunas o cartão pessoal que o dono compartilhou** (`podeMoverCartao`, 08/10/2026): só a coluna, nada mais do cartão (editar segue sendo só do dono, `podeEditarCartao`). A coluna é uma só por cartão, então o dono vê a mudança. Escondido ou silhueta: o Mestre nem enxerga por inteiro, não move. A alça 🔗 (ligar) continua só pra quem edita.
 - **Anotações** (`quadro_notas`): qualquer um anota num cartão que enxerga por inteiro, **todos leem**
   (o Daniel confirmou: visível, não privada). Cada um apaga a sua; o Mestre apaga qualquer uma.
 - **Sessões**: `diario.cartoes` (lista de ids). O Mestre marca quem apareceu; no cartão aparece "Apareceu

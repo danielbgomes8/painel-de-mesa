@@ -6,6 +6,7 @@ import {
   normalizarCartao,
   ordenarColunas,
   podeEditarCartao,
+  podeMoverCartao,
   podeVerSegredo,
   virouDestaque,
   destaqueEmSilhueta,
@@ -83,6 +84,20 @@ describe("quem edita e quem lê o segredo", () => {
     // Mestre vê o compartilhado do jogador, mas não escreve nele.
     expect(podeEditarCartao(cartao({ dono: "ana", revelacao: "revelado" }), MESTRE)).toBe(false);
     expect(podeEditarCartao(cartao(), null)).toBe(false);
+  });
+  it("o Mestre também move de coluna o cartão pessoal que o dono compartilhou", () => {
+    const compartilhado = cartao({ dono: "ana", revelacao: "revelado" });
+    expect(podeMoverCartao(compartilhado, MESTRE)).toBe(true);
+    // Escondido ou em silhueta, o Mestre nem o enxerga por inteiro.
+    expect(podeMoverCartao(cartao({ dono: "ana", revelacao: "escondido" }), MESTRE)).toBe(false);
+    expect(podeMoverCartao(cartao({ dono: "ana", revelacao: "silhueta" }), MESTRE)).toBe(false);
+    // Os outros jogadores seguem sem mexer; o dono e o cartão da mesa seguem como antes.
+    expect(podeMoverCartao(compartilhado, BETO)).toBe(false);
+    expect(podeMoverCartao(compartilhado, ANA)).toBe(true);
+    expect(podeMoverCartao(cartao(), MESTRE)).toBe(true);
+    expect(podeMoverCartao(compartilhado, null)).toBe(false);
+    // Mover não dá o resto: editar continua sendo só do dono.
+    expect(podeEditarCartao(compartilhado, MESTRE)).toBe(false);
   });
   it("segredo é só do Mestre, e só em cartão da mesa", () => {
     expect(podeVerSegredo(cartao(), MESTRE)).toBe(true);

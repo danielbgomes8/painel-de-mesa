@@ -32,6 +32,7 @@ import {
   emojiDoTipo,
   filtrarPorTipo,
   podeEditarCartao,
+  podeMoverCartao,
   podeVerSegredo,
   rotuloDoTipo,
   type Cartao,
@@ -271,7 +272,7 @@ export function QuadroCampanha({
                   quem={quem}
                   nomeDoAutor={nomeDoAutor}
                   aoAbrir={() => setAberto(v.cartao.id)}
-                  alca={podeEditarCartao(v.cartao, quem) ? (e) => arrasto.comecar(e, v.cartao) : undefined}
+                  alca={podeMoverCartao(v.cartao, quem) ? (e) => arrasto.comecar(e, v.cartao) : undefined}
                   arrastando={arrasto.id === v.cartao.id}
                   alcaLigar={podeEditarCartao(v.cartao, quem) ? (e) => ligando.comecar(e, v.cartao) : undefined}
                   alvoDeLigacao={ligando.sobre === v.cartao.id}

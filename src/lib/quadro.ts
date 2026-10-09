@@ -126,6 +126,14 @@ export function podeEditarCartao(c: Cartao, quem: Identidade | null): boolean {
   return false;
 }
 
+/** Quem arrasta o cartão entre colunas: quem edita, e também o Mestre nos cartões
+ *  pessoais que o dono compartilhou (organizar o quadro é dele). Só a coluna: o resto do
+ *  cartão continua sendo do dono. A coluna é uma só por cartão, então o dono vê a mudança. */
+export function podeMoverCartao(c: Cartao, quem: Identidade | null): boolean {
+  if (podeEditarCartao(c, quem)) return true;
+  return quem?.tipo === "mestre" && c.dono !== null && c.revelacao === "revelado";
+}
+
 /** O segredo só existe nos cartões da mesa, e só o Mestre o lê. */
 export function podeVerSegredo(c: Cartao, quem: Identidade | null): boolean {
   return quem?.tipo === "mestre" && c.dono === null;
