@@ -28,6 +28,13 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(limparSala);
 test.afterAll(limparSala);
 
+/** Janelas de jogador abertas pelo teste: fecham sempre, mesmo se o teste falhar no meio (uma janela esquecida
+ *  continua ligada na sala `ci-teste` e atrapalha os testes que vêm depois). */
+const contextosAbertos: import("@playwright/test").BrowserContext[] = [];
+test.afterEach(async () => {
+  for (const c of contextosAbertos.splice(0)) await c.close().catch(() => undefined);
+});
+
 /** O canvas não tem DOM: o robô escuta o que é DESENHADO (arcos [x, y, raio] do último quadro). */
 const espiar = () => {
   const w = window as unknown as { __quadros: number[][][] };
@@ -97,6 +104,7 @@ async function prepararMapa(page: Page) {
 
 async function abrirComoJogador(browser: import("@playwright/test").Browser, slug: string) {
   const contexto = await browser.newContext();
+  contextosAbertos.push(contexto);
   const jogador = await contexto.newPage();
   const erros = coletarErros(jogador);
   await jogador.addInitScript(espiar);
@@ -221,6 +229,13 @@ test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, 
     const r = await rest(`cena_pecas?id=eq.${peao.id}`, { method: "PATCH", body: JSON.stringify({ x, y }) });
     expect(r.ok).toBe(true);
   };
+  /** Sai da zona e volta. A pausa deixa o aparelho do Mestre ver o peão FORA antes de ele voltar: duas escritas
+   *  coladas chegam juntas num aparelho lento (o CI) e o "fora" nunca é visto, então não há "entrada" pra avisar. */
+  const saireVoltar = async () => {
+    await mover(165, 165);
+    await page.waitForTimeout(2000);
+    await mover(405, 285);
+  };
   await mover(405, 285);
   const aviso = page.locator(".arm-aviso");
   await expect(aviso).toBeVisible({ timeout: 30_000 });
@@ -241,8 +256,7 @@ test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, 
   expect(temRaio(await ultimoQuadro(jogador), 90)).toBe(false);
 
   // Sai e volta: avisa de novo. Agora o Mestre dispara: a mesa passa a ver e o log conta.
-  await mover(165, 165);
-  await mover(405, 285);
+  await saireVoltar();
   await expect(aviso).toBeVisible({ timeout: 30_000 });
   await aviso.getByRole("button", { name: "disparar" }).click();
   await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("disparada");
@@ -251,8 +265,7 @@ test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, 
   await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Jogador Robô caiu em Poço escondido"))).toBe(true);
 
   // Disparada não avisa mais: sai e entra de novo, nada.
-  await mover(165, 165);
-  await mover(405, 285);
+  await saireVoltar();
   await page.waitForTimeout(2500);
   await expect(aviso).toHaveCount(0);
 
@@ -263,8 +276,7 @@ test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, 
   await ver(jogador, (q) => temRaio(q, 90), false);
   await page.getByRole("button", { name: "Revelar Poço escondido pra mesa" }).click();
   await ver(jogador, (q) => temRaio(q, 90));
-  await mover(165, 165);
-  await mover(405, 285);
+  await saireVoltar();
   await expect(aviso).toBeVisible({ timeout: 30_000 });
   await aviso.getByRole("button", { name: "desarmar" }).click();
   await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("desarmada");
