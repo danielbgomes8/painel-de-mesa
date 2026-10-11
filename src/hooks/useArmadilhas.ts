@@ -142,7 +142,10 @@ export function useArmadilhas(cenaId: string | null, codigo: string, canalExtra 
         cd: nova.cd ?? null,
         dano: nova.dano ?? "",
         nota: nova.nota ?? "",
-        estado: "armada",
+        estado: nova.estado ?? "armada",
+        // A coluna `tipo` vem na migration 0037: só se manda quando é perigo, pra armadilha comum seguir
+        // funcionando antes dela ser rodada.
+        ...(nova.tipo === "perigo" ? { tipo: "perigo" } : {}),
       };
       // Aparece na hora (created_at vazio marca "ainda não confirmado").
       const provisoria = normalizarArmadilha({ ...linha, created_at: "" });

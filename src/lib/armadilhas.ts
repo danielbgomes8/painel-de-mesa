@@ -11,6 +11,10 @@ import { rolarDado } from "./dados";
 
 export type EstadoArmadilha = "armada" | "revelada" | "disparada" | "desarmada";
 
+/** `armadilha` dispara UMA vez ao ser pisada; `perigo` (fogo, gás, ácido, água gelada) é uma zona que continua
+ *  ali: avisa o Mestre quando alguém ENTRA e no INÍCIO DO TURNO de quem está dentro, até ser extinto. */
+export type TipoArmadilha = "armadilha" | "perigo";
+
 export type Armadilha = {
   id: string;
   cena_id: string;
@@ -26,10 +30,11 @@ export type Armadilha = {
   dano: string;
   nota: string;
   estado: EstadoArmadilha;
+  tipo: TipoArmadilha;
   created_at: string;
 };
 
-export type NovaArmadilha = Pick<Armadilha, "nome" | "x" | "y"> & Partial<Pick<Armadilha, "raio" | "salvaguarda" | "cd" | "dano" | "nota">>;
+export type NovaArmadilha = Pick<Armadilha, "nome" | "x" | "y"> & Partial<Pick<Armadilha, "raio" | "salvaguarda" | "cd" | "dano" | "nota" | "tipo" | "estado">>;
 
 /** Por cena. Cada uma é redesenhada a cada quadro. */
 export const ARMADILHAS_MAXIMAS = 60;
@@ -49,8 +54,14 @@ const ROTULO_DO_ESTADO: Record<EstadoArmadilha, string> = {
   disparada: "disparada",
   desarmada: "desarmada",
 };
-export function rotuloDoEstado(e: EstadoArmadilha): string {
-  return ROTULO_DO_ESTADO[e];
+const ROTULO_DO_ESTADO_PERIGO: Record<EstadoArmadilha, string> = {
+  armada: "escondido",
+  revelada: "ativo",
+  disparada: "ativo",
+  desarmada: "extinto",
+};
+export function rotuloDoEstado(e: EstadoArmadilha, tipo: TipoArmadilha = "armadilha"): string {
+  return (tipo === "perigo" ? ROTULO_DO_ESTADO_PERIGO : ROTULO_DO_ESTADO)[e];
 }
 
 /** Pontos de partida pra o Mestre editar; os números são sugestão, não regra. */
@@ -61,6 +72,14 @@ export const ARMADILHAS_PRONTAS: readonly ArmadilhaPronta[] = [
   { nome: "Chama oculta", salvaguarda: "DES", cd: 14, dano: "3d6 fogo", raio: 3 },
   { nome: "Rede caindo", salvaguarda: "FOR", cd: 13, dano: "", raio: 3 },
   { nome: "Runa de alarme", salvaguarda: "", cd: null, dano: "", raio: 3 },
+];
+
+/** Perigos contínuos prontos, pra o Mestre editar: fogo, gás, ácido, água gelada. Zona maior que a da armadilha. */
+export const PERIGOS_PRONTOS: readonly ArmadilhaPronta[] = [
+  { nome: "Fogo", salvaguarda: "DES", cd: 13, dano: "1d6 fogo", raio: 3 },
+  { nome: "Gás venenoso", salvaguarda: "CON", cd: 13, dano: "1d6 veneno", raio: 4.5 },
+  { nome: "Ácido", salvaguarda: "DES", cd: 12, dano: "2d4 ácido", raio: 3 },
+  { nome: "Água gelada", salvaguarda: "CON", cd: 12, dano: "1d6 gélido", raio: 4.5 },
 ];
 
 function numero(v: unknown): number | null {
@@ -109,6 +128,7 @@ export function normalizarArmadilha(linha: unknown): Armadilha | null {
     dano: texto(o.dano, DANO_MAXIMO),
     nota: texto(o.nota, NOTA_MAXIMA),
     estado,
+    tipo: o.tipo === "perigo" ? "perigo" : "armadilha",
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };
 }
@@ -123,9 +143,9 @@ export function vigia(a: Pick<Armadilha, "estado">): boolean {
   return a.estado === "armada" || a.estado === "revelada";
 }
 
-/** Nome pra mostrar: vazio vira "Armadilha". */
-export function nomeDaArmadilha(a: Pick<Armadilha, "nome">): string {
-  return a.nome.trim() || "Armadilha";
+/** Nome pra mostrar: vazio vira "Armadilha" (ou "Perigo"). */
+export function nomeDaArmadilha(a: Pick<Armadilha, "nome"> & Partial<Pick<Armadilha, "tipo">>): string {
+  return a.nome.trim() || (a.tipo === "perigo" ? "Perigo" : "Armadilha");
 }
 
 /** "Salvaguarda DES CD 13 · 2d6 contundente" — o que o Mestre precisa na hora; vazio se não há nada. */
@@ -142,7 +162,7 @@ export function raioDaZonaPx(cena: Pick<Cena, "grade_px" | "metros">, raioM: num
   return (raioM * cena.grade_px) / cena.metros;
 }
 
-type PecaParaPisar = { id: string; x: number; y: number; espacoPx: number; nome: string };
+type PecaParaPisar = { id: string; x: number; y: number; espacoPx: number; nome: string; slug?: string | null };
 
 /**
  * O peão está na zona? O centro dele dentro do raio, mais o que o espaço dele passa de um quadradinho
@@ -158,9 +178,10 @@ export function estaNaZona(
 }
 
 /** O que o app lembra entre uma conferência e outra: quem estava em qual zona, e quais armadilhas já conhecia. */
-export type EstadoDePisadas = { dentro: Map<string, Set<string>>; conhecidas: Set<string> };
+export type EstadoDePisadas = { dentro: Map<string, Set<string>>; conhecidas: Set<string>; vezDe: string | null };
 
-export type Pisada = { pecaId: string; peca: string; armadilhaId: string };
+/** `entrou` = acabou de pisar na zona; `turno` = (só perigo) é o início do turno de quem está dentro dela. */
+export type Pisada = { pecaId: string; peca: string; armadilhaId: string; motivo: "entrou" | "turno" };
 
 /**
  * Compara onde cada peão está AGORA com onde estava na conferência anterior e devolve quem acabou de ENTRAR
@@ -174,9 +195,13 @@ export function avaliarPisadas(
     cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura" | "metros">;
     armadilhas: readonly Armadilha[];
     pecas: readonly PecaParaPisar[];
+    /** Slug de quem tem a vez na iniciativa (ou null): a mudança dele é o "início do turno" dos perigos. */
+    vezDe?: string | null;
   },
 ): { estado: EstadoDePisadas; pisadas: Pisada[] } {
   const { cena, armadilhas, pecas } = entrada;
+  const vezDe = entrada.vezDe ?? null;
+  const turnoMudou = anterior !== null && anterior.vezDe !== vezDe && vezDe !== null;
   const dentro = new Map<string, Set<string>>();
   const pisadas: Pisada[] = [];
   for (const p of pecas) {
@@ -187,12 +212,15 @@ export function avaliarPisadas(
       const antes = anterior?.dentro.get(p.id);
       const sabiaDaArmadilha = anterior?.conhecidas.has(a.id) ?? false;
       if (anterior && antes && sabiaDaArmadilha && !antes.has(a.id) && vigia(a)) {
-        pisadas.push({ pecaId: p.id, peca: p.nome, armadilhaId: a.id });
+        pisadas.push({ pecaId: p.id, peca: p.nome, armadilhaId: a.id, motivo: "entrou" });
+      } else if (turnoMudou && sabiaDaArmadilha && a.tipo === "perigo" && vigia(a) && p.slug && p.slug === vezDe) {
+        // Já estava dentro quando a vez chegou nele: o perigo age no início do turno.
+        pisadas.push({ pecaId: p.id, peca: p.nome, armadilhaId: a.id, motivo: "turno" });
       }
     }
     dentro.set(p.id, agora);
   }
-  return { estado: { dentro, conhecidas: new Set(armadilhas.map((a) => a.id)) }, pisadas };
+  return { estado: { dentro, conhecidas: new Set(armadilhas.map((a) => a.id)), vezDe }, pisadas };
 }
 
 // ── Rolar o dano sugerido ──────────────────────────────────────────────────
@@ -227,6 +255,13 @@ export function linhaDeDisparo(quem: string, a: Pick<Armadilha, "nome" | "salvag
   return `⚠️ ${quem} caiu em ${nomeDaArmadilha(a)}.${salva ? ` Salvaguarda ${salva}.` : ""}`;
 }
 
-export function linhaDeDesarme(quem: string | null, a: Pick<Armadilha, "nome">): string {
-  return `🛠️ ${nomeDaArmadilha(a)} foi desarmada${quem ? ` (${quem})` : ""}.`;
+export function linhaDeDesarme(quem: string | null, a: Pick<Armadilha, "nome"> & Partial<Pick<Armadilha, "tipo">>): string {
+  return a.tipo === "perigo" ? `🧯 ${nomeDaArmadilha(a)} foi extinto${quem ? ` (${quem})` : ""}.` : `🛠️ ${nomeDaArmadilha(a)} foi desarmada${quem ? ` (${quem})` : ""}.`;
+}
+
+/** Sai no log quando o Mestre registra que o perigo pegou alguém (ao entrar ou no início do turno). */
+export function linhaDePerigo(quem: string, a: Pick<Armadilha, "nome" | "salvaguarda" | "cd">, motivo: "entrou" | "turno"): string {
+  const salva = [a.salvaguarda.trim(), a.cd !== null ? `CD ${a.cd}` : ""].filter(Boolean).join(" ");
+  const quando = motivo === "turno" ? "começou o turno em" : "entrou em";
+  return `☠️ ${quem} ${quando} ${nomeDaArmadilha({ ...a, tipo: "perigo" })}.${salva ? ` Salvaguarda ${salva}.` : ""}`;
 }

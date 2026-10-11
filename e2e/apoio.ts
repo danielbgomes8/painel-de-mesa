@@ -27,7 +27,7 @@ export async function rest(caminho: string, init: RequestInit = {}): Promise<Res
 /** Tira do Storage as imagens da sala: as dos mapas (na pasta da sala) e as fotos dos
  *  cartões do Quadro (em `<sala>/quadro/`). O `delete` da cena ou do cartão no banco não leva o arquivo. */
 async function limparImagens(): Promise<void> {
-  for (const pasta of [SALA, `${SALA}/quadro`]) {
+  for (const pasta of [SALA, `${SALA}/quadro`, `${SALA}/folhas`]) {
     const lista = await fetch(`${url}/storage/v1/object/list/mapas`, {
       method: "POST",
       headers: cabecalhos,
@@ -50,7 +50,7 @@ async function limparImagens(): Promise<void> {
 export async function limparSala(): Promise<void> {
   if (!bancoConfigurado) return;
   await limparImagens();
-  for (const tabela of ["campanha_efeitos", "campanha_tempo", "bau_itens", "quadro_notas", "quadro_ligacoes", "quadro_cartoes", "cena_armadilhas", "cena_marcas", "cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates", "uso", "combate_eventos", "combate_efeitos"]) {
+  for (const tabela of ["campanha_efeitos", "campanha_tempo", "bau_itens", "quadro_notas", "quadro_ligacoes", "quadro_cartoes", "folhas", "cena_armadilhas", "cena_marcas", "cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates", "uso", "combate_eventos", "combate_efeitos"]) {
     // Tabela que ainda não existe (migration por rodar) não é erro aqui.
     await rest(`${tabela}?room_code=eq.${SALA}`, { method: "DELETE" });
   }

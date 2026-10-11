@@ -27,6 +27,7 @@ export const TELAS_DE_USO: Record<string, string> = {
   "campanha:quadro": "Campanha → Quadro",
   "campanha:bau": "Campanha → Baú",
   "campanha:tempo": "Campanha → Tempo",
+  "campanha:folhas": "Campanha → Folhas",
   "campanha:sessoes": "Campanha → Sessões",
   "mestre:encontros": "Mestre → Encontros",
   "mestre:npcs": "Mestre → NPCs",

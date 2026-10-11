@@ -322,6 +322,7 @@ const COR_DA_ARMADILHA: Record<EstadoArmadilha, string> = {
   desarmada: "#8a97a8",
 };
 const SIMBOLO_DA_ARMADILHA: Record<EstadoArmadilha, string> = { armada: "⚠️", revelada: "⚠️", disparada: "💥", desarmada: "✓" };
+const COR_DO_PERIGO = "#e0663a";
 
 /** Armadilhas: a zona que dispara (círculo) e um símbolo no centro. Entram já filtradas pra quem olha: a
  *  escondida (`armada`) só chega ao Mestre, tracejada e apagada, como o desenho "só eu vejo". Ficam por baixo
@@ -331,11 +332,12 @@ export function desenharArmadilhas(ctx: CanvasRenderingContext2D, cena: Pick<Cen
   ctx.textBaseline = "middle";
   for (const a of lista) {
     const oculta = a.estado === "armada";
-    const cor = COR_DA_ARMADILHA[a.estado];
+    const perigo = a.tipo === "perigo";
+    const cor = perigo && a.estado !== "desarmada" ? COR_DO_PERIGO : COR_DA_ARMADILHA[a.estado];
     ctx.globalAlpha = oculta ? 0.6 : a.estado === "desarmada" ? 0.7 : 1;
     ctx.beginPath();
     ctx.arc(a.x, a.y, Math.max(raioDaZonaPx(cena, a.raio), 6 / escala), 0, Math.PI * 2);
-    ctx.fillStyle = corComAlfa(cor, 0.2);
+    ctx.fillStyle = corComAlfa(cor, perigo ? 0.3 : 0.2);
     ctx.fill();
     ctx.setLineDash(oculta ? [6 / escala, 5 / escala] : []);
     ctx.lineWidth = 2 / escala;
@@ -344,7 +346,7 @@ export function desenharArmadilhas(ctx: CanvasRenderingContext2D, cena: Pick<Cen
     ctx.setLineDash([]);
     ctx.font = `${16 / escala}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
     ctx.fillStyle = cor;
-    ctx.fillText(SIMBOLO_DA_ARMADILHA[a.estado], a.x, a.y + 0.5 / escala);
+    ctx.fillText(perigo ? (a.estado === "desarmada" ? "✓" : "☠️") : SIMBOLO_DA_ARMADILHA[a.estado], a.x, a.y + 0.5 / escala);
   }
   ctx.globalAlpha = 1;
 }

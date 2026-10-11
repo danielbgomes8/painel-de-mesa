@@ -13,6 +13,7 @@ import type { Peca } from "../src/lib/pecas";
 import type { Parede } from "../src/lib/paredes";
 import type { Marca } from "../src/lib/marcas";
 import type { Armadilha } from "../src/lib/armadilhas";
+import type { Folha } from "../src/lib/folhas";
 import type { Cartao, Ligacao, NotaDoCartao } from "../src/lib/quadro";
 import type { EfeitoDeTempo, LinhaTempo } from "../src/lib/tempoCampanha";
 import type { LinhaBastiao, LinhaCombate } from "../src/hooks/useSala";
@@ -219,8 +220,13 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       dano: true,
       nota: true,
       estado: true,
+      tipo: true,
       created_at: true,
     }),
+  },
+  {
+    tabela: "folhas",
+    colunas: colunas<Folha>({ id: true, room_code: true, titulo: true, texto: true, foto: true, para: true, entregue_em: true, created_at: true }),
   },
   {
     tabela: "quadro_cartoes",

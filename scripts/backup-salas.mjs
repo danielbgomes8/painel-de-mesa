@@ -57,6 +57,8 @@ export const TABELAS_COM_SALA = [
   "cena_marcas",
   // Armadilhas do mapa (0036). As luzes são colunas de `cena_pecas`; `escura` é coluna de `cenas`.
   "cena_armadilhas",
+  // Folhas de entrega (0037). A foto de cada uma fica no Storage e vai na cópia das imagens.
+  "folhas",
   // Quadro da Campanha (0024). A foto de cada cartão fica no Storage e vai na
   // cópia das imagens, ao lado das dos mapas.
   "quadro_cartoes",
@@ -149,6 +151,7 @@ export async function copiarImagens({ url, copias, pasta, buscar = fetch, gravar
     const citadas = [
       ...(dados.cenas ?? []).map((cena) => cena.imagem),
       ...(dados.quadro_cartoes ?? []).map((cartao) => cartao.foto),
+      ...(dados.folhas ?? []).map((folha) => folha.foto),
     ];
     for (const citada of citadas) {
       if (!citada || vistas.has(citada)) continue;

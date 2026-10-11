@@ -14,6 +14,7 @@ import {
   mudarCena,
   pecasDoBanco,
   pngDeTeste,
+  porNaIniciativa,
   rest,
 } from "./apoio";
 import { contarCelulas, decodificarMascara } from "../src/lib/visao";
@@ -363,4 +364,103 @@ test("armadilhas: o aviso de pisada aparece em qualquer aba do Mestre, não só 
   await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("disparada");
   await expect(aviso).toHaveCount(0);
   expect(erros).toEqual([]);
+});
+
+test("perigo contínuo: a mesa vê a zona; o Mestre é avisado ao entrar e no início do turno, e extingue", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  await criarFicha("outro-robo", "Outro Robô", { hp: 20, hp_max: 20 });
+  await criarPeca(cena.id, "jogador-robo", 165, 165);
+  const r = await rest("cena_armadilhas", {
+    method: "POST",
+    body: JSON.stringify({ cena_id: cena.id, room_code: SALA, nome: "Fogo", tipo: "perigo", estado: "revelada", x: 405, y: 285, raio: 3, salvaguarda: "DES", cd: 13, dano: "1d6 fogo" }),
+  });
+  expect(r.ok).toBe(true);
+  // A vez é do outro: o jogador entra no fogo fora do turno dele.
+  await porNaIniciativa([
+    { slug: "jogador-robo", name: "Jogador Robô", init: 20 },
+    { slug: "outro-robo", name: "Outro Robô", init: 10 },
+  ]);
+  const vez = (turn: number) => rest(`combat_state?room_code=eq.${SALA}`, { method: "PATCH", body: JSON.stringify({ turn }) });
+  expect((await vez(1)).ok).toBe(true);
+  const { jogador, erros: errosJogador } = await abrirComoJogador(browser, "jogador-robo");
+
+  // O perigo é à vista da mesa (a zona de 3 m = 60 px); o Mestre também a vê.
+  await ver(page, (q) => temRaio(q, 60));
+  await ver(jogador, (q) => temRaio(q, 60));
+
+  await page.getByRole("button", { name: "Combate", exact: true }).click();
+  await page.waitForTimeout(2500); // o vigia aprende onde cada um está
+  const peao = (await pecasDoBanco()).find((p) => p.slug === "jogador-robo")!;
+  const mover = (x: number, y: number) => rest(`cena_pecas?id=eq.${peao.id}`, { method: "PATCH", body: JSON.stringify({ x, y }) });
+  expect((await mover(405, 285)).ok).toBe(true);
+  const aviso = page.locator(".arm-aviso");
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await expect(aviso).toContainText("Jogador Robô entrou em Fogo");
+  await expect(aviso).toContainText("Salvaguarda DES CD 13 · 1d6 fogo");
+  await aviso.getByRole("button", { name: "registrar no log" }).click();
+  await expect(aviso).toHaveCount(0);
+  await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Jogador Robô entrou em Fogo"))).toBe(true);
+  expect((await armadilhasDoBanco())[0].estado).toBe("revelada"); // perigo não se gasta
+
+  // A vez chega nele, que está dentro do fogo: avisa de novo, agora como início do turno.
+  expect((await vez(0)).ok).toBe(true);
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await expect(aviso).toContainText("Jogador Robô começou o turno em Fogo");
+  await aviso.getByRole("button", { name: "deixar passar" }).click();
+  await expect(aviso).toHaveCount(0);
+
+  // Mais uma volta e o Mestre extingue: some o perigo pra mesa (continua marcado como extinto) e o log conta.
+  expect((await vez(1)).ok).toBe(true);
+  await page.waitForTimeout(1500);
+  expect((await vez(0)).ok).toBe(true);
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await aviso.getByRole("button", { name: "extinguir" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("desarmada");
+  await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Fogo foi extinto"))).toBe(true);
+
+  // Extinto não avisa mais, nem no turno.
+  expect((await vez(1)).ok).toBe(true);
+  await page.waitForTimeout(1500);
+  expect((await vez(0)).ok).toBe(true);
+  await page.waitForTimeout(2500);
+  await expect(aviso).toHaveCount(0);
+
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
+});
+
+test("perigo pela tela: o Mestre escolhe Perigo, um pronto, toca no mapa, e ele nasce à vista da mesa", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await page.addInitScript(espiar);
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  await criarPeca(cena.id, "jogador-robo", 165, 165);
+  const { jogador, erros: errosJogador } = await abrirComoJogador(browser, "jogador-robo");
+
+  await abrirFerramenta(page, "Armadilhas");
+  await page.getByRole("button", { name: "☠️ Perigo" }).click();
+  await page.getByRole("button", { name: "Gás venenoso", exact: true }).click(); // CON 13, 1d6 veneno, 4,5 m = 90 px
+  await page.getByRole("button", { name: "📍 colocar no mapa" }).click();
+  await fecharPainelDoMapa(page);
+  await tocarNoMapa(page, 405, 285);
+  await expect.poll(async () => (await armadilhasDoBanco()).length).toBe(1);
+  expect((await armadilhasDoBanco())[0]).toMatchObject({ nome: "Gás venenoso", x: 405, y: 285, raio: 4.5, salvaguarda: "CON", cd: 13, dano: "1d6 veneno", estado: "revelada" });
+  const tipo = (await (await rest(`cena_armadilhas?select=tipo&room_code=eq.${SALA}`)).json()) as { tipo: string }[];
+  expect(tipo[0].tipo).toBe("perigo");
+  // A mesa vê a zona na hora (perigo não nasce escondido).
+  await ver(jogador, (q) => temRaio(q, 90));
+  // E a lista fala de perigo: extinguir, e não "desarmar".
+  await abrirFerramenta(page, "Armadilhas");
+  await expect(page.getByRole("button", { name: "Extinguir Gás venenoso" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Disparar Gás venenoso" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Extinguir Gás venenoso" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("desarmada");
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
 });

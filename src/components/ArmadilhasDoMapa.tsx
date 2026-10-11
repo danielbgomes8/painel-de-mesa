@@ -6,6 +6,7 @@ import type { Pisada } from "@/lib/armadilhas";
 import {
   ARMADILHAS_MAXIMAS,
   ARMADILHAS_PRONTAS,
+  PERIGOS_PRONTOS,
   CD_MAXIMA,
   DANO_MAXIMO,
   NOME_MAXIMO,
@@ -14,6 +15,7 @@ import {
   cdValida,
   linhaDeDesarme,
   linhaDeDisparo,
+  linhaDePerigo,
   nomeDaArmadilha,
   raioValido,
   rolarDanoDoTexto,
@@ -22,6 +24,7 @@ import {
   type Armadilha,
   type DanoRolado,
   type NovaArmadilha,
+  type TipoArmadilha,
 } from "@/lib/armadilhas";
 
 /** O que o Mestre preenche antes de tocar no mapa: o lugar vem do toque. */
@@ -52,6 +55,8 @@ export function PainelDeArmadilhas({
   aoCancelarColocar: () => void;
 }) {
   const [editando, setEditando] = useState<string | null>(null);
+  /** O que se prepara: uma armadilha (dispara uma vez) ou um perigo (zona que continua: fogo, gás...). */
+  const [tipo, setTipo] = useState<TipoArmadilha>("armadilha");
   const [nome, setNome] = useState("");
   const [salvaguarda, setSalvaguarda] = useState<string>("DES");
   const [cd, setCd] = useState("");
@@ -70,7 +75,11 @@ export function PainelDeArmadilhas({
     dano: dano.trim().slice(0, DANO_MAXIMO),
     raio: raioValido(raio) ?? RAIO_PADRAO_M,
     nota: nota.trim().slice(0, NOTA_MAXIMA),
+    tipo,
+    // Perigo nasce à vista (a mesa vê o fogo); armadilha nasce escondida.
+    estado: tipo === "perigo" ? "revelada" : "armada",
   };
+  const prontas = tipo === "perigo" ? PERIGOS_PRONTOS : ARMADILHAS_PRONTAS;
   const cheio = arm.armadilhas.length >= ARMADILHAS_MAXIMAS;
 
   function limpar() {
@@ -86,6 +95,7 @@ export function PainelDeArmadilhas({
 
   function editar(a: Armadilha) {
     setEditando(a.id);
+    setTipo(a.tipo);
     setNome(a.nome);
     setSalvaguarda(a.salvaguarda);
     setCd(a.cd === null ? "" : String(a.cd));
@@ -110,14 +120,30 @@ export function PainelDeArmadilhas({
 
   return (
     <>
+      <div className="mapa-ferr" role="group" aria-label="O que preparar">
+        <button type="button" className="chip alvo" aria-pressed={tipo === "armadilha"} disabled={editando !== null} onClick={() => setTipo("armadilha")}>
+          ⚠️ Armadilha
+        </button>
+        <button type="button" className="chip alvo" aria-pressed={tipo === "perigo"} disabled={editando !== null} onClick={() => setTipo("perigo")}>
+          ☠️ Perigo
+        </button>
+      </div>
       <p className="fc-sub">
-        Prepare a armadilha e toque no mapa onde ela fica. Ela nasce <b>escondida</b>: a mesa só a vê depois que você revelar, disparar ou
-        desarmar. Quando um peão pisar, <b>só você</b> recebe o aviso, com a salvaguarda e o dano já à mão. (O aviso aparece enquanto esta aba
-        do Mapa está aberta.)
+        {tipo === "perigo" ? (
+          <>
+            Um <b>perigo</b> é uma zona que continua ali: fogo, gás, ácido, água gelada. A mesa <b>vê</b> a zona. Você é avisado (só você) quando alguém{" "}
+            <b>entra</b> e no <b>início do turno</b> de quem está dentro, com a salvaguarda e o dano à mão. Você decide e aplica; ele segue até você extinguir.
+          </>
+        ) : (
+          <>
+            Prepare a armadilha e toque no mapa onde ela fica. Ela nasce <b>escondida</b>: a mesa só a vê depois que você revelar, disparar ou
+            desarmar. Quando um peão pisar, <b>só você</b> recebe o aviso (em qualquer aba), com a salvaguarda e o dano já à mão.
+          </>
+        )}
       </p>
 
-      <div className="mapa-ferr" role="group" aria-label="Armadilhas prontas">
-        {ARMADILHAS_PRONTAS.map((p) => (
+      <div className="mapa-ferr" role="group" aria-label={tipo === "perigo" ? "Perigos prontos" : "Armadilhas prontas"}>
+        {prontas.map((p) => (
           <button
             key={p.nome}
             type="button"
@@ -140,8 +166,8 @@ export function PainelDeArmadilhas({
         <input
           type="text"
           className="mapa-aura-campo arm-nome"
-          aria-label="Nome da armadilha"
-          placeholder="nome (ex.: poço escondido)"
+          aria-label={tipo === "perigo" ? "Nome do perigo" : "Nome da armadilha"}
+          placeholder={tipo === "perigo" ? "nome (ex.: fogo no corredor)" : "nome (ex.: poço escondido)"}
           maxLength={NOME_MAXIMO}
           value={nome}
           onChange={(e) => setNome(e.target.value)}
@@ -255,18 +281,19 @@ export function PainelDeArmadilhas({
 function LinhaDaArmadilha({ a, arm, aoEditar }: { a: Armadilha; arm: Armadilhas; aoEditar: () => void }) {
   const nome = nomeDaArmadilha(a);
   const sugestao = sugestaoDaArmadilha(a);
+  const perigo = a.tipo === "perigo";
   const vigiando = a.estado === "armada" || a.estado === "revelada";
   return (
     <li className={vigiando ? "luz-item" : "luz-item luz-item--apagada"}>
       <span className="luz-texto">
-        <b>{nome}</b> · {rotuloDoEstado(a.estado)}
+        <span aria-hidden="true">{perigo ? "☠️" : "⚠️"}</span> <b>{nome}</b> · {rotuloDoEstado(a.estado, a.tipo)}
         {sugestao && <span className="fc-sub"> — {sugestao}</span>}
         {a.nota && <span className="fc-sub"> · {a.nota}</span>}
       </span>
       <span className="luz-acoes">
         {a.estado === "armada" && (
           <button type="button" className="minilink" aria-label={`Revelar ${nome} pra mesa`} onClick={() => void arm.atualizar(a.id, { estado: "revelada" })}>
-            revelar
+            {perigo ? "mostrar" : "revelar"}
           </button>
         )}
         {a.estado === "revelada" && (
@@ -274,19 +301,24 @@ function LinhaDaArmadilha({ a, arm, aoEditar }: { a: Armadilha; arm: Armadilhas;
             esconder
           </button>
         )}
+        {vigiando && !perigo && (
+          <button type="button" className="minilink" aria-label={`Disparar ${nome}`} onClick={() => void arm.atualizar(a.id, { estado: "disparada" })}>
+            disparar
+          </button>
+        )}
         {vigiando && (
-          <>
-            <button type="button" className="minilink" aria-label={`Disparar ${nome}`} onClick={() => void arm.atualizar(a.id, { estado: "disparada" })}>
-              disparar
-            </button>
-            <button type="button" className="minilink" aria-label={`Desarmar ${nome}`} onClick={() => void arm.atualizar(a.id, { estado: "desarmada" })}>
-              desarmar
-            </button>
-          </>
+          <button type="button" className="minilink" aria-label={`${perigo ? "Extinguir" : "Desarmar"} ${nome}`} onClick={() => void arm.atualizar(a.id, { estado: "desarmada" })}>
+            {perigo ? "extinguir" : "desarmar"}
+          </button>
         )}
         {!vigiando && (
-          <button type="button" className="minilink" aria-label={`Armar ${nome} de novo, escondida`} onClick={() => void arm.atualizar(a.id, { estado: "armada" })}>
-            rearmar
+          <button
+            type="button"
+            className="minilink"
+            aria-label={perigo ? `Reacender ${nome}` : `Armar ${nome} de novo, escondida`}
+            onClick={() => void arm.atualizar(a.id, { estado: perigo ? "revelada" : "armada" })}
+          >
+            {perigo ? "reacender" : "rearmar"}
           </button>
         )}
         <button type="button" className="minilink" aria-label={`Editar ${nome}`} onClick={aoEditar}>
@@ -301,8 +333,9 @@ function LinhaDaArmadilha({ a, arm, aoEditar }: { a: Armadilha; arm: Armadilhas;
 }
 
 /**
- * O aviso de que alguém pisou: aparece só pro Mestre, em cima do mapa. Ele escolhe: disparar (a mesa passa a ver a
- * armadilha e o log conta), desarmar (idem, como neutralizada) ou deixar passar (continua escondida e vigiando).
+ * O aviso de que alguém pisou: aparece só pro Mestre, em cima do mapa. **Armadilha**: disparar (a mesa passa a ver
+ * e o log conta), desarmar (idem, como neutralizada) ou deixar passar (continua escondida e vigiando).
+ * **Perigo** (fogo, gás...): registrar no log (o perigo pegou), extinguir ou deixar passar; o Mestre aplica o dano.
  */
 export function AvisosDePisada({
   pendentes,
@@ -319,7 +352,7 @@ export function AvisosDePisada({
 }) {
   if (pendentes.length === 0) return null;
   return (
-    <div className="arm-avisos" role="alert" aria-label="Alguém pisou numa armadilha">
+    <div className="arm-avisos" role="alert" aria-label="Alguém pisou numa armadilha ou perigo">
       {pendentes.map((p) => {
         const a = armadilhas.find((x) => x.id === p.armadilhaId);
         if (!a) return null;
@@ -328,10 +361,11 @@ export function AvisosDePisada({
             key={`${p.pecaId}:${p.armadilhaId}`}
             quem={p.peca || "Alguém"}
             a={a}
+            motivo={p.motivo}
             aoDisparar={async () => {
-              const ok = await arm.atualizar(a.id, { estado: "disparada" });
+              const ok = a.tipo === "perigo" ? true : await arm.atualizar(a.id, { estado: "disparada" });
               if (!ok) return;
-              registrar(linhaDeDisparo(p.peca || "Alguém", a));
+              registrar(a.tipo === "perigo" ? linhaDePerigo(p.peca || "Alguém", a, p.motivo) : linhaDeDisparo(p.peca || "Alguém", a));
               aoResolver(p);
             }}
             aoDesarmar={async () => {
@@ -351,22 +385,26 @@ export function AvisosDePisada({
 function AvisoDePisada({
   quem,
   a,
+  motivo,
   aoDisparar,
   aoDesarmar,
   aoDeixarPassar,
 }: {
   quem: string;
   a: Armadilha;
+  motivo: "entrou" | "turno";
   aoDisparar: () => void | Promise<void>;
   aoDesarmar: () => void | Promise<void>;
   aoDeixarPassar: () => void;
 }) {
   const [rolado, setRolado] = useState<DanoRolado | null>(null);
   const sugestao = sugestaoDaArmadilha(a);
+  const perigo = a.tipo === "perigo";
   return (
     <div className="arm-aviso">
       <p className="arm-aviso-titulo">
-        <span aria-hidden="true">⚠️</span> <b>{quem}</b> pisou em <b>{nomeDaArmadilha(a)}</b>
+        <span aria-hidden="true">{perigo ? "☠️" : "⚠️"}</span> <b>{quem}</b> {perigo ? (motivo === "turno" ? "começou o turno em" : "entrou em") : "pisou em"}{" "}
+        <b>{nomeDaArmadilha(a)}</b>
       </p>
       {sugestao && <p className="arm-aviso-sugestao">{sugestao}</p>}
       {a.nota && <p className="fc-sub">{a.nota}</p>}
@@ -382,10 +420,10 @@ function AvisoDePisada({
           </button>
         )}
         <button type="button" className="btn primary" onClick={() => void aoDisparar()}>
-          disparar
+          {perigo ? "registrar no log" : "disparar"}
         </button>
         <button type="button" className="btn" onClick={() => void aoDesarmar()}>
-          desarmar
+          {perigo ? "extinguir" : "desarmar"}
         </button>
         <button type="button" className="btn" onClick={aoDeixarPassar}>
           deixar passar

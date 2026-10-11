@@ -31,7 +31,9 @@ export function GuardaDeArmadilhas({ cena, codigo, sala }: { cena: Cena; codigo:
       }),
     [banco.pecas, cena, sala.personagens, sala.combate],
   );
-  const pisadas = usePisadas(cena, arm.armadilhas, pecas);
+  // O `slug` de cada peão (quem é na iniciativa) pra os perigos saberem de quem é o início do turno.
+  const pecasComSlug = useMemo(() => pecas.map((p) => ({ ...p, slug: banco.pecas.find((b) => b.id === p.id)?.slug ?? null })), [pecas, banco.pecas]);
+  const pisadas = usePisadas(cena, arm.armadilhas, pecasComSlug, sala.combate.order[sala.combate.turn]?.slug ?? null);
   return (
     <AvisosDePisada
       pendentes={pisadas.pendentes}

@@ -7,10 +7,13 @@ import {
   cdValida,
   estaNaZona,
   linhaDeDesarme,
+  linhaDePerigo,
+  PERIGOS_PRONTOS,
   linhaDeDisparo,
   normalizarArmadilha,
   raioValido,
   rolarDanoDoTexto,
+  rotuloDoEstado,
   sugestaoDaArmadilha,
   vigia,
   type Armadilha,
@@ -32,6 +35,7 @@ const base: Armadilha = {
   dano: "2d6 contundente",
   nota: "",
   estado: "armada",
+  tipo: "armadilha",
   created_at: "",
 };
 const medio = (id: string, x: number, y: number, nome = "Ana") => ({ id, x, y, espacoPx: 35, nome });
@@ -113,7 +117,7 @@ describe("avisar quando alguém pisa", () => {
   it("entrar na zona avisa, uma vez só", () => {
     const e0 = vazio();
     const r1 = avaliarPisadas(e0, { cena, armadilhas: [base], pecas: [medio("p", 385, 385)] });
-    expect(r1.pisadas).toEqual([{ pecaId: "p", peca: "Ana", armadilhaId: "a1" }]);
+    expect(r1.pisadas).toEqual([{ pecaId: "p", peca: "Ana", armadilhaId: "a1", motivo: "entrou" }]);
     const r2 = avaliarPisadas(r1.estado, { cena, armadilhas: [base], pecas: [medio("p", 385, 385)] });
     expect(r2.pisadas).toEqual([]); // continuou lá: sem aviso repetido
   });
@@ -190,5 +194,73 @@ describe("o aviso e o dano", () => {
     expect(linhaDeDisparo("Ana", { ...base, nome: "", salvaguarda: "", cd: null })).toBe("⚠️ Ana caiu em Armadilha.");
     expect(linhaDeDesarme("Beto", base)).toBe("🛠️ Poço foi desarmada (Beto).");
     expect(linhaDeDesarme(null, base)).toBe("🛠️ Poço foi desarmada.");
+  });
+});
+
+describe("perigos contínuos (fogo, gás, ácido)", () => {
+  const perigo: Armadilha = { ...base, id: "p1", nome: "Fogo", tipo: "perigo", estado: "revelada", raio: 3, salvaguarda: "DES", cd: 13, dano: "1d6 fogo" };
+  const comSlug = (id: string, x: number, y: number, slug: string, nome = "Ana") => ({ id, x, y, espacoPx: 35, nome, slug });
+  const longe = { x: 100, y: 100 };
+  const dentro = { x: 385, y: 385 };
+
+  it("lê o tipo do banco; sem a coluna (migration por rodar) é armadilha", () => {
+    expect(normalizarArmadilha({ ...perigo })?.tipo).toBe("perigo");
+    const semColuna = { ...base } as Record<string, unknown>;
+    delete semColuna.tipo;
+    expect(normalizarArmadilha(semColuna)?.tipo).toBe("armadilha");
+  });
+
+  it("os perigos prontos passam nas próprias regras", () => {
+    for (const p of PERIGOS_PRONTOS) {
+      expect(raioValido(p.raio)).toBe(p.raio);
+      expect(p.cd === null || cdValida(p.cd) === p.cd).toBe(true);
+    }
+  });
+
+  it("avisa quando alguém ENTRA, com o motivo 'entrou'", () => {
+    const e0 = avaliarPisadas(null, { cena, armadilhas: [perigo], pecas: [comSlug("p", longe.x, longe.y, "ana")], vezDe: "beto" }).estado;
+    const r = avaliarPisadas(e0, { cena, armadilhas: [perigo], pecas: [comSlug("p", dentro.x, dentro.y, "ana")], vezDe: "beto" });
+    expect(r.pisadas).toEqual([{ pecaId: "p", peca: "Ana", armadilhaId: "p1", motivo: "entrou" }]);
+  });
+
+  it("avisa no INÍCIO DO TURNO de quem já estava dentro (motivo 'turno'), uma vez por turno", () => {
+    const pecas = [comSlug("p", dentro.x, dentro.y, "ana"), comSlug("q", longe.x, longe.y, "beto", "Beto")];
+    const e0 = avaliarPisadas(null, { cena, armadilhas: [perigo], pecas, vezDe: "beto" }).estado;
+    // A vez passa pra Ana, que está dentro do fogo.
+    const r1 = avaliarPisadas(e0, { cena, armadilhas: [perigo], pecas, vezDe: "ana" });
+    expect(r1.pisadas).toEqual([{ pecaId: "p", peca: "Ana", armadilhaId: "p1", motivo: "turno" }]);
+    // Ninguém mexeu e a vez continua nela: sem aviso repetido.
+    expect(avaliarPisadas(r1.estado, { cena, armadilhas: [perigo], pecas, vezDe: "ana" }).pisadas).toEqual([]);
+    // A vez vai pro Beto (fora do fogo): nada.
+    expect(avaliarPisadas(r1.estado, { cena, armadilhas: [perigo], pecas, vezDe: "beto" }).pisadas).toEqual([]);
+  });
+
+  it("a primeira conferência não avisa de turno; e armadilha comum nunca avisa de turno", () => {
+    const pecas = [comSlug("p", dentro.x, dentro.y, "ana")];
+    expect(avaliarPisadas(null, { cena, armadilhas: [perigo], pecas, vezDe: "ana" }).pisadas).toEqual([]);
+    const e0 = avaliarPisadas(null, { cena, armadilhas: [base], pecas, vezDe: "beto" }).estado;
+    expect(avaliarPisadas(e0, { cena, armadilhas: [base], pecas, vezDe: "ana" }).pisadas).toEqual([]);
+  });
+
+  it("perigo extinto não avisa mais, nem ao entrar nem no turno", () => {
+    const extinto = { ...perigo, estado: "desarmada" as const };
+    const pecas = [comSlug("p", dentro.x, dentro.y, "ana")];
+    const e0 = avaliarPisadas(null, { cena, armadilhas: [extinto], pecas, vezDe: "beto" }).estado;
+    expect(avaliarPisadas(e0, { cena, armadilhas: [extinto], pecas, vezDe: "ana" }).pisadas).toEqual([]);
+  });
+
+  it("sem iniciativa (vez nula) não há início de turno", () => {
+    const pecas = [comSlug("p", dentro.x, dentro.y, "ana")];
+    const e0 = avaliarPisadas(null, { cena, armadilhas: [perigo], pecas, vezDe: "beto" }).estado;
+    expect(avaliarPisadas(e0, { cena, armadilhas: [perigo], pecas, vezDe: null }).pisadas).toEqual([]);
+  });
+
+  it("rótulos e linhas do log falam de perigo, não de armadilha", () => {
+    expect(rotuloDoEstado("revelada", "perigo")).toBe("ativo");
+    expect(rotuloDoEstado("desarmada", "perigo")).toBe("extinto");
+    expect(rotuloDoEstado("revelada", "armadilha")).toBe("revelada");
+    expect(linhaDePerigo("Ana", perigo, "turno")).toBe("☠️ Ana começou o turno em Fogo. Salvaguarda DES CD 13.");
+    expect(linhaDePerigo("Ana", perigo, "entrou")).toBe("☠️ Ana entrou em Fogo. Salvaguarda DES CD 13.");
+    expect(linhaDeDesarme(null, perigo)).toBe("🧯 Fogo foi extinto.");
   });
 });

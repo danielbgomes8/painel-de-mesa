@@ -5,6 +5,8 @@ import type { Sala } from "@/hooks/useSala";
 import type { Quadro } from "@/hooks/useQuadro";
 import type { Bau } from "@/hooks/useBau";
 import type { Tempo } from "@/hooks/useTempo";
+import type { Folhas } from "@/hooks/useFolhas";
+import { FolhasDaCampanha } from "@/components/FolhasDaCampanha";
 import type { Identidade } from "@/lib/identidade";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { QuadroCampanha } from "@/components/QuadroCampanha";
@@ -13,7 +15,8 @@ import { TempoDaCampanha } from "@/components/TempoDaCampanha";
 import { AUTOR_MESTRE, cartoesVisiveis } from "@/lib/quadro";
 import { registrarUso } from "@/lib/registrarUso";
 
-type Parte = "quadro" | "bau" | "tempo" | "sessoes";
+export type ParteDaCampanha = "quadro" | "bau" | "tempo" | "folhas" | "sessoes";
+type Parte = ParteDaCampanha;
 
 /** A aba da campanha: o Quadro (cartões com foto, o que a mesa vê e o que não),
  *  o baú do grupo e, ao lado, o diário de sessões de sempre. */
@@ -23,6 +26,10 @@ export function AbaCampanha({
   quadro,
   bau,
   tempo,
+  folhas,
+  novasFolhas,
+  aoVerFolhas,
+  parteInicial = "quadro",
   identidade,
 }: {
   sala: Sala;
@@ -30,9 +37,15 @@ export function AbaCampanha({
   quadro: Quadro;
   bau: Bau;
   tempo: Tempo;
+  folhas: Folhas;
+  /** Quantas folhas entregues a este jogador ele ainda não abriu (o número no botão). */
+  novasFolhas: number;
+  aoVerFolhas: (ids: string[]) => void;
+  /** A parte que abre primeiro (o aviso de "folha nova" leva direto às Folhas). */
+  parteInicial?: Parte;
   identidade: Identidade | null;
 }) {
-  const [parte, setParte] = useState<Parte>("quadro");
+  const [parte, setParte] = useState<Parte>(parteInicial);
   // O cartão aberto mora aqui: a lista de sessões também abre cartões.
   const [aberto, setAberto] = useState<string | null>(null);
   useEffect(() => {
@@ -53,11 +66,18 @@ export function AbaCampanha({
         <button type="button" aria-pressed={parte === "tempo"} onClick={() => setParte("tempo")}>
           🗓 {tempo.tempo ? `Dia ${tempo.tempo.dia}` : "Tempo"}
         </button>
+        {!folhas.indisponivel || identidade?.tipo === "mestre" ? (
+          <button type="button" aria-pressed={parte === "folhas"} onClick={() => setParte("folhas")}>
+            📜 Folhas{novasFolhas > 0 ? ` (${novasFolhas})` : ""}
+          </button>
+        ) : null}
         <button type="button" aria-pressed={parte === "sessoes"} onClick={() => setParte("sessoes")}>
           📖 Sessões
         </button>
       </div>
-      {parte === "tempo" ? (
+      {parte === "folhas" ? (
+        <FolhasDaCampanha folhas={folhas} sala={sala} identidade={identidade} aoVer={aoVerFolhas} />
+      ) : parte === "tempo" ? (
         <TempoDaCampanha tempo={tempo} sala={sala} souMestre={identidade?.tipo === "mestre"} />
       ) : parte === "bau" ? (
         <BauDoGrupo bau={bau} sala={sala} codigo={codigo} identidade={identidade} />

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSala } from "@/hooks/useSala";
 import { useCenas } from "@/hooks/useCenas";
 import { useQuadro } from "@/hooks/useQuadro";
 import { useBau } from "@/hooks/useBau";
 import { useTempo } from "@/hooks/useTempo";
+import { useFolhas } from "@/hooks/useFolhas";
+import { folhasNovas, guardarVistas, lerVistas } from "@/lib/folhas";
 import { rotuloCurtoDoDia } from "@/lib/tempoCampanha";
 import { useVersaoNova } from "@/hooks/useVersaoNova";
 import { AvisoVersaoNova } from "@/components/AvisoVersaoNova";
@@ -37,7 +39,8 @@ import { FichaPersonagem } from "@/components/FichaPersonagem";
 import { BannerSuaVez } from "@/components/BannerSuaVez";
 import { BannerMapaNaMesa } from "@/components/BannerMapaNaMesa";
 import { LogCombate } from "@/components/LogCombate";
-import { AbaCampanha } from "@/components/AbaCampanha";
+import { AbaCampanha, type ParteDaCampanha } from "@/components/AbaCampanha";
+import { BannerFolhaNova } from "@/components/BannerFolhaNova";
 import { DestaqueDoCartao } from "@/components/QuadroCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { GuardaDeArmadilhas, PainelMapa } from "@/components/MapaSobDemanda";
@@ -116,6 +119,22 @@ function PainelSala({ codigo }: { codigo: string }) {
   const bau = useBau(codigo);
   // O tempo da campanha (dia, calendário e efeitos que duram dias), idem.
   const tempo = useTempo(codigo);
+  // As folhas de entrega (cartas, pergaminhos) também têm canal próprio. O que este aparelho já abriu fica só nele.
+  const folhas = useFolhas(codigo);
+  const [folhasVistas, setFolhasVistas] = useState<ReadonlySet<string>>(() => lerVistas(codigo));
+  const [parteDaCampanha, setParteDaCampanha] = useState<ParteDaCampanha>("quadro");
+  const novasFolhas = !telao && identidade?.tipo === "jogador" ? folhasNovas(folhas.folhas, identidade.slug, folhasVistas) : [];
+  const verFolhas = useCallback(
+    (ids: string[]) => {
+      setFolhasVistas((antes) => {
+        if (ids.every((id) => antes.has(id))) return antes;
+        const depois = new Set([...antes, ...ids]);
+        guardarVistas(codigo, depois);
+        return depois;
+      });
+    },
+    [codigo],
+  );
   // Os avisos programados do combate (só o Mestre vê); chegam às telas do combate e do encontro por contexto.
   const eventos = useEventos(codigo);
   // Os efeitos com duração ("Bênção, 10 rodadas"): Mestre e jogadores criam e veem; contexto, como os avisos.
@@ -404,11 +423,35 @@ function PainelSala({ codigo }: { codigo: string }) {
         />
       )}
 
+      {identidade.tipo === "jogador" && abaEfetiva !== "diario" && (
+        <BannerFolhaNova
+          quantas={novasFolhas.length}
+          aoAbrir={() => {
+            setParteDaCampanha("folhas");
+            mudarAba("diario");
+          }}
+          aoDispensar={() => verFolhas(novasFolhas.map((f) => f.id))}
+        />
+      )}
+
       {souMestre && cenas.naMesa && <GuardaDeArmadilhas cena={cenas.naMesa} codigo={codigo} sala={sala} />}
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
-      {abaEfetiva === "diario" && <AbaCampanha sala={sala} codigo={codigo} quadro={quadro} bau={bau} tempo={tempo} identidade={identidade} />}
+      {abaEfetiva === "diario" && (
+        <AbaCampanha
+          sala={sala}
+          codigo={codigo}
+          quadro={quadro}
+          bau={bau}
+          tempo={tempo}
+          folhas={folhas}
+          novasFolhas={novasFolhas.length}
+          aoVerFolhas={verFolhas}
+          parteInicial={parteDaCampanha}
+          identidade={identidade}
+        />
+      )}
 
       {abaEfetiva === "bastiao" && <PainelBastiao sala={sala} />}
 
