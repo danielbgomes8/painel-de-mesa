@@ -31,7 +31,7 @@ export type Pecas = {
  * canal próprio, releitura a cada reconexão) — e, como ele, tolera a tabela
  * ainda não existir.
  */
-export function usePecas(cenaId: string | null, codigo: string): Pecas {
+export function usePecas(cenaId: string | null, codigo: string, canalExtra = ""): Pecas {
   const [dados, setDados] = useState<{ cenaId: string | null; pecas: Peca[]; carregou: boolean; indisponivel: boolean }>({
     cenaId: null,
     pecas: [],
@@ -103,7 +103,7 @@ export function usePecas(cenaId: string | null, codigo: string): Pecas {
       document.addEventListener("visibilitychange", aoVoltar);
       window.addEventListener("online", aoVoltar);
       canal = supabase
-        .channel(`pecas:${cenaId}`)
+        .channel(`pecas:${cenaId}${canalExtra}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "cena_pecas", filter: `cena_id=eq.${cenaId}` }, (msg) => {
           if (msg.eventType === "DELETE") {
             const id = (msg.old as { id?: string }).id;
@@ -125,7 +125,7 @@ export function usePecas(cenaId: string | null, codigo: string): Pecas {
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
     };
-  }, [cenaId, mexer]);
+  }, [cenaId, mexer, canalExtra]);
 
   const adicionar = useCallback<Pecas["adicionar"]>(
     async (novas) => {

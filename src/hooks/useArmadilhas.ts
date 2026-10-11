@@ -27,7 +27,7 @@ export type Armadilhas = {
  * releitura a cada reconexão) e, como ele, tolera a tabela ainda não existir. Quem decide o que cada um
  * enxerga é `armadilhasVisiveis` (lib/armadilhas.ts): este hook entrega todas.
  */
-export function useArmadilhas(cenaId: string | null, codigo: string): Armadilhas {
+export function useArmadilhas(cenaId: string | null, codigo: string, canalExtra = ""): Armadilhas {
   const [dados, setDados] = useState<{ cenaId: string | null; lista: Armadilha[]; carregou: boolean; indisponivel: boolean }>({
     cenaId: null,
     lista: [],
@@ -99,7 +99,7 @@ export function useArmadilhas(cenaId: string | null, codigo: string): Armadilhas
       document.addEventListener("visibilitychange", aoVoltar);
       window.addEventListener("online", aoVoltar);
       canal = supabase
-        .channel(`armadilhas:${cenaId}`)
+        .channel(`armadilhas:${cenaId}${canalExtra}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "cena_armadilhas", filter: `cena_id=eq.${cenaId}` }, (msg) => {
           if (msg.eventType === "DELETE") {
             const id = (msg.old as { id?: string }).id;
@@ -121,7 +121,7 @@ export function useArmadilhas(cenaId: string | null, codigo: string): Armadilhas
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
     };
-  }, [cenaId, mexer]);
+  }, [cenaId, mexer, canalExtra]);
 
   const adicionar = useCallback<Armadilhas["adicionar"]>(
     async (nova) => {

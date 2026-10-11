@@ -54,6 +54,12 @@ export const PainelMapa = dynamic(
   { ssr: false, loading: AbrindoOMapa },
 );
 
+/** O vigia das armadilhas (só o Mestre o monta): também fora do pacote de abertura. */
+export const GuardaDeArmadilhas = dynamic(() => import("@/components/GuardaDeArmadilhas").then((m) => m.GuardaDeArmadilhas).catch(() => () => null), {
+  ssr: false,
+  loading: () => null,
+});
+
 export const VisorDaMesa = dynamic(
   () =>
     import("@/components/PainelMapa")

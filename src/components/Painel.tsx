@@ -40,7 +40,7 @@ import { LogCombate } from "@/components/LogCombate";
 import { AbaCampanha } from "@/components/AbaCampanha";
 import { DestaqueDoCartao } from "@/components/QuadroCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
-import { PainelMapa } from "@/components/MapaSobDemanda";
+import { GuardaDeArmadilhas, PainelMapa } from "@/components/MapaSobDemanda";
 import { Telao } from "@/components/Telao";
 import { BASTIAO_ATIVO, BarraAbas, type Aba } from "@/components/BarraAbas";
 import { EscolherCampanha } from "@/components/EscolherCampanha";
@@ -403,6 +403,8 @@ function PainelSala({ codigo }: { codigo: string }) {
           aoDispensar={() => setMapaVisto(cenas.naMesa?.id ?? null)}
         />
       )}
+
+      {souMestre && cenas.naMesa && <GuardaDeArmadilhas cena={cenas.naMesa} codigo={codigo} sala={sala} />}
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 

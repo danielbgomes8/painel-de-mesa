@@ -332,3 +332,35 @@ test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, 
   expect(errosJogador).toEqual([]);
   await contexto.close();
 });
+
+test("armadilhas: o aviso de pisada aparece em qualquer aba do Mestre, não só no Mapa", async ({ page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  await criarPeca(cena.id, "jogador-robo", 165, 165);
+  const r = await rest("cena_armadilhas", {
+    method: "POST",
+    body: JSON.stringify({ cena_id: cena.id, room_code: SALA, nome: "Chamas ocultas", x: 405, y: 285, raio: 0.75, salvaguarda: "DES", cd: 14, dano: "3d6 fogo", estado: "armada" }),
+  });
+  expect(r.ok).toBe(true);
+
+  // O Mestre sai do Mapa e fica na aba Combate.
+  await page.getByRole("button", { name: "Combate", exact: true }).click();
+  await expect(page.locator(".cena-canvas")).toHaveCount(0);
+  await page.waitForTimeout(2500); // o vigia aprende onde cada um está antes de alguém pisar
+
+  const peao = (await pecasDoBanco()).find((p) => p.slug === "jogador-robo")!;
+  const mover = await rest(`cena_pecas?id=eq.${peao.id}`, { method: "PATCH", body: JSON.stringify({ x: 405, y: 285 }) });
+  expect(mover.ok).toBe(true);
+  const aviso = page.locator(".arm-aviso");
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await expect(aviso).toContainText("Jogador Robô pisou em Chamas ocultas");
+
+  // Resolver daqui já vale: dispara, e o estado muda no banco.
+  await aviso.getByRole("button", { name: "disparar" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("disparada");
+  await expect(aviso).toHaveCount(0);
+  expect(erros).toEqual([]);
+});

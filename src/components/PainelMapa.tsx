@@ -10,8 +10,7 @@ import { EditorDeDesenho, ListaDeNotas, NovaNota } from "@/components/MarcasDoMa
 import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
 import { useArmadilhas } from "@/hooks/useArmadilhas";
-import { usePisadas } from "@/hooks/usePisadas";
-import { AvisosDePisada, PainelDeArmadilhas, type RascunhoDeArmadilha } from "@/components/ArmadilhasDoMapa";
+import { PainelDeArmadilhas, type RascunhoDeArmadilha } from "@/components/ArmadilhasDoMapa";
 import { LuzesNaMesa, PainelDeLuzes } from "@/components/LuzesDoMapa";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { encaixarNaGrade, montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
@@ -439,8 +438,6 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     [banco.pecas, cena, sala.personagens, sala.combate, pecaSelecionada],
   );
 
-  const pisadas = usePisadas(cena, arm.armadilhas, pecas);
-
   /** Onde cair um peão novo: o meio do que o Mestre está vendo. */
   function regiaoAtual() {
     return mapaRef.current?.regiaoVisivel() ?? null;
@@ -825,13 +822,6 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
 
           {cena && (
             <>
-              <AvisosDePisada
-                pendentes={pisadas.pendentes}
-                armadilhas={arm.armadilhas}
-                arm={arm}
-                aoResolver={pisadas.resolver}
-                registrar={(texto) => void sala.registrarLog(texto)}
-              />
               <PalcoDoMapa
                 nome={cena.nome || "Sem nome"}
                 estado={cena.na_mesa ? "Na mesa" : "Em preparo"}
