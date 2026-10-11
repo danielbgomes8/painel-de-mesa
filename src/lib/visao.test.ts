@@ -11,6 +11,7 @@ import {
   juntarMascaras,
   ladoDaMemoria,
   marcarVistos,
+  marcarVistosPorLuz,
   poligonoDeVisao,
   pontoNoPoligono,
   type Segmento,
@@ -160,5 +161,49 @@ describe("a memória do que já foi visto", () => {
     expect(juntarMascaras(a, b)).toBe(0);
     // Tamanhos diferentes não se misturam.
     expect(juntarMascaras(a, criarMascara({ ...cena, grade_px: 50 }))).toBe(0);
+  });
+});
+
+describe("o mapa escuro: o que está à vista E iluminado", () => {
+  const cenaEscura = { grade_ligada: true, grade_px: 50, largura: 1000, altura: 1000 };
+
+  it("a luz de um ilumina o que OUTRO jogador vê (vê-se o que está à vista e iluminado)", () => {
+    const m = criarMascara(cenaEscura);
+    // Quem olha está em (100, 500) sem luz; a tocha está em (300, 500) e ilumina 150 px em volta.
+    const los = poligonoDeVisao([100, 500], [], 2000);
+    const luz = poligonoDeVisao([300, 500], [], 150);
+    const novas = marcarVistosPorLuz(m, los, [luz]);
+    expect(novas).toBeGreaterThan(20);
+    // Uma célula no meio da luz está vista; uma longe da luz (mesmo à vista) não.
+    const seen = (x: number, y: number) => m.celulas[Math.floor(y / m.lado) * m.cols + Math.floor(x / m.lado)] === 1;
+    expect(seen(300, 500)).toBe(true);
+    expect(seen(700, 500)).toBe(false);
+  });
+
+  it("a luz não atravessa o que a vista não alcança: atrás de uma parede, escuro mesmo iluminado", () => {
+    const m = criarMascara(cenaEscura);
+    const parede: Segmento = [200, 300, 200, 700];
+    const los = poligonoDeVisao([100, 500], [parede], 2000);
+    const luz = poligonoDeVisao([300, 500], [parede], 150); // a tocha está do outro lado da parede (e a parede segura a luz também)
+    marcarVistosPorLuz(m, los, [luz]);
+    expect(contarCelulas(m)).toBe(0);
+  });
+
+  it("sem luz ou sem linha de visão, nada é marcado", () => {
+    const m = criarMascara(cenaEscura);
+    expect(marcarVistosPorLuz(m, poligonoDeVisao([100, 500], [], 2000), [])).toBe(0);
+    expect(marcarVistosPorLuz(m, [], [poligonoDeVisao([300, 500], [], 150)])).toBe(0);
+  });
+
+  it("duas luzes somam, e rodar de novo não conta duas vezes", () => {
+    const m = criarMascara(cenaEscura);
+    const los = poligonoDeVisao([100, 500], [], 2000);
+    const a = poligonoDeVisao([300, 500], [], 100);
+    const b = poligonoDeVisao([600, 500], [], 100);
+    const um = marcarVistosPorLuz(m, los, [a]);
+    const dois = marcarVistosPorLuz(m, los, [a, b]);
+    expect(dois).toBeGreaterThan(0);
+    expect(marcarVistosPorLuz(m, los, [a, b])).toBe(0);
+    expect(contarCelulas(m)).toBe(um + dois);
   });
 });

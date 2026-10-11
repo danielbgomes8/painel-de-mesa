@@ -94,6 +94,8 @@ export function comporNevoaComVisao(
   cena: Pick<Cena, "largura" | "altura">,
   agora: readonly (readonly Ponto[])[],
   memoria: Mascara | null,
+  /** Mapa escuro: cada observador abre só o que está à vista (`los`) E iluminado (`luz`, de qualquer um). */
+  porLuz: readonly { los: readonly Ponto[]; luz: readonly (readonly Ponto[])[] }[] = [],
 ): void {
   if (destino.width !== fino.width) destino.width = fino.width;
   if (destino.height !== fino.height) destino.height = fino.height;
@@ -125,6 +127,23 @@ export function comporNevoaComVisao(
     poli.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
     ctx.closePath();
     ctx.fill();
+  }
+  // Interseção por recorte: o que cabe na linha de visão e também numa luz.
+  for (const { los, luz } of porLuz) {
+    if (los.length < 3 || luz.length === 0) continue;
+    ctx.save();
+    ctx.beginPath();
+    los.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.closePath();
+    ctx.clip();
+    for (const poli of luz) {
+      if (poli.length < 3) continue;
+      ctx.beginPath();
+      poli.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
   ctx.globalCompositeOperation = "source-over";
   ctx.setTransform(1, 0, 0, 1, 0, 0);

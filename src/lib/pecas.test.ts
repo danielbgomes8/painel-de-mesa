@@ -169,6 +169,7 @@ describe("clicar num peão", () => {
     observa: true,
     inimigo: false,
     visaoPx: null,
+    luzPx: null,
   });
 
   it("acha o peão sob o ponto e ignora quem está fora do círculo", () => {
@@ -660,18 +661,39 @@ describe("a luz que o peão carrega", () => {
     expect(a.visaoPx).toBeNull();
   });
 
-  it("mapa escuro: com a tocha acesa vê 12 m; apagada, só o quadradinho", () => {
+  it("mapa escuro: a tocha acesa ilumina 12 m em volta; a visão PRÓPRIA continua sendo o quadradinho", () => {
     // 100 px por quadradinho de 1,5 m.
     const [acesa] = montar([peca({ id: "a", slug: "tiberio", luz: tocha })], escura);
     const [apagada] = montar([peca({ id: "a", slug: "tiberio", luz: { ...tocha, minutos: 0 } })], escura);
     const [semLuz] = montar([peca({ id: "a", slug: "tiberio" })], escura);
-    expect(acesa.visaoPx).toBeCloseTo(800, 6);
+    expect(acesa.luzPx).toBeCloseTo(800, 6);
+    expect(acesa.visaoPx).toBeCloseTo(100, 6);
+    expect(apagada.luzPx).toBeNull();
     expect(apagada.visaoPx).toBeCloseTo(100, 6);
+    expect(semLuz.luzPx).toBeNull();
     expect(semLuz.visaoPx).toBeCloseTo(100, 6);
+  });
+
+  it("visão no escuro é pessoal: amplia a visão própria e não ilumina ninguém", () => {
+    const [p] = montar([peca({ id: "a", slug: "tiberio", luz: { nome: "Visão no escuro", alcance: 18, minutos: null } })], escura);
+    expect(p.visaoPx).toBeCloseTo(1200, 6);
+    expect(p.luzPx).toBeNull();
+  });
+
+  it("marcador avulso com tocha (tocha no chão) ilumina, mas não enxerga; oculto, não ilumina", () => {
+    const [tocha1, tocha2] = montar(
+      [peca({ id: "m", slug: null, nome: "Tocha na parede", luz: tocha }), peca({ id: "n", slug: null, nome: "Escondida", oculto: true, luz: tocha })],
+      escura,
+    );
+    expect(tocha1.luzPx).toBeCloseTo(800, 6);
+    expect(tocha1.visaoPx).toBeNull();
+    expect(tocha1.observa).toBe(false);
+    expect(tocha2.luzPx).toBeNull();
   });
 
   it("inimigo no escuro enxerga como a cena manda, mesmo carregando luz", () => {
     const [d] = montar([peca({ id: "d", slug: "dragao", luz: tocha })], escura);
     expect(d.visaoPx).toBeNull();
+    expect(d.luzPx).toBeCloseTo(800, 6); // mas a tocha dele ilumina pra quem estiver vendo
   });
 });

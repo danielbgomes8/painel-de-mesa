@@ -199,6 +199,43 @@ test("mapa escuro: com a tocha acesa o grupo explora longe; apagada, só o quadr
   expect(erros).toEqual([]);
 });
 
+test("mapa escuro: a tocha de um ilumina o que outro jogador, sem luz, enxerga", async ({ page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await mudarCena(cena.id, { visao_ligada: true, escura: true, explorado: "" });
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  await criarPeca(cena.id, "jogador-robo", 165, 165); // sem luz: só enxerga o quadradinho em volta
+
+  const explorados = async () => {
+    const c = await cenaDoBanco();
+    const m = decodificarMascara(String(c.explorado ?? ""), c as unknown as Parameters<typeof decodificarMascara>[1]);
+    return m ? contarCelulas(m) : 0;
+  };
+  await expect.poll(explorados, { timeout: 45_000, intervals: [1000] }).toBeGreaterThan(0);
+  await page.waitForTimeout(3000);
+  const sozinho = await explorados();
+  expect(sozinho).toBeLessThan(25); // só o quadradinho em volta
+
+  // Uma tocha no chão (marcador avulso, ao lado do jogador) acende: ela ilumina 12 m e o jogador enxerga isso.
+  await criarPeca(cena.id, "", 225, 165, { slug: null, nome: "Tocha no chão", luz_nome: "Tocha", luz_alcance: 12, luz_minutos: 60 });
+  await expect.poll(explorados, { timeout: 45_000, intervals: [1000] }).toBeGreaterThan(sozinho + 60);
+
+  // Apagada, não ilumina mais: o jogador levado pra longe não ganha nada além do quadradinho dele.
+  const antes = await explorados();
+  const peao = (await pecasDoBanco()).find((p) => p.slug === "jogador-robo")!;
+  const marcador = (await pecasDoBanco()).find((p) => p.slug === null)!;
+  let r = await rest(`cena_pecas?id=eq.${marcador.id}`, { method: "PATCH", body: JSON.stringify({ luz_minutos: 0 }) });
+  expect(r.ok).toBe(true);
+  r = await rest(`cena_pecas?id=eq.${peao.id}`, { method: "PATCH", body: JSON.stringify({ x: 765, y: 465 }) });
+  expect(r.ok).toBe(true);
+  await expect.poll(explorados, { timeout: 45_000, intervals: [1000] }).toBeGreaterThan(antes);
+  await page.waitForTimeout(3000);
+  expect((await explorados()) - antes).toBeLessThan(25);
+  expect(erros).toEqual([]);
+});
+
 test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, e ele dispara, deixa passar ou desarma", async ({ browser, page }) => {
   const erros = coletarErros(page);
   await limparSala();

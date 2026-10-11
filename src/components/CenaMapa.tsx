@@ -63,6 +63,7 @@ import {
   decodificarMascara,
   juntarMascaras,
   marcarVistos,
+  marcarVistosPorLuz,
   poligonoDeVisao,
   type Mascara,
 } from "@/lib/visao";
@@ -399,18 +400,26 @@ export function CenaMapa({
     const pecas = p.pecas ?? [];
     // Mapa escuro: cada jogador enxerga até onde a luz dele vai (`visaoPx`); fora disso, o alcance da cena.
     const dosJogadores = pecas.filter((x) => x.observa).map((x) => poligonoDeVisao(onde(x), segmentos, x.visaoPx ?? alcance));
+    // Mapa escuro: a luz de cada um (e de marcadores com tocha) ilumina o que a vista dela alcança, e QUALQUER jogador
+    // enxerga o que está à vista dele e iluminado. Sem luz acesa por aí, esta lista fica vazia e nada muda.
+    const luzes = pecas.filter((x) => x.luzPx !== null).map((x) => poligonoDeVisao(onde(x), segmentos, x.luzPx as number));
+    const porLuz =
+      luzes.length === 0
+        ? []
+        : pecas.filter((x) => x.observa && x.visaoPx !== null).map((x) => ({ los: poligonoDeVisao(onde(x), segmentos, alcance), luz: luzes }));
     visaoDosInimigosRef.current = p.mestre && p.verVisaoDosInimigos ? pecas.filter((x) => x.inimigo).map((x) => poligonoDeVisao(onde(x), segmentos, alcance)) : [];
     const memoria = memoriaDaCena();
     // Só vira "já visto" o que a MESA viu: com o mapa ainda sendo preparado, o
     // Mestre pode mexer nos peões à vontade sem gastar a névoa.
     if (c.na_mesa) {
       marcarVistos(memoria, dosJogadores);
+      for (const { los, luz } of porLuz) marcarVistosPorLuz(memoria, los, luz);
       // Sempre pergunta se há o que guardar (e não só quando surgiu célula nova): o
       // relógio pode ter sido cancelado, e quem sabe se já foi tudo gravado é a comparação.
       agendarExplorar();
     }
     if (!composicaoRef.current) composicaoRef.current = document.createElement("canvas");
-    comporNevoaComVisao(composicaoRef.current, fino, c, dosJogadores, memoria);
+    comporNevoaComVisao(composicaoRef.current, fino, c, dosJogadores, memoria, porLuz);
     nevoaFinalRef.current = composicaoRef.current;
   }, [memoriaDaCena, agendarExplorar]);
 

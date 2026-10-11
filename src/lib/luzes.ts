@@ -118,18 +118,29 @@ export function acabandoLogo(luz: Luz | null): boolean {
   return luz !== null && luz.minutos !== null && luz.minutos > 0 && luz.minutos <= 10;
 }
 
+/** Luz PESSOAL: a que não acaba (visão no escuro). Ela é do portador e não ilumina ninguém. Toda luz que
+ *  gasta (tocha, lamparina, magia...) é COMPARTILHADA: ilumina o que está em volta, pra quem estiver vendo. */
+export function luzPessoal(luz: Luz | null): boolean {
+  return luz !== null && luz.minutos === null;
+}
+
+type CenaParaLuz = Pick<Cena, "escura" | "grade_px" | "metros" | "largura" | "altura" | "visao_alcance">;
+
 /**
- * Até onde este jogador enxerga, em px da imagem, ou null = "como a cena manda" (mapa claro, ou quem
- * não é jogador). Em mapa escuro: com luz acesa, o alcance dela; sem, o quadradinho em volta.
+ * A visão PRÓPRIA deste jogador, em px da imagem, ou null = "como a cena manda" (mapa claro, ou quem não
+ * é jogador). Em mapa escuro: com visão no escuro, o alcance dela; sem, só o quadradinho em volta. O que
+ * as luzes que gastam iluminam (a dele e as dos outros) entra à parte, por `luzCompartilhadaPx`.
  */
-export function visaoDoPortadorPx(
-  cena: Pick<Cena, "escura" | "grade_px" | "metros" | "largura" | "altura" | "visao_alcance">,
-  luz: Luz | null,
-  ehJogador: boolean,
-): number | null {
+export function visaoDoPortadorPx(cena: CenaParaLuz, luz: Luz | null, ehJogador: boolean): number | null {
   if (!cena.escura || !ehJogador) return null;
-  const metros = luzAcesa(luz) && luz ? luz.alcance : RAIO_NO_ESCURO_M;
+  const metros = luzPessoal(luz) && luzAcesa(luz) && luz ? luz.alcance : RAIO_NO_ESCURO_M;
   return alcanceEmPx({ ...cena, visao_alcance: metros });
+}
+
+/** Até onde esta luz ILUMINA em volta do portador, em px, ou null (mapa claro, luz apagada, ou pessoal). */
+export function luzCompartilhadaPx(cena: CenaParaLuz, luz: Luz | null): number | null {
+  if (!cena.escura || !luz || luzPessoal(luz) || !luzAcesa(luz)) return null;
+  return alcanceEmPx({ ...cena, visao_alcance: luz.alcance });
 }
 
 /** Resumo pro painel e pro telão: quem carrega, a luz e o que falta. */

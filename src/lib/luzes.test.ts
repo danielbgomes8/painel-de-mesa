@@ -11,6 +11,8 @@ import {
   lerLuz,
   linhaDaLuz,
   luzAcesa,
+  luzCompartilhadaPx,
+  luzPessoal,
   luzDaPronta,
   minutosValidos,
   rotuloDoAlcance,
@@ -124,24 +126,37 @@ describe("rótulos", () => {
 
 describe("a visão do portador em mapa escuro", () => {
   const px = (m: number) => (m * 70) / 1.5;
+  const visaoNoEscuro: Luz = { nome: "Visão no escuro", alcance: 18, minutos: null };
 
   it("mapa claro: não mexe (null = como a cena manda)", () => {
     expect(visaoDoPortadorPx({ ...cena, escura: false }, tocha, true)).toBeNull();
+    expect(luzCompartilhadaPx({ ...cena, escura: false }, tocha)).toBeNull();
   });
 
-  it("mapa escuro, luz acesa: o alcance da luz", () => {
-    expect(visaoDoPortadorPx(cena, tocha, true)).toBeCloseTo(px(12), 6);
+  it("a luz que gasta (tocha) é compartilhada: ilumina em volta, e a visão própria fica no quadradinho", () => {
+    expect(luzCompartilhadaPx(cena, tocha)).toBeCloseTo(px(12), 6);
+    expect(visaoDoPortadorPx(cena, tocha, true)).toBeCloseTo(px(RAIO_NO_ESCURO_M), 6);
   });
 
-  it("mapa escuro, luz apagada ou sem luz: só o quadradinho em volta", () => {
-    expect(visaoDoPortadorPx(cena, { ...tocha, minutos: 0 }, true)).toBeCloseTo(px(RAIO_NO_ESCURO_M), 6);
+  it("luz apagada ou sem luz: não ilumina, e a visão própria é só o quadradinho em volta", () => {
+    const apagada = { ...tocha, minutos: 0 };
+    expect(luzCompartilhadaPx(cena, apagada)).toBeNull();
+    expect(luzCompartilhadaPx(cena, null)).toBeNull();
+    expect(visaoDoPortadorPx(cena, apagada, true)).toBeCloseTo(px(RAIO_NO_ESCURO_M), 6);
     expect(visaoDoPortadorPx(cena, null, true)).toBeCloseTo(px(RAIO_NO_ESCURO_M), 6);
   });
 
-  it("a luz que apaga encolhe a visão", () => {
-    const antes = visaoDoPortadorPx(cena, tocha, true)!;
-    const depois = visaoDoPortadorPx(cena, gastarLuz(tocha, 60), true)!;
-    expect(depois).toBeLessThan(antes);
+  it("a visão no escuro é pessoal: amplia a visão própria e não ilumina ninguém", () => {
+    expect(luzPessoal(visaoNoEscuro)).toBe(true);
+    expect(luzPessoal(tocha)).toBe(false);
+    expect(visaoDoPortadorPx(cena, visaoNoEscuro, true)).toBeCloseTo(px(18), 6);
+    expect(luzCompartilhadaPx(cena, visaoNoEscuro)).toBeNull();
+  });
+
+  it("a luz que apaga deixa de iluminar", () => {
+    const antes = luzCompartilhadaPx(cena, tocha)!;
+    expect(antes).toBeGreaterThan(0);
+    expect(luzCompartilhadaPx(cena, gastarLuz(tocha, 60))).toBeNull();
   });
 
   it("inimigo enxerga como a cena manda, mesmo no escuro", () => {
@@ -150,6 +165,7 @@ describe("a visão do portador em mapa escuro", () => {
 
   it("nunca passa da diagonal do mapa", () => {
     const pequeno = { ...cena, largura: 300, altura: 300 };
-    expect(visaoDoPortadorPx(pequeno, { nome: "Sol", alcance: 120, minutos: null }, true)).toBeLessThanOrEqual(Math.hypot(300, 300));
+    expect(visaoDoPortadorPx(pequeno, visaoNoEscuro, true)).toBeLessThanOrEqual(Math.hypot(300, 300));
+    expect(luzCompartilhadaPx(pequeno, { nome: "Sol", alcance: 120, minutos: 60 })).toBeLessThanOrEqual(Math.hypot(300, 300));
   });
 });

@@ -16,7 +16,7 @@ import { corDoJogador } from "./ping";
 import type { Segmento } from "./visao";
 import { CONDICOES, ICONE_CONDICAO, ICONE_EXAUSTAO, condicoesAtivas } from "./condicoes";
 import { estaCaido } from "./regras";
-import { lerLuz, visaoDoPortadorPx, type Luz } from "./luzes";
+import { lerLuz, luzCompartilhadaPx, visaoDoPortadorPx, type Luz } from "./luzes";
 
 export type TamanhoPeca = 1 | 2 | 3 | 4;
 
@@ -109,6 +109,9 @@ export type PecaNaTela = {
   espacoPx: number;
   /** Até onde este jogador enxerga em px da imagem, num mapa ESCURO (a luz que ele carrega); null = como a cena manda. */
   visaoPx: number | null;
+  /** Até onde a luz que ele carrega ilumina em volta (px da imagem), pra quem estiver vendo; null = não ilumina
+   *  (mapa claro, sem luz, luz apagada, visão no escuro, ou peão oculto: a luz entregaria onde ele está). */
+  luzPx: number | null;
 };
 
 export const COR_PECA_INIMIGO = "#c0443a";
@@ -510,6 +513,7 @@ export function montarPecasNaTela(entrada: {
       auraPx: raioDaAuraPx(cena, p.tamanho, p.aura),
       espacoPx: (p.tamanho * ladoDeReferencia(cena)) / 2,
       visaoPx: visaoDoPortadorPx({ escura: false, visao_alcance: null, ...cena }, p.luz, Boolean(ficha) && !ficha?.is_npc),
+      luzPx: p.oculto ? null : luzCompartilhadaPx({ escura: false, visao_alcance: null, ...cena }, p.luz),
     };
   });
 }

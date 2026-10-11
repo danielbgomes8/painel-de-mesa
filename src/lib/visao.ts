@@ -145,6 +145,44 @@ export function marcarVistos(m: Mascara, poligonos: readonly (readonly Ponto[])[
   return novas;
 }
 
+/** Marca como vista toda célula cujo centro está DENTRO da linha de visão `los` E dentro de alguma luz.
+ *  É a conta do mapa escuro: o que se vê é o que está à vista E iluminado (a luz de qualquer um). Devolve
+ *  quantas células novas foram marcadas. */
+export function marcarVistosPorLuz(m: Mascara, los: readonly Ponto[], luzes: readonly (readonly Ponto[])[]): number {
+  if (los.length < 3 || luzes.length === 0) return 0;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const poli of luzes) {
+    for (const [x, y] of poli) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  const c0 = Math.max(0, Math.floor(minX / m.lado));
+  const c1 = Math.min(m.cols - 1, Math.floor(maxX / m.lado));
+  const r0 = Math.max(0, Math.floor(minY / m.lado));
+  const r1 = Math.min(m.rows - 1, Math.floor(maxY / m.lado));
+  let novas = 0;
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      const i = r * m.cols + c;
+      if (m.celulas[i]) continue;
+      const x = (c + 0.5) * m.lado;
+      const y = (r + 0.5) * m.lado;
+      if (!pontoNoPoligono(x, y, los)) continue;
+      if (luzes.some((poli) => poli.length >= 3 && pontoNoPoligono(x, y, poli))) {
+        m.celulas[i] = 1;
+        novas++;
+      }
+    }
+  }
+  return novas;
+}
+
 /** Soma as células de `b` em `a` (a máscara de `a` cresce; devolve quantas eram novas).
  *  Máscaras de tamanhos diferentes não se misturam: devolve 0. */
 export function juntarMascaras(a: Mascara, b: Mascara): number {
