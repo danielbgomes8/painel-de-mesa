@@ -92,7 +92,7 @@ async function prepararMapa(page: Page) {
   await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
   await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
-  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+  await expect(page.locator(".palco-nome").getByText("Na mesa")).toBeVisible();
 }
 
 async function abrirComoJogador(browser: import("@playwright/test").Browser, slug: string) {
