@@ -171,3 +171,21 @@ Canal próprio (`useTempo.ts`, molde do `useBau`) e tolerante à migration ausen
   `UMA_LINHA_POR_SALA`) e o robô de tela limpa as duas. O robô de esquema confere as colunas contra o banco.
 - **Não cobre**: relógio/hora do dia, estações e clima, efeito ligado à ficha do personagem (a lista é à parte; o "quem" é texto),
   contagem em rodadas de combate (isso já existe nos prazos das condições), mudar o dia pelo jogador.
+
+## Folhas de entrega (11/10/2026, migration `0037_perigos_e_folhas.sql`)
+
+Cartas, pergaminhos e o mapa do tesouro. Escolha do Daniel: o Mestre entrega a **um jogador (em segredo) ou à mesa toda**.
+Parte nova **📜 Folhas** da aba Campanha (`FolhasDaCampanha.tsx`, `useFolhas.ts`, regras em `lib/folhas.ts`, testadas).
+
+- **O que o Quadro já fazia e a folha NÃO repete**: mostrar uma foto em tela cheia pra mesa (o "📣 Mostrar à mesa agora" dos cartões,
+  telão e celulares, com silhueta). O que faltava era entregar algo a **um** jogador, em segredo.
+- Tabela `folhas`: `titulo`, `texto` (até 2000), `foto` (caminho no bucket `mapas`, em `<sala>/folhas/`), `para` (slug do jogador; nulo =
+  a mesa toda) e `entregue_em` (nulo = **rascunho**, só o Mestre vê). `folhasVisiveis` decide quem vê o quê (rascunho: só o Mestre; entregue:
+  o destinatário, ou todos; telão e quem não escolheu quem é: nada). Esconde NA TELA, como o resto.
+- **Aviso**: o jogador recebe o banner "📜 Chegou uma folha pra você" (`BannerFolhaNova`, com vibração curta) em qualquer aba menos a
+  Campanha; "ler" abre direto as Folhas. O que cada aparelho **já abriu** fica só nele (`localStorage`, `lerVistas`/`guardarVistas`); abrir a
+  lista dá as folhas por vistas e o botão mostra "📜 Folhas (2)" enquanto há novas.
+- Foto: reduzida a 1400 px no aparelho (`prepararImagem`), caminho novo a cada envio (cache de um ano), apagada do Storage quando a folha ou
+  a foto sai. Entra no backup bruto (tabela e fotos) e no robô de esquema.
+- Robô `e2e/folhas.e2e.ts`: rascunho invisível, entrega pra Ana (aviso só pra ela, foto carrega, Beto não vê), recolher, mudar pra mesa toda,
+  apagar (some a foto do Storage).

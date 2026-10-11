@@ -360,3 +360,26 @@ nome de antes; o conteúdo é o mesmo.)
   disparar, rearmar, revelar, desarmar, editar, apagar. Entra em `limparSala` e no backup bruto (`cena_armadilhas`).
 - **Não cobre**: a luz de um peão iluminando os vizinhos (cada um vê só a própria luz), luz que muda de cor/forma (cone), armadilha que
   dispara sozinha, aviso com a aba Mapa fechada, devolver a luz ao desfazer a saída de um inimigo da iniciativa.
+
+## Segunda leva de luzes e armadilhas (11/10/2026; migration `0037_perigos_e_folhas.sql` só pro item 3)
+
+O Daniel pediu quatro melhorias em cima das luzes e armadilhas. Decisões dele: perigo **avisa o Mestre e ele aplica o dano**.
+
+- **Luz que ilumina os vizinhos** (sem migration). A luz que gasta (tocha, vela, lamparina, magia) é **compartilhada**: ilumina o que a
+  linha de visão DELA alcança (`luzCompartilhadaPx` → `PecaNaTela.luzPx`; o polígono sai de `poligonoDeVisao` com o alcance da luz, então
+  parede segura a luz também) e qualquer jogador enxerga **o que está à vista dele E iluminado** por qualquer luz. A **visão no escuro**
+  (`minutos` nulo) é **pessoal**: amplia a visão própria (`visaoPx`) e não ilumina ninguém. Sem luz, a visão própria é o quadradinho.
+  Marcador avulso com tocha (tocha no chão) ilumina e não enxerga; peão **oculto** não ilumina (a luz entregaria onde ele está); a tocha
+  de um inimigo visível ilumina. No `CenaMapa.recomporNevoa`: `dosJogadores` (visão própria) + `porLuz` (linha de visão de cada jogador
+  × polígonos de luz), a interseção desenhada por **recorte** de canvas (`comporNevoaComVisao`) e a memória pelo `marcarVistosPorLuz`.
+  Mapa claro: `visaoPx` e `luzPx` nulos, nada muda. O robô prova com um marcador-tocha ao lado de um jogador sem luz (**conferido que falha**
+  com o compartilhamento desligado).
+- **Aviso de pisada em qualquer aba** (sem migration). `GuardaDeArmadilhas.tsx` (montado no `Painel` pro Mestre enquanto há mapa na mesa, via
+  `MapaSobDemanda` pra não pesar a abertura) tem leituras próprias de armadilhas e peões com **canal separado** (`usePecas`/`useArmadilhas`
+  ganharam o 3º parâmetro `canalExtra`; dois canais com o mesmo nome brigam). O aviso saiu do editor do mapa: **uma fonte só**.
+- **Perigos contínuos** (`cena_armadilhas.tipo = 'perigo'`). Fogo, gás, ácido, água gelada (`PERIGOS_PRONTOS`): zona de 3 a 4,5 m que **nasce à
+  vista da mesa** (estado `revelada`; `armada` = escondido), não se gasta e **avisa o Mestre ao ENTRAR e no INÍCIO DO TURNO de quem está dentro**
+  (`avaliarPisadas` recebe `vezDe`; `Pisada.motivo` = `entrou` | `turno`). No aviso: rolar o dano, **registrar no log**, extinguir ou deixar
+  passar; o Mestre aplica o dano (decisão dele). Armadilha comum nunca avisa de turno. A coluna `tipo` só vai no `insert` quando é perigo,
+  pra armadilha comum seguir funcionando antes da migration. Desenhado em laranja com ☠️.
+- **Limites**: a visão por luz não distingue luz colorida/cone; o início do turno depende da iniciativa (sem ordem montada não há "turno").
