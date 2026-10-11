@@ -16,6 +16,7 @@ import { corDoJogador } from "./ping";
 import type { Segmento } from "./visao";
 import { CONDICOES, ICONE_CONDICAO, ICONE_EXAUSTAO, condicoesAtivas } from "./condicoes";
 import { estaCaido } from "./regras";
+import { lerLuz, visaoDoPortadorPx, type Luz } from "./luzes";
 
 export type TamanhoPeca = 1 | 2 | 3 | 4;
 
@@ -36,6 +37,8 @@ export type Peca = {
   oculto: boolean;
   /** Aura (emanação): raio em metros a partir da borda do espaço dele; null = sem aura. */
   aura: number | null;
+  /** A luz que ele carrega (tocha, lamparina...); null = sem luz. Ver lib/luzes.ts. */
+  luz: Luz | null;
   created_at: string;
 };
 
@@ -104,6 +107,8 @@ export type PecaNaTela = {
    *  conta pra "está dentro da área" (qualquer parte do espaço dentro vale), não o
    *  diâmetro desenhado, que é um pouco menor. */
   espacoPx: number;
+  /** Até onde este jogador enxerga em px da imagem, num mapa ESCURO (a luz que ele carrega); null = como a cena manda. */
+  visaoPx: number | null;
 };
 
 export const COR_PECA_INIMIGO = "#c0443a";
@@ -134,6 +139,7 @@ export function normalizarPeca(linha: unknown): Peca | null {
     cor: typeof o.cor === "string" && COR_VALIDA.test(o.cor) ? o.cor : null,
     oculto: o.oculto === true,
     aura: auraValida(o.aura),
+    luz: lerLuz(o),
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };
 }
@@ -469,7 +475,7 @@ export function raioDaAuraPx(
 
 export function montarPecasNaTela(entrada: {
   pecas: readonly Peca[];
-  cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura" | "metros">;
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura" | "metros"> & Partial<Pick<Cena, "escura" | "visao_alcance">>;
   fichas: readonly FichaParaPeca[];
   /** Slug de quem tem a vez na iniciativa (ou null). */
   vezDe: string | null;
@@ -503,6 +509,7 @@ export function montarPecasNaTela(entrada: {
       aura: p.aura,
       auraPx: raioDaAuraPx(cena, p.tamanho, p.aura),
       espacoPx: (p.tamanho * ladoDeReferencia(cena)) / 2,
+      visaoPx: visaoDoPortadorPx({ escura: false, visao_alcance: null, ...cena }, p.luz, Boolean(ficha) && !ficha?.is_npc),
     };
   });
 }

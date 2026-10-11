@@ -22,6 +22,7 @@ describe("restaurar o backup diário bruto", () => {
     expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_nevoa"));
     expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_pecas"));
     expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_paredes"));
+    expect(ordem.indexOf("cenas")).toBeLessThan(ordem.indexOf("cena_armadilhas"));
     expect(ordem.indexOf("rooms")).toBeLessThan(ordem.indexOf("characters"));
   });
 

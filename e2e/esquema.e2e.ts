@@ -12,6 +12,7 @@ import type { Cena, RegraNevoa } from "../src/lib/cenas";
 import type { Peca } from "../src/lib/pecas";
 import type { Parede } from "../src/lib/paredes";
 import type { Marca } from "../src/lib/marcas";
+import type { Armadilha } from "../src/lib/armadilhas";
 import type { Cartao, Ligacao, NotaDoCartao } from "../src/lib/quadro";
 import type { EfeitoDeTempo, LinhaTempo } from "../src/lib/tempoCampanha";
 import type { LinhaBastiao, LinhaCombate } from "../src/hooks/useSala";
@@ -162,6 +163,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       camera: true,
       visao_ligada: true,
       visao_alcance: true,
+      escura: true,
       explorado: true,
       created_at: true,
     }),
@@ -173,20 +175,26 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
   },
   {
     tabela: "cena_pecas",
-    colunas: colunas<Peca>({
-      id: true,
-      cena_id: true,
-      room_code: true,
-      slug: true,
-      nome: true,
-      x: true,
-      y: true,
-      tamanho: true,
-      cor: true,
-      oculto: true,
-      aura: true,
-      created_at: true,
-    }),
+    // A luz é um objeto no tipo e três colunas no banco (`luz_nome`, `luz_alcance`, `luz_minutos`).
+    colunas: [
+      ...colunas<Omit<Peca, "luz">>({
+        id: true,
+        cena_id: true,
+        room_code: true,
+        slug: true,
+        nome: true,
+        x: true,
+        y: true,
+        tamanho: true,
+        cor: true,
+        oculto: true,
+        aura: true,
+        created_at: true,
+      }),
+      "luz_nome",
+      "luz_alcance",
+      "luz_minutos",
+    ],
   },
   {
     tabela: "cena_paredes",
@@ -195,6 +203,24 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
   {
     tabela: "cena_marcas",
     colunas: colunas<Marca>({ id: true, cena_id: true, room_code: true, tipo: true, cor: true, pontos: true, x: true, y: true, texto: true, visivel: true, created_at: true }),
+  },
+  {
+    tabela: "cena_armadilhas",
+    colunas: colunas<Armadilha>({
+      id: true,
+      cena_id: true,
+      room_code: true,
+      nome: true,
+      x: true,
+      y: true,
+      raio: true,
+      salvaguarda: true,
+      cd: true,
+      dano: true,
+      nota: true,
+      estado: true,
+      created_at: true,
+    }),
   },
   {
     tabela: "quadro_cartoes",

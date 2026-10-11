@@ -9,8 +9,12 @@ import { useMarcas } from "@/hooks/useMarcas";
 import { EditorDeDesenho, ListaDeNotas, NovaNota } from "@/components/MarcasDoMapa";
 import { COR_MARCA_PADRAO, marcasVisiveis, type ModoMarca } from "@/lib/marcas";
 import { usePecas } from "@/hooks/usePecas";
+import { useArmadilhas } from "@/hooks/useArmadilhas";
+import { usePisadas } from "@/hooks/usePisadas";
+import { AvisosDePisada, PainelDeArmadilhas, type RascunhoDeArmadilha } from "@/components/ArmadilhasDoMapa";
+import { LuzesNaMesa, PainelDeLuzes } from "@/components/LuzesDoMapa";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
-import { montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
+import { encaixarNaGrade, montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
 import { segmentosQueBloqueiam, type ModoParede, type Parede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
@@ -102,6 +106,7 @@ export function VisorDaMesa({
   // As paredes não aparecem pra mesa: só decidem o que a visão automática alcança.
   const muros = useParedes(cena.id, codigo);
   const desenhos = useMarcas(cena.id, codigo);
+  const arm = useArmadilhas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
   // O que o toque faz no mapa: mexer, medir (régua ou área de magia) ou pingar.
   const [uso, setUso] = useState<"mover" | "medir" | "ping">("mover");
@@ -131,6 +136,13 @@ export function VisorDaMesa({
       }),
     [banco.pecas, cena, sala.personagens, sala.combate, meuSlug],
   );
+  // O tempo das luzes que a mesa enxerga: de jogador e de marcador visível (nunca de inimigo, oculto ou não).
+  const luzesDaMesa = banco.pecas.flatMap((p) => {
+    if (!p.luz || p.oculto) return [];
+    const ficha = p.slug ? sala.personagens.find((f) => f.slug === p.slug) : undefined;
+    if (p.slug && (!ficha || ficha.is_npc)) return [];
+    return [{ id: p.id, quem: ficha?.name || p.nome || "alguém", luz: p.luz }];
+  });
   const minhaFicha = meuSlug ? sala.personagens.find((p) => p.slug === meuSlug) : undefined;
   const semMeuPeao = Boolean(minhaFicha) && !banco.pecas.some((p) => p.slug === meuSlug);
   const temCompanheiros = sala.personagens.some((f) => f.dono);
@@ -163,6 +175,7 @@ export function VisorDaMesa({
       aoAreaar={quem ? ping.enviarArea : undefined}
       paredes={muros.paredes}
       marcas={desenhos.marcas}
+      armadilhas={arm.armadilhas}
       visaoPronta={!muros.carregando && !banco.carregando}
       pecas={pecas}
       aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
@@ -175,6 +188,7 @@ export function VisorDaMesa({
       <div className="mapa-visor mapa-visor--telao">
         {mapa}
         <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />
+        <LuzesNaMesa itens={luzesDaMesa} telao />
       </div>
     );
   }
@@ -264,6 +278,7 @@ export function VisorDaMesa({
         dica={dica}
       />
       <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} />
+      <LuzesNaMesa itens={luzesDaMesa} />
       {aberto && aberto.ficha.slug === meuSlug && (
         <CartaoDoPeao
           key={aberto.peca.id}
@@ -348,7 +363,7 @@ export function PainelMapa({
   return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
 }
 
-type Uso = "mover" | "nevoa" | "medir" | "desenhar" | "peoes" | "paredes" | "grade" | "ping" | "mesa";
+type Uso = "mover" | "nevoa" | "medir" | "desenhar" | "peoes" | "luz" | "armadilhas" | "paredes" | "grade" | "ping" | "mesa";
 type FormaNevoa = "pincel" | "retangulo" | "quadradinhos";
 
 const ROTULO_DO_USO: Record<Exclude<Uso, "ping" | "mesa">, FerramentaDoPalco> = {
@@ -357,6 +372,8 @@ const ROTULO_DO_USO: Record<Exclude<Uso, "ping" | "mesa">, FerramentaDoPalco> = 
   medir: { id: "medir", rotulo: "Medir", icone: "medir" },
   desenhar: { id: "desenhar", rotulo: "Desenhar", icone: "desenhar" },
   peoes: { id: "peoes", rotulo: "Peões", icone: "peoes" },
+  luz: { id: "luz", rotulo: "Escuridão e luzes", icone: "luz" },
+  armadilhas: { id: "armadilhas", rotulo: "Armadilhas", icone: "armadilha" },
   paredes: { id: "paredes", rotulo: "Paredes e portas", icone: "paredes" },
   grade: { id: "grade", rotulo: "Cena e grade", icone: "grade" },
 };
@@ -385,6 +402,9 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const muros = useParedes(cena?.id ?? null, codigo);
   const [modoParede, setModoParede] = useState<ModoParede>("parede");
   const desenhos = useMarcas(cena?.id ?? null, codigo);
+  const arm = useArmadilhas(cena?.id ?? null, codigo);
+  /** Armadilha preparada, esperando um toque no mapa pra dizer onde fica. */
+  const [rascunhoArm, setRascunhoArm] = useState<RascunhoDeArmadilha | null>(null);
   const [modoMarca, setModoMarca] = useState<ModoMarca>("livre");
   const [corMarca, setCorMarca] = useState<string>(COR_MARCA_PADRAO);
   const [marcaParaMesa, setMarcaParaMesa] = useState(true);
@@ -418,6 +438,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
         : [],
     [banco.pecas, cena, sala.personagens, sala.combate, pecaSelecionada],
   );
+
+  const pisadas = usePisadas(cena, arm.armadilhas, pecas);
 
   /** Onde cair um peão novo: o meio do que o Mestre está vendo. */
   function regiaoAtual() {
@@ -455,6 +477,13 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
       const [x, y] = cena ? [Math.min(cena.largura, Math.max(0, ponto[0])), Math.min(cena.altura, Math.max(0, ponto[1]))] : ponto;
       void desenhos.atualizar(movendoNota, { x, y });
       setMovendoNota(null);
+      return;
+    }
+    if (rascunhoArm && cena) {
+      // A armadilha cai no centro do quadradinho tocado (sem grade, no ponto exato) e nasce escondida.
+      const [x, y] = encaixarNaGrade(cena, ponto[0], ponto[1], 1);
+      void arm.adicionar({ ...rascunhoArm, x, y });
+      setRascunhoArm(null);
       return;
     }
     if (!cena || !colocando) return;
@@ -523,8 +552,12 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
 
   // As ferramentas de cada fase. Paredes e desenhos somem quando o banco ainda não tem as tabelas.
   const idsDaFase: Exclude<Uso, "ping" | "mesa">[] =
-    faseAtual === "jogar" ? ["mover", "nevoa", "medir", "desenhar", "peoes"] : ["mover", "nevoa", "paredes", "peoes", "desenhar", "grade"];
-  const idsVisiveis = idsDaFase.filter((id) => !(id === "desenhar" && desenhos.indisponivel) && !(id === "paredes" && muros.indisponivel));
+    faseAtual === "jogar"
+      ? ["mover", "nevoa", "medir", "desenhar", "peoes", "luz", "armadilhas"]
+      : ["mover", "nevoa", "paredes", "peoes", "luz", "armadilhas", "desenhar", "grade"];
+  const idsVisiveis = idsDaFase.filter(
+    (id) => !(id === "desenhar" && desenhos.indisponivel) && !(id === "paredes" && muros.indisponivel) && !(id === "armadilhas" && arm.indisponivel),
+  );
   const usoAtivo: Uso = uso === "ping" || uso === "mesa" || (idsVisiveis as Uso[]).includes(uso) ? uso : "mover";
   useEffect(() => {
     registrarUso(`mapa:${usoAtivo}`);
@@ -533,7 +566,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   // O que o toque faz no mapa (as ferramentas internas do CenaMapa) a partir do ícone escolhido.
   const formaDaNevoa: FormaNevoa = formaNevoa === "quadradinhos" && !podeQuadradinhos ? "pincel" : formaNevoa;
   const ferramentaMapa: Ferramenta =
-    colocando || movendoNota
+    colocando || movendoNota || rascunhoArm
       ? "colocar"
       : usoAtivo === "nevoa"
         ? formaDaNevoa
@@ -551,6 +584,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   /** Trocar de ferramenta desiste de "onde eu toco"; tocar na que já está ativa abre/fecha o painel. */
   function escolher(id: Uso) {
     setColocando(null);
+    setRascunhoArm(null);
     setNotaPendente(null);
     setMovendoNota(null);
     if (id === usoAtivo) setPainelAberto((a) => !a);
@@ -562,10 +596,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   function trocarFase(f: "preparar" | "jogar") {
     setFase(f);
     setColocando(null);
+    setRascunhoArm(null);
     setNotaPendente(null);
     setMovendoNota(null);
   }
-  const avisos = [cenas.aviso, nevoa.aviso, banco.aviso, desenhos.aviso, muros.aviso].filter((a): a is string => Boolean(a));
+  const avisos = [cenas.aviso, nevoa.aviso, banco.aviso, desenhos.aviso, muros.aviso, arm.aviso].filter((a): a is string => Boolean(a));
 
   const painel = (() => {
     if (!cena) return null;
@@ -661,6 +696,14 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
             />
           ),
         };
+      case "luz":
+        return { titulo: "Escuridão e luzes", larga: true, conteudo: <PainelDeLuzes cena={cena} banco={banco} sala={sala} cenas={cenas} /> };
+      case "armadilhas":
+        return {
+          titulo: "Armadilhas",
+          larga: true,
+          conteudo: <PainelDeArmadilhas arm={arm} colocando={rascunhoArm !== null} aoColocar={setRascunhoArm} aoCancelarColocar={() => setRascunhoArm(null)} />,
+        };
       case "paredes":
         return {
           titulo: "Paredes e visão",
@@ -696,6 +739,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const dica = (() => {
     if (colocando) return `Toque no mapa no lugar onde ${colocando === "grupo" ? "o grupo entra" : "os inimigos entram"}.`;
     if (movendoNota) return "Toque no mapa no lugar novo da nota.";
+    if (rascunhoArm) return "Toque no mapa no lugar onde a armadilha fica. Ela nasce escondida da mesa.";
     switch (ferramentaMapa) {
       case "ping":
         return "Toque num ponto: a mesa vê um pulso ali, com o seu nome.";
@@ -781,6 +825,13 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
 
           {cena && (
             <>
+              <AvisosDePisada
+                pendentes={pisadas.pendentes}
+                armadilhas={arm.armadilhas}
+                arm={arm}
+                aoResolver={pisadas.resolver}
+                registrar={(texto) => void sala.registrarLog(texto)}
+              />
               <PalcoDoMapa
                 nome={cena.nome || "Sem nome"}
                 estado={cena.na_mesa ? "Na mesa" : "Em preparo"}
@@ -858,6 +909,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     aoCriarParedes={(novas) => void muros.adicionar(novas)}
                     aoApagarParede={(id) => void muros.remover(id)}
                     marcas={desenhos.marcas}
+                    armadilhas={arm.armadilhas}
                     modoMarca={modoMarca}
                     corMarca={corMarca}
                     aoCriarTraco={(pontos) => void desenhos.adicionar({ tipo: "traco", cor: corMarca, pontos, visivel: marcaParaMesa })}

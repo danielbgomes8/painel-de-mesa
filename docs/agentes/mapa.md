@@ -326,3 +326,37 @@ só a apresentação dos controles. Os estados, o `CenaMapa` e os hooks são os 
 - **Robô**: botões antigos ("🧱 paredes", "✏️ desenhar", "✨ área", seções "Peões"/"Paredes e visão") não existem mais. `e2e/apoio.ts` tem
   `abrirFerramenta(page, "Paredes e portas", "preparar")`, `escolherNoPainel`, `fecharPainelDoMapa` (o painel cobre o canto de cima
   do mapa: quem vai tocar no mapa fecha antes) e `abrirMesa`.
+
+## Luzes que acabam e armadilhas (11/10/2026, migration `0036_luzes_e_armadilhas.sql`, rodada e conferida)
+
+O Daniel escolheu dois itens de uma lista de ideias novas: "cronômetro e luz da tocha" e "armadilhas no mapa". Decisões dele: **o Mestre
+passa o tempo** (botões, não relógio real); **a luz que acaba encolhe a visão do portador**; **a armadilha avisa só o Mestre**.
+(A migration nasceu como 0033 e foi renumerada pra 0036 no rebase: outra sessão já tinha usado 0033 a 0035. Rodada no banco com o
+nome de antes; o conteúdo é o mesmo.)
+
+- **Luzes** (`lib/luzes.ts`, `components/LuzesDoMapa.tsx`, ferramenta 🔥 "Escuridão e luzes"). Moram no peão, em três colunas de
+  `cena_pecas`: `luz_nome`, `luz_alcance` (m, claro + penumbra) e `luz_minutos` (restante; **nulo = não acaba**, 0 = apagada). No tipo
+  `Peca` é um objeto só (`luz`), e `colunasDaLuz`/`lerLuz` traduzem; **o robô de esquema lista as três colunas à mão** (`Omit<Peca, "luz">`).
+  `cenas.escura` liga o **mapa escuro**: com a visão automática, `montarPecasNaTela` põe `visaoPx` em cada peão de jogador (luz acesa =
+  o alcance dela; apagada ou sem luz = `RAIO_NO_ESCURO_M`, 1,5 m) e o `CenaMapa` usa `x.visaoPx ?? alcance da cena` em `recomporNevoa`.
+  **Inimigo não entra** (monstro costuma ter visão no escuro): `visaoPx` dele é sempre nulo. Mapa claro: `visaoPx` nulo, a luz só conta o tempo.
+  Valores prontos conferidos no SRD 5.2 (open5e `srd-2024`): tocha 20+20 pés = 12 m por 1 h; vela 3 m por 1 h; lamparina 13,5 m e lanterna
+  coberta 18 m por 6 h; luz do dia 36 m por 1 h. **Passar o tempo** escreve só as colunas da luz de cada peão (`definirLuzes`, em paralelo,
+  volta tudo se uma falhar), loga "⏳ Passaram X" e "🔥 Tocha de Ana apagou". **Desfazer devolve a luz de ANTES** (guardada no clique), não soma
+  minutos de volta: a luz que parou em 0 teria gasto menos que o clique. Só devolve se a luz ainda está como o clique deixou.
+  A mesa e o telão veem "Tocha de Ana — faltam 40 min" (`LuzesNaMesa`): só luz de jogador ou de marcador visível, nunca de inimigo.
+- **Armadilhas** (`lib/armadilhas.ts`, `hooks/useArmadilhas.ts`, `hooks/usePisadas.ts`, `components/ArmadilhasDoMapa.tsx`, ferramenta ⚠️).
+  Tabela `cena_armadilhas`; estados `armada` (escondida, vigia) → `revelada` (a mesa vê, ainda vigia) → `disparada` / `desarmada` (a mesa
+  vê, não vigia mais); o Mestre pode rearmar. **Esconde NA TELA**, como a névoa e as paredes (`armadilhasVisiveis`). A zona é um círculo
+  (`raio` em metros, padrão 0,75 m = o quadradinho: o vizinho a 1 quadradinho NÃO pisa; criatura grande pisa pelo espaço que ocupa).
+  **Pisar = ENTRAR** na zona (`avaliarPisadas`): a primeira conferência só aprende o terreno, armadilha nova e peão novo não avisam de quem
+  já estava em cima, e quem continua lá não avisa de novo. O aviso é só do Mestre (`AvisosDePisada`, acima do palco): rolar o dano
+  (`rolarDanoDoTexto`, soma cada `NdM+K` do texto), **disparar** (a mesa passa a ver, log "⚠️ Ana caiu em…"), **desarmar** ou **deixar passar**
+  (continua escondida). `usePisadas` ajusta o estado durante a renderização, não em efeito: o lint proíbe `setState` em `useEffect`.
+  **Limite conhecido: o aviso só aparece com a aba Mapa do Mestre aberta** (é ela que lê os peões e as armadilhas).
+- **Robô** `e2e/luzesEArmadilhas.e2e.ts`: tocha de ponta a ponta (dar, passar, avisar a mesa, apagar, desfazer, tirar); mapa escuro lendo a
+  máscara `cenas.explorado` (com a tocha explora >60 células; apagada, o peão longe descobre <25; **conferido que falha** com a visão por luz
+  desligada); armadilha escondida (arco de raio 90 só no canvas do Mestre — valor que nenhum outro desenho usa), aviso, rolar, deixar passar,
+  disparar, rearmar, revelar, desarmar, editar, apagar. Entra em `limparSala` e no backup bruto (`cena_armadilhas`).
+- **Não cobre**: a luz de um peão iluminando os vizinhos (cada um vê só a própria luz), luz que muda de cor/forma (cone), armadilha que
+  dispara sozinha, aviso com a aba Mapa fechada, devolver a luz ao desfazer a saída de um inimigo da iniciativa.

@@ -5,6 +5,7 @@ import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { relatarErro } from "@/lib/relatarErro";
 import { ehTabelaAusente } from "@/lib/cenas";
 import { normalizarPeca, type NovaPeca, type Peca } from "@/lib/pecas";
+import { colunasDaLuz, type Luz } from "@/lib/luzes";
 
 const AVISO_NAO_SALVOU = "Não salvou o peão. Confira a conexão e tente de novo.";
 const SEM_PECAS: Peca[] = [];
@@ -18,6 +19,8 @@ export type Pecas = {
   adicionar: (novas: NovaPeca[]) => Promise<boolean>;
   /** Só as colunas que mudaram (nunca a linha inteira: ver AGENTS.md). */
   atualizar: (id: string, mudanca: Partial<Pick<Peca, "x" | "y" | "tamanho" | "oculto" | "nome" | "cor" | "aura">>) => Promise<boolean>;
+  /** Põe, troca ou tira (null) a luz de vários peões numa tacada só: as três colunas da luz, nada mais. */
+  definirLuzes: (mudancas: { id: string; luz: Luz | null }[]) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
   removerTodas: () => Promise<boolean>;
 };
@@ -175,6 +178,26 @@ export function usePecas(cenaId: string | null, codigo: string): Pecas {
     [mexer],
   );
 
+  const definirLuzes = useCallback<Pecas["definirLuzes"]>(
+    async (mudancas) => {
+      if (mudancas.length === 0) return true;
+      const antes = ref.current;
+      const porId = new Map(mudancas.map((m) => [m.id, m.luz]));
+      mexer((atual) => atual.map((p) => (porId.has(p.id) ? { ...p, luz: porId.get(p.id) ?? null } : p)));
+      const respostas = await Promise.all(mudancas.map((m) => supabase.from("cena_pecas").update(colunasDaLuz(m.luz)).eq("id", m.id)));
+      const erro = respostas.find((r) => r.error)?.error;
+      if (erro) {
+        relatarErro("definirLuzes", erro);
+        mexer(() => antes);
+        setAviso("Não salvou a luz. Confira a conexão (e se a migration 0036 foi rodada) e tente de novo.");
+        return false;
+      }
+      setAviso(null);
+      return true;
+    },
+    [mexer],
+  );
+
   const remover = useCallback<Pecas["remover"]>(
     async (id) => {
       const antes = ref.current;
@@ -207,5 +230,5 @@ export function usePecas(cenaId: string | null, codigo: string): Pecas {
     return true;
   }, [cenaId, mexer]);
 
-  return { pecas, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, atualizar, remover, removerTodas };
+  return { pecas, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, atualizar, definirLuzes, remover, removerTodas };
 }

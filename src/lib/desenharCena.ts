@@ -18,6 +18,7 @@ import { medirRegua, opacidadeDaRegua, partesDoRotulo, type CenaParaRegua, type 
 import { formaNoMapa, opacidadeDaArea, rotuloDaArea, type AreaNaTela, type FormaNoMapa, type ModeloArea } from "./area";
 import { alcasDaMarca, caixaDosPontos, notasNumeradas, type Marca } from "./marcas";
 import type { Parede } from "./paredes";
+import { raioDaZonaPx, type Armadilha, type EstadoArmadilha } from "./armadilhas";
 import type { Mascara } from "./visao";
 
 /** A névoa é desenhada num canvas à parte, menor que a imagem: pra um mapa de
@@ -295,6 +296,40 @@ export function desenharMarcas(
   ctx.globalAlpha = 1;
 }
 
+const COR_DA_ARMADILHA: Record<EstadoArmadilha, string> = {
+  armada: "#e0a030",
+  revelada: "#e0a030",
+  disparada: "#c0443a",
+  desarmada: "#8a97a8",
+};
+const SIMBOLO_DA_ARMADILHA: Record<EstadoArmadilha, string> = { armada: "⚠️", revelada: "⚠️", disparada: "💥", desarmada: "✓" };
+
+/** Armadilhas: a zona que dispara (círculo) e um símbolo no centro. Entram já filtradas pra quem olha: a
+ *  escondida (`armada`) só chega ao Mestre, tracejada e apagada, como o desenho "só eu vejo". Ficam por baixo
+ *  da névoa, como as marcas: armadilha revelada num canto ainda coberto continua coberta pra mesa. */
+export function desenharArmadilhas(ctx: CanvasRenderingContext2D, cena: Pick<Cena, "grade_px" | "metros">, lista: readonly Armadilha[], escala: number): void {
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const a of lista) {
+    const oculta = a.estado === "armada";
+    const cor = COR_DA_ARMADILHA[a.estado];
+    ctx.globalAlpha = oculta ? 0.6 : a.estado === "desarmada" ? 0.7 : 1;
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, Math.max(raioDaZonaPx(cena, a.raio), 6 / escala), 0, Math.PI * 2);
+    ctx.fillStyle = corComAlfa(cor, 0.2);
+    ctx.fill();
+    ctx.setLineDash(oculta ? [6 / escala, 5 / escala] : []);
+    ctx.lineWidth = 2 / escala;
+    ctx.strokeStyle = corComAlfa(cor, 0.95);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = `${16 / escala}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+    ctx.fillStyle = cor;
+    ctx.fillText(SIMBOLO_DA_ARMADILHA[a.estado], a.x, a.y + 0.5 / escala);
+  }
+  ctx.globalAlpha = 1;
+}
+
 export type EntradaDeDesenho = {
   cena: Cena;
   imagem: CanvasImageSource | null;
@@ -316,6 +351,8 @@ export type EntradaDeDesenho = {
   /** Desenhos e notas (já filtrados pra quem olha) e o traço em andamento. */
   marcas?: readonly Marca[];
   previaMarca?: { pontos: readonly Ponto[]; cor: string } | null;
+  /** Armadilhas já filtradas pra quem olha (`armadilhasVisiveis`). */
+  armadilhas?: readonly Armadilha[];
   /** Só o Mestre: o desenho selecionado pra editar (pontos já com o arrasto em andamento). */
   selecaoMarca?: readonly Ponto[] | null;
   /** Só pro Mestre: as paredes e portas, a parede em construção e a visão dos inimigos. */
@@ -347,6 +384,8 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
   }
 
   if ((e.marcas && e.marcas.length > 0) || e.previaMarca) desenharMarcas(ctx, e.marcas ?? [], vista.escala, e.previaMarca ?? null);
+
+  if (e.armadilhas && e.armadilhas.length > 0) desenharArmadilhas(ctx, cena, e.armadilhas, vista.escala);
 
   if (e.nevoa) {
     ctx.globalAlpha = e.mestre ? 0.55 : 1;

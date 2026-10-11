@@ -1,0 +1,285 @@
+import { expect, test, type Page } from "@playwright/test";
+import {
+  SALA,
+  bancoConfigurado,
+  cenaDoBanco,
+  coletarErros,
+  comoJogador,
+  criarFicha,
+  criarPeca,
+  abrirFerramenta,
+  entrarComoMestre,
+  fecharPainelDoMapa,
+  limparSala,
+  mudarCena,
+  pecasDoBanco,
+  pngDeTeste,
+  rest,
+} from "./apoio";
+import { contarCelulas, decodificarMascara } from "../src/lib/visao";
+
+/**
+ * Luzes que acabam e armadilhas no mapa (migration 0036). Mesma sala `ci-teste`, limpa antes e depois.
+ * O mapa de teste tem 900×600 px e quadradinho de 30 px = 1,5 m.
+ */
+test.skip(!bancoConfigurado, "sem NEXT_PUBLIC_SUPABASE_URL/ANON_KEY: o robô precisa do banco");
+test.describe.configure({ mode: "serial" });
+
+test.beforeAll(limparSala);
+test.afterAll(limparSala);
+
+/** O canvas não tem DOM: o robô escuta o que é DESENHADO (arcos [x, y, raio] do último quadro). */
+const espiar = () => {
+  const w = window as unknown as { __quadros: number[][][] };
+  w.__quadros = [[]];
+  const preencher = CanvasRenderingContext2D.prototype.fillRect;
+  CanvasRenderingContext2D.prototype.fillRect = function (...args: Parameters<typeof preencher>) {
+    if (args[0] === 0 && args[1] === 0) {
+      w.__quadros.push([]);
+      if (w.__quadros.length > 40) w.__quadros.shift();
+    }
+    return preencher.apply(this, args);
+  };
+  const arco = CanvasRenderingContext2D.prototype.arc;
+  CanvasRenderingContext2D.prototype.arc = function (...args: Parameters<typeof arco>) {
+    w.__quadros[w.__quadros.length - 1].push([args[0], args[1], args[2]]);
+    return arco.apply(this, args);
+  };
+};
+const ultimoQuadro = (p: Page) =>
+  p.evaluate(() => {
+    const q = (window as unknown as { __quadros: number[][][] }).__quadros;
+    return q[q.length - 1] ?? [];
+  });
+const temRaio = (arcos: number[][], raio: number) => arcos.some((a) => Math.abs(a[2] - raio) < 0.6);
+async function ver(pagina: Page, cond: (arcos: number[][]) => boolean, esperado = true) {
+  await expect.poll(async () => cond(await ultimoQuadro(pagina)), { timeout: 30_000, intervals: [500] }).toBe(esperado);
+}
+
+async function tocarNoMapa(page: Page, ix: number, iy: number) {
+  const canvas = page.locator(".cena-canvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const caixa = (await canvas.boundingBox())!;
+  const escala = Math.min(caixa.width / (900 * 1.06), caixa.height / (600 * 1.06));
+  await page.mouse.click(caixa.x + caixa.width / 2 + (ix - 450) * escala, caixa.y + caixa.height / 2 + (iy - 300) * escala);
+}
+
+type LinhaLuz = { slug: string | null; luz_nome: string | null; luz_alcance: number | null; luz_minutos: number | null };
+async function luzesDoBanco(): Promise<LinhaLuz[]> {
+  const r = await rest(`cena_pecas?select=slug,luz_nome,luz_alcance,luz_minutos&room_code=eq.${SALA}&order=created_at`);
+  if (!r.ok) throw new Error(`não leu as luzes: HTTP ${r.status} ${await r.text()}`);
+  return (await r.json()) as LinhaLuz[];
+}
+const luzDe = async (slug: string) => (await luzesDoBanco()).find((l) => l.slug === slug)!;
+
+type LinhaArmadilha = { id: string; nome: string; x: number; y: number; raio: number; salvaguarda: string; cd: number | null; dano: string; estado: string };
+async function armadilhasDoBanco(): Promise<LinhaArmadilha[]> {
+  const r = await rest(`cena_armadilhas?select=id,nome,x,y,raio,salvaguarda,cd,dano,estado&room_code=eq.${SALA}&order=created_at`);
+  if (!r.ok) throw new Error(`não leu as armadilhas: HTTP ${r.status} ${await r.text()}`);
+  return (await r.json()) as LinhaArmadilha[];
+}
+async function linhasDoLog(): Promise<string[]> {
+  const r = await rest(`combat_log?select=text&room_code=eq.${SALA}&order=created_at`);
+  return ((await r.json()) as { text: string }[]).map((l) => l.text);
+}
+
+async function prepararMapa(page: Page) {
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Mapa", exact: true }).click();
+  await page
+    .locator('section[aria-label="Mapa"] input[type=file]')
+    .setInputFiles({ name: "mapa-luzes.png", mimeType: "image/png", buffer: pngDeTeste(900, 600) });
+  await expect(page.locator(".cena-canvas")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  await page.getByRole("button", { name: "levar a mesa pra este mapa" }).click();
+  await expect(page.getByText("A mesa está vendo este mapa")).toBeVisible();
+}
+
+async function abrirComoJogador(browser: import("@playwright/test").Browser, slug: string) {
+  const contexto = await browser.newContext();
+  const jogador = await contexto.newPage();
+  const erros = coletarErros(jogador);
+  await jogador.addInitScript(espiar);
+  await comoJogador(jogador, slug);
+  await jogador.goto(`/?sala=${SALA}`);
+  await jogador.getByRole("button", { name: "ver o mapa" }).click();
+  await expect(jogador.locator(".cena-canvas")).toBeVisible();
+  await expect(jogador.getByText("Carregando o mapa")).toHaveCount(0, { timeout: 30_000 });
+  return { jogador, erros, contexto };
+}
+
+test("luzes: o Mestre dá a tocha, passa o tempo, a mesa vê o que falta, apaga e desfaz", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await page.addInitScript(espiar);
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  await criarPeca(cena.id, "jogador-robo", 165, 165);
+  const { jogador, erros: errosJogador, contexto } = await abrirComoJogador(browser, "jogador-robo");
+
+  await abrirFerramenta(page, "Escuridão e luzes");
+  await page.getByRole("button", { name: "Tocha", exact: true }).click();
+  await expect.poll(async () => (await luzDe("jogador-robo")).luz_minutos).toBe(60);
+  expect(await luzDe("jogador-robo")).toMatchObject({ luz_nome: "Tocha", luz_alcance: 12, luz_minutos: 60 });
+  // A mesa vê quanto falta.
+  await expect(jogador.getByText("Tocha de Jogador Robô — faltam 1 h")).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole("button", { name: "⏳ 30 min" }).click();
+  await expect.poll(async () => (await luzDe("jogador-robo")).luz_minutos).toBe(30);
+  await expect(jogador.getByText("Tocha de Jogador Robô — faltam 30 min")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Quase apagando")).toHaveCount(0);
+
+  // Mais 25 minutos: faltam 5, e o painel avisa.
+  await page.getByPlaceholder("outro (min)").fill("25");
+  await page.getByRole("button", { name: "passar", exact: true }).click();
+  await expect.poll(async () => (await luzDe("jogador-robo")).luz_minutos).toBe(5);
+  await expect(page.getByText("quase apagando")).toBeVisible();
+
+  // Passa do que falta: apaga, o minuto nunca fica negativo e o log conta.
+  await page.getByRole("button", { name: "⏳ 10 min" }).click();
+  await expect.poll(async () => (await luzDe("jogador-robo")).luz_minutos).toBe(0);
+  await expect(jogador.getByText("Tocha de Jogador Robô — apagada")).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Tocha de Jogador Robô apagou"))).toBe(true);
+  await expect(page.getByText("Apagou: Tocha de Jogador Robô.")).toBeVisible();
+
+  // Desfazer devolve os 10 minutos (o último passo): a luz volta a ter 5.
+  await page.getByRole("button", { name: /desfazer 10 min/ }).click();
+  await expect.poll(async () => (await luzDe("jogador-robo")).luz_minutos).toBe(5);
+
+  // Tirar a luz limpa as três colunas.
+  await page.getByRole("button", { name: "Tirar a luz de Jogador Robô" }).click();
+  await expect.poll(async () => await luzDe("jogador-robo")).toMatchObject({ luz_nome: null, luz_alcance: null, luz_minutos: null });
+  await expect(jogador.getByText(/Tocha de Jogador Robô/)).toHaveCount(0);
+
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
+  await contexto.close();
+});
+
+test("mapa escuro: com a tocha acesa o grupo explora longe; apagada, só o quadradinho em volta", async ({ page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await mudarCena(cena.id, { visao_ligada: true, escura: true, explorado: "" });
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  // Tocha de 12 m = 240 px de raio, no canto de cima do mapa.
+  await criarPeca(cena.id, "jogador-robo", 165, 165, { luz_nome: "Tocha", luz_alcance: 12, luz_minutos: 60 });
+
+  const explorados = async () => {
+    const c = await cenaDoBanco();
+    const m = decodificarMascara(String(c.explorado ?? ""), c as unknown as Parameters<typeof decodificarMascara>[1]);
+    return m ? contarCelulas(m) : 0;
+  };
+  // O Mestre guarda o que o grupo viu 1,5 s depois de mudar.
+  await expect.poll(explorados, { timeout: 45_000, intervals: [1000] }).toBeGreaterThan(60);
+  const comTocha = await explorados();
+
+  // Apaga a tocha e leva o peão pro outro lado: só o quadradinho em volta (30 px de raio) é descoberto.
+  const peao = (await pecasDoBanco()).find((p) => p.slug === "jogador-robo")!;
+  let r = await rest(`cena_pecas?id=eq.${peao.id}`, { method: "PATCH", body: JSON.stringify({ luz_minutos: 0, x: 765, y: 465 }) });
+  expect(r.ok).toBe(true);
+  await expect.poll(explorados, { timeout: 45_000, intervals: [1000] }).toBeGreaterThan(comTocha);
+  const depoisApagada = (await explorados()) - comTocha;
+  expect(depoisApagada).toBeGreaterThan(0);
+  expect(depoisApagada).toBeLessThan(25); // ~π·30²/32² ≈ 3 células (até uns 9 nas bordas), nada perto das ~170 da tocha
+
+  // Mapa claro de novo: a visão volta ao que a cena manda (sem limite, vê o mapa todo).
+  await mudarCena(cena.id, { escura: false });
+  await expect.poll(explorados, { timeout: 45_000, intervals: [1000] }).toBeGreaterThan(comTocha + 100);
+  r = await rest(`cena_pecas?id=eq.${peao.id}`, { method: "DELETE" });
+  expect(erros).toEqual([]);
+});
+
+test("armadilhas: nasce escondida, só o Mestre é avisado quando alguém pisa, e ele dispara, deixa passar ou desarma", async ({ browser, page }) => {
+  const erros = coletarErros(page);
+  await limparSala();
+  await page.addInitScript(espiar);
+  await prepararMapa(page);
+  const cena = await cenaDoBanco();
+  await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });
+  await criarPeca(cena.id, "jogador-robo", 165, 165);
+  const { jogador, erros: errosJogador, contexto } = await abrirComoJogador(browser, "jogador-robo");
+
+  await abrirFerramenta(page, "Armadilhas");
+  await page.getByRole("button", { name: "Poço escondido", exact: true }).click();
+  await page.getByRole("button", { name: "4,5 m", exact: true }).click(); // zona de raio 90 px: diferente de qualquer outro arco
+  await page.getByRole("button", { name: "📍 colocar no mapa" }).click();
+  await fecharPainelDoMapa(page); // o painel cobre um pedaço do mapa
+  await tocarNoMapa(page, 405, 285);
+  await expect.poll(async () => (await armadilhasDoBanco()).length).toBe(1);
+  expect((await armadilhasDoBanco())[0]).toMatchObject({ nome: "Poço escondido", x: 405, y: 285, raio: 4.5, salvaguarda: "DES", cd: 12, dano: "2d6 contundente", estado: "armada" });
+
+  // O Mestre a enxerga (tracejada); a mesa, não.
+  await ver(page, (q) => temRaio(q, 90));
+  await jogador.waitForTimeout(1500);
+  expect(temRaio(await ultimoQuadro(jogador), 90)).toBe(false);
+
+  // O jogador anda até a zona: SÓ o Mestre é avisado, com a salvaguarda e o dano à mão.
+  const peao = (await pecasDoBanco()).find((p) => p.slug === "jogador-robo")!;
+  const mover = async (x: number, y: number) => {
+    const r = await rest(`cena_pecas?id=eq.${peao.id}`, { method: "PATCH", body: JSON.stringify({ x, y }) });
+    expect(r.ok).toBe(true);
+  };
+  await mover(405, 285);
+  const aviso = page.locator(".arm-aviso");
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await expect(aviso).toContainText("Jogador Robô pisou em Poço escondido");
+  await expect(aviso).toContainText("Salvaguarda DES CD 12 · 2d6 contundente");
+  await expect(jogador.locator(".arm-aviso")).toHaveCount(0);
+  expect(temRaio(await ultimoQuadro(jogador), 90)).toBe(false);
+
+  // Rolar o dano mostra o total e a conta; ainda não revelou nada.
+  await aviso.getByRole("button", { name: /rolar o dano/ }).click();
+  await expect(aviso.getByRole("status")).toContainText(/Dano: \d+/);
+  expect((await armadilhasDoBanco())[0].estado).toBe("armada");
+
+  // Deixar passar some com o aviso e a armadilha continua escondida e vigiando.
+  await aviso.getByRole("button", { name: "deixar passar" }).click();
+  await expect(aviso).toHaveCount(0);
+  expect((await armadilhasDoBanco())[0].estado).toBe("armada");
+  expect(temRaio(await ultimoQuadro(jogador), 90)).toBe(false);
+
+  // Sai e volta: avisa de novo. Agora o Mestre dispara: a mesa passa a ver e o log conta.
+  await mover(165, 165);
+  await mover(405, 285);
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await aviso.getByRole("button", { name: "disparar" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("disparada");
+  await expect(aviso).toHaveCount(0);
+  await ver(jogador, (q) => temRaio(q, 90));
+  await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Jogador Robô caiu em Poço escondido"))).toBe(true);
+
+  // Disparada não avisa mais: sai e entra de novo, nada.
+  await mover(165, 165);
+  await mover(405, 285);
+  await page.waitForTimeout(2500);
+  await expect(aviso).toHaveCount(0);
+
+  // Rearmar (escondida de novo) some pra mesa; revelar mostra; desarmar neutraliza.
+  await abrirFerramenta(page, "Armadilhas");
+  await page.getByRole("button", { name: "Armar Poço escondido de novo, escondida" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("armada");
+  await ver(jogador, (q) => temRaio(q, 90), false);
+  await page.getByRole("button", { name: "Revelar Poço escondido pra mesa" }).click();
+  await ver(jogador, (q) => temRaio(q, 90));
+  await mover(165, 165);
+  await mover(405, 285);
+  await expect(aviso).toBeVisible({ timeout: 30_000 });
+  await aviso.getByRole("button", { name: "desarmar" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].estado).toBe("desarmada");
+  await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Poço escondido foi desarmada"))).toBe(true);
+
+  // Editar a CD e apagar.
+  await page.getByRole("button", { name: "Editar Poço escondido" }).click();
+  await page.getByLabel("CD da salvaguarda").fill("15");
+  await page.getByRole("button", { name: "salvar alterações" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco())[0].cd).toBe(15);
+  await page.getByRole("button", { name: "Apagar Poço escondido" }).click();
+  await expect.poll(async () => (await armadilhasDoBanco()).length).toBe(0);
+  await ver(jogador, (q) => temRaio(q, 90), false);
+
+  expect(erros).toEqual([]);
+  expect(errosJogador).toEqual([]);
+  await contexto.close();
+});

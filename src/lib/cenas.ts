@@ -38,6 +38,8 @@ export type Cena = {
   visao_ligada: boolean;
   /** Alcance da visão em metros; null = até onde as paredes deixarem. */
   visao_alcance: number | null;
+  /** Mapa escuro: com a visão automática, cada jogador só enxerga até onde a luz dele alcança (lib/luzes.ts). */
+  escura: boolean;
   /** O que o grupo já viu, como máscara compactada em texto (lib/visao.ts); vazio = nada. */
   explorado: string;
   created_at: string;
@@ -113,6 +115,7 @@ export function normalizarCena(linha: unknown): Cena | null {
     camera: regiaoValida(o.camera),
     visao_ligada: o.visao_ligada === true,
     visao_alcance: typeof o.visao_alcance === "number" && o.visao_alcance > 0 ? o.visao_alcance : typeof o.visao_alcance === "string" && Number(o.visao_alcance) > 0 ? Number(o.visao_alcance) : null,
+    escura: o.escura === true,
     explorado: typeof o.explorado === "string" ? o.explorado : "",
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };

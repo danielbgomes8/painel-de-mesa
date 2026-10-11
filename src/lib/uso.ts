@@ -38,6 +38,8 @@ export const TELAS_DE_USO: Record<string, string> = {
   "mapa:medir": "Mapa → Medir",
   "mapa:desenhar": "Mapa → Desenhar",
   "mapa:peoes": "Mapa → Peões",
+  "mapa:luz": "Mapa → Escuridão e luzes",
+  "mapa:armadilhas": "Mapa → Armadilhas",
   "mapa:paredes": "Mapa → Paredes e portas",
   "mapa:grade": "Mapa → Cena e grade",
   "mapa:ping": "Mapa → Ping",

@@ -55,6 +55,8 @@ export const TABELAS_COM_SALA = [
   "cena_paredes",
   // Desenhos e notas do mapa (0022).
   "cena_marcas",
+  // Armadilhas do mapa (0036). As luzes são colunas de `cena_pecas`; `escura` é coluna de `cenas`.
+  "cena_armadilhas",
   // Quadro da Campanha (0024). A foto de cada cartão fica no Storage e vai na
   // cópia das imagens, ao lado das dos mapas.
   "quadro_cartoes",

@@ -55,6 +55,7 @@ import {
   type NovaParede,
   type Parede,
 } from "@/lib/paredes";
+import { armadilhasVisiveis, type Armadilha } from "@/lib/armadilhas";
 import {
   alcanceEmPx,
   codificarMascara,
@@ -147,6 +148,8 @@ type Props = {
   /** Desenhos e notas do mapa (o filtro do que cada um vê é daqui) e o que a ferramenta
    *  "marca" faz: traço livre, linha reta, nota (toca num ponto) ou borracha. */
   marcas?: readonly Marca[];
+  /** Armadilhas da cena (todas; aqui se filtra o que cada um enxerga: a escondida é só do Mestre). */
+  armadilhas?: readonly Armadilha[];
   modoMarca?: ModoMarca;
   corMarca?: string;
   /** Mestre soltou um traço (já simplificado, em px da imagem). */
@@ -226,6 +229,7 @@ export function CenaMapa({
   aoCriarParedes,
   aoApagarParede,
   marcas,
+  armadilhas,
   modoMarca = "livre",
   corMarca = "#f0c24b",
   aoCriarTraco,
@@ -306,9 +310,9 @@ export function CenaMapa({
     telaB: { x: number; y: number };
   } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -393,7 +397,8 @@ export function CenaMapa({
     const arr = arrastoVisual.current;
     const onde = (x: PecaNaTela): Ponto => (arr && arr.id === x.id ? [arr.x, arr.y] : [x.x, x.y]);
     const pecas = p.pecas ?? [];
-    const dosJogadores = pecas.filter((x) => x.observa).map((x) => poligonoDeVisao(onde(x), segmentos, alcance));
+    // Mapa escuro: cada jogador enxerga até onde a luz dele vai (`visaoPx`); fora disso, o alcance da cena.
+    const dosJogadores = pecas.filter((x) => x.observa).map((x) => poligonoDeVisao(onde(x), segmentos, x.visaoPx ?? alcance));
     visaoDosInimigosRef.current = p.mestre && p.verVisaoDosInimigos ? pecas.filter((x) => x.inimigo).map((x) => poligonoDeVisao(onde(x), segmentos, alcance)) : [];
     const memoria = memoriaDaCena();
     // Só vira "já visto" o que a MESA viu: com o mapa ainda sendo preparado, o
@@ -449,6 +454,7 @@ export function CenaMapa({
           ? (editandoMarca.current?.pontos ?? p.marcas?.find((m) => m.tipo === "traco" && m.id === p.marcaSelecionada)?.pontos ?? null)
           : null,
       previaMarca: p.mestre && marcaViva.current ? { pontos: marcaViva.current.pontos, cor: p.corMarca } : null,
+      armadilhas: p.armadilhas ? armadilhasVisiveis(p.armadilhas, p.mestre) : undefined,
     });
     const agora = performance.now();
     const viva = reguaViva.current;
@@ -587,12 +593,12 @@ export function CenaMapa({
   useEffect(() => {
     recomporNevoa();
     pedirQuadro();
-  }, [paredes, verVisaoDosInimigos, visaoPronta, cena.visao_ligada, cena.visao_alcance, cena.metros, cena.grade_px, cena.na_mesa, recomporNevoa, pedirQuadro]);
+  }, [paredes, verVisaoDosInimigos, visaoPronta, cena.visao_ligada, cena.visao_alcance, cena.escura, cena.metros, cena.grade_px, cena.na_mesa, recomporNevoa, pedirQuadro]);
 
   // Desenhos e notas chegaram, mudaram ou saíram (do Mestre ou de outro aparelho).
   useEffect(() => {
     pedirQuadro();
-  }, [marcas, marcaSelecionada, modoMarca, ferramenta, pedirQuadro]);
+  }, [marcas, armadilhas, marcaSelecionada, modoMarca, ferramenta, pedirQuadro]);
 
   // O relógio de guardar a memória não pode sobreviver ao componente.
   useEffect(() => {

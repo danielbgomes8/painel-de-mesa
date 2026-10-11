@@ -47,6 +47,7 @@ const cena: Cena = {
   camera: null,
   visao_ligada: false,
   visao_alcance: null,
+  escura: false,
   explorado: "",
   created_at: "2026-10-01T12:00:00Z",
 };

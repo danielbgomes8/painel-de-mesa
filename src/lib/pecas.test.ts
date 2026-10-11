@@ -52,6 +52,7 @@ function peca(extra: Partial<Peca> = {}): Peca {
     cor: null,
     oculto: false,
     aura: null,
+    luz: null,
     created_at: "",
     ...extra,
   };
@@ -167,6 +168,7 @@ describe("clicar num peão", () => {
     icones: [],
     observa: true,
     inimigo: false,
+    visaoPx: null,
   });
 
   it("acha o peão sob o ponto e ignora quem está fora do círculo", () => {
@@ -634,5 +636,42 @@ describe("pecasQueAcompanham", () => {
   it("parede que corta o caminho na diagonal: o companheiro fica do mesmo lado em que estava", () => {
     const r = pecasQueAcompanham({ cena: grade, pecas, movida: { id: "d", x: 250, y: 450 }, donos, bloqueios: [[0, 300, 900, 300]] });
     for (const p of r) expect(p.y).toBeLessThan(300);
+  });
+});
+
+describe("a luz que o peão carrega", () => {
+  const tocha = { nome: "Tocha", alcance: 12, minutos: 60 };
+  const fichas = [
+    { slug: "tiberio", name: "Tibério Vaz", is_npc: false, revealed: false },
+    { slug: "dragao", name: "Dragão Vermelho", is_npc: true, revealed: false },
+  ];
+  const escura = { ...cena, escura: true, visao_alcance: null };
+  const montar = (pecas: Peca[], c: typeof escura | typeof cena) =>
+    montarPecasNaTela({ pecas, cena: c, fichas, vezDe: null, slugsDosJogadores: ["tiberio"], visao: { mestre: false, meuSlug: "tiberio" }, selecionadaId: null });
+
+  it("lê a luz das três colunas do banco; sem alcance, sem luz", () => {
+    expect(normalizarPeca({ id: "p", cena_id: "c", x: 1, y: 2, luz_nome: "Tocha", luz_alcance: "12", luz_minutos: 40 })?.luz).toEqual({ nome: "Tocha", alcance: 12, minutos: 40 });
+    expect(normalizarPeca({ id: "p", cena_id: "c", x: 1, y: 2 })?.luz).toBeNull();
+    expect(normalizarPeca({ id: "p", cena_id: "c", x: 1, y: 2, luz_nome: "Tocha", luz_alcance: null })?.luz).toBeNull();
+  });
+
+  it("mapa claro: a visão do jogador é a da cena (visaoPx nulo), com ou sem luz", () => {
+    const [a] = montar([peca({ id: "a", slug: "tiberio", luz: tocha })], { ...cena, escura: false, visao_alcance: null });
+    expect(a.visaoPx).toBeNull();
+  });
+
+  it("mapa escuro: com a tocha acesa vê 12 m; apagada, só o quadradinho", () => {
+    // 100 px por quadradinho de 1,5 m.
+    const [acesa] = montar([peca({ id: "a", slug: "tiberio", luz: tocha })], escura);
+    const [apagada] = montar([peca({ id: "a", slug: "tiberio", luz: { ...tocha, minutos: 0 } })], escura);
+    const [semLuz] = montar([peca({ id: "a", slug: "tiberio" })], escura);
+    expect(acesa.visaoPx).toBeCloseTo(800, 6);
+    expect(apagada.visaoPx).toBeCloseTo(100, 6);
+    expect(semLuz.visaoPx).toBeCloseTo(100, 6);
+  });
+
+  it("inimigo no escuro enxerga como a cena manda, mesmo carregando luz", () => {
+    const [d] = montar([peca({ id: "d", slug: "dragao", luz: tocha })], escura);
+    expect(d.visaoPx).toBeNull();
   });
 });
