@@ -31,10 +31,12 @@ export type Armadilha = {
   nota: string;
   estado: EstadoArmadilha;
   tipo: TipoArmadilha;
+  /** CD pra um jogador reparar nela só de passar perto (Percepção passiva da ficha >= CD); null = ninguém repara. */
+  cd_achar: number | null;
   created_at: string;
 };
 
-export type NovaArmadilha = Pick<Armadilha, "nome" | "x" | "y"> & Partial<Pick<Armadilha, "raio" | "salvaguarda" | "cd" | "dano" | "nota" | "tipo" | "estado">>;
+export type NovaArmadilha = Pick<Armadilha, "nome" | "x" | "y"> & Partial<Pick<Armadilha, "raio" | "salvaguarda" | "cd" | "dano" | "nota" | "tipo" | "estado" | "cd_achar">>;
 
 /** Por cena. Cada uma é redesenhada a cada quadro. */
 export const ARMADILHAS_MAXIMAS = 60;
@@ -129,6 +131,7 @@ export function normalizarArmadilha(linha: unknown): Armadilha | null {
     nota: texto(o.nota, NOTA_MAXIMA),
     estado,
     tipo: o.tipo === "perigo" ? "perigo" : "armadilha",
+    cd_achar: cdValida(o.cd_achar),
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };
 }

@@ -12,6 +12,7 @@ import { usePecas } from "@/hooks/usePecas";
 import { useArmadilhas } from "@/hooks/useArmadilhas";
 import { PainelDeArmadilhas, type RascunhoDeArmadilha } from "@/components/ArmadilhasDoMapa";
 import { LuzesNaMesa, PainelDeLuzes } from "@/components/LuzesDoMapa";
+import { AvisoDePortaTrancada, EditorDePorta } from "@/components/PortasDoMapa";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
 import { encaixarNaGrade, montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
 import { segmentosQueBloqueiam, type ModoParede, type Parede } from "@/lib/paredes";
@@ -400,6 +401,10 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const [juntos, setJuntos] = useState(true);
   const muros = useParedes(cena?.id ?? null, codigo);
   const [modoParede, setModoParede] = useState<ModoParede>("parede");
+  /** A porta que o Mestre tocou no modo "propriedades" (pra editar trancada, secreta e as CDs). */
+  const [portaSelecionada, setPortaSelecionada] = useState<string | null>(null);
+  /** A porta trancada em que o Mestre tocou pra abrir: espera ele destrancar (ou deixar). */
+  const [portaTrancadaId, setPortaTrancadaId] = useState<string | null>(null);
   const desenhos = useMarcas(cena?.id ?? null, codigo);
   const arm = useArmadilhas(cena?.id ?? null, codigo);
   /** Armadilha preparada, esperando um toque no mapa pra dizer onde fica. */
@@ -582,6 +587,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   function escolher(id: Uso) {
     setColocando(null);
     setRascunhoArm(null);
+    setPortaSelecionada(null);
+    setPortaTrancadaId(null);
     setNotaPendente(null);
     setMovendoNota(null);
     if (id === usoAtivo) setPainelAberto((a) => !a);
@@ -753,6 +760,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
       case "parede":
         return modoParede === "apagar"
           ? "Toque numa parede ou porta pra apagar, ou passe o dedo por cima de várias."
+          : modoParede === "propriedades"
+            ? "Toque numa porta pra marcar como trancada ou secreta e dar a CD. Só você vê o cadeado e o 🕵️."
           : modoParede === "curva"
             ? "Passe o dedo acompanhando a curva: o traço vira uma parede de vários trechos."
             : modoParede === "comodo"
@@ -908,7 +917,14 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     marcaSelecionada={desenhoSelecionado?.id ?? null}
                     aoSelecionarMarca={setIdSelecionado}
                     aoTransformarMarca={(id, pontos) => void desenhos.atualizar(id, { pontos })}
-                    aoAlternarPorta={(id) => void muros.alternarPorta(id)}
+                    aoAlternarPorta={(id) => {
+                      // Porta trancada e fechada não abre com um toque: pergunta antes (a CD vai no aviso).
+                      const p = muros.paredes.find((x) => x.id === id);
+                      if (p && p.tipo === "porta" && p.trancada && !p.aberta) setPortaTrancadaId(id);
+                      else void muros.alternarPorta(id);
+                    }}
+                    aoSelecionarPorta={setPortaSelecionada}
+                    portaSelecionada={portaSelecionada}
                     verVisaoDosInimigos={verInimigos}
                     visaoPronta={!muros.carregando && !banco.carregando}
                     aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
@@ -921,6 +937,15 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 }
               />
               <EditorDeDesenho marca={desenhoSelecionado} edicao={desenhos} aoFechar={() => setIdSelecionado(null)} />
+              {ferramentaMapa === "parede" && modoParede === "propriedades" && (
+                <EditorDePorta porta={muros.paredes.find((x) => x.id === portaSelecionada) ?? null} muros={muros} aoFechar={() => setPortaSelecionada(null)} />
+              )}
+              <AvisoDePortaTrancada
+                porta={muros.paredes.find((x) => x.id === portaTrancadaId) ?? null}
+                muros={muros}
+                aoFechar={() => setPortaTrancadaId(null)}
+                registrar={(texto) => void sala.registrarLog(texto)}
+              />
               {notaPendente && ferramentaMapa === "marca" && (
                 <NovaNota
                   ponto={notaPendente}

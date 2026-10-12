@@ -146,6 +146,9 @@ type Props = {
   aoApagarParede?: (id: string) => void;
   /** Tocar numa porta com a ferramenta de mover (Mestre) abre ou fecha. */
   aoAlternarPorta?: (id: string) => void;
+  /** Modo "propriedades" da ferramenta de paredes: o Mestre tocou numa porta (ou no vazio: null). */
+  aoSelecionarPorta?: (id: string | null) => void;
+  portaSelecionada?: string | null;
   /** Desenhos e notas do mapa (o filtro do que cada um vê é daqui) e o que a ferramenta
    *  "marca" faz: traço livre, linha reta, nota (toca num ponto) ou borracha. */
   marcas?: readonly Marca[];
@@ -240,6 +243,8 @@ export function CenaMapa({
   aoSelecionarMarca,
   aoTransformarMarca,
   aoAlternarPorta,
+  aoSelecionarPorta,
+  portaSelecionada,
   verVisaoDosInimigos = false,
   visaoPronta = true,
   aoExplorar,
@@ -311,9 +316,9 @@ export function CenaMapa({
     telaB: { x: number; y: number };
   } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -447,6 +452,7 @@ export function CenaMapa({
       arrasto: arrastoVisual.current,
       // Só o Mestre vê paredes, portas e a visão dos inimigos.
       paredes: p.mestre ? p.paredes : undefined,
+      portaSelecionada: p.mestre && p.ferramenta === "parede" && p.modoParede === "propriedades" ? (p.portaSelecionada ?? null) : null,
       previaParede:
         !p.mestre || !paredeViva.current
           ? null
@@ -607,7 +613,7 @@ export function CenaMapa({
   // Desenhos e notas chegaram, mudaram ou saíram (do Mestre ou de outro aparelho).
   useEffect(() => {
     pedirQuadro();
-  }, [marcas, armadilhas, marcaSelecionada, modoMarca, ferramenta, pedirQuadro]);
+  }, [marcas, armadilhas, marcaSelecionada, modoMarca, ferramenta, portaSelecionada, pedirQuadro]);
 
   // O relógio de guardar a memória não pode sobreviver ao componente.
   useEffect(() => {
@@ -798,6 +804,12 @@ export function CenaMapa({
           apagandoParedes.current.add(alvo.id);
           p.aoApagarParede?.(alvo.id);
         }
+        return;
+      }
+      if (p.modoParede === "propriedades") {
+        // Tocar numa porta a seleciona (pra editar trancada/secreta e as CDs); tocar no vazio solta a seleção.
+        const porta = acharParedeNoPonto(p.paredes ?? [], ponto, (TOQUE_NA_PAREDE_PX * 1.5) / escala, "porta");
+        p.aoSelecionarPorta?.(porta?.id ?? null);
         return;
       }
       if (!p.aoCriarParedes) return;

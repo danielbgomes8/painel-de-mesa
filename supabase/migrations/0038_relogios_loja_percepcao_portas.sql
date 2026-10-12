@@ -103,3 +103,22 @@ begin
     alter publication supabase_realtime add table public.loja_itens;
   end if;
 end $$;
+
+-- PERCEPÇÃO PASSIVA NAS ARMADILHAS. O Mestre dá a uma armadilha escondida uma `cd_achar`: se a Percepção passiva da
+-- ficha de um jogador for igual ou maior e ele chegar a 4,5 m, só o Mestre recebe o aviso "Ana percebe algo".
+-- Nulo = ninguém repara sozinho.
+alter table public.cena_armadilhas
+  add column if not exists cd_achar integer
+    check (cd_achar is null or (cd_achar >= 1 and cd_achar <= 40));
+
+-- PORTAS TRANCADAS E SECRETAS. Só vale pra `tipo = 'porta'` (o app ignora nas paredes):
+--   trancada = o Mestre vê o cadeado e a CD (`cd`) pra arrombar; a porta não abre com um toque sem destrancar;
+--   secreta  = ninguém sabe dela; com `cd_achar`, a Percepção passiva de quem chega perto avisa o Mestre.
+-- A mesa nunca vê paredes nem portas (esconde NA TELA, como o resto).
+alter table public.cena_paredes
+  add column if not exists trancada boolean not null default false,
+  add column if not exists secreta boolean not null default false,
+  add column if not exists cd integer
+    check (cd is null or (cd >= 1 and cd <= 40)),
+  add column if not exists cd_achar integer
+    check (cd_achar is null or (cd_achar >= 1 and cd_achar <= 40));

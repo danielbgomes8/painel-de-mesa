@@ -26,13 +26,21 @@ export type Parede = {
   y2: number;
   /** Só importa na porta: aberta deixa a vista passar. */
   aberta: boolean;
+  /** Só na porta: trancada (o Mestre vê o cadeado e a CD pra arrombar; não abre sem destrancar antes). */
+  trancada: boolean;
+  /** Só na porta: secreta (ninguém sabe dela até alguém achar; a Percepção passiva pode avisar o Mestre). */
+  secreta: boolean;
+  /** CD pra arrombar/destrancar; null = não definida. */
+  cd: number | null;
+  /** CD pra achar a porta secreta pela Percepção passiva; null = ninguém repara sozinho. */
+  cd_achar: number | null;
   created_at: string;
 };
 
 export type NovaParede = { tipo: TipoParede; x1: number; y1: number; x2: number; y2: number; aberta?: boolean };
 
 /** O que o Mestre faz com a ferramenta de paredes. */
-export type ModoParede = "parede" | "porta" | "comodo" | "curva" | "apagar";
+export type ModoParede = "parede" | "porta" | "comodo" | "curva" | "apagar" | "propriedades";
 
 /** Por cena: o app não aceita mais que isso (cada parede entra na conta de visão de
  *  cada aparelho, a cada vez que um peão se mexe). */
@@ -50,6 +58,14 @@ export const TOQUE_NA_PAREDE_PX = 16;
 function numero(v: unknown): number | null {
   const n = typeof v === "string" ? Number(v) : v;
   return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+/** CD de porta: inteiro de 1 a 40; qualquer outra coisa = não definida. */
+function cdDaPorta(v: unknown): number | null {
+  const n = typeof v === "string" ? (v.trim() === "" ? NaN : Number(v)) : v;
+  if (typeof n !== "number" || !Number.isFinite(n)) return null;
+  const i = Math.round(n);
+  return i >= 1 && i <= 40 ? i : null;
 }
 
 export function normalizarParede(linha: unknown): Parede | null {
@@ -70,6 +86,10 @@ export function normalizarParede(linha: unknown): Parede | null {
     x2,
     y2,
     aberta: o.aberta === true,
+    trancada: tipo === "porta" && o.trancada === true,
+    secreta: tipo === "porta" && o.secreta === true,
+    cd: tipo === "porta" ? cdDaPorta(o.cd) : null,
+    cd_achar: tipo === "porta" ? cdDaPorta(o.cd_achar) : null,
     created_at: typeof o.created_at === "string" ? o.created_at : "",
   };
 }

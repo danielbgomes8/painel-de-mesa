@@ -36,6 +36,7 @@ const base: Armadilha = {
   nota: "",
   estado: "armada",
   tipo: "armadilha",
+  cd_achar: null,
   created_at: "",
 };
 const medio = (id: string, x: number, y: number, nome = "Ana") => ({ id, x, y, espacoPx: 35, nome });

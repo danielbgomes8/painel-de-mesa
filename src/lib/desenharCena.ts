@@ -156,6 +156,7 @@ export function desenharParedes(
   paredes: readonly Parede[],
   escala: number,
   previa: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | { tipo: "curva"; pontos: readonly Ponto[] } | null,
+  portaSelecionada: string | null = null,
 ): void {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -183,6 +184,35 @@ export function desenharParedes(
     for (const p of paredes) {
       if (p.tipo === "porta") traco(p.x1, p.y1, p.x2, p.y2, "#f0b030", 4, p.aberta, passada);
       else traco(p.x1, p.y1, p.x2, p.y2, "#e0504f", 3, false, passada);
+    }
+  }
+  // Só o Mestre vê: 🔒 (com a CD, se tem) nas trancadas e 🕵️ nas secretas, no meio do traço; anel na selecionada.
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const p of paredes) {
+    if (p.tipo !== "porta") continue;
+    const mx = (p.x1 + p.x2) / 2;
+    const my = (p.y1 + p.y2) / 2;
+    if (p.id === portaSelecionada) {
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(mx, my, 16 / escala, 0, Math.PI * 2);
+      ctx.lineWidth = 3 / escala;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+    }
+    const marcas = `${p.trancada ? "🔒" : ""}${p.secreta ? "🕵️" : ""}`;
+    if (!marcas) continue;
+    ctx.font = `${15 / escala}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+    ctx.fillStyle = "#fff";
+    ctx.fillText(marcas, mx, my - 13 / escala);
+    if (p.trancada && p.cd !== null) {
+      ctx.font = `700 ${11 / escala}px system-ui, sans-serif`;
+      ctx.lineWidth = 3 / escala;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(`CD ${p.cd}`, mx, my + 12 / escala);
+      ctx.fillStyle = "#f0c24b";
+      ctx.fillText(`CD ${p.cd}`, mx, my + 12 / escala);
     }
   }
   if (previa && previa.tipo === "curva") {
@@ -380,6 +410,8 @@ export type EntradaDeDesenho = {
   paredes?: readonly Parede[];
   previaParede?: { tipo: "parede" | "porta" | "comodo"; a: Ponto; b: Ponto } | { tipo: "curva"; pontos: readonly Ponto[] } | null;
   visaoDosInimigos?: readonly (readonly Ponto[])[];
+  /** Só o Mestre: a porta selecionada pra editar (ganha um anel). */
+  portaSelecionada?: string | null;
 };
 
 /** Pinta um quadro completo. */
@@ -424,7 +456,7 @@ export function desenharCena(ctx: CanvasRenderingContext2D, e: EntradaDeDesenho)
   // O que só o Mestre enxerga: sai de baixo dos peões (que ficam por cima).
   if (e.mestre) {
     if (e.visaoDosInimigos && e.visaoDosInimigos.length > 0) desenharVisaoDosInimigos(ctx, e.visaoDosInimigos, vista.escala);
-    if ((e.paredes && e.paredes.length > 0) || e.previaParede) desenharParedes(ctx, e.paredes ?? [], vista.escala, e.previaParede ?? null);
+    if ((e.paredes && e.paredes.length > 0) || e.previaParede) desenharParedes(ctx, e.paredes ?? [], vista.escala, e.previaParede ?? null, e.portaSelecionada ?? null);
     if (e.selecaoMarca) desenharSelecaoDeMarca(ctx, e.selecaoMarca, vista.escala);
   }
 

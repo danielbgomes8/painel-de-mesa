@@ -19,6 +19,8 @@ export type Paredes = {
   adicionar: (novas: NovaParede[]) => Promise<boolean>;
   /** Abre ou fecha uma porta (só ela muda: nunca a linha inteira). */
   alternarPorta: (id: string) => Promise<boolean>;
+  /** Muda só o que foi pedido numa porta (trancada, secreta, as CDs, aberta): nunca a linha inteira. */
+  atualizarPorta: (id: string, mudanca: Partial<Pick<Parede, "aberta" | "trancada" | "secreta" | "cd" | "cd_achar">>) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
   /** Várias numa escrita só (desfazer uma curva ou um cômodo inteiro). */
   removerVarias: (ids: string[]) => Promise<boolean>;
@@ -31,7 +33,7 @@ export type Paredes = {
  * canal próprio, releitura a cada reconexão) e, como ele, tolera a tabela ainda
  * não existir.
  */
-export function useParedes(cenaId: string | null, codigo: string): Paredes {
+export function useParedes(cenaId: string | null, codigo: string, canalExtra = ""): Paredes {
   const [dados, setDados] = useState<{ cenaId: string | null; paredes: Parede[]; carregou: boolean; indisponivel: boolean }>({
     cenaId: null,
     paredes: [],
@@ -103,7 +105,7 @@ export function useParedes(cenaId: string | null, codigo: string): Paredes {
       document.addEventListener("visibilitychange", aoVoltar);
       window.addEventListener("online", aoVoltar);
       canal = supabase
-        .channel(`paredes:${cenaId}`)
+        .channel(`paredes:${cenaId}${canalExtra}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "cena_paredes", filter: `cena_id=eq.${cenaId}` }, (msg) => {
           if (msg.eventType === "DELETE") {
             const id = (msg.old as { id?: string }).id;
@@ -125,7 +127,7 @@ export function useParedes(cenaId: string | null, codigo: string): Paredes {
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
     };
-  }, [cenaId, mexer]);
+  }, [cenaId, mexer, canalExtra]);
 
   const adicionar = useCallback<Paredes["adicionar"]>(
     async (novas) => {
@@ -174,6 +176,24 @@ export function useParedes(cenaId: string | null, codigo: string): Paredes {
       const { error } = await supabase.from("cena_paredes").update({ aberta }).eq("id", id);
       if (error) {
         relatarErro("alternarPorta", error);
+        mexer(() => antes);
+        setAviso(AVISO_NAO_SALVOU);
+        return false;
+      }
+      setAviso(null);
+      return true;
+    },
+    [mexer],
+  );
+
+  const atualizarPorta = useCallback<Paredes["atualizarPorta"]>(
+    async (id, mudanca) => {
+      const antes = ref.current;
+      if (!antes.some((p) => p.id === id && p.tipo === "porta")) return false;
+      mexer((atual) => atual.map((p) => (p.id === id ? { ...p, ...mudanca } : p)));
+      const { error } = await supabase.from("cena_paredes").update(mudanca).eq("id", id);
+      if (error) {
+        relatarErro("atualizarPorta", error);
         mexer(() => antes);
         setAviso(AVISO_NAO_SALVOU);
         return false;
@@ -235,5 +255,5 @@ export function useParedes(cenaId: string | null, codigo: string): Paredes {
     return true;
   }, [cenaId, mexer]);
 
-  return { paredes, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, alternarPorta, remover, removerVarias, removerTodas };
+  return { paredes, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, alternarPorta, atualizarPorta, remover, removerVarias, removerTodas };
 }

@@ -463,7 +463,7 @@ export function PainelParedes({
   return (
     <>
       <div className="mapa-ferr" role="group" aria-label="O que desenhar">
-        {([["parede", "parede"], ["curva", "curva"], ["porta", "porta"], ["comodo", "cômodo"], ["apagar", "apagar"]] as const).map(([modo, rotulo]) => (
+        {([["parede", "parede"], ["curva", "curva"], ["porta", "porta"], ["comodo", "cômodo"], ["apagar", "apagar"], ["propriedades", "🔒 propriedades da porta"]] as const).map(([modo, rotulo]) => (
           <button key={modo} type="button" className="chip alvo" aria-pressed={modoParede === modo} onClick={() => aoMudarModoParede(modo)}>
             {rotulo}
           </button>

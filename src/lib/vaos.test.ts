@@ -6,7 +6,7 @@ const cena = { grade_ligada: true, grade_px: 30, grade_dx: 0, grade_dy: 0, largu
 
 let n = 0;
 function parede(x1: number, y1: number, x2: number, y2: number, extra: Partial<Parede> = {}): Parede {
-  return { id: `p${n++}`, cena_id: "c", room_code: "s", tipo: "parede", x1, y1, x2, y2, aberta: false, created_at: "", ...extra };
+  return { id: `p${n++}`, cena_id: "c", room_code: "s", tipo: "parede", x1, y1, x2, y2, aberta: false, trancada: false, secreta: false, cd: null, cd_achar: null, created_at: "", ...extra };
 }
 
 describe("vãos que viram porta", () => {

@@ -201,7 +201,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
   },
   {
     tabela: "cena_paredes",
-    colunas: colunas<Parede>({ id: true, cena_id: true, room_code: true, tipo: true, x1: true, y1: true, x2: true, y2: true, aberta: true, created_at: true }),
+    colunas: colunas<Parede>({ id: true, cena_id: true, room_code: true, tipo: true, x1: true, y1: true, x2: true, y2: true, aberta: true, trancada: true, secreta: true, cd: true, cd_achar: true, created_at: true }),
   },
   {
     tabela: "cena_marcas",
@@ -223,6 +223,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       nota: true,
       estado: true,
       tipo: true,
+      cd_achar: true,
       created_at: true,
     }),
   },

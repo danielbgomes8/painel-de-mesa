@@ -23,7 +23,7 @@ import {
 const cena = { grade_ligada: true, grade_px: 100, grade_dx: 0, grade_dy: 0, metros: 1.5, largura: 3000, altura: 2000 };
 
 function parede(extra: Partial<Parede> = {}): Parede {
-  return { id: "p", cena_id: "c", room_code: "s", tipo: "parede", x1: 0, y1: 0, x2: 100, y2: 0, aberta: false, created_at: "", ...extra };
+  return { id: "p", cena_id: "c", room_code: "s", tipo: "parede", x1: 0, y1: 0, x2: 100, y2: 0, aberta: false, trancada: false, secreta: false, cd: null, cd_achar: null, created_at: "", ...extra };
 }
 
 describe("o que vem do banco", () => {

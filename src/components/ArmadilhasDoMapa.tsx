@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { Armadilhas } from "@/hooks/useArmadilhas";
 import type { Pisada } from "@/lib/armadilhas";
+import type { Paredes } from "@/hooks/useParedes";
+import { CD_DE_ACHAR_MAXIMA, cdDeAcharValida, linhaDeAchado, type Achado } from "@/lib/percepcao";
 import {
   ARMADILHAS_MAXIMAS,
   ARMADILHAS_PRONTAS,
@@ -65,7 +67,10 @@ export function PainelDeArmadilhas({
   /** O que está escrito no campo "outro (m)" (o raio só muda quando o texto vale). */
   const [outroRaio, setOutroRaio] = useState("");
   const [nota, setNota] = useState("");
+  /** A CD pra um jogador reparar sozinho (Percepção passiva da ficha >= CD); vazio = ninguém repara. */
+  const [cdAchar, setCdAchar] = useState("");
 
+  const cdAcharOk = cdAchar.trim() === "" || cdDeAcharValida(cdAchar) !== null;
   const cdOk = cd.trim() === "" || cdValida(cd) !== null;
   const raioOk = raioValido(raio) !== null;
   const rascunho: RascunhoDeArmadilha = {
@@ -75,6 +80,7 @@ export function PainelDeArmadilhas({
     dano: dano.trim().slice(0, DANO_MAXIMO),
     raio: raioValido(raio) ?? RAIO_PADRAO_M,
     nota: nota.trim().slice(0, NOTA_MAXIMA),
+    cd_achar: tipo === "armadilha" ? cdDeAcharValida(cdAchar) : null,
     tipo,
     // Perigo nasce à vista (a mesa vê o fogo); armadilha nasce escondida.
     estado: tipo === "perigo" ? "revelada" : "armada",
@@ -90,6 +96,7 @@ export function PainelDeArmadilhas({
     setNota("");
     setRaio(RAIO_PADRAO_M);
     setOutroRaio("");
+    setCdAchar("");
     setSalvaguarda("DES");
   }
 
@@ -102,6 +109,7 @@ export function PainelDeArmadilhas({
     setDano(a.dano);
     setRaio(a.raio);
     setOutroRaio("");
+    setCdAchar(a.cd_achar === null ? "" : String(a.cd_achar));
     setNota(a.nota);
   }
 
@@ -114,6 +122,7 @@ export function PainelDeArmadilhas({
       dano: rascunho.dano ?? "",
       raio: rascunho.raio ?? RAIO_PADRAO_M,
       nota: rascunho.nota ?? "",
+      cd_achar: rascunho.cd_achar ?? null,
     });
     if (ok) limpar();
   }
@@ -233,13 +242,33 @@ export function PainelDeArmadilhas({
         value={nota}
         onChange={(e) => setNota(e.target.value)}
       />
+      {tipo === "armadilha" && (
+        <div className="mapa-ferr">
+          <label className="fol-rotulo">
+            CD pra achar sozinho (Percepção passiva)
+            <input
+              type="number"
+              inputMode="numeric"
+              className="mapa-aura-campo loja-qtd"
+              aria-label="CD pra achar pela Percepção passiva"
+              placeholder="sem"
+              min={1}
+              max={CD_DE_ACHAR_MAXIMA}
+              value={cdAchar}
+              onChange={(e) => setCdAchar(e.target.value)}
+            />
+          </label>
+          <span className="fc-sub">Se a Percepção passiva de alguém for igual ou maior, chegando a 4,5 m, só você é avisado.</span>
+        </div>
+      )}
+      {!cdAcharOk && <p className="mapa-aura-aviso erro">Use uma CD de 1 a {CD_DE_ACHAR_MAXIMA}.</p>}
       {!cdOk && <p className="mapa-aura-aviso erro">Use uma CD de 1 a {CD_MAXIMA}.</p>}
       {outroRaio.trim() !== "" && raioValido(outroRaio) === null && <p className="mapa-aura-aviso erro">Use um raio de 0,1 a 60 m.</p>}
 
       <div className="mapa-ferr">
         {editando ? (
           <>
-            <button type="button" className="btn primary" disabled={!cdOk || !raioOk} onClick={() => void salvarEdicao()}>
+            <button type="button" className="btn primary" disabled={!cdOk || !raioOk || !cdAcharOk} onClick={() => void salvarEdicao()}>
               salvar alterações
             </button>
             <button type="button" className="btn" onClick={limpar}>
@@ -252,7 +281,7 @@ export function PainelDeArmadilhas({
             cancelar (esperando o toque no mapa)
           </button>
         ) : (
-          <button type="button" className="btn primary" disabled={!cdOk || !raioOk || cheio} onClick={() => aoColocar(rascunho)}>
+          <button type="button" className="btn primary" disabled={!cdOk || !raioOk || !cdAcharOk || cheio} onClick={() => aoColocar(rascunho)}>
             📍 colocar no mapa
           </button>
         )}
@@ -288,6 +317,7 @@ function LinhaDaArmadilha({ a, arm, aoEditar }: { a: Armadilha; arm: Armadilhas;
       <span className="luz-texto">
         <span aria-hidden="true">{perigo ? "☠️" : "⚠️"}</span> <b>{nome}</b> · {rotuloDoEstado(a.estado, a.tipo)}
         {sugestao && <span className="fc-sub"> — {sugestao}</span>}
+        {a.cd_achar !== null && a.tipo === "armadilha" && <span className="fc-sub"> · acha com PP {a.cd_achar}+</span>}
         {a.nota && <span className="fc-sub"> · {a.nota}</span>}
       </span>
       <span className="luz-acoes">
@@ -429,6 +459,95 @@ function AvisoDePisada({
           deixar passar
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * O aviso de que alguém **repara** numa armadilha escondida ou numa porta secreta (Percepção passiva da ficha >= a CD
+ * que o Mestre deu). Só o Mestre vê. Ele conta à mesa (revela a armadilha, abre ou marca a porta como achada) ou deixa passar.
+ */
+export function AvisosDeAchado({
+  achados,
+  armadilhas,
+  paredes,
+  arm,
+  muros,
+  aoResolver,
+  registrar,
+}: {
+  achados: readonly Achado[];
+  armadilhas: readonly Armadilha[];
+  paredes: readonly { id: string; tipo: string; trancada: boolean }[];
+  arm: Armadilhas;
+  muros: Paredes;
+  aoResolver: (a: Achado) => void;
+  registrar: (texto: string) => void;
+}) {
+  if (achados.length === 0) return null;
+  return (
+    <div className="arm-avisos" role="alert" aria-label="Alguém repara em algo escondido">
+      {achados.map((a) => {
+        const armadilha = a.alvo === "armadilha" ? armadilhas.find((x) => x.id === a.alvoId) : undefined;
+        const porta = a.alvo === "porta" ? paredes.find((x) => x.id === a.alvoId) : undefined;
+        if (!armadilha && !porta) return null;
+        const nome = armadilha ? nomeDaArmadilha(armadilha) : "";
+        return (
+          <div key={`${a.pecaId}:${a.alvo}:${a.alvoId}`} className="arm-aviso">
+            <p className="arm-aviso-titulo">
+              <span aria-hidden="true">{a.alvo === "porta" ? "🕵️" : "👁️"}</span> <b>{a.peca}</b> repara em{" "}
+              <b>{a.alvo === "porta" ? "uma porta secreta" : nome}</b>
+            </p>
+            <p className="arm-aviso-sugestao">
+              Percepção passiva {a.pp} (CD {a.cd})
+            </p>
+            <div className="mapa-ferr">
+              {armadilha && (
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={async () => {
+                    if (!(await arm.atualizar(armadilha.id, { estado: "revelada" }))) return;
+                    registrar(linhaDeAchado(a.peca, "armadilha", nome));
+                    aoResolver(a);
+                  }}
+                >
+                  revelar à mesa
+                </button>
+              )}
+              {porta && !porta.trancada && (
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={async () => {
+                    if (!(await muros.atualizarPorta(porta.id, { secreta: false, aberta: true }))) return;
+                    registrar(linhaDeAchado(a.peca, "porta", ""));
+                    aoResolver(a);
+                  }}
+                >
+                  abrir a porta
+                </button>
+              )}
+              {porta && (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    if (!(await muros.atualizarPorta(porta.id, { secreta: false }))) return;
+                    registrar(linhaDeAchado(a.peca, "porta", ""));
+                    aoResolver(a);
+                  }}
+                >
+                  só marcar como achada
+                </button>
+              )}
+              <button type="button" className="btn" onClick={() => aoResolver(a)}>
+                deixar passar
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

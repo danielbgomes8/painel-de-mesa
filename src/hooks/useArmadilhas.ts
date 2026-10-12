@@ -18,7 +18,7 @@ export type Armadilhas = {
   aviso: string | null;
   adicionar: (nova: NovaArmadilha) => Promise<boolean>;
   /** Muda só o que foi pedido (estado, texto, lugar...): nunca a linha inteira. */
-  atualizar: (id: string, patch: Partial<Pick<Armadilha, "nome" | "x" | "y" | "raio" | "salvaguarda" | "cd" | "dano" | "nota" | "estado">>) => Promise<boolean>;
+  atualizar: (id: string, patch: Partial<Pick<Armadilha, "nome" | "x" | "y" | "raio" | "salvaguarda" | "cd" | "dano" | "nota" | "estado" | "cd_achar">>) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
 };
 
@@ -146,6 +146,8 @@ export function useArmadilhas(cenaId: string | null, codigo: string, canalExtra 
         // A coluna `tipo` vem na migration 0037: só se manda quando é perigo, pra armadilha comum seguir
         // funcionando antes dela ser rodada.
         ...(nova.tipo === "perigo" ? { tipo: "perigo" } : {}),
+        // `cd_achar` vem na migration 0038: só se manda quando o Mestre definiu uma.
+        ...(nova.cd_achar != null ? { cd_achar: nova.cd_achar } : {}),
       };
       // Aparece na hora (created_at vazio marca "ainda não confirmado").
       const provisoria = normalizarArmadilha({ ...linha, created_at: "" });
