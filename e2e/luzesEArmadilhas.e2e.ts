@@ -369,6 +369,7 @@ test("armadilhas: o aviso de pisada aparece em qualquer aba do Mestre, não só 
 test("perigo contínuo: a mesa vê a zona; o Mestre é avisado ao entrar e no início do turno, e extingue", async ({ browser, page }) => {
   const erros = coletarErros(page);
   await limparSala();
+  await page.addInitScript(espiar);
   await prepararMapa(page);
   const cena = await cenaDoBanco();
   await criarFicha("jogador-robo", "Jogador Robô", { hp: 20, hp_max: 20 });

@@ -97,7 +97,7 @@ test("folhas: o Mestre escreve pra um jogador, entrega, recolhe, manda pra mesa 
 
   // Mudar o destino pra mesa toda e entregar: os dois enxergam.
   await page.getByRole("button", { name: "editar", exact: true }).click();
-  await page.getByLabel("Pra quem é a folha").selectOption({ label: "a mesa toda" });
+  await page.locator(".fol-item").getByLabel("Pra quem é a folha").selectOption({ label: "a mesa toda" }); // o formulário "Nova folha" também tem esse campo
   await page.getByRole("button", { name: "salvar alterações" }).click();
   await expect.poll(async () => (await folhasDoBanco())[0].para).toBeNull();
   await page.getByRole("button", { name: "entregar", exact: true }).click();
@@ -111,10 +111,22 @@ test("folhas: o Mestre escreve pra um jogador, entrega, recolhe, manda pra mesa 
   await page.getByRole("button", { name: "Apagar a folha Carta do rei" }).click();
   await expect.poll(async () => (await folhasDoBanco()).length).toBe(0);
   await expect(ana.pagina.getByRole("heading", { name: /Carta do rei/ })).toHaveCount(0, { timeout: 30_000 });
+  // O arquivo saiu do Storage (a lista do Storage, não o link público: o link pode ficar em cache na CDN).
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
+  const chave = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   await expect
-    .poll(async () => (await fetch(`${base}/storage/v1/object/public/mapas/${caminhoDaFoto}`)).status, { timeout: 30_000 })
-    .toBeGreaterThanOrEqual(400);
+    .poll(
+      async () => {
+        const lista = await fetch(`${base}/storage/v1/object/list/mapas`, {
+          method: "POST",
+          headers: { apikey: chave, Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ prefix: `${SALA}/folhas`, limit: 50 }),
+        });
+        return ((await lista.json()) as { name: string }[]).map((x) => `${SALA}/folhas/${x.name}`).includes(caminhoDaFoto);
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(false);
 
   expect(erros).toEqual([]);
   expect(ana.erros).toEqual([]);
