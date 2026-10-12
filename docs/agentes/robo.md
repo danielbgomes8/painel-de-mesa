@@ -2,6 +2,22 @@
 
 > Parte do `AGENTS.md` (dividido em 09/10/2026; o texto é o mesmo de antes, só mudou de lugar). **Leia quando:** Antes de escrever ou rodar teste `e2e/*.e2e.ts`.
 
+## Robô em dois jobs (12/10/2026)
+
+- **Por quê:** a suíte (62 testes, ~943 s de teste + ~35% de limpeza e abertura entre eles) chegou a **22,1 min num job só**, e o limite é 25.
+  Uma única repetição de teste instável já estourava e o GitHub cancelava (aconteceu em `e38a399`, a 2 testes do fim).
+- **Como:** o `e2e.yml` tem uma matriz `metade: [1, 2]`; cada job roda `npm run e2e -- --shard=<metade>/2` com
+  `E2E_SALA=ci-teste-<metade>`. O `--shard` do Playwright reparte por **arquivo** (a suíte é `fullyParallel: false`); com os arquivos de
+  hoje deu 489 s × 454 s de teste. Cada job faz o próprio `npm ci` + build, então cada metade leva ~14 min, em paralelo.
+- **Salas separadas são o que deixa isso funcionar:** na mesma sala, um job apagaria os dados do outro (a lição de 02/10 abaixo). O
+  robô local fica na `ci-teste`, então **não colide mais com o GitHub**. O `concurrency: e2e` continua: duas EXECUÇÕES do workflow
+  (dois pushes seguidos) usariam as mesmas salas.
+- **Sala nova nasce sozinha:** `garantirSala` (em `limparSala`, `e2e/apoio.ts`) faz o mesmo `upsert` que o app faz ao abrir uma sala
+  (`rooms`, `combat_state`, `dm_notes`, `bastiao`). Sem isso, o primeiro `criarFicha` numa sala nova falhava por falta da linha em `rooms`,
+  e o `esquema.e2e.ts` por falta das outras. Testado: `esquema` sozinho numa sala que nunca existiu passa.
+- **Se um dia o tempo voltar a apertar:** passar de 2 para 3 metades (`metade: [1, 2, 3]`, `/3`, e uma sala `ci-teste-3`). Teste novo usa
+  `SALA`, nunca o nome escrito. `ci-teste-1` e `ci-teste-2` são só do robô (as de `ci-teste*` entram no backup diário como qualquer sala).
+
 ## Robô de tela, trava de sala e restauração do backup (01/10/2026)
 
 - **Robô de tela** (`e2e/*.e2e.ts`, `playwright.config.ts`,

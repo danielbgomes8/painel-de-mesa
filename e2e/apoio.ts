@@ -45,10 +45,22 @@ async function limparImagens(): Promise<void> {
   }
 }
 
+/** Faz a sala existir, com as mesmas linhas que o app cria ao abri-la (`iniciar` em `useSala`). Numa sala que o
+ *  robô já usou isso não muda nada; numa sala NOVA (cada metade do robô do GitHub tem a sua) é o que evita o
+ *  primeiro `criarFicha` falhar por falta da linha em `rooms`, e o teste de esquema por falta de `bastiao`. */
+async function garantirSala(): Promise<void> {
+  const ignorar = { Prefer: "resolution=ignore-duplicates,return=minimal" };
+  await rest("rooms?on_conflict=code", { method: "POST", headers: ignorar, body: JSON.stringify({ code: SALA }) });
+  for (const tabela of ["combat_state", "dm_notes", "bastiao"]) {
+    await rest(`${tabela}?on_conflict=room_code`, { method: "POST", headers: ignorar, body: JSON.stringify({ room_code: SALA }) });
+  }
+}
+
 /** Deixa a sala de teste vazia: apaga o que o robô criou, tabela por tabela
  *  (filhas antes das mães) e zera o combate. A linha da sala em si fica. */
 export async function limparSala(): Promise<void> {
   if (!bancoConfigurado) return;
+  await garantirSala();
   await limparImagens();
   for (const tabela of ["campanha_efeitos", "campanha_tempo", "bau_itens", "quadro_notas", "quadro_ligacoes", "quadro_cartoes", "loja_itens", "lojas", "relogios", "folhas", "cena_armadilhas", "cena_marcas", "cena_paredes", "cena_pecas", "cena_nevoa", "cenas", "characters", "combat_log", "diario", "encontros", "npc_templates", "uso", "combate_eventos", "combate_efeitos"]) {
     // Tabela que ainda não existe (migration por rodar) não é erro aqui.
