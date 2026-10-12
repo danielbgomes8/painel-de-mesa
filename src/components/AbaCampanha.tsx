@@ -7,6 +7,10 @@ import type { Bau } from "@/hooks/useBau";
 import type { Tempo } from "@/hooks/useTempo";
 import type { Folhas } from "@/hooks/useFolhas";
 import { FolhasDaCampanha } from "@/components/FolhasDaCampanha";
+import type { Relogios } from "@/hooks/useRelogios";
+import { RelogiosDaCampanha } from "@/components/RelogiosDaCampanha";
+import type { LojaHook } from "@/hooks/useLoja";
+import { LojaDaCampanha } from "@/components/LojaDaCampanha";
 import type { Identidade } from "@/lib/identidade";
 import { DiarioCampanha } from "@/components/DiarioCampanha";
 import { QuadroCampanha } from "@/components/QuadroCampanha";
@@ -15,7 +19,7 @@ import { TempoDaCampanha } from "@/components/TempoDaCampanha";
 import { AUTOR_MESTRE, cartoesVisiveis } from "@/lib/quadro";
 import { registrarUso } from "@/lib/registrarUso";
 
-export type ParteDaCampanha = "quadro" | "bau" | "tempo" | "folhas" | "sessoes";
+export type ParteDaCampanha = "quadro" | "bau" | "tempo" | "folhas" | "relogios" | "loja" | "sessoes";
 type Parte = ParteDaCampanha;
 
 /** A aba da campanha: o Quadro (cartões com foto, o que a mesa vê e o que não),
@@ -27,6 +31,8 @@ export function AbaCampanha({
   bau,
   tempo,
   folhas,
+  relogios,
+  loja,
   novasFolhas,
   aoVerFolhas,
   parteInicial = "quadro",
@@ -38,6 +44,8 @@ export function AbaCampanha({
   bau: Bau;
   tempo: Tempo;
   folhas: Folhas;
+  relogios: Relogios;
+  loja: LojaHook;
   /** Quantas folhas entregues a este jogador ele ainda não abriu (o número no botão). */
   novasFolhas: number;
   aoVerFolhas: (ids: string[]) => void;
@@ -71,11 +79,25 @@ export function AbaCampanha({
             📜 Folhas{novasFolhas > 0 ? ` (${novasFolhas})` : ""}
           </button>
         ) : null}
+        {(!loja.indisponivel || identidade?.tipo === "mestre") && (
+          <button type="button" aria-pressed={parte === "loja"} onClick={() => setParte("loja")}>
+            🛒 Loja
+          </button>
+        )}
+        {identidade?.tipo === "mestre" && (
+          <button type="button" aria-pressed={parte === "relogios"} onClick={() => setParte("relogios")}>
+            ⏳ Relógios
+          </button>
+        )}
         <button type="button" aria-pressed={parte === "sessoes"} onClick={() => setParte("sessoes")}>
           📖 Sessões
         </button>
       </div>
-      {parte === "folhas" ? (
+      {parte === "loja" ? (
+        <LojaDaCampanha loja={loja} sala={sala} identidade={identidade} />
+      ) : parte === "relogios" ? (
+        <RelogiosDaCampanha relogios={relogios} sala={sala} />
+      ) : parte === "folhas" ? (
         <FolhasDaCampanha folhas={folhas} sala={sala} identidade={identidade} aoVer={aoVerFolhas} />
       ) : parte === "tempo" ? (
         <TempoDaCampanha tempo={tempo} sala={sala} souMestre={identidade?.tipo === "mestre"} />

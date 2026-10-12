@@ -7,6 +7,9 @@ import { useQuadro } from "@/hooks/useQuadro";
 import { useBau } from "@/hooks/useBau";
 import { useTempo } from "@/hooks/useTempo";
 import { useFolhas } from "@/hooks/useFolhas";
+import { useRelogios } from "@/hooks/useRelogios";
+import { useLoja } from "@/hooks/useLoja";
+import { RelogiosNaMesa } from "@/components/RelogiosDaCampanha";
 import { folhasNovas, guardarVistas, lerVistas } from "@/lib/folhas";
 import { rotuloCurtoDoDia } from "@/lib/tempoCampanha";
 import { useVersaoNova } from "@/hooks/useVersaoNova";
@@ -121,6 +124,10 @@ function PainelSala({ codigo }: { codigo: string }) {
   const tempo = useTempo(codigo);
   // As folhas de entrega (cartas, pergaminhos) também têm canal próprio. O que este aparelho já abriu fica só nele.
   const folhas = useFolhas(codigo);
+  // Os relógios de tensão (o ritual termina, a guarda chega): a mesa vê encher; o Mestre mexe na Campanha.
+  const relogios = useRelogios(codigo);
+  // A loja (itens, preço, estoque): o Mestre monta, o jogador compra do celular.
+  const loja = useLoja(codigo);
   const [folhasVistas, setFolhasVistas] = useState<ReadonlySet<string>>(() => lerVistas(codigo));
   const [parteDaCampanha, setParteDaCampanha] = useState<ParteDaCampanha>("quadro");
   const novasFolhas = !telao && identidade?.tipo === "jogador" ? folhasNovas(folhas.folhas, identidade.slug, folhasVistas) : [];
@@ -290,6 +297,7 @@ function PainelSala({ codigo }: { codigo: string }) {
     return (
       <>
         <Telao sala={sala} rotulo={rotulo} cenas={cenas} codigo={codigo} tempo={tempo} />
+        <RelogiosNaMesa relogios={relogios.relogios} telao />
         {quadro.destaque && (
           <DestaqueDoCartao
             cartao={quadro.destaque}
@@ -438,6 +446,8 @@ function PainelSala({ codigo }: { codigo: string }) {
 
       <BarraAbas aba={abaEfetiva} onMudar={mudarAba} souMestre={souMestre} temMapa={temMapa} />
 
+      <RelogiosNaMesa relogios={relogios.relogios} mestre={souMestre} />
+
       {abaEfetiva === "diario" && (
         <AbaCampanha
           sala={sala}
@@ -446,6 +456,8 @@ function PainelSala({ codigo }: { codigo: string }) {
           bau={bau}
           tempo={tempo}
           folhas={folhas}
+          relogios={relogios}
+          loja={loja}
           novasFolhas={novasFolhas.length}
           aoVerFolhas={verFolhas}
           parteInicial={parteDaCampanha}

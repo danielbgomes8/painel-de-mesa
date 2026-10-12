@@ -14,6 +14,8 @@ import type { Parede } from "../src/lib/paredes";
 import type { Marca } from "../src/lib/marcas";
 import type { Armadilha } from "../src/lib/armadilhas";
 import type { Folha } from "../src/lib/folhas";
+import type { Relogio } from "../src/lib/relogios";
+import type { ItemDaLoja, Loja } from "../src/lib/loja";
 import type { Cartao, Ligacao, NotaDoCartao } from "../src/lib/quadro";
 import type { EfeitoDeTempo, LinhaTempo } from "../src/lib/tempoCampanha";
 import type { LinhaBastiao, LinhaCombate } from "../src/hooks/useSala";
@@ -223,6 +225,27 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       tipo: true,
       created_at: true,
     }),
+  },
+  { tabela: "lojas", colunas: colunas<Loja>({ id: true, room_code: true, nome: true, aberta: true, created_at: true }) },
+  {
+    tabela: "loja_itens",
+    colunas: colunas<ItemDaLoja>({
+      id: true,
+      loja_id: true,
+      room_code: true,
+      nome: true,
+      descricao: true,
+      preco_pc: true,
+      estoque: true,
+      peso: true,
+      magico: true,
+      raridade: true,
+      created_at: true,
+    }),
+  },
+  {
+    tabela: "relogios",
+    colunas: colunas<Relogio>({ id: true, room_code: true, nome: true, fatias: true, cheias: true, visivel: true, consequencia: true, created_at: true }),
   },
   {
     tabela: "folhas",

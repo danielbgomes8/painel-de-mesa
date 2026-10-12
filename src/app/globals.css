@@ -6169,3 +6169,196 @@ input.fj-score:focus-visible {
   gap: 4px;
   font-size: 13px;
 }
+
+/* ---------- Relógios de tensão ---------- */
+.rel,
+.rel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rel-form {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.rel-svg {
+  flex: none;
+}
+.rel-fatia {
+  fill: transparent;
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+.rel-fatia--cheia {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+.rel-item--cheio .rel-fatia--cheia {
+  fill: var(--danger);
+  stroke: var(--danger);
+}
+.rel-faixa,
+.rel-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rel-faixa {
+  margin: 6px 0;
+}
+.rel-lista {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.rel-item,
+.rel-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 6px 12px 6px 8px;
+  font-size: 13px;
+}
+.rel-linha {
+  flex-wrap: wrap;
+}
+.rel-item--oculto {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.rel-item--cheio {
+  border-color: var(--danger);
+}
+.rel-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 120px;
+}
+.rel-contagem,
+.rel-conseq {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rel-conseq {
+  overflow-wrap: anywhere;
+}
+.rel-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+/* No telão: um cartão no canto de cima, fora do caminho do mapa e da faixa da vez. */
+.rel-faixa--telao {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  max-width: min(32%, 420px);
+  margin: 0;
+  pointer-events: none;
+}
+.rel-faixa--telao .rel-item {
+  background: rgba(13, 11, 9, 0.85);
+  color: #f5f0e6;
+  border-color: rgba(245, 240, 230, 0.35);
+  font-size: clamp(16px, 1.7vw, 26px);
+}
+.rel-faixa--telao .rel-contagem,
+.rel-faixa--telao .rel-conseq {
+  color: rgba(245, 240, 230, 0.8);
+  font-size: clamp(13px, 1.3vw, 20px);
+}
+.rel-faixa--telao .rel-fatia {
+  stroke: rgba(245, 240, 230, 0.7);
+}
+.rel-faixa--telao .rel-fatia--cheia {
+  fill: #f0c24b;
+  stroke: #f0c24b;
+}
+.rel-faixa--telao .rel-item--cheio .rel-fatia--cheia {
+  fill: #e0504f;
+  stroke: #e0504f;
+}
+
+/* ---------- Loja (Campanha → Loja) ---------- */
+.loja {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.loja-bloco {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.loja-bloco--fechada {
+  border-style: dashed;
+}
+.loja-titulo {
+  margin: 0;
+  font-size: 16px;
+}
+.loja-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.loja-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+.loja-item--esgotado {
+  opacity: 0.6;
+}
+.loja-item-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.loja-desc {
+  overflow-wrap: anywhere;
+}
+.loja-preco {
+  font-weight: 600;
+  color: var(--accent);
+}
+.loja-compra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.mapa-aura-campo.loja-qtd {
+  width: 84px;
+}
+.loja-motivo {
+  flex: 1 1 100%;
+}

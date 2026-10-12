@@ -59,6 +59,11 @@ export const TABELAS_COM_SALA = [
   "cena_armadilhas",
   // Folhas de entrega (0037). A foto de cada uma fica no Storage e vai na cópia das imagens.
   "folhas",
+  // Relógios de tensão (0038).
+  "relogios",
+  // Lojas e os itens delas (0038).
+  "lojas",
+  "loja_itens",
   // Quadro da Campanha (0024). A foto de cada cartão fica no Storage e vai na
   // cópia das imagens, ao lado das dos mapas.
   "quadro_cartoes",
