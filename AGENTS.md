@@ -145,3 +145,8 @@ falhas em testes que nada têm a ver com a mudança (aura, mapa, quadro...). Iss
 **A checagem certa é `gh run list --workflow e2e.yml --limit 1 --json status`** (o `gh run list --limit 1` sozinho pode mostrar o workflow
 "Verificar", que acaba em 1 minuto, e dar "completed" com o robô ainda andando). Depois de um push, **espere o "Robô de tela" terminar
 (~9 min) antes de rodar qualquer `playwright` aqui**; e se ele falhar, refaça com `gh run rerun <id>` antes de achar defeito no código.
+
+**Desde 12/10/2026 o robô do GitHub roda em DOIS jobs** (`--shard=1/2` e `2/2`), cada um na sua sala: **`ci-teste-1` e `ci-teste-2`**
+(`E2E_SALA` no `e2e.yml`; a suíte tinha passado de 22 min num job só, perto do limite de 25). O robô local segue na **`ci-teste`**, então
+**o choque local × GitHub descrito acima não acontece mais** — mas dois robôs locais juntos ainda se atrapalham, e as três salas são só do robô.
+A sala nasce sozinha na primeira vez (`garantirSala` em `e2e/apoio.ts`). Teste novo continua usando `SALA`, nunca o nome escrito.

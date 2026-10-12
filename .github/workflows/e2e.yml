@@ -5,8 +5,14 @@
 # mapa. Ver e2e/ e playwright.config.ts.
 #
 # Como o `verificar.yml`, isto AVISA (✗ no commit, e-mail) mas não segura o
-# deploy. Roda no banco de verdade, numa sala fixa de teste (`ci-teste`) que o
-# próprio robô limpa antes e depois; por isso é um de cada vez.
+# deploy. Roda no banco de verdade, em salas fixas de teste que o próprio robô
+# limpa antes e depois.
+#
+# Dois jobs em paralelo (a suíte passou de 22 min num job só, perto do limite):
+# cada um roda uma METADE dos arquivos de teste (`--shard`) na SUA sala —
+# `ci-teste-1` e `ci-teste-2`. Salas diferentes são o que deixa os dois andarem
+# juntos sem um apagar os dados do outro; o robô local segue na `ci-teste`.
+# Se a sala ainda não existir, o robô a cria na primeira vez (`garantirSala`).
 #
 # Segredos do repositório (os mesmos do backup diário): SUPABASE_URL e
 # SUPABASE_ANON_KEY — públicos por natureza, ver README, "Segurança".
@@ -21,18 +27,26 @@ on:
 permissions:
   contents: read
 
-# A sala de teste é uma só: duas execuções ao mesmo tempo se atrapalhariam.
+# Cada metade tem a sala dela, mas duas EXECUÇÕES do workflow ao mesmo tempo
+# (dois pushes seguidos) usariam as mesmas salas e se atrapalhariam: uma por vez.
 concurrency:
   group: e2e
   cancel-in-progress: false
 
 jobs:
   e2e:
+    name: Robô de tela (${{ matrix.metade }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      # Se uma metade falhar, a outra termina: o relatório mostra tudo de uma vez.
+      fail-fast: false
+      matrix:
+        metade: [1, 2]
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      E2E_SALA: ci-teste-${{ matrix.metade }}
     steps:
       - uses: actions/checkout@v7
 
@@ -52,12 +66,12 @@ jobs:
         run: npx playwright install chrome
 
       - name: Robô de tela
-        run: npm run e2e
+        run: npm run e2e -- --shard=${{ matrix.metade }}/2
 
       # Só se falhar: o vídeo passo a passo (trace) de cada teste que quebrou.
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: relatorio-do-robo
+          name: relatorio-do-robo-${{ matrix.metade }}
           path: test-results/
           retention-days: 7
