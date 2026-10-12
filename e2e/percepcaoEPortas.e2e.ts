@@ -157,7 +157,7 @@ test("porta trancada: o Mestre marca pelas propriedades, vê o cadeado e a CD, e
   expect(r.ok).toBe(true);
 
   // Propriedades: toca na porta, marca "trancada" e dá a CD.
-  await escolherNoPainel(page, "Paredes e portas", /O que desenhar/, "🔒 propriedades da porta", "preparar");
+  await escolherNoPainel(page, "Paredes e portas", /O que desenhar/, "🔒 trancas", "preparar");
   await tocarNoMapa(page, 300, 300);
   const editor = page.getByRole("group", { name: "Propriedades da porta" });
   await expect(editor).toBeVisible();

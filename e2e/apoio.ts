@@ -238,7 +238,12 @@ export async function abrirFerramenta(page: Page, ferramenta: string, fase?: "pr
 /** Fecha o painel flutuante: ele cobre um pedaço do mapa, então quem vai tocar no mapa fecha antes. */
 export async function fecharPainelDoMapa(page: Page): Promise<void> {
   const fechar = page.getByRole("button", { name: "Fechar o painel" });
-  if (await fechar.isVisible()) await fechar.click();
+  if (await fechar.isVisible()) {
+    await fechar.click();
+    // O painel sai com uma animação: tocar no mapa antes dela acabar acerta o ponto errado (a caixa do mapa ainda mexe).
+    await page.locator(".palco-painel").waitFor({ state: "hidden" });
+    await page.waitForTimeout(400);
+  }
 }
 
 /** Escolhe uma opção do painel de uma ferramenta (abre o painel, toca na opção e fecha o painel, que cobre o mapa). */

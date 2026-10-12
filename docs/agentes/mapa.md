@@ -399,7 +399,7 @@ Mestre: **o app nunca revela nada sozinho**.
   armadilha → "revelar à mesa" (estado `revelada` + log); porta → "abrir a porta" (some a marca de secreta e abre; só se não está trancada),
   "só marcar como achada" ou "deixar passar". O log diz "👁️ Ana percebe «Poço»" / "🕵️ Ana percebe uma porta secreta" **sem a CD**.
 - **Portas** (`cena_paredes`: `trancada`, `secreta`, `cd`, `cd_achar`; só valem em `tipo = 'porta'`, o normalizador zera nas paredes). Novo
-  modo **🔒 propriedades da porta** na ferramenta Paredes e portas: tocar numa porta a seleciona (anel branco) e o `EditorDePorta`, abaixo do
+  modo **🔒 trancas** na ferramenta Paredes e portas: tocar numa porta a seleciona (anel branco) e o `EditorDePorta`, abaixo do
   mapa, liga trancada/secreta e grava as CDs ao sair do campo. **Só o Mestre vê** o 🔒 (com "CD 14") e o 🕵️ no mapa (`desenharParedes`); a mesa
   nunca vê paredes nem portas. **Porta trancada e fechada não abre com um toque**: o `aoAlternarPorta` do editor pergunta ("🔒 Porta trancada
   — CD 14": "destrancar e abrir" tira o cadeado, abre e loga; "deixar trancada"). Fechar uma aberta ou abrir uma destrancada é o toque de sempre.
