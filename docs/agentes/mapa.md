@@ -383,3 +383,28 @@ O Daniel pediu quatro melhorias em cima das luzes e armadilhas. Decisões dele: 
   passar; o Mestre aplica o dano (decisão dele). Armadilha comum nunca avisa de turno. A coluna `tipo` só vai no `insert` quando é perigo,
   pra armadilha comum seguir funcionando antes da migration. Desenhado em laranja com ☠️.
 - **Limites**: a visão por luz não distingue luz colorida/cone; o início do turno depende da iniciativa (sem ordem montada não há "turno").
+
+## Percepção passiva e portas trancadas ou secretas (12/10/2026, migration `0038_relogios_loja_percepcao_portas.sql`)
+
+O Daniel pediu "percepção passiva nas armadilhas" e "portas trancadas e secretas com CD". Quem decide o que contar à mesa é sempre o
+Mestre: **o app nunca revela nada sozinho**.
+
+- **Percepção passiva** (`lib/percepcao.ts`, testada). Armadilha escondida (`tipo = 'armadilha'`, `estado = 'armada'`) e porta
+  secreta ganham uma **`cd_achar`** (1 a 40; nula = ninguém repara). Quando o jogador cuja **Percepção passiva da ficha (`pp`, a do cartão)**
+  é **igual ou maior** que a CD chega a **4,5 m** do alvo (contado da BORDA da zona da armadilha, ou do traço da porta; criatura grande
+  usa a borda do espaço dela), só o Mestre recebe o aviso. Mesma regra de "entrar" das pisadas: a primeira conferência só aprende o terreno,
+  alvo novo e peão novo não avisam de quem já estava perto, quem continua perto não avisa de novo, sair e voltar avisa. **Só jogador
+  repara** (inimigo e marcador não têm `pp`). `usePisadas` agora devolve também `achados`/`resolverAchado`; a chave de dedupe inclui o alvo.
+  Os botões do aviso (`AvisosDeAchado`, dentro do vigia `GuardaDeArmadilhas`, que ganhou leitura própria das paredes no canal `guarda`):
+  armadilha → "revelar à mesa" (estado `revelada` + log); porta → "abrir a porta" (some a marca de secreta e abre; só se não está trancada),
+  "só marcar como achada" ou "deixar passar". O log diz "👁️ Ana percebe «Poço»" / "🕵️ Ana percebe uma porta secreta" **sem a CD**.
+- **Portas** (`cena_paredes`: `trancada`, `secreta`, `cd`, `cd_achar`; só valem em `tipo = 'porta'`, o normalizador zera nas paredes). Novo
+  modo **🔒 propriedades da porta** na ferramenta Paredes e portas: tocar numa porta a seleciona (anel branco) e o `EditorDePorta`, abaixo do
+  mapa, liga trancada/secreta e grava as CDs ao sair do campo. **Só o Mestre vê** o 🔒 (com "CD 14") e o 🕵️ no mapa (`desenharParedes`); a mesa
+  nunca vê paredes nem portas. **Porta trancada e fechada não abre com um toque**: o `aoAlternarPorta` do editor pergunta ("🔒 Porta trancada
+  — CD 14": "destrancar e abrir" tira o cadeado, abre e loga; "deixar trancada"). Fechar uma aberta ou abrir uma destrancada é o toque de sempre.
+  **Secreta não muda a visão**: continua uma porta fechada que a mesa lê como parede; a marca é só pro Mestre lembrar e pro aviso.
+- `usePecas`/`useArmadilhas`/`useParedes` têm o 3º parâmetro `canalExtra` (o vigia usa `"guarda"`): dois canais com o mesmo nome brigam.
+- Robô `e2e/percepcaoEPortas.e2e.ts`: PP 15 × CD 13 avisa e PP 10 não (a mesma distância), revelar, porta secreta (PP 16 × CD 15) e abrir, a CD de
+  achar de uma armadilha criada pela tela, e a porta trancada de ponta a ponta (propriedades, "deixar trancada", "destrancar e abrir").
+- **Não cobre**: teste de ver "só quem olha pra lá", visão no escuro ajudando a achar, a CD variar por distância, porta que tranca sozinha.

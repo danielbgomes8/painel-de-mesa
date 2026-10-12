@@ -189,3 +189,28 @@ Parte nova **📜 Folhas** da aba Campanha (`FolhasDaCampanha.tsx`, `useFolhas.t
   a foto sai. Entra no backup bruto (tabela e fotos) e no robô de esquema.
 - Robô `e2e/folhas.e2e.ts`: rascunho invisível, entrega pra Ana (aviso só pra ela, foto carrega, Beto não vê), recolher, mudar pra mesa toda,
   apagar (some a foto do Storage).
+
+## Relógios de tensão e Loja (12/10/2026, migration `0038_relogios_loja_percepcao_portas.sql`)
+
+Duas partes novas da aba Campanha, pedidas pelo Daniel: **⏳ Relógios** (só o Mestre) e **🛒 Loja** (Mestre monta, jogador compra).
+
+- **Relógios** (`lib/relogios.ts`, `hooks/useRelogios.ts`, `RelogiosDaCampanha.tsx`). Círculo de 4, 6, 8, 10 ou 12 fatias que o Mestre enche
+  com "+" e esvazia com "−"; `visivel = false` deixa só pra ele (preparo). A mesa vê uma **faixa de relógios** logo abaixo das abas, em qualquer
+  tela, e no **telão** um cartão no canto de cima (`RelogiosNaMesa`). **A consequência é segredo até o relógio fechar** (`consequenciaVisivel`).
+  Cada passo vira uma linha no log ("⏳ Ritual: 3 de 6"; ao fechar, "⏰ Ritual fechou (6 de 6)! <consequência>"), **menos os escondidos**, que
+  andam em silêncio. Cheio fica vermelho; o "+" desliga. Limite de 20 por sala.
+- **Loja** (`lib/loja.ts`, `hooks/useLoja.ts`, `LojaDaCampanha.tsx`; tabelas `lojas` e `loja_itens`). O Mestre cria a loja (nasce **fechada**),
+  põe itens (nome, preço, estoque ou "sempre tem", peso, mágico, descrição) e toca em "abrir pra mesa". **O preço é guardado em peças de cobre**
+  (`preco_pc`, inteiro; 1 PO = 100 PC): sem centavo quebrado; a tela mostra "5 PO", "3 PP" ou "2 PO · 5 PP" (platina não aparece, a mesa conta em ouro).
+  - **Comprar** (no celular do jogador): 1) baixa o estoque (`tirarEstoque`: "troco só se ninguém mexeu antes", como o baú, então duas pessoas
+    na última unidade não levam as duas); 2) `alterarListasDoPersonagem` paga e põe o item no inventário **com a conta refeita em cima da ficha de
+    verdade** (se o dinheiro não chega mais, devolve null e o estoque volta); 3) loga "🛒 Ana comprou 2× Poção por 100 PO (Loja)".
+    Se o passo 2 falha, o estoque é **devolvido**: nada sai da loja se a compra não terminou.
+  - **O troco** (`pagar`): gasta primeiro as moedas pequenas; se falta, quebra a menor moeda que cobre e devolve o troco em ouro, prata e cobre
+    (electro e platina nunca são troco). Testado que nunca cria nem perde dinheiro. O botão mostra o motivo quando não dá ("Faltam 4 PO.",
+    "Só restam 2.", "Esgotado.").
+  - Loja fechada é invisível pra mesa (`lojasVisiveis`, esconde NA TELA). Apagar a loja apaga os itens (`on delete cascade`).
+- Backup bruto: `relogios`, `lojas` e `loja_itens` entram em `TABELAS_COM_SALA`; robô de esquema confere as colunas; `limparSala` limpa as três.
+- Robôs `e2e/relogios.e2e.ts` (criar, encher, a mesa vê, consequência só ao fechar, esconder, apagar) e `e2e/loja.e2e.ts` (montar, abrir, comprar com
+  troco, sem dinheiro, esgotar, **duas pessoas na última unidade: só uma leva e a outra não paga**, fechar, apagar).
+- **Não cobre**: vender de volta, desconto/regateio, loja só pra um jogador, catálogo pronto do SRD, relógio que avança sozinho por rodada.
