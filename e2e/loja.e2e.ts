@@ -67,8 +67,8 @@ async function porItem(page: Page, nome: string, preco: string, moeda: string, e
 
 test("loja: o Mestre monta e abre; o jogador compra com troco; sem dinheiro ou estoque não compra; duas pessoas na última unidade, só uma leva", async ({ browser, page }) => {
   const erros = coletarErros(page);
-  // Ana tem 10 PO; Beto, 1 PO; Carla, 10 PO (pra disputar a última unidade com a Ana).
-  await criarFicha("ana-robo", "Ana Robô", { hp: 20, hp_max: 20, moedas: { pc: 0, pp: 0, pe: 0, po: 10, pl: 0 } });
+  // Ana tem 20 PO; Beto, 1 PO; Carla, 10 PO (as duas podem pagar a última unidade e disputam).
+  await criarFicha("ana-robo", "Ana Robô", { hp: 20, hp_max: 20, moedas: { pc: 0, pp: 0, pe: 0, po: 20, pl: 0 } });
   await criarFicha("beto-robo", "Beto Robô", { hp: 20, hp_max: 20, moedas: { pc: 0, pp: 0, pe: 0, po: 1, pl: 0 } });
   await criarFicha("carla-robo", "Carla Robô", { hp: 20, hp_max: 20, moedas: { pc: 0, pp: 0, pe: 0, po: 10, pl: 0 } });
   await entrarComoMestre(page);
@@ -102,11 +102,11 @@ test("loja: o Mestre monta e abre; o jogador compra com troco; sem dinheiro ou e
   await expect(ana.pagina.getByText("Poção de cura")).toBeVisible({ timeout: 30_000 });
   await irParaLoja(beto.pagina);
   await irParaLoja(carla.pagina);
-  await expect(ana.pagina.getByText("Seu dinheiro: 10 PO")).toBeVisible();
+  await expect(ana.pagina.getByText("Seu dinheiro: 20 PO")).toBeVisible();
 
-  // A Ana compra 1 Poção (5 PO): sobra 5 PO, o item entra no inventário, o estoque cai pra 1, o log conta.
+  // A Ana compra 1 Poção (5 PO): sobram 15 PO, o item entra no inventário, o estoque cai pra 1, o log conta.
   await ana.pagina.getByRole("button", { name: "Comprar Poção de cura" }).click();
-  await expect.poll(async () => (await fichaDe("ana-robo")).moedas.po).toBe(5);
+  await expect.poll(async () => (await fichaDe("ana-robo")).moedas.po).toBe(15);
   expect((await fichaDe("ana-robo")).inventario).toEqual([expect.objectContaining({ nome: "Poção de cura", qtd: 1 })]);
   await expect.poll(async () => (await itensDoBanco())[0].estoque).toBe(1);
   await expect.poll(async () => (await linhasDoLog()).some((t) => t.includes("Ana Robô comprou Poção de cura por 5 PO"))).toBe(true);
@@ -115,7 +115,7 @@ test("loja: o Mestre monta e abre; o jogador compra com troco; sem dinheiro ou e
   // A Ana compra Corda (5 PP) com troco: paga com 1 PO, volta 5 PP.
   await ana.pagina.getByRole("button", { name: "Comprar Corda" }).click();
   await expect.poll(async () => (await fichaDe("ana-robo")).moedas.pp).toBe(5);
-  expect((await fichaDe("ana-robo")).moedas).toMatchObject({ po: 4, pp: 5 });
+  expect((await fichaDe("ana-robo")).moedas).toMatchObject({ po: 14, pp: 5 });
   expect((await itensDoBanco())[1].estoque).toBeNull(); // "sempre tem" não baixa
 
   // O Beto só tem 1 PO: a Poção custa 5 PO, o botão fica desligado e o motivo aparece.
