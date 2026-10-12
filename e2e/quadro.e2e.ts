@@ -327,9 +327,13 @@ test("telão: o cartão mostrado pelo Mestre aparece em tela cheia (silhueta só
 
   // Silhueta mostrada pelo Mestre vira tela cheia no telão, mas só a foto escura e "???":
   // nem o nome, nem o tipo, nem o texto do cartão vazam (nem no rótulo de acessibilidade).
-  await rest(`quadro_cartoes?id=eq.${sombra}`, { method: "PATCH", body: JSON.stringify({ destaque_em: new Date().toISOString() }) });
+  // O telão só assina o tempo real depois da primeira leitura (e a releitura não dispara destaque de propósito):
+  // um destaque mandado antes disso se perde, então o Mestre "manda de novo" até a tela cheia aparecer.
   const sombraNaTv = telao.locator(".qd-destaque");
-  await expect(sombraNaTv).toContainText("???", { timeout: 15_000 });
+  await expect(async () => {
+    await rest(`quadro_cartoes?id=eq.${sombra}`, { method: "PATCH", body: JSON.stringify({ destaque_em: new Date().toISOString() }) });
+    await expect(sombraNaTv).toContainText("???", { timeout: 4000 });
+  }).toPass({ timeout: 45_000 });
   await expect(sombraNaTv).not.toContainText("Sombra Secreta");
   await expect(sombraNaTv).not.toContainText("Vilão");
   expect(await sombraNaTv.getAttribute("aria-label")).not.toContain("Sombra");

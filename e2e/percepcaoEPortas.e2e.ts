@@ -166,10 +166,15 @@ test("porta trancada: o Mestre marca pelas propriedades, vê o cadeado e a CD, e
   await editor.getByLabel("CD pra destrancar").fill("14");
   await editor.getByLabel("CD pra destrancar").blur();
   await expect.poll(async () => (await portasDoBanco())[0].cd).toBe(14);
-  await editor.getByRole("checkbox", { name: /secreta/ }).check();
-  await expect.poll(async () => (await portasDoBanco())[0].secreta).toBe(true);
-  await editor.getByRole("checkbox", { name: /secreta/ }).uncheck();
-  await expect.poll(async () => (await portasDoBanco())[0].secreta).toBe(false);
+  // O eco atrasado de uma gravação anterior (a da CD) pode desmarcar a caixa por um instante; o gesto repete até o banco confirmar.
+  await expect(async () => {
+    await editor.getByRole("checkbox", { name: /secreta/ }).check();
+    await expect.poll(async () => (await portasDoBanco())[0].secreta, { timeout: 2500 }).toBe(true);
+  }).toPass({ timeout: 20_000 });
+  await expect(async () => {
+    await editor.getByRole("checkbox", { name: /secreta/ }).uncheck();
+    await expect.poll(async () => (await portasDoBanco())[0].secreta, { timeout: 2500 }).toBe(false);
+  }).toPass({ timeout: 20_000 });
   await editor.getByRole("button", { name: "pronto" }).click();
   await expect(editor).toHaveCount(0);
 

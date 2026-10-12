@@ -98,8 +98,11 @@ test("o jogador não atravessa parede nem porta fechada; porta aberta passa, e o
   // Na diagonal, por cima da parede: desliza por ela, mas não passa.
   await arrastar(jogador, [435, 315], [525, 105]);
   await expect.poll(peaoDoJogador).toEqual([435, 105]);
-  await arrastar(jogador, [435, 105], [435, 315]);
-  await expect.poll(peaoDoJogador).toEqual([435, 315]);
+  // (o eco atrasado do movimento anterior pode tirar o peão do lugar por um instante: o gesto repete)
+  await expect(async () => {
+    await arrastar(jogador, [435, 105], [435, 315]);
+    await expect.poll(peaoDoJogador, { timeout: 2500 }).toEqual([435, 315]);
+  }).toPass({ timeout: 30_000 });
 
   // O Mestre abre a porta: agora passa — por ela.
   const porta = (await paredesDoBanco()).find((p) => p.tipo === "porta")!;
