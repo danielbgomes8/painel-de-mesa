@@ -161,6 +161,26 @@ confirmar" — **não funcionava**, porque a "lista do banco" que o componente e
 "PEND set" e "PEND limpa" com 20 ms de diferença, antes do PATCH sair. Foi removido. Lição: **achar a causa no log
 (console.log temporário + o PATCH que saiu) antes de empilhar remendo**; três remendos seguidos só mudaram a taxa de falha.
 Os robôs `inventario`/`recap` rodaram 15 vezes seguidas sem falhar, sem nenhuma espera artificial.
+
+### Mesma corrida nas tabelas do mapa e da campanha (12/10/2026)
+
+Tudo acima vale para `characters`/`combat_state`, as únicas tabelas com `updated_at`. As outras (`cena_paredes`, `relogios`,
+`cena_pecas`, `cena_armadilhas`, `cena_marcas`...) trocam a linha inteira pelo `msg.new` do tempo real, sem filtro. Resultado
+**reproduzido em teste de hook** (`useRelogios.test.ts`, `useParedes.test.ts`, com o banco falso segurando os ecos): em toques
+seguidos o eco do PRIMEIRO chega depois de a tela já ter ido ao segundo, a tela volta atrás, e o toque seguinte parte do valor
+velho (relógio: três toques davam 2 fatias; porta: abrir, fechar, abrir deixava fechada). É a explicação mais provável de um dos
+testes instáveis do robô (a caixa "secreta" da porta piscava e o `uncheck()` não clicava) e, sem reprodução, do de `andarComParedes`.
+
+- **`lib/escudoDeEco.ts`**: sem `updated_at` o critério é o TEMPO. Ao gravar numa linha, `escudo.proteger(id)`; durante 3 s o
+  aviso dessa linha é ignorado (`escudo.protegido(id)`); passada a janela o hook RELÊ a tabela uma vez (`escudo.aoFechar`), o que
+  traz o que outro aparelho mudou nesse meio tempo. Falta só o atraso, nunca o dado.
+- **Aplicado em** `useRelogios` (`atualizar`) e `useParedes` (`alternarPorta`, `atualizarPorta`). **Não precisa** de `loja`, `bau` e
+  `tempo`: eles gravam por comparar-e-trocar contra o BANCO (leem a linha, só gravam se ela ainda for a que leram), não contra a tela.
+- **Se for escrever hook novo** que grava valor CALCULADO do que a tela mostra (`cheias + 1`, `!aberta`), use o escudo, ou
+  compare-e-troque contra o banco como `useBau.ajustar`. Teste com `bd.reterEcos()` / `bd.soltarEcos(n)` (`bancoFalsoParaTeste.ts`).
+- **Ainda sem escudo**: `usePecas`, `useArmadilhas`, `useMarcas`, `useEfeitos`, `useCenas`, `useNevoa`, `useFolhas`, `useQuadro`. Numa
+  BUSCA por contas sobre o estado (`+ delta`, `!x.aberta`...) não achei gravação calculada da tela neles (não li um por um), então
+  no pior caso piscam por instantes. Se aparecer toque perdido num deles, o conserto é o mesmo e já tem molde pronto.
 ~~O que NÃO foi resolvido: dois aparelhos mexendo na MESMA lista da MESMA pessoa~~ — resolvido em 05/10/2026, ver "Listas da
 ficha com trava de versão" logo abaixo.
 

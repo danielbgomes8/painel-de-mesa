@@ -5,6 +5,7 @@ import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { relatarErro } from "@/lib/relatarErro";
 import { ehTabelaAusente } from "@/lib/cenas";
 import { RELOGIOS_MAXIMOS, avancar, normalizarRelogio, type Relogio } from "@/lib/relogios";
+import { criarEscudoDeEco } from "@/lib/escudoDeEco";
 
 const AVISO_NAO_SALVOU = "Não salvou o relógio. Confira a conexão e tente de novo.";
 const AVISO_LIMITE = `Já existem ${RELOGIOS_MAXIMOS} relógios, que é o máximo. Apague algum antigo.`;
@@ -43,6 +44,9 @@ export function useRelogios(codigo: string): Relogios {
   useEffect(() => {
     ref.current = relogios;
   }, [relogios]);
+  // O aviso de tempo real de uma gravação ANTERIOR não pode devolver a tela ao valor velho no meio de toques seguidos
+  // (lib/escudoDeEco.ts); passada a janela, a tabela é relida uma vez.
+  const [escudo] = useState(() => criarEscudoDeEco());
 
   useEffect(() => {
     if (!supabaseConfigurado) return;
@@ -64,6 +68,10 @@ export function useRelogios(codigo: string): Relogios {
       return true;
     }
 
+    escudo.aoFechar(() => {
+      void carregar();
+    });
+
     const aoVoltar = () => {
       if (document.visibilityState === "visible") void carregar();
     };
@@ -81,7 +89,7 @@ export function useRelogios(codigo: string): Relogios {
             return;
           }
           const nova = normalizarRelogio(msg.new);
-          if (nova) setRelogios((atual) => juntar(atual, nova));
+          if (nova && !escudo.protegido(nova.id)) setRelogios((atual) => juntar(atual, nova));
         })
         .subscribe((status) => {
           if (vivo && status === "SUBSCRIBED") void carregar();
@@ -90,11 +98,13 @@ export function useRelogios(codigo: string): Relogios {
 
     return () => {
       vivo = false;
+      escudo.encerrar();
+      escudo.aoFechar(() => {});
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
     };
-  }, [codigo]);
+  }, [codigo, escudo]);
 
   const criar = useCallback<Relogios["criar"]>(
     async (novo) => {
@@ -119,6 +129,7 @@ export function useRelogios(codigo: string): Relogios {
 
   const atualizar = useCallback<Relogios["atualizar"]>(async (id, mudanca) => {
     const antes = ref.current;
+    escudo.proteger(id);
     setRelogios((atual) => atual.map((r) => (r.id === id ? { ...r, ...mudanca } : r)));
     const { error } = await supabase.from("relogios").update(mudanca).eq("id", id);
     if (error) {
@@ -129,7 +140,7 @@ export function useRelogios(codigo: string): Relogios {
     }
     setAviso(null);
     return true;
-  }, []);
+  }, [escudo]);
 
   const mexer = useCallback<Relogios["mexer"]>(
     async (id, delta) => {

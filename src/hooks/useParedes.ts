@@ -5,6 +5,7 @@ import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { relatarErro } from "@/lib/relatarErro";
 import { ehTabelaAusente } from "@/lib/cenas";
 import { PAREDES_MAXIMAS, normalizarParede, type NovaParede, type Parede } from "@/lib/paredes";
+import { criarEscudoDeEco } from "@/lib/escudoDeEco";
 
 const AVISO_NAO_SALVOU = "Não salvou a parede. Confira a conexão e tente de novo.";
 const AVISO_LIMITE = `Esta cena já tem ${PAREDES_MAXIMAS} paredes e portas, que é o máximo.`;
@@ -48,6 +49,9 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
   useEffect(() => {
     ref.current = paredes;
   }, [paredes]);
+  // O aviso de tempo real de uma gravação ANTERIOR não pode devolver a porta ao estado velho no meio de toques seguidos
+  // (lib/escudoDeEco.ts); passada a janela, as paredes da cena são relidas uma vez.
+  const [escudo] = useState(() => criarEscudoDeEco());
 
   const mexer = useCallback(
     (fn: (atual: Parede[]) => Parede[], extra: { carregou?: boolean; indisponivel?: boolean } = {}) => {
@@ -96,6 +100,10 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
       return true;
     }
 
+    escudo.aoFechar(() => {
+      void carregar();
+    });
+
     const aoVoltar = () => {
       if (document.visibilityState === "visible") void carregar();
     };
@@ -113,7 +121,7 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
             return;
           }
           const nova = normalizarParede(msg.new);
-          if (!nova) return;
+          if (!nova || escudo.protegido(nova.id)) return;
           mexer((atual) => (atual.some((p) => p.id === nova.id) ? atual.map((p) => (p.id === nova.id ? nova : p)) : [...atual, nova]));
         })
         .subscribe((status) => {
@@ -123,11 +131,13 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
 
     return () => {
       vivo = false;
+      escudo.encerrar();
+      escudo.aoFechar(() => {});
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
     };
-  }, [cenaId, mexer, canalExtra]);
+  }, [cenaId, mexer, canalExtra, escudo]);
 
   const adicionar = useCallback<Paredes["adicionar"]>(
     async (novas) => {
@@ -172,6 +182,7 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
       const porta = antes.find((p) => p.id === id && p.tipo === "porta");
       if (!porta) return false;
       const aberta = !porta.aberta;
+      escudo.proteger(id);
       mexer((atual) => atual.map((p) => (p.id === id ? { ...p, aberta } : p)));
       const { error } = await supabase.from("cena_paredes").update({ aberta }).eq("id", id);
       if (error) {
@@ -183,13 +194,14 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
       setAviso(null);
       return true;
     },
-    [mexer],
+    [mexer, escudo],
   );
 
   const atualizarPorta = useCallback<Paredes["atualizarPorta"]>(
     async (id, mudanca) => {
       const antes = ref.current;
       if (!antes.some((p) => p.id === id && p.tipo === "porta")) return false;
+      escudo.proteger(id);
       mexer((atual) => atual.map((p) => (p.id === id ? { ...p, ...mudanca } : p)));
       const { error } = await supabase.from("cena_paredes").update(mudanca).eq("id", id);
       if (error) {
@@ -201,7 +213,7 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
       setAviso(null);
       return true;
     },
-    [mexer],
+    [mexer, escudo],
   );
 
   const remover = useCallback<Paredes["remover"]>(

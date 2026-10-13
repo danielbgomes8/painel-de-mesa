@@ -274,9 +274,26 @@ export class BancoFalso {
       for (const i of canal.inscricoes) {
         if (i.tabela !== tabela || (i.evento !== "*" && i.evento !== evento)) continue;
         if (i.filtro && String(ref[i.filtro[0]]) !== i.filtro[1]) continue;
-        setTimeout(() => i.aoMudar(msg), 0);
+        const entregar = () => i.aoMudar(msg);
+        if (this.ecosRetidos) this.ecosRetidos.push(entregar);
+        else setTimeout(entregar, 0);
       }
     }
+  }
+
+  private ecosRetidos: (() => void)[] | null = null;
+
+  /** Segura os avisos de tempo real (a rede lenta): a escrita vale no banco na hora, mas o eco só chega
+   *  quando o teste mandar (`soltarEcos`). É a janela em que a tela já seguiu em frente. */
+  reterEcos(): void {
+    this.ecosRetidos ??= [];
+  }
+
+  /** Entrega os `quantos` ecos retidos mais antigos (todos, se omitido), na ordem em que o banco gravou. */
+  soltarEcos(quantos = Infinity): void {
+    const fila = this.ecosRetidos ?? [];
+    for (const entregar of fila.splice(0, quantos)) setTimeout(entregar, 0);
+    if (fila.length === 0 && quantos === Infinity) this.ecosRetidos = null;
   }
 
   async executar(q: ConsultaFalsa): Promise<Resposta> {
