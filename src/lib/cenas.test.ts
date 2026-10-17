@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  ajustarLadoDaGrade,
   cameraValida,
+  deslocarGrade,
   ehTabelaAusente,
   celulaNoPonto,
   celulasNoSegmento,
@@ -281,5 +283,36 @@ describe("o que vem do banco", () => {
   it("as pinceladas valem na ordem em que foram feitas, não na ordem em que chegaram", () => {
     const mk = (id: string, seq: number): RegraNevoa => ({ id, seq, modo: "revelar", forma: "retangulos", dados: { r: [] } });
     expect(ordenarRegras([mk("c", 3), mk("a", 1), mk("b", 2)]).map((r) => r.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("alinhar a grade arrastando", () => {
+  const base = { grade_px: 70, grade_dx: 10, grade_dy: 20 };
+
+  it("anda a grade o tanto que o dedo andou", () => {
+    expect(deslocarGrade(base, 15, 5)).toEqual({ grade_dx: 25, grade_dy: 25 });
+    expect(deslocarGrade(base, 0, 0)).toEqual({ grade_dx: 10, grade_dy: 20 });
+  });
+
+  it("passando de um quadradinho volta pro começo, nos dois sentidos", () => {
+    expect(deslocarGrade(base, 65, 55)).toEqual({ grade_dx: 5, grade_dy: 5 });
+    expect(deslocarGrade(base, -15, -30)).toEqual({ grade_dx: 65, grade_dy: 60 });
+    expect(deslocarGrade(base, 70 * 40 + 3, -70 * 12)).toEqual({ grade_dx: 13, grade_dy: 20 });
+  });
+
+  it("arredonda em centésimos e nunca sai de [0, lado)", () => {
+    const r = deslocarGrade({ grade_px: 70.5, grade_dx: 0, grade_dy: 0 }, -0.004, 70.499);
+    expect(r.grade_dx).toBeGreaterThanOrEqual(0);
+    expect(r.grade_dx).toBeLessThan(70.5);
+    expect(r.grade_dy).toBeGreaterThanOrEqual(0);
+    expect(r.grade_dy).toBeLessThan(70.5);
+    expect(deslocarGrade(base, 0.123456, 0).grade_dx).toBe(10.12);
+  });
+
+  it("o lado do quadradinho muda em passos finos e respeita o limite do banco (8 a 2000)", () => {
+    expect(ajustarLadoDaGrade(70, 0.1)).toBe(70.1);
+    expect(ajustarLadoDaGrade(70.1, -1)).toBe(69.1);
+    expect(ajustarLadoDaGrade(8.05, -1)).toBe(8);
+    expect(ajustarLadoDaGrade(1999.95, 1)).toBe(2000);
   });
 });

@@ -202,6 +202,29 @@ export function gradePxParaQuadrados(largura: number, quadrados: number): number
   return Math.max(8, Math.round((largura / quadrados) * 100) / 100);
 }
 
+/**
+ * Arrastar a grade (ferramenta "alinhar"): o ponto onde a grade começa anda `ddx`/`ddy` (px da imagem) e volta
+ * pro intervalo [0, lado) — a grade se repete a cada quadradinho, então andar um lado inteiro é ficar no mesmo lugar.
+ * Arredonda em centésimos de pixel (o mesmo que o campo `grade_px` guarda).
+ */
+export function deslocarGrade(
+  c: Pick<Cena, "grade_px" | "grade_dx" | "grade_dy">,
+  ddx: number,
+  ddy: number,
+): { grade_dx: number; grade_dy: number } {
+  const g = c.grade_px > 0 ? c.grade_px : 70;
+  const volta = (v: number) => {
+    const r = Math.round((((v % g) + g) % g) * 100) / 100;
+    return r >= g ? 0 : r; // arredondar 70,496 pra 70,5 num lado de 70,5 é dar a volta inteira: é 0
+  };
+  return { grade_dx: volta(c.grade_dx + ddx), grade_dy: volta(c.grade_dy + ddy) };
+}
+
+/** Muda o lado do quadradinho em `passo` px (negativo diminui), no intervalo que o banco aceita (8 a 2000). */
+export function ajustarLadoDaGrade(gradePx: number, passo: number): number {
+  return Math.min(2000, Math.max(8, Math.round((gradePx + passo) * 100) / 100));
+}
+
 /** Lado do quadradinho usado pra medir o pincel: o da grade, ou — sem grade —
  *  um trinta avos do mapa. */
 export function ladoDeReferencia(c: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura">): number {
