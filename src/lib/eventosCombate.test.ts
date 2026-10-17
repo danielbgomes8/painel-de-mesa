@@ -8,6 +8,7 @@ import {
   normalizarPreparados,
   pendentes,
   rotuloDoGatilho,
+  testeDeConcentracao,
   validarNovoEvento,
   type EventoDoCombate,
   type SituacaoDoCombate,
@@ -150,5 +151,58 @@ describe("eventosAoTirarGrupo", () => {
       1,
     );
     expect(r.map((e) => [e.id, e.grupo])).toEqual([["a", 0], ["c", 1], ["d", null]]);
+  });
+});
+
+describe("aviso de teste de concentração", () => {
+  const vida = (hp: number, extra: Partial<{ hp_temp: number; concentration: boolean; concentration_on: string }> = {}) => ({
+    hp,
+    hp_temp: 0,
+    concentration: true,
+    concentration_on: "Bênção",
+    ...extra,
+  });
+
+  it("quem concentra e perde PV recebe a CD (10 ou metade do dano) e o texto com o feitiço", () => {
+    expect(testeDeConcentracao(vida(20), vida(17))).toEqual({ cd: 10, texto: "Teste de Constituição, CD 10 · concentrado em Bênção · 3 de dano" });
+    expect(testeDeConcentracao(vida(40), vida(10))?.cd).toBe(15);
+    expect(testeDeConcentracao(vida(200), vida(1))?.cd).toBe(30);
+  });
+
+  it("PV temporário absorvendo tudo ainda é dano", () => {
+    expect(testeDeConcentracao(vida(20, { hp_temp: 5 }), vida(20, { hp_temp: 0 }))?.cd).toBe(10);
+  });
+
+  it("sem teste: cura, mesmo PV, não concentrava, ou largou a concentração (0 PV, condição)", () => {
+    expect(testeDeConcentracao(vida(10), vida(15))).toBeNull();
+    expect(testeDeConcentracao(vida(10), vida(10))).toBeNull();
+    expect(testeDeConcentracao(vida(10, { concentration: false }), vida(5, { concentration: false }))).toBeNull();
+    expect(testeDeConcentracao(vida(10), vida(0, { concentration: false }))).toBeNull();
+  });
+
+  it("sem nome do feitiço o texto não inventa nada", () => {
+    expect(testeDeConcentracao(vida(10, { concentration_on: "" }), vida(8, { concentration_on: "" }))?.texto).toBe("Teste de Constituição, CD 10 · 2 de dano");
+  });
+
+  it("o aviso aparece enquanto a pessoa concentra, com ou sem combate, e some quando ela larga", () => {
+    const e = ev({ tipo: "concentracao", rodada: null, slugs: ["ana"], texto: "Teste" });
+    const com = { ...sit(1, [], false), concentrando: ["ana"] };
+    expect(disparou(e, com)).toBe(true);
+    expect(pendentes([e], com)).toHaveLength(1);
+    expect(pendentes([e], { ...com, concentrando: [] })).toHaveLength(0);
+    expect(pendentes([e], sit(1, [], false))).toHaveLength(0);
+  });
+
+  it("vem antes dos avisos de rodada e de PV, e o rótulo leva o nome", () => {
+    const c = ev({ id: "c", tipo: "concentracao", rodada: null, slugs: ["ana"], created_at: "2026-10-09T12:00:00Z" });
+    const r = ev({ id: "r", tipo: "rodada", rodada: 1 });
+    const s = { ...sit(2), concentrando: ["ana"] };
+    expect(pendentes([r, c], s).map((x) => x.id)).toEqual(["c", "r"]);
+    expect(rotuloDoGatilho(c, (slug) => (slug === "ana" ? "Ana" : null))).toBe("Concentração · Ana");
+  });
+
+  it("normaliza o tipo novo sem rodada nem porcentagem", () => {
+    const n = normalizarEvento({ id: "x", tipo: "concentracao", slugs: ["ana"], texto: "t" });
+    expect([n.tipo, n.rodada, n.pct]).toEqual(["concentracao", null, null]);
   });
 });

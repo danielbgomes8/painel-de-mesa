@@ -12,6 +12,15 @@
   o resumo automático dela errou e disse que Petrificado não inclui
   Incapacitado. O − da ficha e as Ações em Massa usam a mesma função — não
   voltar a montar a mensagem de dano em cada componente.
+- **Aviso fixo de teste de concentração pro Mestre** (17/10/2026, migration `0039_aviso_de_concentracao.sql`; `useAvisoDeConcentracao`,
+  `testeDeConcentracao` em `lib/eventosCombate.ts`). O app **não rola nada** (a mesa joga dados de verdade): quando quem está com 🔮 ligado perde
+  PV ou PV temporário e continua concentrado, o aparelho do Mestre cria um aviso `tipo = 'concentracao'` em `combate_eventos` ("Teste de
+  Constituição, CD 12 · concentrado em Bênção · 24 de dano"), que aparece no topo do Combate (`AvisosDoCombate`, junto dos eventos, com a vibração)
+  até ele tocar "Feito" (que APAGA a linha, não marca). Quem dispara é a **mudança de PV que chega na tela**, não cada caminho de escrita: vale
+  pro Mestre no painel, pro jogador no −/+ da própria ficha e pras Ações em Massa, e um caminho novo de dano não precisa lembrar de avisar. O aviso
+  some sozinho se a pessoa larga a concentração (0 PV, condição, desligou). **Limite:** só avisa se o aparelho do Mestre estava aberto na hora; o log
+  público continua trazendo a CD de qualquer jeito. Antes da migration o botão de aviso fica quieto (`indisponivel`); migration só troca a trava de
+  `tipo`. Robô: `e2e/avisoDeConcentracao.e2e.ts`.
 - **Descanso longo limpa o que sobra de quem caiu** (`aplicarDescansoLongo`):
   além de PV cheio, −1 de exaustão, dados de vida e recursos, zera
   `hp_temp` (PV temporário dura até o próximo descanso longo, regra explícita

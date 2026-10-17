@@ -29,6 +29,7 @@ import { horaCurta } from "@/lib/offline";
 import { definirContextoDoErro, relatarErro } from "@/lib/relatarErro";
 import { definirContextoDeUso, registrarUso } from "@/lib/registrarUso";
 import { EventosContext, useEventos } from "@/hooks/useEventos";
+import { useAvisoDeConcentracao } from "@/hooks/useAvisoDeConcentracao";
 import { EfeitosContext, useEfeitos } from "@/hooks/useEfeitos";
 import { AvisosDeEfeitos } from "@/components/EfeitosDoCombate";
 import { AvisosDoCombate, GavetaDeEventos } from "@/components/EventosDoCombate";
@@ -191,6 +192,8 @@ function PainelSala({ codigo }: { codigo: string }) {
   }
 
   const souMestre = identidade?.tipo === "mestre";
+  // Quem concentra e leva dano vira um aviso fixo de teste de CON no topo do combate (só o Mestre).
+  useAvisoDeConcentracao(sala, souMestre, eventos);
   const [aba, setAba] = useState<Aba>("diario");
   // O Mestre sempre vê a aba (é onde ele prepara, e onde descobre que falta a
   // migration); o jogador só quando há um mapa na mesa.
