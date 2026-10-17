@@ -17,7 +17,7 @@ import type { ModoRegua } from "@/lib/regua";
 import type { PecaNaTela, TamanhoPeca } from "@/lib/pecas";
 import { PAREDES_MAXIMAS, cabemParedes, ultimoDesenho, type ModoParede, type NovaParede, type Parede } from "@/lib/paredes";
 import { vaosDePorta } from "@/lib/vaos";
-import { gradePxParaQuadrados, quadradosNaLargura, type Cena, type ModoNevoa, type TamanhoPincel } from "@/lib/cenas";
+import { ajustarLadoDaGrade, gradePxParaQuadrados, quadradosNaLargura, type Cena, type ModoNevoa, type TamanhoPincel } from "@/lib/cenas";
 
 /** O que cada ícone da barra abre. São as antigas seções e barras de opções do mapa, uma por ferramenta. */
 
@@ -554,7 +554,7 @@ export function PainelParedes({
 }
 
 /** "Esta cena": nome, grade e se ela começa coberta de névoa (as antigas seções "Grade e névoa" e o campo de nome). */
-export function PainelCena({ cena, cenas }: { cena: Cena; cenas: Cenas }) {
+export function PainelCena({ cena, cenas, alinhando, aoAlinhar }: { cena: Cena; cenas: Cenas; alinhando: boolean; aoAlinhar: (ligado: boolean) => void }) {
   return (
     <>
       <div className="mapa-linha">
@@ -569,6 +569,31 @@ export function PainelCena({ cena, cenas }: { cena: Cena; cenas: Cenas }) {
         <input type="checkbox" checked={cena.grade_ligada} onChange={(e) => void cenas.atualizarCena(cena.id, { grade_ligada: e.target.checked })} />
         mostrar a grade (os quadradinhos)
       </label>
+      {cena.grade_ligada && (
+        <div className="mapa-ferr">
+          <button type="button" className="chip alvo" aria-pressed={alinhando} onClick={() => aoAlinhar(!alinhando)}>
+            ✋ arrastar a grade
+          </button>
+          <span className="fc-sub">Ligado, um dedo anda a grade por cima do mapa; desligado, anda o mapa.</span>
+        </div>
+      )}
+      {cena.grade_ligada && (
+        <div className="mapa-ferr" role="group" aria-label="Tamanho do quadradinho">
+          <span className="fc-sub">quadradinho: {Math.round(cena.grade_px * 100) / 100} px</span>
+          {[-1, -0.1, 0.1, 1].map((passo) => (
+            <button
+              key={passo}
+              type="button"
+              className="chip"
+              aria-label={`${passo < 0 ? "diminuir" : "aumentar"} o quadradinho em ${Math.abs(passo)} pixel`}
+              onClick={() => void cenas.atualizarCena(cena.id, { grade_px: ajustarLadoDaGrade(cena.grade_px, passo) })}
+            >
+              {passo > 0 ? "+" : "−"}
+              {Math.abs(passo)}
+            </button>
+          ))}
+        </div>
+      )}
       {cena.grade_ligada && (
         <div className="mapa-grade">
           <label>

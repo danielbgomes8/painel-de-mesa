@@ -11,6 +11,7 @@ import {
   raioDoPincel,
   regiaoVisivel,
   retanguloEntre,
+  deslocarGrade,
   retangulosDasCelulas,
   simplificarTrilha,
   telaParaMapa,
@@ -92,7 +93,7 @@ import { COR_PING_MESTRE } from "@/lib/ping";
 import { acharPecaNoPonto, encaixarNaGrade, type PecaNaTela } from "@/lib/pecas";
 import { PING_TOLERANCIA_PX, PING_TOQUE_LONGO_MS, type PingNaTela } from "@/lib/ping";
 
-export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua" | "area" | "parede" | "marca" | "colocar";
+export type Ferramenta = "mover" | "quadradinhos" | "pincel" | "retangulo" | "ping" | "regua" | "area" | "parede" | "marca" | "colocar" | "grade";
 
 /** O que o Mestre pode pedir ao mapa de fora (botões "enquadrar", "levar a mesa"). */
 export type CenaMapaApi = {
@@ -176,6 +177,8 @@ type Props = {
   aoExplorar?: (texto: string) => void;
   /** Ferramenta "colocar": o Mestre tocou num ponto do mapa. */
   aoEscolherPonto?: (ponto: Ponto) => void;
+  /** Ferramenta "grade": o Mestre arrastou a grade e soltou; é onde ela passa a começar (px da imagem). */
+  aoAlinharGrade?: (grade_dx: number, grade_dy: number) => void;
   /** Peões da cena (já calculados pro ponto de vista de quem olha). */
   pecas?: readonly PecaNaTela[];
   /** Soltou um peão num lugar novo (já encaixado na grade). */
@@ -188,7 +191,7 @@ type Props = {
 };
 
 type Pintura = {
-  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua" | "area" | "parede" | "marca" | "colocar">;
+  ferramenta: Exclude<Ferramenta, "mover" | "ping" | "regua" | "area" | "parede" | "marca" | "colocar" | "grade">;
   modo: ModoNevoa;
   raio: number;
   pontos: Ponto[];
@@ -249,6 +252,7 @@ export function CenaMapa({
   visaoPronta = true,
   aoExplorar,
   aoEscolherPonto,
+  aoAlinharGrade,
   pecas,
   aoMoverPeca,
   aoTocarPeca,
@@ -279,6 +283,8 @@ export function CenaMapa({
   const arrastoVisual = useRef<{ id: string; x: number; y: number } | null>(null);
   /** Régua sendo arrastada agora (pontos em px do mapa; `telaA` pra saber se é toque ou medida). */
   const areaViva = useRef<{ o: Ponto; d: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number } } | null>(null);
+  /** Arrastando a grade (ferramenta "grade"): de onde partiu e onde ela começa agora. */
+  const gradeViva = useRef<{ inicio: Ponto; dx: number; dy: number } | null>(null);
   const reguaViva = useRef<{ a: Ponto; b: Ponto; telaA: { x: number; y: number }; telaB: { x: number; y: number }; desloc: number | null } | null>(null);
   /** "Este ponto está na névoa?" guardado, pra não reler o canvas da névoa a cada quadro. */
   const coberturaRef = useRef(new Map<string, boolean>());
@@ -316,9 +322,9 @@ export function CenaMapa({
     telaB: { x: number; y: number };
   } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, aoAlinharGrade, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, aoAlinharGrade, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -437,8 +443,9 @@ export function CenaMapa({
     const ctx = canvas.getContext("2d");
     if (!ctx) return 0;
     const p = propsRef.current;
+    const gv = gradeViva.current;
     desenharCena(ctx, {
-      cena: p.cena,
+      cena: gv ? { ...p.cena, grade_dx: gv.dx, grade_dy: gv.dy } : p.cena,
       imagem: imagemRef.current,
       nevoa: nevoaFinalRef.current ?? nevoaRef.current,
       vista: vistaRef.current,
@@ -743,6 +750,7 @@ export function CenaMapa({
       arrastoPeca.current = null;
       arrastoVisual.current = null;
       reguaViva.current = null;
+      gradeViva.current = null;
       areaViva.current = null;
       paredeViva.current = null;
       apagandoParedes.current = null;
@@ -779,6 +787,14 @@ export function CenaMapa({
       const ponto = noMapa(pos);
       const origem = cruzamentoMaisPerto(p.cena, ponto);
       areaViva.current = { o: origem, d: p.modeloArea.forma === "esfera" ? origem : ponto, telaA: pos, telaB: pos };
+      semArrastar.current = true;
+      pedirQuadro();
+      return;
+    }
+
+    // Alinhar a grade (Mestre): arrastar anda a grade por cima do mapa; ao soltar, guarda onde ela começa.
+    if (p.ferramenta === "grade" && p.mestre && p.aoAlinharGrade && p.cena.grade_ligada) {
+      gradeViva.current = { inicio: noMapa(pos), dx: p.cena.grade_dx, dy: p.cena.grade_dy };
       semArrastar.current = true;
       pedirQuadro();
       return;
@@ -923,7 +939,7 @@ export function CenaMapa({
 
     const ferr = p.ferramenta;
     const pintavel =
-      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && ferr !== "area" && ferr !== "parede" && ferr !== "marca" && ferr !== "colocar" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
+      p.mestre && ferr !== "mover" && ferr !== "ping" && ferr !== "regua" && ferr !== "area" && ferr !== "parede" && ferr !== "marca" && ferr !== "colocar" && ferr !== "grade" && p.aoPintar && (ferr !== "quadradinhos" || gradeUsavel(p.cena));
     if (!pintavel && p.aoPingar) {
       // Sem ferramenta de pintura em uso: dedo parado por um instante vira ping.
       cancelarToqueLongo();
@@ -990,6 +1006,18 @@ export function CenaMapa({
       }
       s.ultimo = ponto;
       atualizarPrevia();
+      pedirQuadro();
+      return;
+    }
+
+    // Arrastando a grade: ela anda o mesmo tanto que o dedo, e volta pro intervalo de um quadradinho.
+    const gv = gradeViva.current;
+    if (gv) {
+      const ponto = noMapa(agora);
+      const base = { grade_px: p.cena.grade_px, grade_dx: p.cena.grade_dx, grade_dy: p.cena.grade_dy };
+      const nova = deslocarGrade(base, ponto[0] - gv.inicio[0], ponto[1] - gv.inicio[1]);
+      gv.dx = nova.grade_dx;
+      gv.dy = nova.grade_dy;
       pedirQuadro();
       return;
     }
@@ -1225,6 +1253,14 @@ export function CenaMapa({
         pedirQuadro();
         return;
       }
+      const gv = gradeViva.current;
+      if (gv) {
+        gradeViva.current = null;
+        const p = propsRef.current;
+        if (!cancelado && (gv.dx !== p.cena.grade_dx || gv.dy !== p.cena.grade_dy)) p.aoAlinharGrade?.(gv.dx, gv.dy);
+        pedirQuadro();
+        return;
+      }
       const rv = reguaViva.current;
       if (rv) {
         reguaViva.current = null;
@@ -1313,7 +1349,7 @@ export function CenaMapa({
     }
   }
 
-  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua" && ferramenta !== "area" && ferramenta !== "parede" && ferramenta !== "marca" && ferramenta !== "colocar";
+  const pintando = mestre && ferramenta !== "mover" && ferramenta !== "ping" && ferramenta !== "regua" && ferramenta !== "area" && ferramenta !== "parede" && ferramenta !== "marca" && ferramenta !== "colocar" && ferramenta !== "grade";
   return (
     <div ref={caixaRef} className="cena-caixa" data-pronto={visaoPronta ? "sim" : "nao"}>
       <canvas

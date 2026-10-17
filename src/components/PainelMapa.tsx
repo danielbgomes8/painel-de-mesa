@@ -421,6 +421,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
   const [verInimigos, setVerInimigos] = useState(false);
   /** Esperando o Mestre tocar no mapa pra dizer onde o grupo (ou os inimigos) entra. */
   const [colocando, setColocando] = useState<"grupo" | "inimigos" | null>(null);
+  // Ferramenta "Cena e grade": ligado, um dedo arrasta a grade por cima do mapa (desligado, arrasta o mapa).
+  const [alinhandoGrade, setAlinhandoGrade] = useState(false);
   const [pecaSelecionada, setPecaSelecionada] = useState<string | null>(null);
   /** Peão com o cartão de ações aberto (tocou e soltou sem arrastar, ou tocou o nome na lista). */
   const [cartao, setCartao] = useState<string | null>(null);
@@ -578,9 +580,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
             ? "marca"
             : usoAtivo === "paredes"
               ? "parede"
-              : usoAtivo === "ping"
-                ? "ping"
-                : "mover";
+              : usoAtivo === "grade" && alinhandoGrade
+                ? "grade"
+                : usoAtivo === "ping"
+                  ? "ping"
+                  : "mover";
   const desenhoSelecionado = ferramentaMapa === "marca" && modoMarca === "editar" ? (desenhos.marcas.find((m) => m.tipo === "traco" && m.id === idSelecionado) ?? null) : null;
 
   /** Trocar de ferramenta desiste de "onde eu toco"; tocar na que já está ativa abre/fecha o painel. */
@@ -729,7 +733,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
           ),
         };
       case "grade":
-        return { titulo: "Cena e grade", larga: true, conteudo: <PainelCena cena={cena} cenas={cenas} /> };
+        return { titulo: "Cena e grade", larga: true, conteudo: <PainelCena cena={cena} cenas={cenas} alinhando={alinhandoGrade} aoAlinhar={setAlinhandoGrade} /> };
       case "mesa":
         return {
           titulo: "A mesa",
@@ -745,6 +749,8 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
     if (movendoNota) return "Toque no mapa no lugar novo da nota.";
     if (rascunhoArm) return "Toque no mapa no lugar onde a armadilha fica. Ela nasce escondida da mesa.";
     switch (ferramentaMapa) {
+      case "grade":
+        return "Arraste no mapa pra andar a grade até ela casar com a do desenho. Dois dedos movem o mapa.";
       case "ping":
         return "Toque num ponto: a mesa vê um pulso ali, com o seu nome.";
       case "pincel":
@@ -929,6 +935,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     visaoPronta={!muros.carregando && !banco.carregando}
                     aoExplorar={muros.indisponivel ? undefined : (texto) => void cenas.atualizarCena(cena.id, { explorado: texto })}
                     aoEscolherPonto={colocarOnde}
+                    aoAlinharGrade={(grade_dx, grade_dy) => void cenas.atualizarCena(cena.id, { grade_dx, grade_dy })}
                     pecas={pecas}
                     aoMoverPeca={(id, x, y) => cena && moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
                     aoTocarPeca={setPecaSelecionada}
