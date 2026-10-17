@@ -479,6 +479,15 @@ function corComAlfa(hex: string, alfa: number): string {
 /** Os peões, em coordenadas do mapa (crescem com o zoom, como a miniatura numa
  *  mesa de verdade). A mesa não vê peão oculto nem peão sob a névoa — só o
  *  Mestre, e cada jogador o dele. */
+/**
+ * Espessura de um contorno do peão. Proporcional ao raio, com um mínimo medido NA TELA (`minimoNaTela` px): o
+ * contexto está em px da imagem, então um mínimo fixo de "2" virava 2 px da imagem e, numa grade pequena (quadradinho
+ * de 8 px, a imagem ampliada), o contorno passava de um quarto do quadradinho e o peão parecia não encolher.
+ */
+export function espessuraDoContorno(raio: number, escala: number, fracao: number, minimoNaTela: number): number {
+  return Math.max(minimoNaTela / Math.max(escala, 1e-6), raio * fracao);
+}
+
 function desenharPecas(
   ctx: CanvasRenderingContext2D,
   pecas: readonly PecaNaTela[],
@@ -518,7 +527,7 @@ function desenharPecas(
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fillStyle = p.cor;
     ctx.fill();
-    ctx.lineWidth = Math.max(2, r * 0.1);
+    ctx.lineWidth = espessuraDoContorno(r, escala, 0.1, 2);
     ctx.strokeStyle = "#fff";
     if (mestre && p.oculto) ctx.setLineDash([r * 0.35, r * 0.25]);
     ctx.stroke();
@@ -526,14 +535,14 @@ function desenharPecas(
     if (p.vez) {
       ctx.beginPath();
       ctx.arc(x, y, r * 1.16, 0, Math.PI * 2);
-      ctx.lineWidth = Math.max(3, r * 0.16);
+      ctx.lineWidth = espessuraDoContorno(r, escala, 0.16, 3);
       ctx.strokeStyle = COR_VEZ;
       ctx.stroke();
     }
     if (p.selecionada) {
       ctx.beginPath();
       ctx.arc(x, y, r * 1.34, 0, Math.PI * 2);
-      ctx.lineWidth = Math.max(2, r * 0.08);
+      ctx.lineWidth = espessuraDoContorno(r, escala, 0.08, 2);
       ctx.strokeStyle = "rgba(255,255,255,0.85)";
       ctx.setLineDash([r * 0.3, r * 0.2]);
       ctx.stroke();
@@ -544,7 +553,7 @@ function desenharPecas(
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
-    ctx.lineWidth = Math.max(2, r * 0.16);
+    ctx.lineWidth = espessuraDoContorno(r, escala, 0.16, 2);
     ctx.strokeStyle = "rgba(0,0,0,0.75)";
     ctx.strokeText(p.rotulo, x, y + r * 0.04);
     ctx.fillStyle = "#fff";
@@ -575,7 +584,7 @@ function desenharIcones(ctx: CanvasRenderingContext2D, p: PecaNaTela, x: number,
     ctx.arc(cx, cy, raio, 0, Math.PI * 2);
     ctx.fillStyle = cor;
     ctx.fill();
-    ctx.lineWidth = Math.max(1.5, raio * 0.16);
+    ctx.lineWidth = espessuraDoContorno(raio, escala, 0.16, 1.5);
     ctx.strokeStyle = "#fff";
     ctx.stroke();
   };
@@ -589,7 +598,7 @@ function desenharIcones(ctx: CanvasRenderingContext2D, p: PecaNaTela, x: number,
     if (icone.nivel) {
       // O nível da exaustão, pequeno, no canto de baixo à direita da bolinha.
       ctx.font = `800 ${Math.round(raio * 0.85)}px system-ui, sans-serif`;
-      ctx.lineWidth = Math.max(2, raio * 0.3);
+      ctx.lineWidth = espessuraDoContorno(raio, escala, 0.3, 2);
       ctx.strokeStyle = "rgba(0,0,0,0.85)";
       ctx.strokeText(String(icone.nivel), cx + raio * 0.7, cy + raio * 0.7);
       ctx.fillStyle = "#fff";
