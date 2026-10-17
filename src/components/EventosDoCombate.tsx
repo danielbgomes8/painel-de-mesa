@@ -36,6 +36,7 @@ function useSituacao(sala: Sala): SituacaoDoCombate {
       combateAtivo: order.length > 0,
       round,
       fichas: sala.personagens.map((p) => ({ slug: p.slug, hp: p.hp, hp_max: p.hp_max })),
+      concentrando: sala.personagens.filter((p) => p.concentration).map((p) => p.slug),
     }),
     [order.length, round, sala.personagens],
   );
@@ -43,7 +44,7 @@ function useSituacao(sala: Sala): SituacaoDoCombate {
 
 /** O que está pedindo atenção agora. Vibra uma vez quando aparece um aviso novo (o celular do Mestre está no bolso). */
 export function AvisosDoCombate({ sala }: { sala: Sala }) {
-  const { eventos, marcarFeito } = useEventosDoCombate();
+  const { eventos, marcarFeito, remover } = useEventosDoCombate();
   const situacao = useSituacao(sala);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const lista = useMemo(() => pendentes(eventos, situacao), [eventos, situacao]);
@@ -66,7 +67,8 @@ export function AvisosDoCombate({ sala }: { sala: Sala }) {
     if (ocupado) return;
     setOcupado(e.id);
     registrarUso("acao:evento-combate");
-    const ok = await marcarFeito(e.id);
+    // O teste de concentração não é programado e não vai pro log: feito, some (não pesa no limite de avisos).
+    const ok = e.tipo === "concentracao" ? await remover(e.id) : await marcarFeito(e.id);
     // Só conta à mesa depois que o banco aceitou (e uma vez só: o `feito` é por UPDATE condicional).
     if (ok && e.publico) await sala.registrarLog(linhaPublicaDoEvento(e.texto));
     setOcupado(null);
@@ -78,7 +80,7 @@ export function AvisosDoCombate({ sala }: { sala: Sala }) {
       {lista.map((e) => (
         <div key={e.id} className="evaviso">
           <p className="evgatilho">
-            {e.tipo === "rodada" ? "⏱" : "💔"} {rotuloDoGatilho(e, nomeDe)}
+            {e.tipo === "concentracao" ? "🔮" : e.tipo === "rodada" ? "⏱" : "💔"} {rotuloDoGatilho(e, nomeDe)}
           </p>
           <p className="evtexto">{e.texto}</p>
           <button type="button" className="btn primary" disabled={ocupado === e.id} onClick={() => void feito(e)}>

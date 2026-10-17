@@ -1,4 +1,4 @@
-import { limitarQuantidade } from "./regras";
+import { cdConcentracao, limitarQuantidade } from "./regras";
 import type { EventoPreparado, GrupoEncontro } from "./tipos";
 
 /**
@@ -23,7 +23,8 @@ export const EVENTOS_NO_COMBATE = 60;
 export type EventoDoCombate = {
   id: string;
   room_code: string;
-  tipo: "rodada" | "pv";
+  /** `concentracao` não é programado: nasce quando quem concentra leva dano (ver `testeDeConcentracao`). */
+  tipo: "rodada" | "pv" | "concentracao";
   rodada: number | null;
   slugs: string[];
   pct: number | null;
@@ -48,7 +49,7 @@ function inteiro(v: unknown, min: number, max: number): number | null {
 /** Linha do banco → evento; tudo que vier torto vira valor seguro (a linha com id vazio é descartada por quem chama). */
 export function normalizarEvento(bruto: unknown): EventoDoCombate {
   const o = (bruto ?? {}) as Record<string, unknown>;
-  const tipo = o.tipo === "pv" ? "pv" : "rodada";
+  const tipo = o.tipo === "pv" || o.tipo === "concentracao" ? o.tipo : "rodada";
   return {
     id: typeof o.id === "string" ? o.id : "",
     room_code: typeof o.room_code === "string" ? o.room_code : "",
@@ -89,6 +90,8 @@ export type SituacaoDoCombate = {
   combateAtivo: boolean;
   round: number;
   fichas: { slug: string; hp: number; hp_max: number }[];
+  /** Slugs de quem está concentrado agora: o aviso de concentração some se a concentração acabou. */
+  concentrando?: string[];
 };
 
 /**
@@ -97,6 +100,8 @@ export type SituacaoDoCombate = {
  * Monstro que não existe mais na sala (ficha apagada) não dispara nada.
  */
 export function disparou(e: Pick<EventoDoCombate, "tipo" | "rodada" | "slugs" | "pct">, s: SituacaoDoCombate): boolean {
+  // Concentração vale na hora, com combate ou sem (dano de armadilha, de queda), enquanto a pessoa ainda concentra.
+  if (e.tipo === "concentracao") return e.slugs.some((slug) => s.concentrando?.includes(slug));
   if (!s.combateAtivo) return false;
   if (e.tipo === "rodada") return e.rodada !== null && s.round >= e.rodada;
   if (e.pct === null) return false;
@@ -104,12 +109,14 @@ export function disparou(e: Pick<EventoDoCombate, "tipo" | "rodada" | "slugs" | 
   return s.fichas.some((f) => e.slugs.includes(f.slug) && f.hp_max > 0 && f.hp * 100 <= pct * f.hp_max);
 }
 
-/** Os que pedem atenção agora: gatilho verdadeiro e ainda não tratados. Rodada primeiro (pela ordem de rodada), depois PV. */
+const ORDEM_DO_TIPO = { concentracao: 0, rodada: 1, pv: 2 } as const;
+
+/** Os que pedem atenção agora: gatilho verdadeiro e ainda não tratados. Concentração primeiro (é da vez de agora), depois rodada, depois PV. */
 export function pendentes(eventos: EventoDoCombate[], s: SituacaoDoCombate): EventoDoCombate[] {
   return eventos
     .filter((e) => !e.feito && disparou(e, s))
     .sort((a, b) => {
-      if (a.tipo !== b.tipo) return a.tipo === "rodada" ? -1 : 1;
+      if (a.tipo !== b.tipo) return ORDEM_DO_TIPO[a.tipo] - ORDEM_DO_TIPO[b.tipo];
       if (a.tipo === "rodada") return (a.rodada ?? 0) - (b.rodada ?? 0) || a.created_at.localeCompare(b.created_at);
       return a.created_at.localeCompare(b.created_at);
     });
@@ -117,6 +124,7 @@ export function pendentes(eventos: EventoDoCombate[], s: SituacaoDoCombate): Eve
 
 /** "Rodada 3" ou "50% de PV · Dragão" (vários monstros: "Goblin, Goblin 2 +1"). */
 export function rotuloDoGatilho(e: Pick<EventoDoCombate, "tipo" | "rodada" | "slugs" | "pct">, nomeDe: (slug: string) => string | null): string {
+  if (e.tipo === "concentracao") return `Concentração · ${nomeDe(e.slugs[0] ?? "") ?? "personagem que saiu da sala"}`;
   if (e.tipo === "rodada") return `Rodada ${e.rodada ?? "?"}`;
   const nomes = e.slugs.map((s) => nomeDe(s)).filter((n): n is string => Boolean(n));
   const alvo = nomes.length === 0 ? "monstro que saiu da sala" : nomes.length <= 2 ? nomes.join(", ") : `${nomes.slice(0, 2).join(", ")} +${nomes.length - 2}`;
@@ -181,4 +189,21 @@ export function eventosAoTirarGrupo(eventos: EventoPreparado[], i: number): Even
   return eventos
     .filter((e) => !(e.tipo === "pv" && e.grupo === i))
     .map((e) => (e.tipo === "pv" && e.grupo !== null && e.grupo > i ? { ...e, grupo: e.grupo - 1 } : e));
+}
+
+type VidaParaConcentracao = { hp: number; hp_temp: number; concentration: boolean; concentration_on: string };
+
+/**
+ * Quem estava concentrado e perdeu PV (ou PV temporário) sem largar a concentração precisa de um teste de
+ * Constituição. Devolve a dificuldade e o texto do aviso, ou null se não há teste: não estava concentrado, não
+ * perdeu nada, ou já largou a concentração (caiu a 0 PV ou ganhou uma condição que a derruba — aí não tem o que testar).
+ * O app só AVISA; os dados são rolados na mesa.
+ */
+export function testeDeConcentracao(antes: VidaParaConcentracao, depois: VidaParaConcentracao): { cd: number; texto: string } | null {
+  if (!antes.concentration || !depois.concentration) return null;
+  const dano = antes.hp + antes.hp_temp - (depois.hp + depois.hp_temp);
+  if (dano <= 0) return null;
+  const cd = cdConcentracao(dano);
+  const em = (depois.concentration_on || antes.concentration_on).trim();
+  return { cd, texto: limparTexto(`Teste de Constituição, CD ${cd}${em ? ` · concentrado em ${em}` : ""} · ${dano} de dano`) };
 }
