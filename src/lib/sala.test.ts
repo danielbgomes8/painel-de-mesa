@@ -4,6 +4,7 @@ import {
   codigoDigitado,
   escolherSala,
   mestreDaSala,
+  pareceSalaNova,
   rotuloDaSala,
   SALA_PADRAO,
 } from "./sala";
@@ -76,5 +77,20 @@ describe("código digitado", () => {
   it("campo vazio não leva ninguém pra Salamina sem querer", () => {
     expect(codigoDigitado("")).toBeNull();
     expect(codigoDigitado(" !! ")).toBeNull();
+  });
+});
+
+describe("sala nova (link possivelmente errado)", () => {
+  it("código desconhecido e sem personagens: avisa", () => {
+    expect(pareceSalaNova("forgoten-realms", 0)).toBe(true);
+  });
+
+  it("campanha do grupo nunca avisa, mesmo vazia", () => {
+    expect(pareceSalaNova("forgotten-realms", 0)).toBe(false);
+    expect(pareceSalaNova("setimo-raio", 0)).toBe(false);
+  });
+
+  it("sala fora do grupo que já tem personagem não avisa", () => {
+    expect(pareceSalaNova("cripta-de-ferro-7k2", 3)).toBe(false);
   });
 });

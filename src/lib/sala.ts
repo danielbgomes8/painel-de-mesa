@@ -135,6 +135,22 @@ export function rotuloDaSala(codigo: string): string {
   );
 }
 
+/**
+ * Qualquer `?sala=` cria a sala no primeiro acesso (ver `iniciar` no useSala),
+ * então um link digitado errado abre uma sala nova e vazia que parece certa:
+ * o telão mostra "Sem combate no momento" com o nome do código no topo, e
+ * ninguém desconfia. Por isso a tabela `rooms` não serve pra saber se o link
+ * existia — o próprio link errado já gravou a sala lá.
+ *
+ * O que denuncia: não é campanha do grupo (`CAMPANHAS`) e não tem nenhum
+ * personagem. Campanha de verdade ganha personagens logo no começo; uma
+ * campanha nova aberta por código também cai aqui até o primeiro, e aí o
+ * aviso ("é nova?") continua verdadeiro.
+ */
+export function pareceSalaNova(codigo: string, quantosPersonagens: number): boolean {
+  return !campanhaDoCatalogo(codigo) && quantosPersonagens === 0;
+}
+
 /** Nome de quem mestra a campanha, quando o catálogo sabe. */
 export function mestreDaSala(codigo: string): string | undefined {
   return campanhaDoCatalogo(codigo)?.mestre;

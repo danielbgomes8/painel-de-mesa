@@ -15,6 +15,7 @@ import {
   proximosDaOrdem,
   pvExibidoIniciativa,
 } from "@/lib/regras";
+import { pareceSalaNova } from "@/lib/sala";
 
 /** Quantos "a seguir" cabem sem competir com o nome de quem está jogando. */
 const QUANTOS_PROXIMOS = 3;
@@ -88,6 +89,11 @@ export function Telao({
         {tela === "recusada" ? " (ou a economia de bateria)" : ""}.
       </p>
     ) : null;
+
+  // Só depois de ler o banco: carregando, sem internet (foto do aparelho) ou
+  // com erro, a lista vazia de personagens não quer dizer nada.
+  const salaNova =
+    !sala.carregando && !sala.semInternet && !sala.erro && pareceSalaNova(codigo, personagens.length);
 
   if (cenas.naMesa) {
     return (
@@ -186,6 +192,12 @@ export function Telao({
         </>
       ) : (
         <div className="telao-nome">Sem combate no momento</div>
+      )}
+      {salaNova && (
+        <p className="telao-sala-nova" role="status">
+          Esta sala é nova? Por favor, confira o link com o Mestre.
+          <span className="telao-sala-nova-codigo">sala: {codigo}</span>
+        </p>
       )}
       {aviso}
     </div>
