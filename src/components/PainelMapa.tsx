@@ -195,11 +195,14 @@ export function VisorDaMesa({
   });
   // "Seguir a vez": no turno novo de um jogador, desliza até ele uma vez — depois o Mestre mexe à vontade.
   // Vez de inimigo não mexe a vista (não entrega onde ele está).
+  // Depende também do id do peão da vez: ao abrir o controle os peões ainda
+  // estão chegando do banco, e o foco tem de esperar o peão aparecer.
+  const idDaVez = daVez?.peca.id ?? null;
   useEffect(() => {
-    if (!controle || !seguirVez) return;
-    const vez = itensRef.current.find((i) => i.peca.vez);
+    if (!controle || !seguirVez || !idDaVez) return;
+    const vez = itensRef.current.find((i) => i.peca.id === idDaVez);
     if (vez) mapaRef.current?.focar(vez.peca.x, vez.peca.y);
-  }, [controle, seguirVez, turno]);
+  }, [controle, seguirVez, turno, idDaVez]);
   useEffect(() => {
     if (controle) enviarFoco(focoId);
   }, [controle, focoId, enviarFoco]);
