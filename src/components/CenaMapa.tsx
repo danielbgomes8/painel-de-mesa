@@ -291,8 +291,9 @@ export function CenaMapa({
   const focoRef = useRef(0);
   /** A última vista avisada por `aoMudarVista` (pra não repetir a mesma). */
   const vistaAvisadaRef = useRef<Vista | null>(null);
-  /** A vista que o aparelho tinha quando a Vista Mestre ligou (volta pra ela ao desligar). */
-  const vistaPropriaRef = useRef<{ vista: Vista; tocou: boolean } | null>(null);
+  /** A vista que o aparelho tinha quando a Vista Mestre ligou (volta pra ela ao desligar).
+   *  `vista` null: abriu já seguindo o Mestre (link `?vista=mestre`), sem vista própria. */
+  const vistaPropriaRef = useRef<{ vista: Vista | null; tocou: boolean } | null>(null);
   const pintura = useRef<Pintura | null>(null);
   /** Dedo parado esperando virar ping (toque longo): onde começou e o relógio. */
   const toqueLongo = useRef<{ x: number; y: number; timer: number } | null>(null);
@@ -625,7 +626,7 @@ export function CenaMapa({
     const p = propsRef.current;
     const guiada = p.vistaGuiada;
     if (guiada) {
-      if (!vistaPropriaRef.current) vistaPropriaRef.current = { vista: vistaRef.current, tocou: tocouRef.current };
+      if (!vistaPropriaRef.current) vistaPropriaRef.current = { vista: w > 0 ? vistaRef.current : null, tocou: w > 0 && tocouRef.current };
       if (w === 0 || p.cena.largura <= 0) return;
       deslizarPara(limitarVista(enquadrar(guiada, w, h), p.cena, w, h));
       return;
@@ -634,7 +635,13 @@ export function CenaMapa({
     if (!propria) return;
     vistaPropriaRef.current = null;
     tocouRef.current = propria.tocou;
-    deslizarPara(propria.vista);
+    if (propria.vista) {
+      deslizarPara(propria.vista);
+      return;
+    }
+    // Nunca teve vista própria: volta ao enquadre de partida (a câmera da mesa ou o mapa todo).
+    if (w === 0 || p.cena.largura <= 0) return;
+    deslizarPara(enquadrar((p.seguirCamera && p.cena.camera) || { x: 0, y: 0, w: p.cena.largura, h: p.cena.altura }, w, h));
   }, [chaveGuiada, deslizarPara]);
 
   // Imagem da cena.
