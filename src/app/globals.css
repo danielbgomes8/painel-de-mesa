@@ -3864,6 +3864,11 @@ input.fj-score:focus-visible {
   .telao-foco--esquerda {
     left: 6px;
   }
+  /* No controle do Mestre: abaixo dos botões do canto (seguir a vez, voltar a editar). */
+  .telao-foco--direita {
+    top: 100px;
+    max-height: calc(100% - 170px);
+  }
   .telao-foco-peao {
     min-width: 36px;
     min-height: 36px;
