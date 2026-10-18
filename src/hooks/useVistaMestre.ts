@@ -30,6 +30,8 @@ export function useVistaMestre(cena: { id: string; largura: number; altura: numb
   const [recebida, setRecebida] = useState<VistaMestre | null>(null);
   const canalRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const ultimaRef = useRef<VistaMestre | null>(null);
+  /** O foco pedido, mesmo antes da primeira região (vai junto quando ela sair). */
+  const focoRef = useRef<string | null>(null);
   const freioRef = useRef<{ timer: number; pendente: boolean }>({ timer: 0, pendente: false });
   const cenaId = cena?.id ?? null;
   const largura = cena?.largura ?? 0;
@@ -48,7 +50,8 @@ export function useVistaMestre(cena: { id: string; largura: number; altura: numb
     if (papel === "espectador") {
       canal.on("broadcast", { event: "vista" }, ({ payload }) => {
         const v = validarVista(payload, { largura, altura });
-        if (v) setRecebida(v);
+        // O lembrete repete a mesma vista a cada 3 s: igual, não redesenha nada.
+        if (v) setRecebida((atual) => (atual && mesmaVista(atual, v) ? atual : v));
       });
     } else {
       canal.on("broadcast", { event: "pedir" }, () => mandarAgora());
@@ -62,6 +65,11 @@ export function useVistaMestre(cena: { id: string; largura: number; altura: numb
     canalRef.current = canal;
     const freio = freioRef.current;
     return () => {
+      // Saindo do controle: fecha no telão o cartão que estava aberto (senão ficava lá sem botão de fechar).
+      const ultima = ultimaRef.current;
+      if (papel === "controle" && ultima?.foco) {
+        void canal.send({ type: "broadcast", event: "vista", payload: pacoteDaVista({ ...ultima, foco: null }) });
+      }
       window.clearInterval(lembrete);
       window.clearTimeout(freio.timer);
       freio.timer = 0;
@@ -93,7 +101,7 @@ export function useVistaMestre(cena: { id: string; largura: number; altura: numb
 
   const enviarRegiao = useCallback(
     (r: Regiao) => {
-      ultimaRef.current = { regiao: r, foco: ultimaRef.current?.foco ?? null };
+      ultimaRef.current = { regiao: r, foco: focoRef.current };
       agendar();
     },
     [agendar],
@@ -101,6 +109,7 @@ export function useVistaMestre(cena: { id: string; largura: number; altura: numb
 
   const enviarFoco = useCallback(
     (id: string | null) => {
+      focoRef.current = id;
       const atual = ultimaRef.current;
       if (!atual || atual.foco === id) return;
       ultimaRef.current = { ...atual, foco: id };
@@ -110,4 +119,8 @@ export function useVistaMestre(cena: { id: string; largura: number; altura: numb
   );
 
   return { recebida, enviarRegiao, enviarFoco };
+}
+
+function mesmaVista(a: VistaMestre, b: VistaMestre): boolean {
+  return a.foco === b.foco && a.regiao.x === b.regiao.x && a.regiao.y === b.regiao.y && a.regiao.w === b.regiao.w && a.regiao.h === b.regiao.h;
 }

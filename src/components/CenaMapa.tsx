@@ -628,6 +628,8 @@ export function CenaMapa({
     if (guiada) {
       if (!vistaPropriaRef.current) vistaPropriaRef.current = { vista: w > 0 ? vistaRef.current : null, tocou: w > 0 && tocouRef.current };
       if (w === 0 || p.cena.largura <= 0) return;
+      // Vista nova do Mestre: redimensionar volta a enquadrá-la, até quem olha dar zoom por conta própria.
+      tocouRef.current = false;
       deslizarPara(limitarVista(enquadrar(guiada, w, h), p.cena, w, h));
       return;
     }
@@ -744,7 +746,7 @@ export function CenaMapa({
       tamanhoRef.current = { w, h, dpr };
       canvas.width = Math.max(1, Math.round(w * dpr));
       canvas.height = Math.max(1, Math.round(h * dpr));
-      if (!tocouRef.current || propsRef.current.vistaGuiada) aplicarEnquadre();
+      if (!tocouRef.current) aplicarEnquadre();
       else {
         vistaRef.current = limitarVista(vistaRef.current, propsRef.current.cena, w, h);
         pedirQuadro();

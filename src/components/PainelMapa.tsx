@@ -149,7 +149,8 @@ export function VisorDaMesa({
   const [seguirVez, setSeguirVez] = useState(true);
   /** O peão que tocaram no HUD, e em que turno (o "seguir a vez" passa por cima no turno seguinte). */
   const [escolhido, setEscolhido] = useState<{ id: string | null; turno: string } | null>(null);
-  const turno = `${sala.combate.round}:${sala.combate.turn}:${sala.combate.order.length}`;
+  // Só rodada e vez: pôr ou tirar alguém da iniciativa não é turno novo.
+  const turno = `${sala.combate.round}:${sala.combate.turn}`;
 
   // O que o toque faz no mapa: mexer, medir (régua ou área de magia) ou pingar.
   const [uso, setUso] = useState<"mover" | "medir" | "ping">("mover");

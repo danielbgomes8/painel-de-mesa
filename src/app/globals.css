@@ -3756,7 +3756,7 @@ input.fj-score:focus-visible {
 }
 .telao-foco-recolher {
   min-width: 32px;
-  min-height: 28px;
+  min-height: 32px;
   padding: 2px 8px;
   font-size: 12px;
 }
