@@ -55,6 +55,19 @@ Decisões que não estão no código à primeira vista:
   NPC nunca aparece). O telão e os celulares enquadram a `camera` que o Mestre
   definiu ("levar a mesa pra esta visão"); jogador pode dar zoom e voltar com
   "voltar à visão da mesa".
+- **Vista Mestre** (`lib/vistaMestre.ts`, `hooks/useVistaMestre.ts`, sem migration, 18/10/2026): o Mestre
+  toca em "📺 conduzir a mesa" (canto do palco, com mapa na mesa) e vira um **controle remoto** da câmera:
+  vê o mapa como a mesa vê (`VisorDaMesa controle`), e o zoom/arrasto dele dali vai por broadcast
+  (`vista:<cena>`, freio de 80 ms, repete a cada 3 s, responde a "pedir" de quem entra). **A tela de
+  edição dele nunca transmite** — pintar névoa num canto não entrega nada. Cada aparelho liga a sua
+  "Vista Mestre" (👁 no telão, no HUD; 👁 ao lado do zoom no celular), lembrada em
+  `mesa-vista-mestre:<sala>`; `?vista=mestre` no link já abre ligada (TV sem teclado), `?vista=jogador`
+  desliga. Viaja o pedaço do mapa em px da imagem (`CenaMapa.aoMudarVista` → `vistaGuiada`), então cada
+  tela enquadra no próprio tamanho; desligar volta à vista que o aparelho tinha. Sem nada do Mestre,
+  segue a `camera` salva. **"Seguir a vez"** (no controle): no turno novo de um jogador, desliza até ele
+  uma vez; vez de inimigo não mexe. O **HUD** (`FocoDoTelao`) é só os ícones dos peões de jogador
+  (inimigo nunca entra); tocar foca e abre o cartão (ícone, nome, classe, PV por `pvExibidoIniciativa`).
+  O cartão que o Mestre abre no controle aparece no telão que segue a Vista Mestre.
 - **Backup:** `cenas` e `cena_nevoa` entram no backup DIÁRIO bruto (a imagem também,
   desde 02/10/2026) e **não** no botão "backup" do Mestre. O Mestre ainda deve guardar
   o arquivo original do mapa (o app reduz a imagem ao subir).

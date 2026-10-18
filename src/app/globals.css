@@ -3639,62 +3639,158 @@ input.fj-score:focus-visible {
 .mapa-visor--telao {
   position: relative;
 }
-/* HUD do telão (FocoDoTelao): discreto no canto de cima, fica forte só ao tocar. */
+/* HUD (FocoDoTelao): coluna discreta só com os ícones dos peões; fica forte ao tocar. */
 .telao-foco {
   position: absolute;
   top: 14px;
-  left: 14px;
   z-index: 4;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   max-height: calc(100% - 28px);
   overflow-y: auto;
-  opacity: 0.55;
+  opacity: 0.6;
   transition: opacity 0.2s;
+}
+.telao-foco--esquerda {
+  left: 14px;
+}
+/* No controle do Mestre o canto de cima à direita tem os botões do palco. */
+.telao-foco--direita {
+  right: 10px;
+  top: 112px;
+  max-height: calc(100% - 180px);
 }
 .telao-foco:hover,
 .telao-foco:focus-within {
   opacity: 1;
 }
+.telao-foco-peao,
 .telao-foco-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 4px 12px 4px 8px;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 3px;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.telao-foco-peao[aria-pressed="true"] .foco-icone {
+  box-shadow: 0 0 0 3px rgba(245, 240, 230, 0.9);
+}
+.telao-foco-item {
+  padding: 4px 10px;
   /* Fundo e letra fixos, como as notas do telão: a cor do tema sumia sobre o mapa escuro. */
   background: rgba(13, 11, 9, 0.78);
   color: #f5f0e6;
   border: 1px solid rgba(245, 240, 230, 0.25);
-  border-radius: 999px;
   font: inherit;
-  font-size: clamp(13px, 1.2vw, 18px);
-  cursor: pointer;
-  touch-action: manipulation;
+  font-size: clamp(13px, 1.1vw, 16px);
+  white-space: nowrap;
 }
-.telao-foco-item:active {
-  background: rgba(13, 11, 9, 0.95);
-  border-color: rgba(245, 240, 230, 0.6);
+.telao-foco-vista[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.telao-foco-item:focus-visible {
+.telao-foco-peao:focus-visible,
+.telao-foco-item:focus-visible,
+.foco-cartao-fechar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.telao-foco-item--vez {
-  border-color: var(--accent);
-}
-.telao-foco-cor {
-  width: 12px;
-  height: 12px;
+/* O peão em miniatura, igual ao do mapa (desenharCena): cor, borda branca, letras com contorno escuro. */
+.foco-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font: 700 13px/1 system-ui, sans-serif;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.9);
   flex: none;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
-.telao-foco-mesa {
-  padding-left: 12px;
-  color: rgba(245, 240, 230, 0.75);
+.foco-icone--vez {
+  outline: 3px solid #f0c24b;
+  outline-offset: 2px;
+}
+.foco-icone--grande {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+  border-width: 3px;
+}
+/* O cartão do peão em foco, do outro lado do HUD. */
+.foco-cartao {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(360px, calc(100% - 140px));
+  padding: 10px 14px;
+  background: rgba(13, 11, 9, 0.85);
+  color: #f5f0e6;
+  border: 1px solid rgba(245, 240, 230, 0.3);
+  border-radius: 14px;
+}
+.foco-cartao--direita {
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.foco-cartao--esquerda {
+  left: 68px;
+  bottom: 12px;
+}
+.foco-cartao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.foco-cartao-texto b {
+  font-size: clamp(16px, 1.6vw, 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foco-cartao-classe {
+  font-size: 13px;
+  color: rgba(245, 240, 230, 0.7);
+}
+.foco-cartao-pv {
+  font-family: ui-monospace, monospace;
+  font-size: clamp(15px, 1.4vw, 20px);
+}
+.foco-cartao-vez {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f0c24b;
+}
+.foco-cartao-fechar {
+  align-self: flex-start;
+  min-width: 32px;
+  min-height: 32px;
+  margin: -4px -6px 0 4px;
+  background: transparent;
+  border: 0;
+  color: rgba(245, 240, 230, 0.7);
+  font-size: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.palco-vista[aria-pressed="true"] {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 .mapa-notas--telao {
   position: absolute;

@@ -1,47 +1,118 @@
 "use client";
 
 import type { PecaNaTela } from "@/lib/pecas";
+import type { Personagem } from "@/lib/tipos";
+import { pvExibidoIniciativa } from "@/lib/regras";
 
-/** Só o primeiro nome cabe na pílula; o completo vai no `title` e no leitor de tela. */
-function primeiroNome(nome: string): string {
-  return nome.trim().split(/\s+/)[0] || nome;
+/** Um peão de jogador no HUD, com a ficha dele (pro PV do cartão), se houver. */
+export type ItemDoFoco = { peca: PecaNaTela; ficha: Personagem | null };
+
+/** Os peões que entram no HUD: só jogadores (e companheiros) visíveis. Peão de
+ *  inimigo, revelado ou não, fica de fora — o telão nunca aponta o que o Mestre esconde. */
+export function itensDoFoco(pecas: readonly PecaNaTela[], fichaDaPeca: (id: string) => Personagem | null): ItemDoFoco[] {
+  return pecas.filter((p) => p.observa && !p.oculto).map((peca) => ({ peca, ficha: fichaDaPeca(peca.id) }));
+}
+
+/** O peão em miniatura, igual ao do mapa: bolinha na cor, borda branca, letras. */
+function IconeDoPeao({ peca, grande = false }: { peca: PecaNaTela; grande?: boolean }) {
+  return (
+    <span
+      className={`foco-icone${grande ? " foco-icone--grande" : ""}${peca.vez ? " foco-icone--vez" : ""}`}
+      style={{ background: peca.cor }}
+      aria-hidden="true"
+    >
+      {peca.rotulo}
+    </span>
+  );
 }
 
 /**
- * HUD discreto no canto do telão: um botão por jogador com peão no mapa. Tocar
- * desliza a vista até ele com um zoom moderado (`focar` do CenaMapa); "mesa"
- * volta pra visão que o Mestre definiu. Só jogadores: peão de inimigo (revelado
- * ou não) fica de fora, pra o telão não apontar quem o Mestre ainda esconde.
+ * HUD discreto: uma coluna só com os ícones dos peões dos jogadores. Tocar foca
+ * o peão (desliza com zoom moderado) e abre o cartão dele do outro lado.
+ * Embaixo, "mesa" (volta à visão da mesa) e, quando há, o botão da Vista Mestre.
  */
 export function FocoDoTelao({
-  pecas,
+  itens,
+  focado,
   aoFocar,
   aoVoltar,
+  vistaMestre,
+  lado = "esquerda",
 }: {
-  pecas: readonly PecaNaTela[];
+  itens: readonly ItemDoFoco[];
+  focado: string | null;
   aoFocar: (peca: PecaNaTela) => void;
-  aoVoltar: () => void;
+  aoVoltar?: () => void;
+  vistaMestre?: { ligada: boolean; aoAlternar: () => void };
+  lado?: "esquerda" | "direita";
 }) {
-  const jogadores = pecas.filter((p) => p.observa && !p.oculto);
-  if (jogadores.length === 0) return null;
+  if (itens.length === 0 && !vistaMestre) return null;
   return (
-    <nav className="telao-foco" aria-label="Focar num jogador">
-      {jogadores.map((p) => (
+    <nav className={`telao-foco telao-foco--${lado}`} aria-label="Focar num jogador">
+      {itens.map(({ peca }) => (
         <button
-          key={p.id}
+          key={peca.id}
           type="button"
-          className={`telao-foco-item${p.vez ? " telao-foco-item--vez" : ""}`}
-          onClick={() => aoFocar(p)}
-          title={`Focar em ${p.nome}`}
-          aria-label={`Focar em ${p.nome}`}
+          className="telao-foco-peao"
+          aria-pressed={focado === peca.id}
+          onClick={() => aoFocar(peca)}
+          title={peca.nome}
+          aria-label={`Focar em ${peca.nome}`}
         >
-          <span className="telao-foco-cor" style={{ background: p.cor }} aria-hidden="true" />
-          {primeiroNome(p.nome)}
+          <IconeDoPeao peca={peca} />
         </button>
       ))}
-      <button type="button" className="telao-foco-item telao-foco-mesa" onClick={aoVoltar} aria-label="Voltar à visão da mesa">
-        ⤢ mesa
-      </button>
+      {aoVoltar && (
+        <button type="button" className="telao-foco-item" onClick={aoVoltar} title="Voltar à visão da mesa" aria-label="Voltar à visão da mesa">
+          ⤢
+        </button>
+      )}
+      {vistaMestre && (
+        <button
+          type="button"
+          className="telao-foco-item telao-foco-vista"
+          aria-pressed={vistaMestre.ligada}
+          onClick={vistaMestre.aoAlternar}
+          title={vistaMestre.ligada ? "Vista Mestre ligada: a tela segue o Mestre" : "Ligar a Vista Mestre: a tela segue o Mestre"}
+        >
+          👁 Mestre
+        </button>
+      )}
     </nav>
+  );
+}
+
+/** O cartão do peão em foco: ícone, nome e PV (só o que a mesa já pode ver). */
+export function CartaoDoFoco({
+  item,
+  aoFechar,
+  lado = "direita",
+}: {
+  item: ItemDoFoco;
+  aoFechar?: () => void;
+  lado?: "esquerda" | "direita";
+}) {
+  const { peca, ficha } = item;
+  const pv = ficha ? pvExibidoIniciativa(ficha, false) : null;
+  const nome = ficha?.name || peca.nome;
+  return (
+    <aside className={`foco-cartao foco-cartao--${lado}`} aria-live="polite" aria-label={`Em foco: ${nome}`}>
+      <IconeDoPeao peca={peca} grande />
+      <div className="foco-cartao-texto">
+        <b>{nome}</b>
+        {ficha?.cls && <span className="foco-cartao-classe">{ficha.cls}</span>}
+        {pv && (
+          <span className="foco-cartao-pv">
+            {pv.hp} / {pv.hp_max} PV
+          </span>
+        )}
+        {peca.vez && <span className="foco-cartao-vez">na vez</span>}
+      </div>
+      {aoFechar && (
+        <button type="button" className="foco-cartao-fechar" onClick={aoFechar} aria-label="Fechar o cartão">
+          ✕
+        </button>
+      )}
+    </aside>
   );
 }

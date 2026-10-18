@@ -128,6 +128,12 @@ type Props = {
   interativo?: boolean;
   /** Acompanha a câmera que o Mestre definiu (mesa); o Mestre navega livre. */
   seguirCamera?: boolean;
+  /** Vista Mestre ligada: o mapa desliza pra este pedaço sempre que ele muda
+   *  (e se ajusta ao tamanho da tela). Voltando a null, volta à vista que o
+   *  aparelho tinha antes de ligar. */
+  vistaGuiada?: Regiao | null;
+  /** Avisa o pedaço que a tela mostra sempre que a vista muda (o controle da Vista Mestre). */
+  aoMudarVista?: (r: Regiao) => void;
   ferramenta?: Ferramenta;
   modoNevoa?: ModoNevoa;
   pincel?: TamanhoPincel;
@@ -226,6 +232,8 @@ export function CenaMapa({
   mestre,
   interativo = true,
   seguirCamera = false,
+  vistaGuiada = null,
+  aoMudarVista,
   ferramenta = "mover",
   modoNevoa = "revelar",
   pincel = "m",
@@ -281,6 +289,10 @@ export function CenaMapa({
   const pinca = useRef<Pinca | null>(null);
   // O deslize do foco em andamento; tocar no mapa ou rolar a roda cancela.
   const focoRef = useRef(0);
+  /** A última vista avisada por `aoMudarVista` (pra não repetir a mesma). */
+  const vistaAvisadaRef = useRef<Vista | null>(null);
+  /** A vista que o aparelho tinha quando a Vista Mestre ligou (volta pra ela ao desligar). */
+  const vistaPropriaRef = useRef<{ vista: Vista; tocou: boolean } | null>(null);
   const pintura = useRef<Pintura | null>(null);
   /** Dedo parado esperando virar ping (toque longo): onde começou e o relógio. */
   const toqueLongo = useRef<{ x: number; y: number; timer: number } | null>(null);
@@ -332,9 +344,9 @@ export function CenaMapa({
     telaB: { x: number; y: number };
   } | null>(null);
 
-  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, aoAlinharGrade, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
+  const propsRef = useRef({ cena, mestre, interativo, seguirCamera, vistaGuiada, aoMudarVista, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, aoAlinharGrade, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca });
   useEffect(() => {
-    propsRef.current = { cena, mestre, interativo, seguirCamera, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, aoAlinharGrade, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
+    propsRef.current = { cena, mestre, interativo, seguirCamera, vistaGuiada, aoMudarVista, ferramenta, modoNevoa, pincel, aoPintar, pings, aoPingar, modoRegua, corRegua, reguas, aoMedir, modeloArea, areas, aoAreaar, paredes, modoParede, aoCriarParedes, aoApagarParede, marcas, armadilhas, modoMarca, corMarca, aoCriarTraco, aoEscolherNota, aoApagarMarca, marcaSelecionada, aoSelecionarMarca, aoTransformarMarca, aoAlternarPorta, aoSelecionarPorta, portaSelecionada, verVisaoDosInimigos, visaoPronta, aoExplorar, aoEscolherPonto, aoAlinharGrade, pecas, aoMoverPeca, aoTocarPeca, aoAbrirPeca };
   });
 
   // Resultado da última tentativa de carregar; vale só pra URL e tentativa a
@@ -509,6 +521,16 @@ export function CenaMapa({
     const quadro = () => {
       quadroRef.current = 0;
       if (pintar() > 0) quadroRef.current = requestAnimationFrame(quadro);
+      // Todo movimento de vista passa por um quadro: aqui dá pra avisar quem
+      // conduz a Vista Mestre sem espalhar chamadas por cada gesto.
+      const aviso = propsRef.current.aoMudarVista;
+      const v = vistaRef.current;
+      const u = vistaAvisadaRef.current;
+      const { w, h } = tamanhoRef.current;
+      if (aviso && w > 0 && (!u || u.escala !== v.escala || u.tx !== v.tx || u.ty !== v.ty)) {
+        vistaAvisadaRef.current = v;
+        aviso(regiaoVisivel(v, w, h));
+      }
     };
     quadroRef.current = requestAnimationFrame(quadro);
   }, [pintar]);
@@ -517,11 +539,29 @@ export function CenaMapa({
     const { w, h } = tamanhoRef.current;
     const p = propsRef.current;
     if (w === 0 || h === 0 || p.cena.largura <= 0) return;
-    const regiao = (p.seguirCamera && p.cena.camera) || { x: 0, y: 0, w: p.cena.largura, h: p.cena.altura };
+    const regiao = p.vistaGuiada || (p.seguirCamera && p.cena.camera) || { x: 0, y: 0, w: p.cena.largura, h: p.cena.altura };
     vistaRef.current = enquadrar(regiao, w, h);
     tocouRef.current = false;
     pedirQuadro();
   }, [pedirQuadro]);
+
+  /** Desliza da vista atual até `para` (em vez de pular): foco e Vista Mestre. */
+  const deslizarPara = useCallback(
+    (para: Vista) => {
+      cancelAnimationFrame(focoRef.current);
+      const de = vistaRef.current;
+      const inicio = performance.now();
+      const passo = (agora: number) => {
+        const t = (agora - inicio) / FOCO_MS;
+        // Sai rápido e chega devagar (ease-out cúbico).
+        vistaRef.current = misturarVistas(de, para, 1 - Math.pow(1 - Math.min(1, t), 3));
+        pedirQuadro();
+        focoRef.current = t < 1 ? requestAnimationFrame(passo) : 0;
+      };
+      focoRef.current = requestAnimationFrame(passo);
+    },
+    [pedirQuadro],
+  );
 
   useImperativeHandle(
     ref,
@@ -549,25 +589,9 @@ export function CenaMapa({
         const { w, h } = tamanhoRef.current;
         const c = propsRef.current.cena;
         if (w === 0 || c.largura <= 0) return;
-        const de = vistaRef.current;
         const alvo = enquadrar(regiaoDeFoco(c, x, y), w, h, 0);
-        const para = limitarVista(
-          { ...alvo, escala: Math.min(ZOOM_MAXIMO, Math.max(escalaMinima(c, w, h), alvo.escala)) },
-          c,
-          w,
-          h,
-        );
         tocouRef.current = true;
-        cancelAnimationFrame(focoRef.current);
-        const inicio = performance.now();
-        const passo = (agora: number) => {
-          const t = (agora - inicio) / FOCO_MS;
-          // Sai rápido e chega devagar (ease-out cúbico).
-          vistaRef.current = misturarVistas(de, para, 1 - Math.pow(1 - Math.min(1, t), 3));
-          pedirQuadro();
-          focoRef.current = t < 1 ? requestAnimationFrame(passo) : 0;
-        };
-        focoRef.current = requestAnimationFrame(passo);
+        deslizarPara(limitarVista({ ...alvo, escala: Math.min(ZOOM_MAXIMO, Math.max(escalaMinima(c, w, h), alvo.escala)) }, c, w, h));
       },
       aproximar: (fator) => {
         const { w, h } = tamanhoRef.current;
@@ -579,8 +603,28 @@ export function CenaMapa({
         pedirQuadro();
       },
     }),
-    [pedirQuadro, aplicarEnquadre, recomporNevoa],
+    [pedirQuadro, aplicarEnquadre, recomporNevoa, deslizarPara],
   );
+
+  // Vista Mestre: segue o pedaço que o Mestre mostra; ao desligar, volta à vista
+  // própria deste aparelho (guardada quando ligou).
+  const chaveGuiada = vistaGuiada ? `${vistaGuiada.x},${vistaGuiada.y},${vistaGuiada.w},${vistaGuiada.h}` : "";
+  useEffect(() => {
+    const { w, h } = tamanhoRef.current;
+    const p = propsRef.current;
+    const guiada = p.vistaGuiada;
+    if (guiada) {
+      if (!vistaPropriaRef.current) vistaPropriaRef.current = { vista: vistaRef.current, tocou: tocouRef.current };
+      if (w === 0 || p.cena.largura <= 0) return;
+      deslizarPara(limitarVista(enquadrar(guiada, w, h), p.cena, w, h));
+      return;
+    }
+    const propria = vistaPropriaRef.current;
+    if (!propria) return;
+    vistaPropriaRef.current = null;
+    tocouRef.current = propria.tocou;
+    deslizarPara(propria.vista);
+  }, [chaveGuiada, deslizarPara]);
 
   // Imagem da cena.
   useEffect(() => {
@@ -682,7 +726,7 @@ export function CenaMapa({
       tamanhoRef.current = { w, h, dpr };
       canvas.width = Math.max(1, Math.round(w * dpr));
       canvas.height = Math.max(1, Math.round(h * dpr));
-      if (!tocouRef.current) aplicarEnquadre();
+      if (!tocouRef.current || propsRef.current.vistaGuiada) aplicarEnquadre();
       else {
         vistaRef.current = limitarVista(vistaRef.current, propsRef.current.cena, w, h);
         pedirQuadro();

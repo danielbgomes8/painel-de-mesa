@@ -1,6 +1,8 @@
 "use client";
 
-import { FocoDoTelao } from "@/components/FocoDoTelao";
+import { CartaoDoFoco, FocoDoTelao, itensDoFoco, type ItemDoFoco } from "@/components/FocoDoTelao";
+import { useVistaMestre } from "@/hooks/useVistaMestre";
+import { vistaMestreAoAbrir } from "@/lib/vistaMestre";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Cenas } from "@/hooks/useCenas";
 import type { Sala } from "@/hooks/useSala";
@@ -90,6 +92,8 @@ export function VisorDaMesa({
   quem = null,
   meuSlug = null,
   telao = false,
+  controle = false,
+  aoVoltarAEditar,
 }: {
   cena: Cena;
   codigo: string;
@@ -100,6 +104,10 @@ export function VisorDaMesa({
   /** A ficha de quem joga (move o peão dela); null no telão. */
   meuSlug?: string | null;
   telao?: boolean;
+  /** O Mestre conduzindo a Vista Mestre: vê o mapa como a mesa vê, e o zoom e
+   *  o arrasto dele vão pra todo aparelho com a Vista Mestre ligada. */
+  controle?: boolean;
+  aoVoltarAEditar?: () => void;
 }) {
   const nevoa = useNevoa(cena.id, codigo);
   const ping = usePing(cena, quem);
@@ -109,6 +117,40 @@ export function VisorDaMesa({
   const desenhos = useMarcas(cena.id, codigo);
   const arm = useArmadilhas(cena.id, codigo);
   const mapaRef = useRef<CenaMapaApi>(null);
+
+  // Vista Mestre (ver lib/vistaMestre.ts): cada aparelho liga ou desliga a sua;
+  // o link `?vista=mestre` já abre ligada (TV sem teclado).
+  const chaveVista = `mesa-vista-mestre:${codigo}`;
+  const [vistaLigada, setVistaLigada] = useState(() => {
+    let lembrada: string | null = null;
+    try {
+      lembrada = localStorage.getItem(chaveVista);
+    } catch {
+      /* aba privada / storage bloqueado: segue sem lembrar */
+    }
+    return vistaMestreAoAbrir(window.location.search, lembrada);
+  });
+  function alternarVista() {
+    const nova = !vistaLigada;
+    setVistaLigada(nova);
+    try {
+      localStorage.setItem(chaveVista, nova ? "1" : "0");
+    } catch {
+      /* idem */
+    }
+  }
+  const seguindoMestre = !controle && vistaLigada;
+  const canalVista = useVistaMestre(cena, controle ? "controle" : seguindoMestre ? "espectador" : null);
+  const { enviarRegiao, enviarFoco } = canalVista;
+  // Sem nada do Mestre ainda (ele não abriu o controle), a câmera da mesa.
+  const vistaGuiada = seguindoMestre
+    ? (canalVista.recebida?.regiao ?? cena.camera ?? { x: 0, y: 0, w: cena.largura, h: cena.altura })
+    : null;
+  const [seguirVez, setSeguirVez] = useState(true);
+  /** O peão que tocaram no HUD, e em que turno (o "seguir a vez" passa por cima no turno seguinte). */
+  const [escolhido, setEscolhido] = useState<{ id: string | null; turno: string } | null>(null);
+  const turno = `${sala.combate.round}:${sala.combate.turn}:${sala.combate.order.length}`;
+
   // O que o toque faz no mapa: mexer, medir (régua ou área de magia) ou pingar.
   const [uso, setUso] = useState<"mover" | "medir" | "ping">("mover");
   useEffect(() => {
@@ -137,6 +179,35 @@ export function VisorDaMesa({
       }),
     [banco.pecas, cena, sala.personagens, sala.combate, meuSlug],
   );
+  const itens: ItemDoFoco[] = itensDoFoco(pecas, (id) => {
+    const slug = banco.pecas.find((p) => p.id === id)?.slug;
+    return slug ? (sala.personagens.find((f) => f.slug === slug) ?? null) : null;
+  });
+  const daVez = itens.find((i) => i.peca.vez) ?? null;
+  // No controle com "seguir a vez", o turno novo põe quem joga em foco até o Mestre tocar em outro.
+  const focoLocal = controle && seguirVez && daVez && escolhido?.turno !== turno ? daVez.peca.id : (escolhido?.id ?? null);
+  // Seguindo o Mestre, o cartão é o que ele abriu.
+  const focoId = seguindoMestre ? (canalVista.recebida?.foco ?? null) : focoLocal;
+  const itemEmFoco = itens.find((i) => i.peca.id === focoId) ?? null;
+  const itensRef = useRef(itens);
+  useEffect(() => {
+    itensRef.current = itens;
+  });
+  // "Seguir a vez": no turno novo de um jogador, desliza até ele uma vez — depois o Mestre mexe à vontade.
+  // Vez de inimigo não mexe a vista (não entrega onde ele está).
+  useEffect(() => {
+    if (!controle || !seguirVez) return;
+    const vez = itensRef.current.find((i) => i.peca.vez);
+    if (vez) mapaRef.current?.focar(vez.peca.x, vez.peca.y);
+  }, [controle, seguirVez, turno]);
+  useEffect(() => {
+    if (controle) enviarFoco(focoId);
+  }, [controle, focoId, enviarFoco]);
+  function focarPeca(p: ItemDoFoco["peca"]) {
+    setEscolhido({ id: p.id, turno });
+    mapaRef.current?.focar(p.x, p.y);
+  }
+
   // O tempo das luzes que a mesa enxerga: de jogador e de marcador visível (nunca de inimigo, oculto ou não).
   const luzesDaMesa = banco.pecas.flatMap((p) => {
     if (!p.luz || p.oculto) return [];
@@ -163,6 +234,8 @@ export function VisorDaMesa({
       regras={nevoa.regras}
       mestre={false}
       seguirCamera
+      vistaGuiada={vistaGuiada}
+      aoMudarVista={controle ? enviarRegiao : undefined}
       pings={ping.pings}
       aoPingar={quem ? ping.enviar : undefined}
       ferramenta={telao ? "mover" : ferramentaMapa}
@@ -178,8 +251,8 @@ export function VisorDaMesa({
       armadilhas={arm.armadilhas}
       visaoPronta={!muros.carregando && !banco.carregando}
       pecas={pecas}
-      aoMoverPeca={telao ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
-      aoAbrirPeca={telao ? undefined : setCartao}
+      aoMoverPeca={telao || controle ? undefined : (id, x, y) => moverPeao(banco, cena, sala.personagens, muros.paredes, juntos, id, x, y)}
+      aoAbrirPeca={telao || controle ? undefined : setCartao}
     />
   );
 
@@ -188,10 +261,13 @@ export function VisorDaMesa({
       <div className="mapa-visor mapa-visor--telao">
         {mapa}
         <FocoDoTelao
-          pecas={pecas}
-          aoFocar={(p) => mapaRef.current?.focar(p.x, p.y)}
+          itens={itens}
+          focado={focoId}
+          aoFocar={focarPeca}
           aoVoltar={() => mapaRef.current?.reenquadrar()}
+          vistaMestre={{ ligada: vistaLigada, aoAlternar: alternarVista }}
         />
+        {itemEmFoco && <CartaoDoFoco item={itemEmFoco} aoFechar={seguindoMestre ? undefined : () => setEscolhido(null)} />}
         <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />
         <LuzesNaMesa itens={luzesDaMesa} telao />
       </div>
@@ -242,11 +318,32 @@ export function VisorDaMesa({
   return (
     <div className="mapa-visor">
       <PalcoDoMapa
-        mapa={mapa}
+        mapa={
+          controle ? (
+            <>
+              {mapa}
+              <FocoDoTelao itens={itens} focado={focoId} aoFocar={focarPeca} lado="direita" />
+              {itemEmFoco && <CartaoDoFoco item={itemEmFoco} lado="esquerda" aoFechar={() => setEscolhido({ id: null, turno })} />}
+            </>
+          ) : (
+            mapa
+          )
+        }
         nome={cena.nome || "Mapa"}
-        estado="Na mesa"
-        cantoAlto={Boolean(quem) && semMeuPeao && !cena.visao_ligada}
+        estado={controle ? "Conduzindo a mesa" : seguindoMestre ? "Vista Mestre" : "Na mesa"}
+        estadoLigado={controle || seguindoMestre}
+        cantoAlto={controle || (Boolean(quem) && semMeuPeao && !cena.visao_ligada)}
         canto={
+          controle ? (
+            <>
+              <button type="button" className="chip alvo palco-vidro" aria-pressed={seguirVez} onClick={() => setSeguirVez(!seguirVez)}>
+                🎯 seguir a vez
+              </button>
+              <button type="button" className="btn palco-vidro" onClick={aoVoltarAEditar}>
+                ✎ voltar a editar
+              </button>
+            </>
+          ) : (
           <>
             {quem && (
               <div className="palco-voce palco-vidro">
@@ -260,6 +357,7 @@ export function VisorDaMesa({
               </button>
             )}
           </>
+          )
         }
         ferramentas={ferramentas}
         ativa={uso}
@@ -280,7 +378,27 @@ export function VisorDaMesa({
           enquadrar: () => mapaRef.current?.reenquadrar(),
           rotuloEnquadrar: "Voltar à visão da mesa",
         }}
-        dica={dica}
+        extraEmbaixo={
+          controle ? undefined : (
+            <button
+              type="button"
+              className="palco-ferr pequeno palco-vista"
+              aria-pressed={vistaLigada}
+              title={vistaLigada ? "Vista Mestre ligada: a tela segue o Mestre" : "Vista Mestre: seguir o que o Mestre mostra"}
+              aria-label="Vista Mestre"
+              onClick={alternarVista}
+            >
+              👁
+            </button>
+          )
+        }
+        dica={
+          controle
+            ? "O que você mostra aqui vai pra todo telão e celular com a Vista Mestre ligada. Toque num ícone pra focar o jogador."
+            : seguindoMestre
+              ? "Vista Mestre: a tela segue o Mestre. Toque no 👁 pra voltar à sua."
+              : dica
+        }
       />
       <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} />
       <LuzesNaMesa itens={luzesDaMesa} />
@@ -365,7 +483,29 @@ export function PainelMapa({
     );
   }
 
-  return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
+  return <MapaDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
+}
+
+/** O Mestre alterna entre editar o mapa e conduzir a Vista Mestre (controle remoto da câmera da mesa). */
+function MapaDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: string; quem: QuemPinga | null; sala: Sala }) {
+  const [conduzindo, setConduzindo] = useState(false);
+  const naMesa = cenas.naMesa;
+  if (conduzindo && naMesa) {
+    return (
+      <section className="combat" aria-label="Conduzir a vista da mesa">
+        <VisorDaMesa
+          cena={naMesa}
+          codigo={codigo}
+          urlDaImagem={cenas.urlDaImagem}
+          sala={sala}
+          quem={quem}
+          controle
+          aoVoltarAEditar={() => setConduzindo(false)}
+        />
+      </section>
+    );
+  }
+  return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} aoConduzir={naMesa ? () => setConduzindo(true) : undefined} />;
 }
 
 type Uso = "mover" | "nevoa" | "medir" | "desenhar" | "peoes" | "luz" | "armadilhas" | "paredes" | "grade" | "ping" | "mesa";
@@ -383,7 +523,20 @@ const ROTULO_DO_USO: Record<Exclude<Uso, "ping" | "mesa">, FerramentaDoPalco> = 
   grade: { id: "grade", rotulo: "Cena e grade", icone: "grade" },
 };
 
-function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: string; quem: QuemPinga | null; sala: Sala }) {
+function EditorDoMestre({
+  cenas,
+  codigo,
+  quem,
+  sala,
+  aoConduzir,
+}: {
+  cenas: Cenas;
+  codigo: string;
+  quem: QuemPinga | null;
+  sala: Sala;
+  /** Abre o controle da Vista Mestre (só com mapa na mesa). */
+  aoConduzir?: () => void;
+}) {
   const [escolhida, setEscolhida] = useState<string | null>(null);
   const cena = cenas.cenas.find((c) => c.id === escolhida) ?? cenas.naMesa ?? cenas.cenas[0] ?? null;
 
@@ -846,7 +999,7 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                 nome={cena.nome || "Sem nome"}
                 estado={cena.na_mesa ? "Na mesa" : "Em preparo"}
                 estadoLigado={cena.na_mesa}
-                cantoAlto={!cena.na_mesa}
+                cantoAlto={!cena.na_mesa || Boolean(cena.na_mesa && aoConduzir)}
                 canto={
                   <>
                     <div className="palco-modo palco-vidro" role="group" aria-label="Modo">
@@ -860,6 +1013,11 @@ function EditorDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: s
                     {!cena.na_mesa && (
                       <button type="button" className="btn primary" onClick={() => void cenas.mandarParaMesa(cena.id)}>
                         levar a mesa pra este mapa
+                      </button>
+                    )}
+                    {cena.na_mesa && aoConduzir && (
+                      <button type="button" className="btn palco-vidro" onClick={aoConduzir} title="Controlar o que o telão e a Vista Mestre mostram">
+                        📺 conduzir a mesa
                       </button>
                     )}
                   </>
