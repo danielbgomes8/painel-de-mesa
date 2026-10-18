@@ -10,6 +10,9 @@ import {
   escalaMinima,
   gradePxParaQuadrados,
   limitarVista,
+  misturarVistas,
+  QUADRADOS_NO_FOCO,
+  regiaoDeFoco,
   mapaParaTela,
   nomeDaCenaPeloArquivo,
   normalizarCena,
@@ -314,5 +317,31 @@ describe("alinhar a grade arrastando", () => {
     expect(ajustarLadoDaGrade(70.1, -1)).toBe(69.1);
     expect(ajustarLadoDaGrade(8.05, -1)).toBe(8);
     expect(ajustarLadoDaGrade(1999.95, 1)).toBe(2000);
+  });
+});
+
+describe("foco do telão num peão", () => {
+  const cena = { largura: 3000, altura: 2000, grade_ligada: true, grade_px: 50 };
+
+  it("enquadra um quadrado de QUADRADOS_NO_FOCO casas centrado no peão", () => {
+    const r = regiaoDeFoco(cena, 1000, 800);
+    expect(r).toEqual({ x: 1000 - 300, y: 800 - 300, w: 600, h: 600 });
+    expect(r.w / cena.grade_px).toBe(QUADRADOS_NO_FOCO);
+  });
+
+  it("sem grade usável, usa um terço do lado menor do mapa", () => {
+    const r = regiaoDeFoco({ ...cena, grade_ligada: false }, 1500, 1000);
+    expect(r.w).toBeCloseTo(2000 / 3);
+    expect(r.x + r.w / 2).toBe(1500);
+    expect(r.y + r.h / 2).toBe(1000);
+  });
+
+  it("misturarVistas vai de uma vista à outra e não passa dos extremos", () => {
+    const a = { escala: 1, tx: 0, ty: 0 };
+    const b = { escala: 3, tx: -200, ty: 100 };
+    expect(misturarVistas(a, b, 0)).toEqual(a);
+    expect(misturarVistas(a, b, 1)).toEqual(b);
+    expect(misturarVistas(a, b, 0.5)).toEqual({ escala: 2, tx: -100, ty: 50 });
+    expect(misturarVistas(a, b, 2)).toEqual(b);
   });
 });
