@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { PecaNaTela } from "@/lib/pecas";
 import type { Personagem } from "@/lib/tipos";
 import { pvExibidoIniciativa } from "@/lib/regras";
@@ -46,10 +47,24 @@ export function FocoDoTelao({
   vistaMestre?: { ligada: boolean; aoAlternar: () => void };
   lado?: "esquerda" | "direita";
 }) {
+  // Recolhido, sobra só o botão de abrir (e a Vista Mestre, que muda o que a tela mostra).
+  const [aberto, setAberto] = useState(true);
   if (itens.length === 0 && !vistaMestre) return null;
   return (
     <nav className={`telao-foco telao-foco--${lado}`} aria-label="Focar num jogador">
-      {itens.map(({ peca }) => (
+      {itens.length > 0 && (
+        <button
+          type="button"
+          className="telao-foco-item telao-foco-recolher"
+          aria-expanded={aberto}
+          aria-label={aberto ? "Recolher os jogadores" : "Mostrar os jogadores"}
+          title={aberto ? "Recolher" : "Jogadores"}
+          onClick={() => setAberto((a) => !a)}
+        >
+          {aberto ? "▴" : `👥 ${itens.length}`}
+        </button>
+      )}
+      {aberto && itens.map(({ peca }) => (
         <button
           key={peca.id}
           type="button"
@@ -62,7 +77,7 @@ export function FocoDoTelao({
           <IconeDoPeao peca={peca} />
         </button>
       ))}
-      {aoVoltar && (
+      {aberto && aoVoltar && (
         <button type="button" className="telao-foco-item" onClick={aoVoltar} title="Voltar à visão da mesa" aria-label="Voltar à visão da mesa">
           ⤢
         </button>
