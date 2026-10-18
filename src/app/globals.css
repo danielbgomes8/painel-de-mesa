@@ -3878,6 +3878,10 @@ input.fj-score:focus-visible {
     font-size: 12px;
     padding: 3px 8px;
   }
+  /* Só o olho: com o texto, o botão passava por baixo do card da vez. */
+  .telao-foco-vista-texto {
+    display: none;
+  }
   /* O cartão do foco desce pro canto de baixo, pequeno: o mapa continua sendo o principal. */
   .foco-cartao {
     gap: 8px;

@@ -90,7 +90,7 @@ export function FocoDoTelao({
           onClick={vistaMestre.aoAlternar}
           title={vistaMestre.ligada ? "Vista Mestre ligada: a tela segue o Mestre" : "Ligar a Vista Mestre: a tela segue o Mestre"}
         >
-          👁 Mestre
+          👁<span className="telao-foco-vista-texto"> Mestre</span>
         </button>
       )}
     </nav>
