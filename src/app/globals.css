@@ -3833,10 +3833,6 @@ input.fj-score:focus-visible {
   font-size: 13px;
   color: rgba(245, 240, 230, 0.7);
 }
-.foco-cartao-pv {
-  font-family: ui-monospace, monospace;
-  font-size: clamp(15px, 1.4vw, 20px);
-}
 .foco-cartao-vez {
   font-size: 12px;
   letter-spacing: 0.08em;
@@ -3915,9 +3911,82 @@ input.fj-score:focus-visible {
   .foco-cartao-classe {
     display: none;
   }
-  .foco-cartao-pv {
-    font-size: 14px;
+  .barra-pv-trilho {
+    width: 64px;
+    height: 8px;
   }
+}
+/* Barra de PV do telão (BarraDePv): moldura dourada fina, trilho escuro com marcas
+   a cada 10% e o enchimento na cor da faixa, com brilho em cima — cara de RPG sem
+   sair da paleta. Fundo e cores fixos: fica sempre sobre o vidro escuro do telão. */
+.barra-pv {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.barra-pv-trilho {
+  position: relative;
+  flex: none;
+  width: clamp(84px, 9vw, 140px);
+  height: 10px;
+  padding: 1px;
+  border-radius: 3px;
+  background: #120e0b;
+  border: 1px solid rgba(217, 154, 78, 0.65);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.barra-pv-trilho i {
+  position: absolute;
+  inset: 1px;
+  border-radius: 2px;
+  transform-origin: left;
+  transition: transform 0.35s ease-out, background-color 0.35s;
+  background-color: #6f9a63;
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.25));
+}
+/* As marcas a cada 10%, por cima do enchimento. */
+.barra-pv-trilho::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  background: repeating-linear-gradient(to right, transparent 0, transparent calc(10% - 1px), rgba(0, 0, 0, 0.45) calc(10% - 1px), rgba(0, 0, 0, 0.45) 10%);
+  pointer-events: none;
+}
+.barra-pv--baixo .barra-pv-trilho i {
+  background-color: #c98a3a;
+}
+.barra-pv--critico .barra-pv-trilho i {
+  background-color: #b8483d;
+}
+.barra-pv--critico .barra-pv-trilho {
+  border-color: rgba(184, 72, 61, 0.85);
+  animation: barra-pv-pulso 1.6s ease-in-out infinite;
+}
+@keyframes barra-pv-pulso {
+  50% {
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.8),
+      0 0 6px rgba(184, 72, 61, 0.7);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .barra-pv--critico .barra-pv-trilho {
+    animation: none;
+  }
+}
+.barra-pv-num {
+  font-family: var(--f-mono);
+  font-size: clamp(13px, 1.3vw, 18px);
+  color: #f5f0e6;
+  white-space: nowrap;
+}
+.barra-pv-num small {
+  font-size: 0.75em;
+  color: rgba(245, 240, 230, 0.6);
 }
 .palco-vista[aria-pressed="true"] {
   color: var(--accent);

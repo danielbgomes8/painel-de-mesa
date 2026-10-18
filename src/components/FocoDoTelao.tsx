@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { PecaNaTela } from "@/lib/pecas";
 import type { Personagem } from "@/lib/tipos";
 import { pvExibidoIniciativa } from "@/lib/regras";
+import { BarraDePv } from "@/components/BarraDePv";
 
 /** Um peão de jogador no HUD, com a ficha dele (pro PV do cartão), se houver. */
 export type ItemDoFoco = { peca: PecaNaTela; ficha: Personagem | null };
@@ -116,11 +117,7 @@ export function CartaoDoFoco({
       <div className="foco-cartao-texto">
         <b>{nome}</b>
         {ficha?.cls && <span className="foco-cartao-classe">{ficha.cls}</span>}
-        {pv && (
-          <span className="foco-cartao-pv">
-            {pv.hp} / {pv.hp_max} PV
-          </span>
-        )}
+        {pv && <BarraDePv hp={pv.hp} hpMax={pv.hp_max} />}
         {peca.vez && <span className="foco-cartao-vez">na vez</span>}
       </div>
       {aoFechar && (

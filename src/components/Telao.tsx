@@ -6,6 +6,7 @@ import type { Tempo } from "@/hooks/useTempo";
 import { diasRestantes, efeitosPertoDeVencer, rotuloCurtoDoDia, textoDoRestante } from "@/lib/tempoCampanha";
 import type { Cenas } from "@/hooks/useCenas";
 import { VisorDaMesa } from "@/components/MapaSobDemanda";
+import { BarraDePv } from "@/components/BarraDePv";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import { nomeDoDono } from "@/lib/companheiros";
@@ -115,11 +116,7 @@ export function Telao({
                 <span className="telao-card-rotulo">vez de</span>
                 <b className="telao-card-nome">{nomeExibido}</b>
                 {donoDaVez && <span className="telao-card-pv">🐾 de {donoDaVez}</span>}
-                {pvVisivel && (
-                  <span className="telao-card-pv">
-                    {pvVisivel.hp} / {pvVisivel.hp_max} PV
-                  </span>
-                )}
+                {pvVisivel && <BarraDePv hp={pvVisivel.hp} hpMax={pvVisivel.hp_max} />}
               </div>
             ) : (
               <div className="telao-card-linha">
