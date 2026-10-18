@@ -8,6 +8,8 @@ import { caminhoDaImagem, ehTabelaAusente, gradePxParaQuadrados, normalizarCena,
 
 const BUCKET = "mapas";
 const AVISO_NAO_SALVOU = "Não salvou. Confira a conexão e tente de novo.";
+/** De quanto em quanto tempo tenta ler os mapas de novo depois de uma falha. */
+const INTERVALO_TENTATIVA_MS = 10_000;
 
 export type ResultadoCriarCena = { ok: true; cena: Cena } | { ok: false; erro: string };
 
@@ -50,7 +52,13 @@ export function useCenas(codigo: string): Cenas {
     let vivo = true;
     let canal: ReturnType<typeof supabase.channel> | null = null;
 
-    // Devolve false quando não dá pra seguir (sem tabela ou erro de leitura).
+    // Se a última leitura falhou (internet instável, banco acordando), o
+    // relógio lá embaixo tenta de novo. Antes, uma falha na PRIMEIRA leitura
+    // deixava o telão sem mapa até alguém recarregar a página: nem o canal de
+    // tempo real nem os avisos de "voltou" chegavam a ser ligados.
+    let falhou = false;
+
+    // Devolve false só quando as tabelas de mapa não existem — aí não há o que esperar.
     async function carregar(): Promise<boolean> {
       const { data, error } = await supabase
         .from("cenas")
@@ -59,11 +67,16 @@ export function useCenas(codigo: string): Cenas {
         .order("created_at", { ascending: true });
       if (!vivo) return false;
       if (error) {
-        if (ehTabelaAusente(error)) setIndisponivel(true);
-        else relatarErro("lerCenas", error);
         setCarregando(false);
-        return false;
+        if (ehTabelaAusente(error)) {
+          setIndisponivel(true);
+          return false;
+        }
+        relatarErro("lerCenas", error);
+        falhou = true;
+        return true;
       }
+      falhou = false;
       setIndisponivel(false);
       setCenas((data ?? []).map(normalizarCena).filter((c): c is Cena => c !== null));
       setCarregando(false);
@@ -103,8 +116,15 @@ export function useCenas(codigo: string): Cenas {
         });
     });
 
+    // Mesmo ritmo do useSala: "conectado no wi-fi" sem internet não dispara
+    // o aviso de "online", e o telão fica com a tela sempre visível.
+    const relogio = window.setInterval(() => {
+      if (falhou && navigator.onLine !== false) void carregar();
+    }, INTERVALO_TENTATIVA_MS);
+
     return () => {
       vivo = false;
+      window.clearInterval(relogio);
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
