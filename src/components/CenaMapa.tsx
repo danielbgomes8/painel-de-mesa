@@ -563,6 +563,24 @@ export function CenaMapa({
     [pedirQuadro],
   );
 
+  /** Pedido de foco que chegou antes de a tela ter tamanho (o "seguir a vez" ao abrir). */
+  const focoPendenteRef = useRef<Ponto | null>(null);
+  const focar = useCallback(
+    (x: number, y: number) => {
+      const { w, h } = tamanhoRef.current;
+      const c = propsRef.current.cena;
+      if (w === 0 || h === 0 || c.largura <= 0) {
+        focoPendenteRef.current = [x, y];
+        return;
+      }
+      focoPendenteRef.current = null;
+      const alvo = enquadrar(regiaoDeFoco(c, x, y), w, h, 0);
+      tocouRef.current = true;
+      deslizarPara(limitarVista({ ...alvo, escala: Math.min(ZOOM_MAXIMO, Math.max(escalaMinima(c, w, h), alvo.escala)) }, c, w, h));
+    },
+    [deslizarPara],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -585,14 +603,7 @@ export function CenaMapa({
         const { w, h } = tamanhoRef.current;
         return w === 0 ? null : regiaoVisivel(vistaRef.current, w, h);
       },
-      focar: (x, y) => {
-        const { w, h } = tamanhoRef.current;
-        const c = propsRef.current.cena;
-        if (w === 0 || c.largura <= 0) return;
-        const alvo = enquadrar(regiaoDeFoco(c, x, y), w, h, 0);
-        tocouRef.current = true;
-        deslizarPara(limitarVista({ ...alvo, escala: Math.min(ZOOM_MAXIMO, Math.max(escalaMinima(c, w, h), alvo.escala)) }, c, w, h));
-      },
+      focar,
       aproximar: (fator) => {
         const { w, h } = tamanhoRef.current;
         const c = propsRef.current.cena;
@@ -603,7 +614,7 @@ export function CenaMapa({
         pedirQuadro();
       },
     }),
-    [pedirQuadro, aplicarEnquadre, recomporNevoa, deslizarPara],
+    [pedirQuadro, aplicarEnquadre, recomporNevoa, focar],
   );
 
   // Vista Mestre: segue o pedaço que o Mestre mostra; ao desligar, volta à vista
@@ -731,6 +742,8 @@ export function CenaMapa({
         vistaRef.current = limitarVista(vistaRef.current, propsRef.current.cena, w, h);
         pedirQuadro();
       }
+      const pendente = focoPendenteRef.current;
+      if (pendente && w > 0 && h > 0) focar(pendente[0], pendente[1]);
     };
     medir();
     const obs = new ResizeObserver(medir);
@@ -740,7 +753,7 @@ export function CenaMapa({
       if (quadroRef.current) cancelAnimationFrame(quadroRef.current);
       quadroRef.current = 0;
     };
-  }, [aplicarEnquadre, pedirQuadro]);
+  }, [aplicarEnquadre, pedirQuadro, focar]);
 
   // Cena nova, ou câmera nova do Mestre: reenquadra.
   const chaveCamera = cena.camera ? `${cena.camera.x},${cena.camera.y},${cena.camera.w},${cena.camera.h}` : "tudo";
