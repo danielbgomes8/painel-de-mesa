@@ -385,6 +385,32 @@ export function limitarVista(v: Vista, c: Pick<Cena, "largura" | "altura">, larg
   return { escala: v.escala, tx, ty };
 }
 
+/** Quantos quadradinhos cabem no lado menor da tela quando o telão foca um
+ *  peão: perto o bastante pra ver quem está em volta, sem perder o contexto. */
+export const QUADRADOS_NO_FOCO = 12;
+
+/** O pedaço do mapa (em px da imagem) que o foco num ponto enquadra. Sem grade
+ *  usável, um terço do lado menor do mapa. */
+export function regiaoDeFoco(
+  c: Pick<Cena, "largura" | "altura" | "grade_ligada" | "grade_px">,
+  x: number,
+  y: number,
+  quadrados = QUADRADOS_NO_FOCO,
+): Regiao {
+  const lado = gradeUsavel(c) ? c.grade_px * quadrados : Math.min(c.largura, c.altura) / 3;
+  return { x: x - lado / 2, y: y - lado / 2, w: lado, h: lado };
+}
+
+/** Caminho entre duas vistas (t de 0 a 1), pro mapa deslizar até o foco em vez de pular. */
+export function misturarVistas(a: Vista, b: Vista, t: number): Vista {
+  const k = Math.min(1, Math.max(0, t));
+  return {
+    escala: a.escala + (b.escala - a.escala) * k,
+    tx: a.tx + (b.tx - a.tx) * k,
+    ty: a.ty + (b.ty - a.ty) * k,
+  };
+}
+
 export function regioesIguais(a: Regiao | null, b: Regiao | null): boolean {
   if (!a || !b) return a === b;
   return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;

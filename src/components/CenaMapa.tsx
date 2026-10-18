@@ -8,7 +8,9 @@ import {
   escalaMinima,
   gradeUsavel,
   limitarVista,
+  misturarVistas,
   raioDoPincel,
+  regiaoDeFoco,
   regiaoVisivel,
   retanguloEntre,
   deslocarGrade,
@@ -107,7 +109,12 @@ export type CenaMapaApi = {
   regiaoVisivel: () => Regiao | null;
   /** Aproxima (fator > 1) ou afasta (< 1) em torno do centro da tela: os botões de zoom. */
   aproximar: (fator: number) => void;
+  /** Desliza até o ponto (px da imagem) com um zoom moderado: o HUD do telão focando um jogador. */
+  focar: (x: number, y: number) => void;
 };
+
+/** Quanto dura o deslize do foco. Curto: quem toca quer ver o peão já. */
+const FOCO_MS = 450;
 
 type Props = {
   cena: Cena;
@@ -116,7 +123,8 @@ type Props = {
   regras: readonly RegraNevoa[];
   /** O Mestre enxerga o mapa através da névoa e pode pintá-la. */
   mestre: boolean;
-  /** Telão: sem toque nem roda do mouse, só mostra. */
+  /** Com toque e roda do mouse. Desligado, o mapa só mostra. (O telão liga: dá
+   *  zoom e arrasta a vista, mas sem `aoMoverPeca`/`aoPingar` não mexe em nada.) */
   interativo?: boolean;
   /** Acompanha a câmera que o Mestre definiu (mesa); o Mestre navega livre. */
   seguirCamera?: boolean;
@@ -271,6 +279,8 @@ export function CenaMapa({
   const tocouRef = useRef(false);
   const dedos = useRef(new Map<number, { x: number; y: number }>());
   const pinca = useRef<Pinca | null>(null);
+  // O deslize do foco em andamento; tocar no mapa ou rolar a roda cancela.
+  const focoRef = useRef(0);
   const pintura = useRef<Pintura | null>(null);
   /** Dedo parado esperando virar ping (toque longo): onde começou e o relógio. */
   const toqueLongo = useRef<{ x: number; y: number; timer: number } | null>(null);
@@ -535,6 +545,30 @@ export function CenaMapa({
         const { w, h } = tamanhoRef.current;
         return w === 0 ? null : regiaoVisivel(vistaRef.current, w, h);
       },
+      focar: (x, y) => {
+        const { w, h } = tamanhoRef.current;
+        const c = propsRef.current.cena;
+        if (w === 0 || c.largura <= 0) return;
+        const de = vistaRef.current;
+        const alvo = enquadrar(regiaoDeFoco(c, x, y), w, h, 0);
+        const para = limitarVista(
+          { ...alvo, escala: Math.min(ZOOM_MAXIMO, Math.max(escalaMinima(c, w, h), alvo.escala)) },
+          c,
+          w,
+          h,
+        );
+        tocouRef.current = true;
+        cancelAnimationFrame(focoRef.current);
+        const inicio = performance.now();
+        const passo = (agora: number) => {
+          const t = (agora - inicio) / FOCO_MS;
+          // Sai rápido e chega devagar (ease-out cúbico).
+          vistaRef.current = misturarVistas(de, para, 1 - Math.pow(1 - Math.min(1, t), 3));
+          pedirQuadro();
+          focoRef.current = t < 1 ? requestAnimationFrame(passo) : 0;
+        };
+        focoRef.current = requestAnimationFrame(passo);
+      },
       aproximar: (fator) => {
         const { w, h } = tamanhoRef.current;
         const c = propsRef.current.cena;
@@ -670,6 +704,12 @@ export function CenaMapa({
     aplicarEnquadre();
   }, [cena.id, cena.largura, cena.altura, chaveCamera, seguirCamera, aplicarEnquadre]);
 
+  // Desmontou no meio do deslize do foco: para o quadro.
+  useEffect(() => {
+    const foco = focoRef;
+    return () => cancelAnimationFrame(foco.current);
+  }, []);
+
   // Roda do mouse (notebook): precisa de ouvinte nativo pra poder impedir a
   // rolagem da página.
   useEffect(() => {
@@ -679,6 +719,7 @@ export function CenaMapa({
       const p = propsRef.current;
       if (!p.interativo) return;
       e.preventDefault();
+      cancelAnimationFrame(focoRef.current);
       const r = canvas.getBoundingClientRect();
       const { w, h } = tamanhoRef.current;
       const v = zoomEm(
@@ -732,6 +773,7 @@ export function CenaMapa({
   function aoPressionar(e: React.PointerEvent) {
     const p = propsRef.current;
     if (!p.interativo) return;
+    cancelAnimationFrame(focoRef.current);
     const pos = posicao(e);
 
     // Shift+clique (notebook): ping na hora, sem arrastar nada.

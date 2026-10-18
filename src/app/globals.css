@@ -3639,6 +3639,63 @@ input.fj-score:focus-visible {
 .mapa-visor--telao {
   position: relative;
 }
+/* HUD do telão (FocoDoTelao): discreto no canto de cima, fica forte só ao tocar. */
+.telao-foco {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+.telao-foco:hover,
+.telao-foco:focus-within {
+  opacity: 1;
+}
+.telao-foco-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 12px 4px 8px;
+  /* Fundo e letra fixos, como as notas do telão: a cor do tema sumia sobre o mapa escuro. */
+  background: rgba(13, 11, 9, 0.78);
+  color: #f5f0e6;
+  border: 1px solid rgba(245, 240, 230, 0.25);
+  border-radius: 999px;
+  font: inherit;
+  font-size: clamp(13px, 1.2vw, 18px);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.telao-foco-item:active {
+  background: rgba(13, 11, 9, 0.95);
+  border-color: rgba(245, 240, 230, 0.6);
+}
+.telao-foco-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.telao-foco-item--vez {
+  border-color: var(--accent);
+}
+.telao-foco-cor {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.telao-foco-mesa {
+  padding-left: 12px;
+  color: rgba(245, 240, 230, 0.75);
+}
 .mapa-notas--telao {
   position: absolute;
   left: 14px;

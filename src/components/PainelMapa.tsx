@@ -1,5 +1,6 @@
 "use client";
 
+import { FocoDoTelao } from "@/components/FocoDoTelao";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Cenas } from "@/hooks/useCenas";
 import type { Sala } from "@/hooks/useSala";
@@ -161,7 +162,6 @@ export function VisorDaMesa({
       imagemUrl={urlDaImagem(cena)}
       regras={nevoa.regras}
       mestre={false}
-      interativo={!telao}
       seguirCamera
       pings={ping.pings}
       aoPingar={quem ? ping.enviar : undefined}
@@ -187,6 +187,11 @@ export function VisorDaMesa({
     return (
       <div className="mapa-visor mapa-visor--telao">
         {mapa}
+        <FocoDoTelao
+          pecas={pecas}
+          aoFocar={(p) => mapaRef.current?.focar(p.x, p.y)}
+          aoVoltar={() => mapaRef.current?.reenquadrar()}
+        />
         <ListaDeNotas marcas={marcasVisiveis(desenhos.marcas, false)} telao />
         <LuzesNaMesa itens={luzesDaMesa} telao />
       </div>
