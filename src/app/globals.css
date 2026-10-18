@@ -2834,11 +2834,6 @@ body:has(.telao) {
   font-size: 13px;
   color: var(--accent);
 }
-.telao-faixa-dia {
-  font-size: 18px;
-  opacity: 0.85;
-  margin-top: 6px;
-}
 .telao-efeitos {
   display: flex;
   flex-wrap: wrap;
@@ -3339,50 +3334,116 @@ input.fj-score:focus-visible {
   border: 0;
   border-radius: 0;
 }
-.telao-faixa {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 32px;
-  padding: 12px 28px;
-  background: var(--surface);
-  border-top: 2px solid var(--line);
+/* A vez no telão com mapa (Telao.tsx): card discreto por cima do mapa, que fica com a tela inteira. */
+.telao--mapa {
+  position: relative;
 }
-.telao-faixa-vez {
+.telao-card {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: max-content;
+  max-width: min(560px, calc(100% - 150px));
+  padding: 6px 14px 6px 6px;
+  /* Fundo e letra fixos, como as notas do telão: a cor do tema sumia sobre o mapa escuro. */
+  background: rgba(13, 11, 9, 0.78);
+  color: #f5f0e6;
+  border: 1px solid rgba(245, 240, 230, 0.22);
+  border-radius: 14px;
+  backdrop-filter: blur(4px);
+}
+.telao-card-alternar {
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+  background: transparent;
+  border: 0;
+  color: rgba(245, 240, 230, 0.6);
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.telao-card-alternar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.telao-card-corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.telao-card-linha {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 2px 10px;
 }
-.telao-faixa-rotulo {
-  font-size: clamp(16px, 1.8vw, 24px);
-  color: var(--muted);
+.telao-card-rotulo {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(245, 240, 230, 0.6);
 }
-.telao-faixa-nome {
+.telao-card-nome {
   font-family: var(--f-display);
-  font-weight: 700;
-  font-size: clamp(28px, 4.6vw, 60px);
+  font-size: clamp(17px, 2vw, 28px);
+  line-height: 1.15;
   color: var(--accent);
-  line-height: 1.1;
 }
-.telao-faixa-pv {
+.telao-card-nome--calmo {
+  font-size: clamp(15px, 1.5vw, 20px);
+  color: #f5f0e6;
+}
+.telao-card-pv {
   font-family: var(--f-mono);
-  font-size: clamp(18px, 2.2vw, 30px);
-  color: var(--ink);
+  font-size: clamp(13px, 1.3vw, 18px);
 }
-.telao-faixa-prox {
-  font-family: var(--f-display);
-  font-size: clamp(16px, 2.2vw, 28px);
-  color: var(--muted);
+.telao-card-cond {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
-.telao-cond--faixa {
-  justify-content: flex-start;
+.telao-card-cond span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(245, 240, 230, 0.12);
+  font-size: 12px;
 }
-.telao--mapa .telao-aviso {
-  flex-basis: 100%;
-  margin: 0;
-  max-width: none;
+.telao-card-prox,
+.telao-card-dia {
+  font-size: clamp(12px, 1.1vw, 15px);
+  color: rgba(245, 240, 230, 0.75);
+}
+.telao-card .telao-aviso {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: rgba(245, 240, 230, 0.55);
+}
+/* Os relógios ficam no canto de cima à direita: descem pra não brigar com o card. */
+.telao--mapa ~ .rel-faixa--telao {
+  top: 84px;
+}
+@media (max-width: 640px) {
+  /* Celular/tablet estreito: o card encosta no HUD (à esquerda) e ocupa só o que sobra. */
+  .telao-card {
+    top: 8px;
+    left: 58px;
+    right: 8px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    padding-right: 10px;
+  }
+  .telao-card-nome {
+    font-size: 17px;
+  }
 }
 
 /* Bolinha com a cor de ping de quem está olhando (ver lib/ping.ts). */
@@ -3639,62 +3700,297 @@ input.fj-score:focus-visible {
 .mapa-visor--telao {
   position: relative;
 }
-/* HUD do telão (FocoDoTelao): discreto no canto de cima, fica forte só ao tocar. */
+/* HUD (FocoDoTelao): coluna discreta só com os ícones dos peões; fica forte ao tocar. */
 .telao-foco {
   position: absolute;
   top: 14px;
-  left: 14px;
   z-index: 4;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   max-height: calc(100% - 28px);
   overflow-y: auto;
-  opacity: 0.55;
+  opacity: 0.6;
   transition: opacity 0.2s;
+}
+.telao-foco--esquerda {
+  left: 14px;
+}
+/* No controle do Mestre o canto de cima à direita tem os botões do palco. */
+.telao-foco--direita {
+  right: 10px;
+  top: 112px;
+  max-height: calc(100% - 180px);
 }
 .telao-foco:hover,
 .telao-foco:focus-within {
   opacity: 1;
 }
+.telao-foco-peao,
 .telao-foco-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 4px 12px 4px 8px;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 3px;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.telao-foco-peao[aria-pressed="true"] .foco-icone {
+  box-shadow: 0 0 0 3px rgba(245, 240, 230, 0.9);
+}
+.telao-foco-item {
+  padding: 4px 10px;
   /* Fundo e letra fixos, como as notas do telão: a cor do tema sumia sobre o mapa escuro. */
   background: rgba(13, 11, 9, 0.78);
   color: #f5f0e6;
   border: 1px solid rgba(245, 240, 230, 0.25);
-  border-radius: 999px;
   font: inherit;
-  font-size: clamp(13px, 1.2vw, 18px);
-  cursor: pointer;
-  touch-action: manipulation;
+  font-size: clamp(13px, 1.1vw, 16px);
+  white-space: nowrap;
 }
-.telao-foco-item:active {
-  background: rgba(13, 11, 9, 0.95);
-  border-color: rgba(245, 240, 230, 0.6);
+.telao-foco-recolher {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 2px 8px;
+  font-size: 12px;
 }
-.telao-foco-item:focus-visible {
+.telao-foco-vista[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.telao-foco-peao:focus-visible,
+.telao-foco-item:focus-visible,
+.foco-cartao-fechar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.telao-foco-item--vez {
-  border-color: var(--accent);
-}
-.telao-foco-cor {
-  width: 12px;
-  height: 12px;
+/* O peão em miniatura, igual ao do mapa (desenharCena): cor, borda branca, letras com contorno escuro. */
+.foco-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
+  border: 2px solid #fff;
+  color: #fff;
+  font: 700 13px/1 system-ui, sans-serif;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 1px rgba(0, 0, 0, 0.9);
   flex: none;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
-.telao-foco-mesa {
-  padding-left: 12px;
-  color: rgba(245, 240, 230, 0.75);
+.foco-icone--vez {
+  outline: 3px solid #f0c24b;
+  outline-offset: 2px;
+}
+.foco-icone--grande {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+  border-width: 3px;
+}
+/* O cartão do peão em foco, do outro lado do HUD. */
+.foco-cartao {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(360px, calc(100% - 140px));
+  padding: 10px 14px;
+  background: rgba(13, 11, 9, 0.85);
+  color: #f5f0e6;
+  border: 1px solid rgba(245, 240, 230, 0.3);
+  border-radius: 14px;
+}
+.foco-cartao--direita {
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.foco-cartao--esquerda {
+  left: 68px;
+  bottom: 12px;
+}
+.foco-cartao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.foco-cartao-texto b {
+  font-size: clamp(16px, 1.6vw, 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foco-cartao-classe {
+  font-size: 13px;
+  color: rgba(245, 240, 230, 0.7);
+}
+.foco-cartao-vez {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f0c24b;
+}
+.foco-cartao-fechar {
+  align-self: flex-start;
+  min-width: 32px;
+  min-height: 32px;
+  margin: -4px -6px 0 4px;
+  background: transparent;
+  border: 0;
+  color: rgba(245, 240, 230, 0.7);
+  font-size: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+@media (max-width: 640px) {
+  .telao-foco {
+    top: 8px;
+    gap: 2px;
+    opacity: 0.75;
+  }
+  .telao-foco--esquerda {
+    left: 6px;
+  }
+  /* No controle do Mestre: abaixo dos botões do canto (seguir a vez, voltar a editar). */
+  .telao-foco--direita {
+    top: 100px;
+    max-height: calc(100% - 170px);
+  }
+  .telao-foco-peao {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 2px;
+  }
+  .foco-icone {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+  .telao-foco-item {
+    font-size: 12px;
+    padding: 3px 8px;
+  }
+  /* Só o olho: com o texto, o botão passava por baixo do card da vez. */
+  .telao-foco-vista-texto {
+    display: none;
+  }
+  /* O cartão do foco desce pro canto de baixo, pequeno: o mapa continua sendo o principal. */
+  .foco-cartao {
+    gap: 8px;
+    padding: 6px 10px;
+    max-width: calc(100% - 70px);
+  }
+  .foco-cartao--direita {
+    top: auto;
+    bottom: 10px;
+    right: 8px;
+    transform: none;
+  }
+  .foco-cartao--esquerda {
+    left: 8px;
+    bottom: 64px;
+  }
+  .foco-icone--grande {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    border-width: 2px;
+  }
+  .foco-cartao-texto b {
+    font-size: 15px;
+  }
+  .foco-cartao-classe {
+    display: none;
+  }
+  .barra-pv-trilho {
+    width: 64px;
+    height: 8px;
+  }
+}
+/* Barra de PV do telão (BarraDePv): moldura dourada fina, trilho escuro com marcas
+   a cada 10% e o enchimento na cor da faixa, com brilho em cima — cara de RPG sem
+   sair da paleta. Fundo e cores fixos: fica sempre sobre o vidro escuro do telão. */
+.barra-pv {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.barra-pv-trilho {
+  position: relative;
+  flex: none;
+  width: clamp(84px, 9vw, 140px);
+  height: 10px;
+  padding: 1px;
+  border-radius: 3px;
+  background: #120e0b;
+  border: 1px solid rgba(217, 154, 78, 0.65);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.barra-pv-trilho i {
+  position: absolute;
+  inset: 1px;
+  border-radius: 2px;
+  transform-origin: left;
+  transition: transform 0.35s ease-out, background-color 0.35s;
+  background-color: #6f9a63;
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.25));
+}
+/* As marcas a cada 10%, por cima do enchimento. */
+.barra-pv-trilho::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  background: repeating-linear-gradient(to right, transparent 0, transparent calc(10% - 1px), rgba(0, 0, 0, 0.45) calc(10% - 1px), rgba(0, 0, 0, 0.45) 10%);
+  pointer-events: none;
+}
+.barra-pv--baixo .barra-pv-trilho i {
+  background-color: #c98a3a;
+}
+.barra-pv--critico .barra-pv-trilho i {
+  background-color: #b8483d;
+}
+.barra-pv--critico .barra-pv-trilho {
+  border-color: rgba(184, 72, 61, 0.85);
+  animation: barra-pv-pulso 1.6s ease-in-out infinite;
+}
+@keyframes barra-pv-pulso {
+  50% {
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.8),
+      0 0 6px rgba(184, 72, 61, 0.7);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .barra-pv--critico .barra-pv-trilho {
+    animation: none;
+  }
+}
+.barra-pv-num {
+  font-family: var(--f-mono);
+  font-size: clamp(13px, 1.3vw, 18px);
+  color: #f5f0e6;
+  white-space: nowrap;
+}
+.barra-pv-num small {
+  font-size: 0.75em;
+  color: rgba(245, 240, 230, 0.6);
+}
+.palco-vista[aria-pressed="true"] {
+  color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 .mapa-notas--telao {
   position: absolute;

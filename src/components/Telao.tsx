@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Tempo } from "@/hooks/useTempo";
 import { diasRestantes, efeitosPertoDeVencer, rotuloCurtoDoDia, textoDoRestante } from "@/lib/tempoCampanha";
 import type { Cenas } from "@/hooks/useCenas";
 import { VisorDaMesa } from "@/components/MapaSobDemanda";
+import { BarraDePv } from "@/components/BarraDePv";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
 import { nomeDoDono } from "@/lib/companheiros";
@@ -44,6 +46,8 @@ export function Telao({
   // Ninguém mexe no aparelho do telão: sem isto a tela apaga (ou o notebook
   // entra em descanso) no meio do combate.
   const tela = useTelaAcesa();
+  // Com mapa, a vez é um card por cima dele: tocar recolhe pra só a linha da vez.
+  const [cardRecolhido, setCardRecolhido] = useState(false);
   const atual = combate.order[combate.turn];
   const pv = atual ? personagens.find((p) => p.slug === atual.slug) ?? null : null;
   const contagensNpc = numerarNpcsNaOrdem(
@@ -95,48 +99,58 @@ export function Telao({
         <div className="telao-mapa">
           <VisorDaMesa cena={cenas.naMesa} codigo={codigo} urlDaImagem={cenas.urlDaImagem} sala={sala} telao />
         </div>
-        <div className="telao-faixa">
-          {atual ? (
-            <>
-              <div className="telao-faixa-vez">
-                <span className="telao-faixa-rotulo">vez de</span>
-                <span className="telao-faixa-nome">{nomeExibido}</span>
-                {donoDaVez && <span className="telao-faixa-pv">🐾 de {donoDaVez}</span>}
-                {pvVisivel && (
-                  <span className="telao-faixa-pv">
-                    {pvVisivel.hp} / {pvVisivel.hp_max} PV
-                  </span>
-                )}
+        {/* O mapa é o principal: a vez fica num card discreto por cima, nunca numa faixa que rouba altura. */}
+        <section className={`telao-card${cardRecolhido ? " telao-card--recolhido" : ""}`} aria-label="Vez">
+          <button
+            type="button"
+            className="telao-card-alternar"
+            aria-expanded={!cardRecolhido}
+            aria-label={cardRecolhido ? "Mostrar os detalhes da vez" : "Recolher os detalhes da vez"}
+            onClick={() => setCardRecolhido((r) => !r)}
+          >
+            {cardRecolhido ? "▸" : "▾"}
+          </button>
+          <div className="telao-card-corpo">
+            {atual ? (
+              <div className="telao-card-linha">
+                <span className="telao-card-rotulo">vez de</span>
+                <b className="telao-card-nome">{nomeExibido}</b>
+                {donoDaVez && <span className="telao-card-pv">🐾 de {donoDaVez}</span>}
+                {pvVisivel && <BarraDePv hp={pvVisivel.hp} hpMax={pvVisivel.hp_max} />}
               </div>
-              {etiquetas.length > 0 && (
-                <div className="telao-cond telao-cond--faixa">
-                  {etiquetas.map((e) => (
-                    <span key={e}>{e}</span>
-                  ))}
-                </div>
-              )}
-              {proximos.length > 0 && (
-                <div className="telao-faixa-prox">
-                  <span className="telao-proximos-rotulo">a seguir</span> {proximos.map((p) => p.nome).join(" · ")}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="telao-faixa-vez">
-              <span className="telao-faixa-rotulo">{rotulo}</span>
-              <span className="telao-faixa-nome">Sem combate no momento</span>
-            </div>
-          )}
-          {diaDaCampanha && (
-            <div className="telao-faixa-dia">
-              🗓 {diaDaCampanha}
-              {vencendo.map((e) => (
-                <span key={e.id}> · ⏳ {e.nome}: {textoDoRestante(diasRestantes(e, hoje!.dia))}</span>
-              ))}
-            </div>
-          )}
-          {aviso}
-        </div>
+            ) : (
+              <div className="telao-card-linha">
+                <span className="telao-card-rotulo">{rotulo}</span>
+                <b className="telao-card-nome telao-card-nome--calmo">Sem combate no momento</b>
+              </div>
+            )}
+            {!cardRecolhido && (
+              <>
+                {atual && etiquetas.length > 0 && (
+                  <div className="telao-card-cond">
+                    {etiquetas.map((e) => (
+                      <span key={e}>{e}</span>
+                    ))}
+                  </div>
+                )}
+                {atual && proximos.length > 0 && (
+                  <div className="telao-card-prox">
+                    <span className="telao-card-rotulo">a seguir</span> {proximos.map((p) => p.nome).join(" · ")}
+                  </div>
+                )}
+                {diaDaCampanha && (
+                  <div className="telao-card-dia">
+                    🗓 {diaDaCampanha}
+                    {vencendo.map((e) => (
+                      <span key={e.id}> · ⏳ {e.nome}: {textoDoRestante(diasRestantes(e, hoje!.dia))}</span>
+                    ))}
+                  </div>
+                )}
+                {aviso}
+              </>
+            )}
+          </div>
+        </section>
       </div>
     );
   }
