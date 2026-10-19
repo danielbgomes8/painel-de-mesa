@@ -159,6 +159,85 @@ function atualizarEspacos(
   };
 }
 
+/**
+ * Recursos de classe que crescem com o nível (Fúria, Pontos de Foco, Mãos Consagradas...).
+ * Valores conferidos na tabela de cada classe do SRD 5.2 (open5e, srd-2024) em 19/10/2026:
+ * `usos` lista [nível em que o valor passa a valer, valor]; `porNivel` é "valor × nível da
+ * classe". Antes só os espaços de magia subiam: a pessoa esquecia de aumentar a Fúria e saía
+ * do nível com o contador velho. A Forma Selvagem do Druida fica de fora (a fonte não traz a
+ * tabela de usos).
+ */
+type RegraRecurso = {
+  /** Nome pra criar quando a habilidade nasce neste nível. */
+  nome: string;
+  /** Trecho do nome (sem acento, minúsculo) que acha o contador que a pessoa já tem. */
+  chave: string;
+  inicio: number;
+  usos?: [number, number][];
+  porNivel?: number;
+  /** Volta inteiro no descanso curto (Pontos de Foco). */
+  descansoCurto?: boolean;
+};
+
+export const RECURSOS_DE_CLASSE: Partial<Record<ClasseBase, RegraRecurso[]>> = {
+  barbaro: [{ nome: "Fúria", chave: "furia", inicio: 1, usos: [[1, 2], [3, 3], [6, 4], [12, 5], [17, 6]] }],
+  clerigo: [{ nome: "Canalizar Divindade", chave: "canalizar divindade", inicio: 2, usos: [[2, 2], [6, 3], [18, 4]] }],
+  guerreiro: [{ nome: "Segundo Fôlego", chave: "segundo folego", inicio: 1, usos: [[1, 2], [4, 3], [10, 4]] }],
+  monge: [{ nome: "Pontos de Foco", chave: "foco", inicio: 2, porNivel: 1, descansoCurto: true }],
+  feiticeiro: [{ nome: "Pontos de Feitiçaria", chave: "feiticaria", inicio: 2, porNivel: 1 }],
+  paladino: [
+    { nome: "Mãos Consagradas (pontos)", chave: "maos consagradas", inicio: 1, porNivel: 5 },
+    { nome: "Canalizar Divindade", chave: "canalizar divindade", inicio: 3, usos: [[3, 2], [11, 3]] },
+  ],
+};
+
+const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+export function maximoDoRecurso(regra: RegraRecurso, nivelDaClasse: number): number {
+  if (nivelDaClasse < regra.inicio) return 0;
+  if (regra.porNivel) return regra.porNivel * nivelDaClasse;
+  return [...(regra.usos ?? [])].reverse().find(([n]) => nivelDaClasse >= n)?.[1] ?? 0;
+}
+
+/**
+ * Sobe o máximo dos contadores da classe que sobe (o que já foi gasto continua gasto) e cria o
+ * contador quando a habilidade nasce neste nível. Se outra classe da ficha tem um contador com
+ * o mesmo nome (Canalizar Divindade de Clérigo e de Paladino), não mexe: avisa.
+ */
+function atualizarRecursosDeClasse(
+  recursos: Recurso[],
+  classes: ClassePersonagem[],
+  indice: number,
+): { recursos: Recurso[]; linhas: string[]; avisos: string[] } | null {
+  const classe = classes[indice];
+  const regras = RECURSOS_DE_CLASSE[classe.classe];
+  if (!regras) return null;
+  let saida = recursos;
+  const linhas: string[] = [];
+  const avisos: string[] = [];
+  for (const regra of regras) {
+    const max = maximoDoRecurso(regra, classe.nivel);
+    if (max === 0) continue;
+    const repetida = classes.some((c, i) => i !== indice && RECURSOS_DE_CLASSE[c.classe]?.some((r) => r.chave === regra.chave));
+    if (repetida) {
+      avisos.push(`${regra.nome}: mais de uma classe tem esse recurso — ajuste o máximo à mão.`);
+      continue;
+    }
+    const i = saida.findIndex((r) => semAcento(r.name).includes(regra.chave));
+    if (i === -1) {
+      if (classe.nivel !== regra.inicio) continue; // a pessoa apagou ou nunca usou: não recria
+      saida = [...saida, { name: regra.nome, max, cur: max, short_rest: regra.descansoCurto ?? false }];
+      linhas.push(`${regra.nome}: ${max} (novo contador em Recursos)`);
+    } else if (saida[i].max !== max) {
+      const antigo = saida[i];
+      const cur = Math.max(0, Math.min(max, antigo.cur + (max - antigo.max)));
+      saida = saida.map((r, k) => (k === i ? { ...r, max, cur } : r));
+      linhas.push(`${antigo.name}: ${antigo.max} → ${max}`);
+    }
+  }
+  return linhas.length || avisos.length ? { recursos: saida, linhas, avisos } : null;
+}
+
 function anotarNaFicha(secoes: SecaoFicha[], classe: ClasseBase, nivelDaClasse: number, novas: HabilidadeClasse[]): SecaoFicha[] {
   const titulo = `Habilidades de ${NOME_CLASSE[classe]}`;
   const itens = novas.map((h) => ({ titulo: h.nome, tag: `Nv. ${nivelDaClasse}`, descricao: h.descricao.slice(0, 1200) }));
@@ -247,6 +326,14 @@ export function subirDeNivel(p: EstadoSubida, pedido: PedidoSubida, habilidadesN
     if (espacos.recursos !== p.resources) patch.resources = espacos.recursos;
     if (espacos.linha) linhas.push(espacos.linha);
     if (espacos.aviso) avisos.push(espacos.aviso);
+  }
+
+  // Contadores da classe (Fúria, Foco, Mãos Consagradas...), em cima dos espaços já ajustados
+  const doNivel2 = atualizarRecursosDeClasse(patch.resources ?? p.resources, depoisDasClasses, pedido.indiceClasse);
+  if (doNivel2) {
+    if (doNivel2.recursos !== (patch.resources ?? p.resources)) patch.resources = doNivel2.recursos;
+    linhas.push(...doNivel2.linhas);
+    avisos.push(...doNivel2.avisos);
   }
 
   // Habilidades novas

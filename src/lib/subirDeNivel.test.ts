@@ -300,3 +300,57 @@ describe("habilidades novas", () => {
     expect(r.patch.ficha_secoes).toHaveLength(2);
   });
 });
+
+describe("contadores da classe", () => {
+  const rec = (name: string, cur: number, max: number, short_rest = false): Recurso => ({ name, cur, max, short_rest });
+  const nivelUm = (c: ClassePersonagem["classe"], resources: Recurso[]) => estado({ classes: [classe(c, 1)], resources, hd_die: "d8" });
+
+  it("valores da tabela do SRD 5.2", () => {
+    const f = (c: ClassePersonagem["classe"], nivel: number, nome: string) => {
+      const r = ok(subirDeNivel(estado({ classes: [classe(c, nivel - 1)], resources: [rec(nome, 0, 1)] }), { ...fixo, atributos: { tipo: "talento" } }));
+      return (r.patch.resources ?? []).find((x) => x.name === nome)?.max;
+    };
+    expect(f("barbaro", 3, "Fúria")).toBe(3);
+    expect(f("barbaro", 6, "Fúria")).toBe(4);
+    expect(f("barbaro", 12, "Fúria")).toBe(5);
+    expect(f("barbaro", 17, "Fúria")).toBe(6);
+    expect(f("clerigo", 6, "Canalizar Divindade")).toBe(3);
+    expect(f("paladino", 11, "Canalizar Divindade")).toBe(3);
+    expect(f("paladino", 3, "Mãos Consagradas (pontos)")).toBe(15);
+    expect(f("guerreiro", 4, "Segundo Fôlego")).toBe(3);
+    expect(f("monge", 5, "Pontos de Foco")).toBe(5);
+  });
+
+  it("sobe o máximo e o que foi gasto continua gasto", () => {
+    const r = ok(subirDeNivel(estado({ classes: [classe("barbaro", 2)], resources: [rec("Fúria", 0, 2)] }), fixo));
+    expect(r.patch.resources).toEqual([rec("Fúria", 1, 3)]);
+    expect(r.linhas.join("\n")).toContain("Fúria: 2 → 3");
+  });
+
+  it("acha o contador pelo nome, mesmo com acento e sufixo", () => {
+    const r = ok(subirDeNivel(estado({ classes: [classe("paladino", 1)], resources: [rec("Mãos Consagradas (pontos)", 3, 5)] }), fixo));
+    expect(r.patch.resources).toEqual([rec("Mãos Consagradas (pontos)", 8, 10)]);
+  });
+
+  it("cria o contador no nível em que a habilidade nasce", () => {
+    const monge = ok(subirDeNivel(nivelUm("monge", []), fixo));
+    expect(monge.patch.resources).toEqual([rec("Pontos de Foco", 2, 2, true)]);
+    const clerigo = ok(subirDeNivel(nivelUm("clerigo", []), fixo));
+    expect(clerigo.patch.resources).toEqual([rec("Canalizar Divindade", 2, 2)]);
+  });
+
+  it("não recria o que a pessoa apagou depois do nível de origem", () => {
+    const r = ok(subirDeNivel(estado({ classes: [classe("barbaro", 2)], resources: [] }), fixo));
+    expect(r.patch.resources).toBeUndefined();
+  });
+
+  it("classe sem contador por nível (Bruxo, Bardo) não mexe nos recursos", () => {
+    expect(ok(subirDeNivel(nivelUm("bruxo", [rec("Sortudo", 2, 2)]), fixo)).patch.resources).toBeUndefined();
+  });
+
+  it("mesmo recurso em duas classes: avisa e não mexe", () => {
+    const r = ok(subirDeNivel(estado({ classes: [classe("clerigo", 5), classe("paladino", 3)], resources: [rec("Canalizar Divindade", 2, 2)] }), { ...fixo, indiceClasse: 0 }));
+    expect(r.avisos.join("\n")).toContain("Canalizar Divindade");
+    expect(r.patch.resources).toBeUndefined();
+  });
+});
