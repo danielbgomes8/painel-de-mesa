@@ -9,6 +9,7 @@ import { VisorDaMesa } from "@/components/MapaSobDemanda";
 import { BarraDePv } from "@/components/BarraDePv";
 import { useTelaAcesa } from "@/hooks/useTelaAcesa";
 import { condicoesAtivas, textoPrazo } from "@/lib/condicoes";
+import { nomeCurtoDoTelao } from "@/lib/nomeCurto";
 import { nomeDoDono } from "@/lib/companheiros";
 import {
   estaCaido,
@@ -17,6 +18,12 @@ import {
   proximosDaOrdem,
   pvExibidoIniciativa,
 } from "@/lib/regras";
+
+/** Nome comprido ("Thorgrim Martelo de Pedra") encolhe a letra em vez de virar três linhas e esticar o card. */
+function tamanhoDoNome(nome: string | null): "g" | "gg" | undefined {
+  const n = nome?.length ?? 0;
+  return n > 22 ? "gg" : n > 14 ? "g" : undefined;
+}
 
 /** Quantos "a seguir" cabem sem competir com o nome de quem está jogando. */
 const QUANTOS_PROXIMOS = 3;
@@ -114,7 +121,7 @@ export function Telao({
             {atual ? (
               <div className="telao-card-linha">
                 <span className="telao-card-rotulo">vez de</span>
-                <b className="telao-card-nome">{nomeExibido}</b>
+                <b className="telao-card-nome" data-tam={tamanhoDoNome(nomeCurtoDoTelao(nomeExibido ?? ""))}>{nomeCurtoDoTelao(nomeExibido ?? "")}</b>
                 {donoDaVez && <span className="telao-card-pv">🐾 de {donoDaVez}</span>}
                 {pvVisivel && <BarraDePv hp={pvVisivel.hp} hpMax={pvVisivel.hp_max} />}
               </div>
@@ -135,7 +142,7 @@ export function Telao({
                 )}
                 {atual && proximos.length > 0 && (
                   <div className="telao-card-prox">
-                    <span className="telao-card-rotulo">a seguir</span> {proximos.map((p) => p.nome).join(" · ")}
+                    <span className="telao-card-rotulo">a seguir</span> {proximos.map((p) => nomeCurtoDoTelao(p.nome)).join(" · ")}
                   </div>
                 )}
                 {diaDaCampanha && (
