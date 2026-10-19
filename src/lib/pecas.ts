@@ -262,6 +262,53 @@ export function pecasDosQueEntram(entrada: {
 
 type CompanheiroQueEntra = { slug: string; cls?: string; dono: string };
 
+/** Dois peões "se tocam" quando a distância entre os centros é menor que a soma dos raios (um pouco folgada,
+ *  pra vizinhos encaixados quadradinho a quadradinho nunca contarem como sobrepostos). */
+const FOLGA_DE_OCUPACAO = 0.9;
+
+export function pecaOcupaPonto(
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "largura" | "altura">,
+  outra: Pick<Peca, "x" | "y" | "tamanho">,
+  ponto: Ponto,
+  tamanho: TamanhoPeca,
+): boolean {
+  const lado = ladoDeReferencia(cena);
+  return Math.hypot(ponto[0] - outra.x, ponto[1] - outra.y) < ((lado * (outra.tamanho + tamanho)) / 2) * FOLGA_DE_OCUPACAO;
+}
+
+/**
+ * REGRA: dois peões não ocupam o mesmo espaço. Devolve onde o peão de `tamanho` pode ficar ao ser solto em (x, y):
+ * o próprio ponto encaixado na grade se estiver livre; senão o quadradinho livre mais perto de onde foi solto
+ * (anéis em volta, até 12 quadradinhos). `null` = não achou lugar (mapa lotado) e o peão não deve sair de onde está.
+ * `ocupadas` são os OUTROS peões visíveis (sem o que está sendo movido). **Oculto nunca entra aqui**: empurrar um peão
+ * visível por causa de um oculto entregaria à mesa que tem algo ali (quem chama filtra, ver `moverPeao`).
+ */
+export function pontoLivreParaPeca(
+  cena: Pick<Cena, "grade_ligada" | "grade_px" | "grade_dx" | "grade_dy" | "largura" | "altura">,
+  ocupadas: readonly Pick<Peca, "x" | "y" | "tamanho">[],
+  x: number,
+  y: number,
+  tamanho: TamanhoPeca,
+): Ponto | null {
+  const livre = (p: Ponto) => !ocupadas.some((o) => pecaOcupaPonto(cena, o, p, tamanho));
+  const alvo = encaixarNaGrade(cena, x, y, tamanho);
+  if (livre(alvo)) return alvo;
+  const lado = ladoDeReferencia(cena);
+  const candidatos: Ponto[] = [];
+  for (let k = 1; k <= 12; k++) {
+    for (let dx = -k; dx <= k; dx++) {
+      for (let dy = -k; dy <= k; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== k) continue;
+        candidatos.push(encaixarNaGrade(cena, alvo[0] + dx * lado, alvo[1] + dy * lado, tamanho));
+      }
+    }
+  }
+  // O mais perto de onde a pessoa soltou; aneis menores primeiro em caso de empate.
+  const distancia = (p: Ponto) => Math.hypot(p[0] - x, p[1] - y);
+  const achado = candidatos.filter(livre).sort((a, b) => distancia(a) - distancia(b))[0];
+  return achado ?? null;
+}
+
 /**
  * Os peões dos companheiros (familiar, montaria, animal companheiro) de quem está na iniciativa, com um mapa na
  * mesa: cada um nasce VISÍVEL (é aliado) e ENCOSTADO no peão do dono, no primeiro quadradinho livre em volta (do

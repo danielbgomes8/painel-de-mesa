@@ -18,7 +18,7 @@ export type Pecas = {
   aviso: string | null;
   adicionar: (novas: NovaPeca[]) => Promise<boolean>;
   /** Só as colunas que mudaram (nunca a linha inteira: ver AGENTS.md). */
-  atualizar: (id: string, mudanca: Partial<Pick<Peca, "x" | "y" | "tamanho" | "oculto" | "nome" | "cor" | "aura">>) => Promise<boolean>;
+  atualizar: (id: string, mudanca: Partial<Pick<Peca, "x" | "y" | "tamanho" | "oculto" | "nome" | "cor" | "aura" | "slug">>) => Promise<boolean>;
   /** Põe, troca ou tira (null) a luz de vários peões numa tacada só: as três colunas da luz, nada mais. */
   definirLuzes: (mudancas: { id: string; luz: Luz | null }[]) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;

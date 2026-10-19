@@ -6,6 +6,8 @@ import {
   acharPecaNoPonto,
   diametroDaPeca,
   encaixarNaGrade,
+  pecaOcupaPonto,
+  pontoLivreParaPeca,
   iconesDaPeca,
   iconesVisiveis,
   AURA_MAXIMA_M,
@@ -695,5 +697,29 @@ describe("a luz que o peão carrega", () => {
     const [d] = montar([peca({ id: "d", slug: "dragao", luz: tocha })], escura);
     expect(d.visaoPx).toBeNull();
     expect(d.luzPx).toBeCloseTo(800, 6); // mas a tocha dele ilumina pra quem estiver vendo
+  });
+});
+
+describe("peão não ocupa o espaço de outro", () => {
+  const cena = { grade_ligada: true, grade_px: 100, grade_dx: 0, grade_dy: 0, largura: 2000, altura: 2000 };
+  const peca = (x: number, y: number, tamanho: 1 | 2 | 3 | 4 = 1) => ({ x, y, tamanho });
+
+  it("solto num quadradinho livre: fica ali, encaixado", () => {
+    expect(pontoLivreParaPeca(cena, [peca(150, 150)], 540, 530, 1)).toEqual([550, 550]);
+  });
+  it("vizinho encostado não conta como sobreposto", () => {
+    expect(pontoLivreParaPeca(cena, [peca(150, 150)], 250, 150, 1)).toEqual([250, 150]);
+  });
+  it("solto em cima de outro: vai pro quadradinho livre mais perto de onde soltou", () => {
+    const p = pontoLivreParaPeca(cena, [peca(150, 150)], 190, 150, 1);
+    expect(p).toEqual([250, 150]);
+  });
+  it("peão grande não encosta em quem já está perto", () => {
+    const p = pontoLivreParaPeca(cena, [peca(250, 250)], 300, 300, 2)!;
+    expect(pecaOcupaPonto(cena, peca(250, 250), p, 2)).toBe(false);
+  });
+  it("sem lugar nenhum: devolve null", () => {
+    const cheia = { ...cena, largura: 100, altura: 100 };
+    expect(pontoLivreParaPeca(cheia, [peca(50, 50)], 50, 50, 1)).toBeNull();
   });
 });

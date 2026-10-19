@@ -299,6 +299,8 @@ export function PainelPecas({
   aoPorGrupo,
   aoPorInimigos,
   aoPorMarcador,
+  aoAlternarOculto,
+  aoNaIniciativa,
 }: {
   banco: Pecas;
   pecas: PecaNaTela[];
@@ -311,6 +313,10 @@ export function PainelPecas({
   aoJuntos: (v: boolean) => void;
   temCompanheiros: boolean;
   aoPorGrupo: () => void;
+  /** Mostra/esconde o peão (ao mostrar em cima de outro, desloca pro espaço livre). */
+  aoAlternarOculto: (id: string) => void;
+  /** Marcador avulso (sem ficha) vira NPC e entra na iniciativa. */
+  aoNaIniciativa: (id: string) => void;
   aoPorInimigos: () => void;
   aoPorMarcador: (nome: string) => void;
 }) {
@@ -393,10 +399,20 @@ export function PainelPecas({
                 className="chip alvo"
                 aria-pressed={p.oculto}
                 aria-label={`${p.oculto ? "Mostrar" : "Ocultar"} o peão ${naTela?.nome ?? p.nome} pra mesa`}
-                onClick={() => void banco.atualizar(p.id, { oculto: !p.oculto })}
+                onClick={() => aoAlternarOculto(p.id)}
               >
                 {p.oculto ? "oculto" : "visível"}
               </button>
+              {!p.slug && (
+                <button
+                  type="button"
+                  className="chip"
+                  aria-label={`Pôr o marcador ${p.nome} na iniciativa`}
+                  onClick={() => aoNaIniciativa(p.id)}
+                >
+                  ⚔ iniciativa
+                </button>
+              )}
               <button
                 type="button"
                 className="chip"

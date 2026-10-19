@@ -3557,6 +3557,7 @@ input.fj-score:focus-visible {
 }
 .mapa-peca {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 4px 6px;
@@ -3567,7 +3568,7 @@ input.fj-score:focus-visible {
   border-color: var(--accent);
 }
 .mapa-peca-nome {
-  flex: 1;
+  flex: 1 1 110px;
   min-width: 0;
   text-align: left;
   background: none;

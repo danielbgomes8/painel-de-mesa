@@ -17,9 +17,11 @@ import { PainelDeArmadilhas, type RascunhoDeArmadilha } from "@/components/Armad
 import { LuzesNaMesa, PainelDeLuzes } from "@/components/LuzesDoMapa";
 import { AvisoDePortaTrancada, EditorDePorta } from "@/components/PortasDoMapa";
 import { usePing, type QuemPinga } from "@/hooks/usePing";
-import { encaixarNaGrade, montarPecasNaTela, pecasQueAcompanham, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
+import { encaixarNaGrade, montarPecasNaTela, pecasQueAcompanham, pontoLivreParaPeca, posicoesIniciais, regiaoEmTornoDe, tamanhoPeloTipo, type Peca } from "@/lib/pecas";
 import { segmentosQueBloqueiam, type ModoParede, type Parede } from "@/lib/paredes";
 import type { ModoRegua } from "@/lib/regua";
+import { rolarIniciativa } from "@/lib/dados";
+import { entrarNaOrdem, nomeNoLog } from "@/lib/regras";
 import { MODELO_INICIAL, type ModeloArea } from "@/lib/area";
 import {
   cameraValida,
@@ -49,7 +51,7 @@ import {
 /** Move um peão e, se `juntos`, os dos companheiros dele o mesmo tanto (`pecasQueAcompanham`). */
 function moverPeao(
   banco: ReturnType<typeof usePecas>,
-  cena: Parameters<typeof pecasQueAcompanham>[0]["cena"],
+  cena: Parameters<typeof pontoLivreParaPeca>[0] & Parameters<typeof pecasQueAcompanham>[0]["cena"],
   personagens: Sala["personagens"],
   paredes: readonly Parede[],
   juntos: boolean,
@@ -59,9 +61,44 @@ function moverPeao(
 ) {
   const donos: Record<string, string> = {};
   if (juntos) for (const f of personagens) if (f.dono) donos[f.slug] = f.dono;
-  const seguem = pecasQueAcompanham({ cena, pecas: banco.pecas, movida: { id, x, y }, donos, bloqueios: segmentosQueBloqueiam(paredes) });
-  void banco.atualizar(id, { x, y });
-  for (const c of seguem) void banco.atualizar(c.id, { x: c.x, y: c.y });
+  const movida = banco.pecas.find((p) => p.id === id);
+  if (!movida) return;
+  // Os que andam junto saem do lugar de qualquer jeito, então não contam como obstáculo pro dono.
+  const seguemOriginal = pecasQueAcompanham({ cena, pecas: banco.pecas, movida: { id, x, y }, donos, bloqueios: segmentosQueBloqueiam(paredes) });
+  const andam = new Set([id, ...seguemOriginal.map((c) => c.id)]);
+  // Peão oculto fica fora da regra: se um peão visível fosse empurrado por causa de um oculto, a mesa
+  // descobriria que tem algo ali. Então oculto nunca é obstáculo, e o oculto (do Mestre) anda livre.
+  const parados = banco.pecas.filter((p) => !andam.has(p.id) && !p.oculto);
+  // Regra: peão não ocupa o espaço de outro. Sem lugar livre, fica onde está.
+  const destino = movida.oculto ? encaixarNaGrade(cena, x, y, movida.tamanho) : pontoLivreParaPeca(cena, parados, x, y, movida.tamanho);
+  if (!destino) return;
+  const seguem = pecasQueAcompanham({ cena, pecas: banco.pecas, movida: { id, x: destino[0], y: destino[1] }, donos, bloqueios: segmentosQueBloqueiam(paredes) });
+  const ocupadas = [...parados, { x: destino[0], y: destino[1], tamanho: movida.tamanho }];
+  void banco.atualizar(id, { x: destino[0], y: destino[1] });
+  for (const c of seguem) {
+    const peca = banco.pecas.find((p) => p.id === c.id);
+    if (!peca) continue;
+    const ponto = pontoLivreParaPeca(cena, ocupadas, c.x, c.y, peca.tamanho);
+    if (!ponto) continue;
+    ocupadas.push({ x: ponto[0], y: ponto[1], tamanho: peca.tamanho });
+    void banco.atualizar(c.id, { x: ponto[0], y: ponto[1] });
+  }
+}
+
+/** Mostra ou esconde um peão. Ao MOSTRAR um que está em cima de outro visível, ele é deslocado pro quadradinho
+ *  livre mais perto (regra: peão visível não ocupa o espaço de outro; o que estava visível não se mexe). */
+function alternarOculto(banco: ReturnType<typeof usePecas>, cena: Parameters<typeof pontoLivreParaPeca>[0], id: string) {
+  const peca = banco.pecas.find((p) => p.id === id);
+  if (!peca) return;
+  if (peca.oculto) {
+    const visiveis = banco.pecas.filter((p) => p.id !== id && !p.oculto);
+    const ponto = pontoLivreParaPeca(cena, visiveis, peca.x, peca.y, peca.tamanho);
+    if (ponto && (ponto[0] !== peca.x || ponto[1] !== peca.y)) {
+      void banco.atualizar(id, { oculto: false, x: ponto[0], y: ponto[1] });
+      return;
+    }
+  }
+  void banco.atualizar(id, { oculto: !peca.oculto });
 }
 
 /** O peão com o cartão de ações aberto e a ficha dele — só se ainda existem
@@ -659,6 +696,29 @@ function EditorDoMestre({
     setColocando(null);
   }
 
+  /** Marcador avulso (sem ficha) entra na iniciativa: vira um NPC com o mesmo nome, ligado ao peão, com iniciativa
+   *  rolada (d20). PV e CA ficam num valor de partida (1 e 10) pro Mestre ajustar na ficha. */
+  async function marcadorNaIniciativa(id: string) {
+    const peca = banco.pecas.find((p) => p.id === id);
+    if (!peca || peca.slug || !cena) return;
+    const criado = await sala.criarPersonagem({ name: peca.nome || "Inimigo", is_npc: true, hp: 1, hp_max: 1, ac: 10 });
+    if (!criado) return;
+    // Só segue se o peão aceitou o vínculo; senão a ficha criada seria órfã.
+    if (!(await banco.atualizar(id, { slug: criado.slug }))) {
+      await sala.removerPersonagem(criado.id);
+      return;
+    }
+    const item = { slug: criado.slug, name: criado.name, init: rolarIniciativa(0, false).total };
+    let entrou = false;
+    const feito = await sala.definirCombate((atual) => {
+      const r = entrarNaOrdem(atual.order, [item]);
+      entrou = r.entraram.length > 0;
+      return { order: r.ordem };
+    });
+    // Log é público: NPC oculto entra como "Um inimigo" (ver nomeNoLog).
+    if (feito && entrou) void sala.registrarLog(`${nomeNoLog(criado)} entrou no combate (iniciativa ${item.init})`);
+  }
+
   function porMarcador(nomeDigitado: string) {
     if (!cena) return;
     const nome = nomeDigitado.trim().slice(0, 30);
@@ -863,6 +923,8 @@ function EditorDoMestre({
               aoPorGrupo={() => porOGrupo()}
               aoPorInimigos={() => porOsInimigos()}
               aoPorMarcador={porMarcador}
+              aoAlternarOculto={(id) => cena && alternarOculto(banco, cena, id)}
+              aoNaIniciativa={(id) => void marcadorNaIniciativa(id)}
             />
           ),
         };
@@ -1136,7 +1198,7 @@ function EditorDoMestre({
                   vez={aberto.vez}
                   naOrdem={aberto.naOrdem}
                   oculto={aberto.peca.oculto}
-                  aoAlternarOculto={() => void banco.atualizar(aberto.peca.id, { oculto: !aberto.peca.oculto })}
+                  aoAlternarOculto={() => cena && alternarOculto(banco, cena, aberto.peca.id)}
                   aura={aberto.peca.aura}
                   aoMudarAura={(m) => void banco.atualizar(aberto.peca.id, { aura: m })}
                   aoFechar={() => setCartao(null)}

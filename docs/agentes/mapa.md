@@ -421,3 +421,20 @@ Mestre: **o app nunca revela nada sozinho**.
 - Robô `e2e/percepcaoEPortas.e2e.ts`: PP 15 × CD 13 avisa e PP 10 não (a mesma distância), revelar, porta secreta (PP 16 × CD 15) e abrir, a CD de
   achar de uma armadilha criada pela tela, e a porta trancada de ponta a ponta (propriedades, "deixar trancada", "destrancar e abrir").
 - **Não cobre**: teste de ver "só quem olha pra lá", visão no escuro ajudando a achar, a CD variar por distância, porta que tranca sozinha.
+## Peões não ocupam o mesmo espaço (19/10/2026, regra pedida pelo Daniel)
+
+- Regra pura em `lib/pecas.ts`: `pontoLivreParaPeca` (e `pecaOcupaPonto`), testada em `pecas.test.ts`. Ao soltar um
+  peão em cima de outro, ele vai pro quadradinho livre MAIS PERTO de onde foi solto (até 12 quadradinhos); sem lugar,
+  fica onde estava. **Peão oculto fica FORA da regra** (decisão do Daniel, 19/10): ele nunca é obstáculo, senão um jogador que soltasse o peão em cima do espaço de um oculto seria empurrado e a mesa descobriria que há algo ali; e o peão oculto anda livre, sem ser empurrado. **Ao o Mestre MOSTRAR um oculto que está em cima de um visível, o que estava oculto é deslocado pro quadradinho livre mais perto** (`alternarOculto` em PainelMapa; o que já estava visível não se mexe). Vizinhos encaixados quadradinho a quadradinho não contam como
+  sobrepostos (folga de 0,9 na soma dos raios).
+- Aplicada em `moverPeao` (PainelMapa): vale pro Mestre e pros jogadores. Os companheiros que andam junto não são
+  obstáculo pro dono, mas cada um também é resolvido contra os já colocados. Posição inicial e companheiros novos já
+  tinham a própria lógica de "livre" (`posicoesIniciais`, `pecasDosCompanheiros`).
+- Não cobre: peão que o Mestre cola por cima de outro por outro caminho que não seja arrastar/mover.
+
+## Marcador avulso na iniciativa (19/10/2026)
+
+- Peão sem ficha (`+ marcador`) ganha o botão "⚔ iniciativa" na lista de Peões: cria um NPC com o mesmo nome (PV 1, CA 10,
+  pro Mestre ajustar), liga ao peão (`slug` do peão), rola d20 e entra na ordem (`entrarNaOrdem`). Se o peão não aceitar
+  o vínculo, a ficha criada é apagada. NPC nasce não revelado: a mesa vê "Inimigo N". **Sem "desfazer"** por ora (apagar a ficha
+  deixaria o peão com vínculo solto).
