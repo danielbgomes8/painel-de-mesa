@@ -125,6 +125,7 @@ export function CartaoDoPeao({
         naVez={vez}
         souMestre={souMestre}
         focarAoAbrir={false}
+        condicoesRecolhiveis
         onAplicar={aplicar}
         onFechar={aoFechar}
       />

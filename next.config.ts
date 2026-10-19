@@ -47,6 +47,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Só no `npm run dev`: deixa o tablet/celular na mesma rede abrir o servidor de teste pelo IP do computador
+  // (sem isso o Next bloqueia o JavaScript da página e ela não "conecta"). Em produção não tem efeito.
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*"],
   turbopack: { root: path.join(__dirname) },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

@@ -831,6 +831,44 @@ body:has(.desfazerbarra) .proximoturno {
   padding-top: 8px;
   border-top: 1px solid var(--line);
 }
+.initajustecond--recolhivel > summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-height: 32px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.initajustecond--recolhivel > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.initajustecond--recolhivel > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 12px;
+}
+.initajustecond--recolhivel[open] > summary::before {
+  content: "▾";
+}
+.initajustecond--recolhivel > summary::-webkit-details-marker {
+  display: none;
+}
+.initajustecond--recolhivel > summary .sectitle {
+  margin: 0;
+}
+.initajustecond--recolhivel[open] > summary {
+  margin-bottom: 6px;
+}
+.initajustecond--recolhivel > .chips,
+.initajustecond--recolhivel > .condprazos {
+  margin-top: 6px;
+}
+.condresumo {
+  font-size: 13px;
+  color: var(--warn);
+}
 .initajustecond .condprazos {
   margin-top: 0;
 }
@@ -3443,6 +3481,98 @@ input.fj-score:focus-visible {
   }
   .telao-card-nome {
     font-size: 17px;
+  }
+}
+
+/* Disposição do telão com mapa (tablet): o card da vez deixa de boiar sobre o mapa e vira uma coluna fixa ao lado
+   (tablet deitado, o caso comum) ou uma faixa fina embaixo (em pé). O mapa fica com o resto, sem nada por cima dele.
+   --telao-lado é a largura da coluna: os relógios (fixos no canto) se afastam dela. */
+.telao--mapa {
+  --telao-lado: clamp(230px, 24vw, 340px);
+}
+.telao-card {
+  position: static;
+  transform: none;
+  order: 2;
+  flex: none;
+  max-width: none;
+  width: auto;
+  align-items: stretch;
+  border-radius: 0;
+  border: 0;
+  background: #14110e;
+  backdrop-filter: none;
+}
+.telao-card-alternar {
+  display: none;
+}
+.telao-card-corpo {
+  flex: 1;
+  padding-top: 0;
+}
+@media (orientation: landscape) {
+  .telao--mapa {
+    flex-direction: row;
+  }
+  .telao-card {
+    width: var(--telao-lado);
+    padding: 16px 18px;
+    border-left: 2px solid rgba(245, 240, 230, 0.22);
+    overflow-y: auto;
+  }
+  .telao-card-corpo {
+    gap: 10px;
+  }
+  .telao-card-linha {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .telao-card-rotulo {
+    font-size: 13px;
+  }
+  .telao-card-nome {
+    font-size: clamp(28px, 3.4vw, 52px);
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+  .telao-card-nome--calmo {
+    font-size: clamp(20px, 2vw, 28px);
+  }
+  .telao-card-pv {
+    font-size: clamp(16px, 1.6vw, 22px);
+  }
+  .telao-card-cond span {
+    font-size: clamp(14px, 1.4vw, 20px);
+    padding: 3px 10px;
+  }
+  .telao-card-prox,
+  .telao-card-dia {
+    font-size: clamp(15px, 1.5vw, 21px);
+    line-height: 1.35;
+  }
+  .telao--mapa ~ .rel-faixa--telao {
+    top: 14px;
+    right: calc(var(--telao-lado) + 14px);
+  }
+}
+@media (orientation: portrait) {
+  .telao-card {
+    width: 100%;
+    padding: 8px 16px;
+    border-top: 2px solid rgba(245, 240, 230, 0.22);
+  }
+  .telao-card-corpo {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 18px;
+  }
+  .telao-card-nome {
+    font-size: clamp(22px, 4.4vw, 38px);
+  }
+  .telao--mapa ~ .rel-faixa--telao {
+    top: 14px;
   }
 }
 

@@ -58,11 +58,10 @@ Decisões que não estão no código à primeira vista:
 - **Vista Mestre** (`lib/vistaMestre.ts`, `hooks/useVistaMestre.ts`, sem migration, 18/10/2026): o Mestre
   toca em "📺 conduzir a mesa" (canto do palco, com mapa na mesa) e vira um **controle remoto** da câmera:
   vê o mapa como a mesa vê (`VisorDaMesa controle`), e o zoom/arrasto dele dali vai por broadcast
-  (`vista:<cena>`, freio de 80 ms, repete a cada 3 s, responde a "pedir" de quem entra). **A tela de
-  edição dele nunca transmite** — pintar névoa num canto não entrega nada. Cada aparelho liga a sua
+  (`vista:<cena>`, freio de 80 ms, repete a cada 3 s, responde a "pedir" de quem entra). **Desde 19/10, a tela de edição do Mestre TRANSMITE quando ele está em "Jogar" com o mapa na mesa** (a mesa segue sozinha; o botão "conduzir a mesa" foi REMOVIDO porque era um modo à parte que travava o Mestre de mexer na mesa — o "seguir a vez" agora é automático na tela de edição, uma vez por turno de jogador **ou de inimigo já REVELADO** com peão visível; inimigo não revelado ou peão oculto nunca move a câmera). O caminho `controle` do `VisorDaMesa` ficou sem uso; em "Preparar" ela **nunca transmite** — pintar névoa num canto não entrega nada. Cada aparelho liga a sua
   "Vista Mestre" (👁 no telão, no HUD; 👁 ao lado do zoom no celular), lembrada em
   `mesa-vista-mestre:<sala>`; `?vista=mestre` no link já abre ligada (TV sem teclado), `?vista=jogador`
-  desliga. Viaja o pedaço do mapa em px da imagem (`CenaMapa.aoMudarVista` → `vistaGuiada`), então cada
+  desliga. **O telão (`telao`) abre LIGADO** se o aparelho nunca escolheu (19/10: o tablet da mesa não seguia o Mestre porque o 👁 vinha desligado). Viaja o pedaço do mapa em px da imagem (`CenaMapa.aoMudarVista` → `vistaGuiada`), então cada
   tela enquadra no próprio tamanho; desligar volta à vista que o aparelho tinha. Sem nada do Mestre,
   segue a `camera` salva. **"Seguir a vez"** (no controle): no turno novo de um jogador, desliza até ele
   uma vez; vez de inimigo não mexe. O **HUD** (`FocoDoTelao`) é só os ícones dos peões de jogador
@@ -438,3 +437,14 @@ Mestre: **o app nunca revela nada sozinho**.
   pro Mestre ajustar), liga ao peão (`slug` do peão), rola d20 e entra na ordem (`entrarNaOrdem`). Se o peão não aceitar
   o vínculo, a ficha criada é apagada. NPC nasce não revelado: a mesa vê "Inimigo N". **Sem "desfazer"** por ora (apagar a ficha
   deixaria o peão com vínculo solto).
+
+## Telão no tablet: coluna ao lado (19/10/2026)
+
+- O card da vez (`.telao-card`) deixou de boiar sobre o mapa: com o tablet **deitado** (o caso comum, `orientation: landscape`) vira
+  uma coluna à direita (`--telao-lado`, 230–340px) com o nome grande, PV, condições e "a seguir"; **em pé** vira uma faixa fina
+  (~70px) embaixo. Nada fica por cima do mapa. Os relógios fixos se afastam da coluna. O botão de recolher o card some
+  (a coluna já é fina). Só CSS, em globals.css logo depois do `@media (max-width: 640px)` do card.
+
+- **Cartão do peão (19/10/2026):** o bloco "Condições" é um `<details>` recolhível (`condicoesRecolhiveis` em `AcoesNaLinha`),
+  **fechado por padrão**, com as condições ativas no título ("Condições  Cego · Surdo"), pra o cartão não comer o mapa no
+  celular/tablet. Na aba Combate segue aberto como sempre.

@@ -55,11 +55,14 @@ export function pacoteDaVista(v: VistaMestre): { x: number; y: number; w: number
 /**
  * Vista Mestre ligada ao abrir? O link manda (`?vista=mestre` liga,
  * `?vista=jogador` desliga) — é o jeito de deixar o telão de uma TV sem
- * teclado já seguindo o Mestre. Sem isso, a última escolha deste aparelho.
+ * teclado já seguindo o Mestre. Sem isso, a última escolha deste aparelho; e, sem escolha nenhuma, o `padrao`
+ * (o telão abre seguindo o Mestre: é um aparelho de mesa que ninguém fica tocando pra ligar).
  */
-export function vistaMestreAoAbrir(busca: string, lembrada: string | null): boolean {
+export function vistaMestreAoAbrir(busca: string, lembrada: string | null, padrao = false): boolean {
   const daUrl = new URLSearchParams(busca).get("vista");
   if (daUrl === "mestre") return true;
   if (daUrl === "jogador") return false;
-  return lembrada === "1";
+  if (lembrada === "1") return true;
+  if (lembrada === "0") return false;
+  return padrao;
 }

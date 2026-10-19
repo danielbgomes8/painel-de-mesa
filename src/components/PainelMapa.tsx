@@ -165,7 +165,7 @@ export function VisorDaMesa({
     } catch {
       /* aba privada / storage bloqueado: segue sem lembrar */
     }
-    return vistaMestreAoAbrir(window.location.search, lembrada);
+    return vistaMestreAoAbrir(window.location.search, lembrada, telao);
   });
   function alternarVista() {
     const nova = !vistaLigada;
@@ -527,26 +527,9 @@ export function PainelMapa({
   return <MapaDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
 }
 
-/** O Mestre alterna entre editar o mapa e conduzir a Vista Mestre (controle remoto da câmera da mesa). */
+/** A tela do Mestre. A Vista Mestre é automática: em "Jogar" com o mapa na mesa, a câmera dele vai pra mesa (ver `transmitindo`). */
 function MapaDoMestre({ cenas, codigo, quem, sala }: { cenas: Cenas; codigo: string; quem: QuemPinga | null; sala: Sala }) {
-  const [conduzindo, setConduzindo] = useState(false);
-  const naMesa = cenas.naMesa;
-  if (conduzindo && naMesa) {
-    return (
-      <section className="combat" aria-label="Conduzir a vista da mesa">
-        <VisorDaMesa
-          cena={naMesa}
-          codigo={codigo}
-          urlDaImagem={cenas.urlDaImagem}
-          sala={sala}
-          quem={quem}
-          controle
-          aoVoltarAEditar={() => setConduzindo(false)}
-        />
-      </section>
-    );
-  }
-  return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} aoConduzir={naMesa ? () => setConduzindo(true) : undefined} />;
+  return <EditorDoMestre cenas={cenas} codigo={codigo} quem={quem} sala={sala} />;
 }
 
 type Uso = "mover" | "nevoa" | "medir" | "desenhar" | "peoes" | "luz" | "armadilhas" | "paredes" | "grade" | "ping" | "mesa";
@@ -569,14 +552,11 @@ function EditorDoMestre({
   codigo,
   quem,
   sala,
-  aoConduzir,
 }: {
   cenas: Cenas;
   codigo: string;
   quem: QuemPinga | null;
   sala: Sala;
-  /** Abre o controle da Vista Mestre (só com mapa na mesa). */
-  aoConduzir?: () => void;
 }) {
   const [escolhida, setEscolhida] = useState<string | null>(null);
   const cena = cenas.cenas.find((c) => c.id === escolhida) ?? cenas.naMesa ?? cenas.cenas[0] ?? null;
@@ -775,6 +755,29 @@ function EditorDoMestre({
 
   const podeQuadradinhos = cena ? gradeUsavel(cena) : false;
   const faseAtual = fase ?? (cena?.na_mesa ? "jogar" : "preparar");
+  // Jogar com o mapa na mesa = a mesa segue o Mestre sozinha: o zoom e o arrasto daqui vão pra todo aparelho com a
+  // Vista Mestre ligada (o telão abre ligada). Preparar nunca transmite — mexer na câmera antes da sessão não arrasta a mesa.
+  const transmitindo = Boolean(cena?.na_mesa) && faseAtual === "jogar";
+  const canalDaVista = useVistaMestre(cena, transmitindo ? "controle" : null);
+  // Turno novo de um jogador: a câmera desliza até o peão dele, uma vez (e vai pra mesa junto). Depois o Mestre mexe
+  // à vontade. Vez de inimigo AINDA NÃO REVELADO ou de peão oculto não mexe — não entrega onde ele está.
+  const vezSlug = sala.combate.order[sala.combate.turn]?.slug ?? null;
+  const fichaDaVez = vezSlug ? sala.personagens.find((f) => f.slug === vezSlug) : undefined;
+  const mesaSabeDaVez = Boolean(fichaDaVez) && (!fichaDaVez?.is_npc || fichaDaVez.revealed);
+  const peaoDaVez = vezSlug && mesaSabeDaVez ? banco.pecas.find((p) => p.slug === vezSlug && !p.oculto) : undefined;
+  const idPeaoDaVez = peaoDaVez?.id ?? null;
+  const posPeaoDaVez = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    posPeaoDaVez.current = peaoDaVez ? { x: peaoDaVez.x, y: peaoDaVez.y } : null;
+  });
+  useEffect(() => {
+    if (!transmitindo || !idPeaoDaVez || !posPeaoDaVez.current) return;
+    mapaRef.current?.focar(posPeaoDaVez.current.x, posPeaoDaVez.current.y);
+  }, [transmitindo, idPeaoDaVez, sala.combate.turn, sala.combate.round]);
+  useEffect(() => {
+    // Dá um quadro ao entrar em Jogar: sem mexer na câmera, a mesa ficaria esperando o primeiro gesto.
+    if (transmitindo) mapaRef.current?.aproximar(1);
+  }, [transmitindo]);
 
   // As ferramentas de cada fase. Paredes e desenhos somem quando o banco ainda não tem as tabelas.
   const idsDaFase: Exclude<Uso, "ping" | "mesa">[] =
@@ -1065,7 +1068,7 @@ function EditorDoMestre({
                 nome={cena.nome || "Sem nome"}
                 estado={cena.na_mesa ? "Na mesa" : "Em preparo"}
                 estadoLigado={cena.na_mesa}
-                cantoAlto={!cena.na_mesa || Boolean(cena.na_mesa && aoConduzir)}
+                cantoAlto={!cena.na_mesa}
                 canto={
                   <>
                     <div className="palco-modo palco-vidro" role="group" aria-label="Modo">
@@ -1079,11 +1082,6 @@ function EditorDoMestre({
                     {!cena.na_mesa && (
                       <button type="button" className="btn primary" onClick={() => void cenas.mandarParaMesa(cena.id)}>
                         levar a mesa pra este mapa
-                      </button>
-                    )}
-                    {cena.na_mesa && aoConduzir && (
-                      <button type="button" className="btn palco-vidro" onClick={aoConduzir} title="Controlar o que o telão e a Vista Mestre mostram">
-                        📺 conduzir a mesa
                       </button>
                     )}
                   </>
@@ -1125,6 +1123,7 @@ function EditorDoMestre({
                     imagemUrl={cenas.urlDaImagem(cena)}
                     regras={nevoa.regras}
                     mestre
+                    aoMudarVista={transmitindo ? canalDaVista.enviarRegiao : undefined}
                     ferramenta={ferramentaMapa}
                     modoNevoa={modo}
                     pincel={pincel}

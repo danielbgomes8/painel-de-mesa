@@ -746,6 +746,7 @@ export function AcoesNaLinha({
   onFechar,
   focarAoAbrir = true,
   souMestre,
+  condicoesRecolhiveis = false,
 }: {
   sala: Sala;
   personagem: Personagem;
@@ -758,6 +759,9 @@ export function AcoesNaLinha({
   focarAoAbrir?: boolean;
   /** Pro nome do inimigo oculto: o Mestre vê o nome real, os outros só "Um inimigo". */
   souMestre: boolean;
+  /** As condições viram um bloco que abre e fecha (começa fechado, com as ativas no título). No mapa, onde cada
+   *  centímetro do cartão é mapa que some. */
+  condicoesRecolhiveis?: boolean;
 }) {
   // Na vez de quem tem ataque pra rolar, abrir a linha é pra atacar, não pra
   // tomar dano: sem o cursor no campo de PV, o teclado do celular não sobe
@@ -837,11 +841,22 @@ export function AcoesNaLinha({
       )}
       <RolarAtaques texto={textoEfetivoDeAtaques(p)} />
       {p.is_npc && <LendariasNaLinha sala={sala} personagem={p} />}
-      <div className="initajustecond">
-        <span className="sectitle">Condições</span>
-        <ChipsCondicao sala={sala} personagem={p} editavel />
-        <PrazosCondicao sala={sala} personagem={p} />
-      </div>
+      {condicoesRecolhiveis ? (
+        <details className="initajustecond initajustecond--recolhivel">
+          <summary>
+            <span className="sectitle">Condições</span>
+            {condicoesAtivas(p.cond).length > 0 && <span className="condresumo">{condicoesAtivas(p.cond).join(" · ")}</span>}
+          </summary>
+          <ChipsCondicao sala={sala} personagem={p} editavel />
+          <PrazosCondicao sala={sala} personagem={p} />
+        </details>
+      ) : (
+        <div className="initajustecond">
+          <span className="sectitle">Condições</span>
+          <ChipsCondicao sala={sala} personagem={p} editavel />
+          <PrazosCondicao sala={sala} personagem={p} />
+        </div>
+      )}
       <EfeitosDoPersonagem sala={sala} personagem={p} souMestre={souMestre} />
     </div>
   );

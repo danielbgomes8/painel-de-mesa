@@ -44,4 +44,10 @@ describe("Vista Mestre ao abrir", () => {
     expect(vistaMestreAoAbrir("?sala=a", "0")).toBe(false);
     expect(vistaMestreAoAbrir("", null)).toBe(false);
   });
+
+  it("o telão abre ligada se ninguém escolheu; a escolha e o link ainda mandam", () => {
+    expect(vistaMestreAoAbrir("?sala=a&telao=1", null, true)).toBe(true);
+    expect(vistaMestreAoAbrir("?sala=a&telao=1", "0", true)).toBe(false);
+    expect(vistaMestreAoAbrir("?vista=jogador", null, true)).toBe(false);
+  });
 });
