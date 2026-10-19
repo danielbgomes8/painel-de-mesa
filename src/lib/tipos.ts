@@ -161,7 +161,7 @@ export type ClasseBase =
  *  CD e ataque são campos separados de propósito: há habilidade que sobe só
  *  a CD (Feitiçaria Inata) e item que sobe os dois (varinha do mago de
  *  guerra) — quem sobe os dois cadastra duas linhas. */
-export type CampoModificavel = Atributo | "cd_magia" | "ataque_magia" | "pp";
+export type CampoModificavel = Atributo | "cd_magia" | "ataque_magia" | "pp" | "ca";
 
 /** Uma entrada de classe do personagem — multiclasse é uma lista destas.
  *  `nivel` é só daquela classe (bônus de proficiência usa a soma de todas,
@@ -183,6 +183,9 @@ export type Modificador = {
   campo: CampoModificavel;
   delta: number;
   ativo: boolean;
+  /** Efeito de uma magia de concentração (ex.: Escudo da Fé): só vale enquanto a
+   *  ficha segue concentrada nela. Ausente = vale sempre que estiver ligado. */
+  concentracao?: boolean;
 };
 
 export type Personagem = {

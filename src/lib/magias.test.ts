@@ -7,6 +7,7 @@ import {
   contarTruques,
   contarTruquesExtras,
   devolverEspaco,
+  efeitoDeCa,
   espacosDosRecursos,
   espacosPossiveis,
   gastarEspaco,
@@ -265,5 +266,57 @@ describe("limite de truques conhecidos", () => {
     expect(contarTruquesExtras([t(false), t(true), t(true)])).toBe(2);
     // a marca num truque não mexe na conta das preparadas
     expect(contarSempre([t(true)])).toBe(0);
+  });
+});
+
+describe("efeito na CA ao conjurar", () => {
+  const base = { resources: [espaco(1, 2)], concentration: false, concentration_on: "", modificadores: [] };
+
+  it("Escudo da Fé liga +2 na CA, preso à concentração (nome em português ou inglês)", () => {
+    expect(efeitoDeCa("Escudo da Fé")).toEqual({ delta: 2, concentracao: true });
+    expect(efeitoDeCa("shield of faith")).toEqual({ delta: 2, concentracao: true });
+    const r = conjurar(base, { nome: "Escudo da Fé", nivel: 1, concentracao: true, ritual: false })!;
+    expect(r.mudanca.modificadores).toEqual([{ nome: "Escudo da Fé", campo: "ca", delta: 2, ativo: true, concentracao: true }]);
+    expect(r.resumo).toContain("CA +2");
+  });
+
+  it("magia cadastrada à mão sem a marca de concentração também segura a concentração", () => {
+    const r = conjurar(base, { nome: "Escudo da fé", nivel: 1, concentracao: false, ritual: false })!;
+    expect(r.mudanca.concentration_on).toBe("Escudo da fé");
+  });
+
+  it("Escudo Arcano dá +5 sem concentração", () => {
+    const r = conjurar(base, { nome: "Escudo arcano", nivel: 1, concentracao: false, ritual: false })!;
+    expect(r.mudanca.modificadores).toEqual([{ nome: "Escudo arcano", campo: "ca", delta: 5, ativo: true }]);
+    expect(r.mudanca.concentration).toBeUndefined();
+  });
+
+  it("conjurar de novo não empilha: troca o efeito que já existia", () => {
+    const antes = { ...base, modificadores: [{ nome: "Escudo da Fé", campo: "ca" as const, delta: 2, ativo: false, concentracao: true }] };
+    const r = conjurar(antes, { nome: "Escudo da Fé", nivel: 1, concentracao: true, ritual: false })!;
+    expect(r.mudanca.modificadores).toHaveLength(1);
+    expect(r.mudanca.modificadores![0].ativo).toBe(true);
+  });
+
+  it("concentrar em outra magia desliga o efeito da anterior, mas não mexe nos outros modificadores", () => {
+    const segurando = {
+      ...base,
+      concentration: true,
+      concentration_on: "Escudo da Fé",
+      modificadores: [
+        { nome: "Escudo da Fé", campo: "ca" as const, delta: 2, ativo: true, concentracao: true },
+        { nome: "Feitiçaria Inata", campo: "cd_magia" as const, delta: 1, ativo: true },
+      ],
+    };
+    const r = conjurar(segurando, { nome: "Bênção", nivel: 1, concentracao: true, ritual: false })!;
+    expect(r.mudanca.modificadores).toEqual([
+      { nome: "Escudo da Fé", campo: "ca", delta: 2, ativo: false, concentracao: true },
+      { nome: "Feitiçaria Inata", campo: "cd_magia", delta: 1, ativo: true },
+    ]);
+  });
+
+  it("magia sem efeito conhecido não toca nos modificadores", () => {
+    const r = conjurar(base, { nome: "Bênção", nivel: 1, concentracao: true, ritual: false })!;
+    expect(r.mudanca.modificadores).toBeUndefined();
   });
 });

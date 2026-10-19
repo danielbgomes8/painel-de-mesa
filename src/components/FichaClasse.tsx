@@ -295,6 +295,7 @@ const NOME_CAMPO: Record<CampoModificavel, string> = {
   cd_magia: "CD de magia",
   ataque_magia: "Ataque de magia",
   pp: "PP",
+  ca: "CA",
 };
 
 /** Formulário pra cadastrar um modificador novo — nome livre + campo que

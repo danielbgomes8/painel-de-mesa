@@ -19,6 +19,7 @@ import {
   PERICIAS,
   pvAoSubir,
   somaModificadores,
+  efeitosDeCa,
 } from "@/lib/regras";
 import { CampoNumero } from "@/components/CampoNumero";
 import { SecaoRecolhivel } from "@/components/SecaoRecolhivel";
@@ -239,7 +240,7 @@ export function FichaClassicaJogador({
                 cartão de combate, que é onde mudam durante a luta. */}
             {!doJogador && (
               <>
-                <Tile rotulo="CA" valor={p.ac} termo={termoCartao} />
+                <Tile rotulo="CA" valor={p.ac + efeitosDeCa(p).bonus} termo={termoCartao} />
                 <Tile rotulo="Iniciativa" valor={sinal(p.init_mod)} termo={termoCartao} />
                 <Tile rotulo="Deslocamento" valor={formatarMetros(p.speed)} termo={termoCartao} />
               </>

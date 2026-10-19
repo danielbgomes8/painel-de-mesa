@@ -22,6 +22,7 @@ import {
   rotuloDeNivel,
 } from "@/lib/magias";
 import { NOME_CLASSE } from "@/lib/classesNomes";
+import { efeitosDeCa } from "@/lib/regras";
 import { CampoTexto } from "@/components/CampoTexto";
 import { CampoTextoAdiado } from "@/components/CampoTextoAdiado";
 import { BotaoRemover } from "@/components/BotaoRemover";
@@ -53,6 +54,10 @@ export function MagiasPersonagem({
   const [aberta, setAberta] = useState<number | null>(null);
   const [conjurando, setConjurando] = useState<number | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** Confirmação do que acabou de acontecer ("Escudo da Fé conjurada...") — fica até o próximo toque. */
+  const [feito, setFeito] = useState<string | null>(null);
+  const { efeitos } = efeitosDeCa(p);
+  const modificadores = p.modificadores ?? [];
   const [adicionando, setAdicionando] = useState(false);
   const preparadas = contarPreparadas(magias);
   const sempre = contarSempre(magias);
@@ -106,7 +111,7 @@ export function MagiasPersonagem({
   function conjurarMagia(i: number, opcoes: { nivelDoEspaco?: number; comoRitual?: boolean }) {
     const magia = magias[i];
     const r = conjurar(
-      { resources: p.resources, concentration: p.concentration, concentration_on: p.concentration_on },
+      { resources: p.resources, concentration: p.concentration, concentration_on: p.concentration_on, modificadores },
       magia,
       opcoes,
     );
@@ -117,12 +122,35 @@ export function MagiasPersonagem({
     patch(r.mudanca);
     registrar?.(`${p.name} conjura ${r.resumo}${r.largouConcentracao ? ` (larga a concentração em ${r.largouConcentracao})` : ""}`);
     setAviso(r.largouConcentracao ? `Você largou a concentração em ${r.largouConcentracao}.` : null);
+    const gasto = magia.nivel > 0 && !opcoes.comoRitual ? espacos.find((e) => e.nivel === (opcoes.nivelDoEspaco ?? magia.nivel)) : undefined;
+    setFeito(`Conjurou ${r.resumo}${gasto ? ` · espaço de ${gasto.nivel}º: ${Math.max(0, gasto.cur - 1)} restante${gasto.cur - 1 === 1 ? "" : "s"}` : ""}.`);
     setConjurando(null);
+  }
+
+  /** Encerra um efeito ativo (e, se for de concentração, a própria concentração). */
+  function encerrarEfeito(nome: string, deConcentracao: boolean) {
+    const mudanca: Partial<Personagem> = {
+      modificadores: modificadores.map((m) => (m.campo === "ca" && m.nome === nome ? { ...m, ativo: false } : m)),
+    };
+    if (deConcentracao) Object.assign(mudanca, { concentration: false, concentration_on: "" });
+    patch(mudanca);
+    setFeito(`${nome} encerrada.`);
+  }
+
+  /** Largar a concentração desliga os efeitos que dependiam dela. */
+  function largarConcentracao() {
+    patch({
+      concentration: false,
+      concentration_on: "",
+      modificadores: modificadores.map((m) => (m.concentracao ? { ...m, ativo: false } : m)),
+    });
+    setFeito(null);
   }
 
   function aoToqueConjurar(i: number) {
     const magia = magias[i];
     setAviso(null);
+    setFeito(null);
     // Truque: direto. Magia com um jeito só de conjurar: direto também.
     if (magia.nivel === 0) return conjurarMagia(i, {});
     const possiveis = espacosPossiveis(p.resources, magia.nivel);
@@ -135,19 +163,27 @@ export function MagiasPersonagem({
   }
 
   return (
-    <SecaoRecolhivel abertoInicial={false} titulo={<h4>Magias</h4>}>
+    <SecaoRecolhivel
+      abertoInicial={false}
+      titulo={<h4>Magias</h4>}
+      cabecalhoExtra={
+        // Os espaços ficam no cabeçalho pra aparecer mesmo com a seção fechada.
+        <span className="mg-estado mg-cabeca">
+          {espacos.map((e) => (
+            <span key={e.nivel} className="mg-espaco" data-vazio={e.cur === 0 || undefined}>
+              {e.nivel}º <b>{e.cur}</b>/{e.max}
+            </span>
+          ))}
+          {p.concentration && <span title={`Concentrando${p.concentration_on ? ` em ${p.concentration_on}` : ""}`}>🧠</span>}
+        </span>
+      }
+    >
       <div className="mg">
         <div className="mg-estado">
-          {espacos.length === 0 ? (
+          {espacos.length === 0 && (
             <span className="empty-note">
               Sem espaços de magia — gere em “Classe e conjuração” ou cadastre em Recursos.
             </span>
-          ) : (
-            espacos.map((e) => (
-              <span key={e.nivel} className="mg-espaco" data-vazio={e.cur === 0 || undefined}>
-                {e.nivel}º <b>{e.cur}</b>/{e.max}
-              </span>
-            ))
           )}
           {truques + truquesExtras > 0 && (
             <span className="mg-contagem mg-truques" data-acima={truquesAcima || undefined} title={detalheTruques}>
@@ -166,11 +202,32 @@ export function MagiasPersonagem({
               <button
                 type="button"
                 className="minilink"
-                onClick={() => patch({ concentration: false, concentration_on: "" })}
+                onClick={largarConcentracao}
               >
                 largar
               </button>
             )}
+          </p>
+        )}
+        {efeitos.length > 0 && (
+          <div className="mg-efeitos" aria-label="Efeitos ativos">
+            {efeitos.map((m) => (
+              <span key={m.nome} className="mg-efeito">
+                ✨ <b>{m.nome}</b> · CA {m.delta > 0 ? "+" : ""}
+                {m.delta}
+                {m.concentracao ? " · concentração" : ""}
+                {editavel && (
+                  <button type="button" className="minilink" onClick={() => encerrarEfeito(m.nome, m.concentracao === true)}>
+                    encerrar
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+        {feito && (
+          <p className="mg-feito" role="status" aria-live="polite">
+            ✓ {feito}
           </p>
         )}
         {aviso && (
@@ -212,7 +269,7 @@ export function MagiasPersonagem({
                           title={magia.sempre ? "Sempre preparada: não conta no limite. Desmarque nos detalhes da magia." : undefined}
                           onClick={() => alternarPreparada(indice)}
                         >
-                          {magia.sempre ? "sempre" : magia.preparada ? "preparada" : "preparar"}
+                          {magia.sempre ? "sempre" : magia.preparada ? "✓ preparada" : "preparar"}
                         </button>
                       )}
                       {editavel && (

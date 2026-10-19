@@ -979,6 +979,24 @@ export function somaModificadores(modificadores: Modificador[], campo: CampoModi
     .reduce((acc, m) => acc + m.delta, 0);
 }
 
+/** Efeitos que estão valendo na CA agora e a soma deles. Efeito de concentração
+ *  (Escudo da Fé) só conta enquanto a ficha segue concentrada naquela magia —
+ *  perdeu a concentração, a CA volta sozinha, sem ninguém desligar. */
+export function efeitosDeCa(p: {
+  modificadores?: Modificador[] | null;
+  concentration: boolean;
+  concentration_on: string;
+}): { bonus: number; efeitos: Modificador[] } {
+  const foco = (p.concentration_on ?? "").trim().toLowerCase();
+  const efeitos = (p.modificadores ?? []).filter(
+    (m) =>
+      m.ativo &&
+      m.campo === "ca" &&
+      (!m.concentracao || (p.concentration && foco !== "" && foco === m.nome.trim().toLowerCase())),
+  );
+  return { bonus: efeitos.reduce((acc, m) => acc + m.delta, 0), efeitos };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Bastião — evento do turno (d100)
 // ─────────────────────────────────────────────────────────────────────────────

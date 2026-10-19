@@ -5164,6 +5164,30 @@ input.fj-score:focus-visible {
 .mg-truques + .mg-contagem {
   margin-left: 12px;
 }
+.mg-cabeca {
+  margin-left: auto;
+  gap: 6px;
+}
+.mg-efeitos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mg-efeito {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 99px;
+  padding: 4px 12px;
+}
+.mg-feito {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ok);
+}
 .mg-conc {
   margin: 0;
   font-size: 13px;

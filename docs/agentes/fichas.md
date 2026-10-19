@@ -228,6 +228,10 @@ entra no botão ↩ Desfazer (`lembrarDesfazer`, igual aos PV). Quem pode: o don
   "Habilidades de <Classe>" na ficha completa — sem duplicar se o nível for refeito e sem apagar o que o jogador escreveu.
 - **Bônus de proficiência** é derivado do nível (nada a gravar), mas CD/resistências/percepção do cartão NÃO mudam sozinhos
   (o cartão manda, item mágico soma por cima): quando a proficiência sobe, a confirmação manda usar "usar o calculado".
+- **Contadores da classe** (19/10/2026, `RECURSOS_DE_CLASSE`): o botão também sobe o máximo de Fúria, Canalizar Divindade, Segundo Fôlego,
+  Pontos de Foco, Pontos de Feitiçaria e Mãos Consagradas (valores da tabela do SRD 5.2). Acha o contador pelo nome (sem acento), o
+  gasto continua gasto, e cria o contador só no nível em que a habilidade nasce. Forma Selvagem fica de fora (fonte sem tabela). Antes
+  só os espaços subiam e o resto ficava velho — foi o "ficou pela metade" do Daniel e da Bárbara.
 - **Multiclasse nova** (primeiro nível de uma classe que o personagem ainda não tem) NÃO está aqui: continua sendo cadastrar a
   classe em "Classe e conjuração". O botão sobe níveis de classes que já estão na ficha. Teto de 20 no total.
 - Robô: `e2e/subirDeNivel.e2e.ts` (Paladino 3→4 com +1 FOR/+1 CON, PV retroativo, log, habilidades na ficha completa e desfazer).
@@ -280,3 +284,7 @@ barra e "Faltam 1.450 XP pro nível 4" ou "XP suficiente pro nível 4"). Contas 
 - Log: toda linha começa com 🏅 ("🏅 Ana ganhou 300 XP (total 1.250)"); o recap da sessão ganhou a seção "XP" com essas linhas.
 - **Não cobre**: calcular o XP pelos monstros derrotados (o catálogo tem o XP por ND, mas o app não sabe quem morreu "de verdade"),
   XP por jogador diferente no mesmo prêmio, e subir o nível automático ao bater o limite.
+
+## Efeito de magia na CA (19/10/2026, sem migration)
+
+O Daniel jogou de Paladino e conjurou Escudo da Fé: o app gastava o espaço e ligava a concentração, mas a CA não mudava. Hoje `conjurar` (`lib/magias.ts`) também liga um **Modificador** de campo `"ca"` (o mesmo sistema de "Modificadores" da ficha de classe, então sem coluna nova) para as magias de `EFEITOS_DE_CA`: Escudo da Fé +2 e Velocidade +2 (concentração), Escudo Arcano +5 (sem concentração, encerra à mão). **A CA digitada (`p.ac`) nunca é alterada**: as telas mostram `p.ac + efeitosDeCa(p).bonus` (`regras.ts`). Efeito de concentração (`Modificador.concentracao`) só conta enquanto `concentration_on` for o nome dele — perdeu a concentração, a CA volta sozinha. Armadura Arcana fica de fora de propósito (troca a conta da CA, não soma). Tela de CA nova deve usar `efeitosDeCa`. Os espaços de magia agora ficam no cabeçalho da seção Magias (visíveis fechada), e conjurar mostra uma confirmação (`.mg-feito`). Robô: `e2e/inventario.e2e.ts`.

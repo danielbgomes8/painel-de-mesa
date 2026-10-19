@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Sala } from "@/hooks/useSala";
 import type { Personagem } from "@/lib/tipos";
 import { AURA_MAXIMA_M, AURAS_PRONTAS_M, auraValida } from "@/lib/pecas";
-import { estaCaido, formatarMetros } from "@/lib/regras";
+import { efeitosDeCa, estaCaido, formatarMetros } from "@/lib/regras";
 import { mudarPVComLog } from "@/components/FichaPersonagem";
 import { AcoesNaLinha, avancarTurno } from "@/components/RastreadorCombate";
 
@@ -83,7 +83,7 @@ export function CartaoDoPeao({
           {p.hp}/{p.hp_max} PV
         </span>
         {p.hp_temp > 0 && <span className="hptemp">+{p.hp_temp}</span>}
-        <span className="mapa-cartao-ca">CA {p.ac}</span>
+        <span className="mapa-cartao-ca">CA {p.ac + efeitosDeCa(p).bonus}</span>
         {vez ? <span className="mapa-cartao-vez">é a vez</span> : !naOrdem && <span className="fc-sub">fora da iniciativa</span>}
       </div>
       {(vez || (souMestre && (aoAlternarOculto || npc))) && (

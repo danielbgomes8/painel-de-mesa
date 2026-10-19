@@ -59,6 +59,7 @@ import {
   nivelTotal,
   percepcaoPassiva,
   somaModificadores,
+  efeitosDeCa,
   adicionarAoEncontro,
   limitarQuantidade,
   nomesDoGrupo,
@@ -920,5 +921,24 @@ describe("PV ao subir de nível (2024)", () => {
     expect(pvAoSubir("", 2)).toBeNull();
     expect(pvAoSubir("1d10", 2)).toBeNull();
     expect(pvAoSubir("d1", 2)).toBeNull();
+  });
+});
+
+describe("efeitosDeCa", () => {
+  const escudo = { nome: "Escudo da Fé", campo: "ca" as const, delta: 2, ativo: true, concentracao: true };
+  it("soma o efeito enquanto a ficha segue concentrada nele", () => {
+    const r = efeitosDeCa({ modificadores: [escudo], concentration: true, concentration_on: "escudo da fé" });
+    expect(r.bonus).toBe(2);
+    expect(r.efeitos).toHaveLength(1);
+  });
+  it("perdeu a concentração: volta a CA sozinha, mesmo com o efeito ainda ligado", () => {
+    expect(efeitosDeCa({ modificadores: [escudo], concentration: false, concentration_on: "" }).bonus).toBe(0);
+    expect(efeitosDeCa({ modificadores: [escudo], concentration: true, concentration_on: "Bênção" }).bonus).toBe(0);
+  });
+  it("efeito sem concentração vale ligado; desligado ou de outro campo não conta", () => {
+    const arcano = { nome: "Escudo arcano", campo: "ca" as const, delta: 5, ativo: true };
+    const mods = [arcano, { ...arcano, nome: "x", ativo: false }, { nome: "y", campo: "pp" as const, delta: 9, ativo: true }];
+    expect(efeitosDeCa({ modificadores: mods, concentration: false, concentration_on: "" }).bonus).toBe(5);
+    expect(efeitosDeCa({ modificadores: null, concentration: false, concentration_on: "" }).bonus).toBe(0);
   });
 });

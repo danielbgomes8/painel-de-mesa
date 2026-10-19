@@ -81,6 +81,45 @@ test("magias: catálogo, preparar, conjurar com espaço, concentração e log", 
   expect(erros).toEqual([]);
 });
 
+test("magias: Escudo da Fé soma +2 na CA enquanto concentra, e encerrar devolve a CA", async ({ page }) => {
+  const erros = coletarErros(page);
+  await mudarFicha("ana-robo", {
+    ac: 18,
+    resources: ESPACOS,
+    concentration: false,
+    concentration_on: "",
+    modificadores: [],
+    magias: [{ nome: "Escudo da Fé", nivel: 1, preparada: true, concentracao: true }],
+  });
+  await comoJogador(page, "ana-robo");
+  await page.goto(`/?sala=${SALA}`);
+  await page.getByRole("button", { name: "Fichas", exact: true }).click();
+  await page.locator(".fc-sechead", { hasText: "Magias" }).click();
+
+  await page.locator(".mg-item", { hasText: "Escudo da Fé" }).getByRole("button", { name: "conjurar" }).click();
+  await page.getByRole("group", { name: /Como conjurar Escudo da Fé/ }).getByRole("button", { name: "1º (4)" }).click();
+  await expect(page.locator(".mg-feito")).toContainText("Conjurou Escudo da Fé");
+  await expect(page.locator(".mg-efeito")).toContainText("CA +2");
+  await expect(page.getByText("18 base → 20 com Escudo da Fé")).toBeVisible();
+  await expect
+    .poll(async () => JSON.stringify(((await fichaDoBanco("ana-robo")).modificadores as { nome: string; ativo: boolean }[]).map((m) => [m.nome, m.ativo])))
+    .toBe(JSON.stringify([["Escudo da Fé", true]]));
+  // O número que o Mestre/jogador digitou não muda: o +2 é só mostrado.
+  expect((await fichaDoBanco("ana-robo")).ac).toBe(18);
+
+  await page.locator(".mg-efeito").getByRole("button", { name: "encerrar" }).click();
+  await expect(page.locator(".mg-efeito")).toHaveCount(0);
+  await expect(page.getByText("com Escudo da Fé")).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const f = await fichaDoBanco("ana-robo");
+      return JSON.stringify([f.concentration, (f.modificadores as { ativo: boolean }[]).map((m) => m.ativo)]);
+    })
+    .toBe(JSON.stringify([false, [false]]));
+
+  expect(erros).toEqual([]);
+});
+
 test("inventário: moedas, item que empilha, peso e limite de sintonia", async ({ page }) => {
   const erros = coletarErros(page);
   await comoJogador(page, "ana-robo");

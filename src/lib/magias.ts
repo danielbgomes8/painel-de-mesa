@@ -9,7 +9,7 @@
  * concentração que a ficha já tem (`concentration`/`concentration_on`).
  */
 import { PREFIXO_ESPACO_MAGIA } from "./regras";
-import type { ClasseBase, ClassePersonagem, MagiaPersonagem, Recurso } from "./tipos";
+import type { ClasseBase, ClassePersonagem, MagiaPersonagem, Modificador, Recurso } from "./tipos";
 
 export const NIVEL_MAXIMO_MAGIA = 9;
 
@@ -102,7 +102,26 @@ export type EstadoConjuracao = {
   resources: Recurso[];
   concentration: boolean;
   concentration_on: string;
+  /** Efeitos de magia (hoje só CA). Só entra na `mudanca` quando a conjuração liga ou desliga algum. */
+  modificadores?: Modificador[];
 };
+
+/** Magias cujo efeito é um bônus fixo na CA — as únicas que o app sabe aplicar sozinho
+ *  (conferido no SRD 5.2). Chave: nome em português e em inglês, em minúsculas.
+ *  Armadura Arcana não entra: ela TROCA a conta da CA (13 + Des), não soma. */
+const EFEITOS_DE_CA: { nomes: string[]; delta: number; concentracao: boolean }[] = [
+  { nomes: ["escudo da fé", "shield of faith"], delta: 2, concentracao: true },
+  { nomes: ["velocidade", "haste"], delta: 2, concentracao: true },
+  // Dura até o começo do seu próximo turno: o jogador encerra à mão.
+  { nomes: ["escudo arcano", "shield"], delta: 5, concentracao: false },
+];
+
+/** O efeito na CA de uma magia, ou null se o app não conhece (ou se não é de CA). */
+export function efeitoDeCa(nomeDaMagia: string): { delta: number; concentracao: boolean } | null {
+  const n = nomeDaMagia.trim().toLowerCase();
+  const e = EFEITOS_DE_CA.find((x) => x.nomes.includes(n));
+  return e ? { delta: e.delta, concentracao: e.concentracao } : null;
+}
 
 export type ResultadoConjuracao = {
   /** Os campos da ficha que mudam, prontos pro `patch` (só os que mudaram). */
@@ -140,8 +159,13 @@ export function conjurar(
     resumo = `${magia.nome} (ritual)`;
   }
 
+  const efeito = efeitoDeCa(magia.nome);
+  const concentra = magia.concentracao || efeito?.concentracao === true;
+  let modificadores = estado.modificadores ?? [];
+  let mexeuNosEfeitos = false;
+
   let largouConcentracao: string | null = null;
-  if (magia.concentracao) {
+  if (concentra) {
     if (estado.concentration) {
       const antes = estado.concentration_on.trim();
       if (antes && antes.toLowerCase() !== magia.nome.toLowerCase()) largouConcentracao = antes;
@@ -149,7 +173,24 @@ export function conjurar(
     }
     mudanca.concentration = true;
     mudanca.concentration_on = magia.nome;
+    // Largou a concentração anterior: o efeito dela desliga junto (só os que dependiam de concentração).
+    if (largouConcentracao) {
+      const eraDela = (m: Modificador) => m.concentracao === true && m.ativo && m.nome.trim().toLowerCase() !== magia.nome.trim().toLowerCase();
+      if (modificadores.some(eraDela)) {
+        modificadores = modificadores.map((m) => (eraDela(m) ? { ...m, ativo: false } : m));
+        mexeuNosEfeitos = true;
+      }
+    }
   }
+
+  if (efeito) {
+    const nova: Modificador = { nome: magia.nome, campo: "ca", delta: efeito.delta, ativo: true, ...(efeito.concentracao ? { concentracao: true } : {}) };
+    const ja = modificadores.findIndex((m) => m.campo === "ca" && m.nome.trim().toLowerCase() === magia.nome.trim().toLowerCase());
+    modificadores = ja === -1 ? [...modificadores, nova] : modificadores.map((m, i) => (i === ja ? nova : m));
+    mexeuNosEfeitos = true;
+    resumo = `${resumo} (CA ${efeito.delta > 0 ? "+" : ""}${efeito.delta})`;
+  }
+  if (mexeuNosEfeitos) mudanca.modificadores = modificadores;
 
   return { mudanca, resumo, largouConcentracao };
 }

@@ -12,6 +12,7 @@ import {
   alternarPips,
   deslocamentoEfetivo,
   efeitoExaustao,
+  efeitosDeCa,
   estaCaido,
   EXAUSTAO_MAX,
   faixaPV,
@@ -192,7 +193,13 @@ export function FichaPersonagem({
             {editavel ? (
               <CampoNumero valor={p.ac} onCommit={(n) => patch({ ac: n })} />
             ) : (
-              <div className="val">{p.ac}</div>
+              <div className="val">{p.ac + efeitosDeCa(p).bonus}</div>
+            )}
+            {efeitosDeCa(p).bonus !== 0 && (
+              <div className="fc-sub" title={efeitosDeCa(p).efeitos.map((m) => m.nome).join(", ")}>
+                {editavel ? `${p.ac} base → ` : ""}
+                {p.ac + efeitosDeCa(p).bonus} com {efeitosDeCa(p).efeitos.map((m) => m.nome).join(" + ")}
+              </div>
             )}
           </div>
           <div className="stat">
