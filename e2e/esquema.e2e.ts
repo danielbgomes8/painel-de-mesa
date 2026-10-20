@@ -261,6 +261,7 @@ const TABELAS: { tabela: string; colunas: string[] }[] = [
       titulo: true,
       subtitulo: true,
       foto: true,
+      fotos: true,
       texto: true,
       segredo: true,
       revelacao: true,

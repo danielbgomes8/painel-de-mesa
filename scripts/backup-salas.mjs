@@ -155,7 +155,7 @@ export async function copiarImagens({ url, copias, pasta, buscar = fetch, gravar
     // A imagem de cada mapa e a foto de cada cartão do Quadro: mesmo bucket.
     const citadas = [
       ...(dados.cenas ?? []).map((cena) => cena.imagem),
-      ...(dados.quadro_cartoes ?? []).map((cartao) => cartao.foto),
+      ...(dados.quadro_cartoes ?? []).flatMap((cartao) => [cartao.foto, ...(Array.isArray(cartao.fotos) ? cartao.fotos : [])]),
       ...(dados.folhas ?? []).map((folha) => folha.foto),
     ];
     for (const citada of citadas) {

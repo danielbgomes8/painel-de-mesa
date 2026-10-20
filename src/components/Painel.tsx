@@ -303,8 +303,9 @@ function PainelSala({ codigo }: { codigo: string }) {
         <RelogiosNaMesa relogios={relogios.relogios} telao />
         {quadro.destaque && (
           <DestaqueDoCartao
+            key={`${quadro.destaque.id}-${quadro.destaque.destaque_em}`}
             cartao={quadro.destaque}
-            url={quadro.urlDaFoto(quadro.destaque)}
+            urls={quadro.urlsDasFotos(quadro.destaque)}
             aoFechar={quadro.dispensarDestaque}
             fecharSozinhoEmMs={30000}
           />
@@ -555,7 +556,7 @@ function PainelSala({ codigo }: { codigo: string }) {
       {(abaEfetiva === "combate" || abaEfetiva === "fichas") && <BarraDesfazer sala={sala} />}
 
       {quadro.destaque && (
-        <DestaqueDoCartao cartao={quadro.destaque} url={quadro.urlDaFoto(quadro.destaque)} aoFechar={quadro.dispensarDestaque} />
+        <DestaqueDoCartao key={`${quadro.destaque.id}-${quadro.destaque.destaque_em}`} cartao={quadro.destaque} urls={quadro.urlsDasFotos(quadro.destaque)} aoFechar={quadro.dispensarDestaque} />
       )}
       </EfeitosContext.Provider>
     </EventosContext.Provider>

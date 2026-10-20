@@ -375,3 +375,65 @@ test("telão: o cartão mostrado pelo Mestre aparece em tela cheia (silhueta só
   expect(errosTelao).toEqual([]);
   await tv.close();
 });
+
+test("várias fotos: adicionar de uma vez, galeria, tirar a capa, limite de 6 e rodízio no telão", async ({ browser, page }) => {
+  test.setTimeout(180_000);
+  await limparSala();
+  const erros = coletarErros(page);
+  const foto = (n: number) => ({ name: `f${n}.png`, mimeType: "image/png", buffer: pngDeTeste(300 + n * 10, 400) });
+  const fotosDoBanco = async () => {
+    const r = await rest(`quadro_cartoes?select=foto,fotos&room_code=eq.${SALA}`);
+    return ((await r.json()) as { foto: string | null; fotos: string[] }[])[0];
+  };
+
+  await entrarComoMestre(page);
+  await page.getByRole("button", { name: "Campanha", exact: true }).click();
+  await page.getByRole("button", { name: "+ cartão" }).click();
+  await page.getByLabel("Nome do cartão").fill("Galeria do Barão");
+  await page.locator(".qd-form input[type=file]").setInputFiles(foto(0));
+  await page.getByRole("button", { name: "Criar cartão" }).click();
+  const folha = page.locator(".qd-folha");
+  await expect(folha).toBeVisible({ timeout: 30_000 });
+
+  // Duas de uma vez: viram 3 no total (capa + 2 extras).
+  const campo = folha.locator("input[type=file]");
+  await campo.setInputFiles([foto(1), foto(2)]);
+  await expect(folha.locator(".qd-galeria .qd-foto")).toHaveCount(3, { timeout: 30_000 });
+  await expect(folha.locator(".qd-contagem")).toHaveText("1/3");
+  await expect(folha.locator(".qd-miniaturas li")).toHaveCount(3);
+  let b = await fotosDoBanco();
+  expect(b.foto).toMatch(/quadro\//);
+  expect(b.fotos).toHaveLength(2);
+  const capaAntiga = b.foto;
+
+  // Tirar a capa: a primeira extra assume.
+  await folha.getByRole("button", { name: "Tirar a foto 1" }).click();
+  await expect(folha.locator(".qd-galeria .qd-foto")).toHaveCount(2, { timeout: 15_000 });
+  b = await fotosDoBanco();
+  expect(b.foto).not.toBe(capaAntiga);
+  expect(b.fotos).toHaveLength(1);
+
+  // Passou do limite: entram só as que cabem (6 no total) e a tela avisa.
+  await campo.setInputFiles([foto(3), foto(4), foto(5), foto(6), foto(7)]);
+  await expect(folha.locator(".qd-galeria .qd-foto")).toHaveCount(6, { timeout: 60_000 });
+  await expect(folha).toContainText("ficaram de fora");
+  await expect(campo).toBeDisabled();
+  b = await fotosDoBanco();
+  expect(1 + b.fotos.length).toBe(6);
+
+  // Telão: o destaque troca de foto sozinho.
+  const tv = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const telao = await tv.newPage();
+  await telao.goto(`/?sala=${SALA}&telao=1`);
+  await expect(telao.locator(".telao")).toBeVisible();
+  const destaque = telao.locator(".qd-destaque");
+  await expect(async () => {
+    await page.getByRole("button", { name: "📣 Mostrar à mesa agora" }).click();
+    await expect(destaque).toBeVisible({ timeout: 4000 });
+  }).toPass({ timeout: 45_000 });
+  await expect(destaque.locator(".qd-pontos span")).toHaveCount(6);
+  const primeira = await destaque.locator("img").getAttribute("src");
+  await expect.poll(() => destaque.locator("img").getAttribute("src"), { timeout: 10_000 }).not.toBe(primeira);
+  await tv.close();
+  expect(erros).toEqual([]);
+});
