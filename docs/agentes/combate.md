@@ -43,6 +43,13 @@
   devolve `entraram` — sem isso, toque duplo no celular punha a pessoa duas
   vezes na ordem (dois turnos) e, depois de corrigido, ainda logava duas
   vezes que ela entrou. Achado testando com dois toques de propósito.
+- **Editar/trocar a iniciativa** (20/10/2026, sem migration): tocar no número da linha abre
+  `EditarIniciativa` — digitar outro número ou "Trocar com…" um aliado (talento Alerta, 2024: o jogador
+  trocava e o Mestre é quem fazia o ajuste). O Mestre edita qualquer linha; o jogador só a do próprio
+  personagem, e troca só com outros jogadores na ordem. Regra em `mudarIniciativas`/`trocarIniciativas`
+  (`regras.ts`): reordena **mantendo o turno na mesma pessoa**; companheiros seguem o número do dono.
+  Vai pro log ("X mudou a iniciativa de 12 para 18" / "X trocou de iniciativa com Y", por `nomeNoLog`) e dá pra desfazer.
+  Não exige que o aliado "topou": a troca é do jogador, o Mestre desfaz se for abuso.
 - **Encontros preparados** (tabela `encontros`, migration `0016`,
   `EncontrosPreparados.tsx`): o Mestre monta o grupo inimigo antes da sessão
   na aba Mestre ("Emboscada na ponte: 3× Goblin + 1× Chefe goblin"),

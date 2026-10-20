@@ -596,6 +596,37 @@ export function entrarNaOrdem(
 }
 
 /**
+ * Muda a iniciativa de uma ou mais pessoas (`novos`: slug → número) e reordena,
+ * mantendo o turno apontando pra QUEM estava na vez — sem isso, subir a
+ * iniciativa de alguém passaria a vez pra outra pessoa. Slug que não está na
+ * ordem é ignorado. Empate: quem já estava antes continua na frente.
+ */
+export function mudarIniciativas(
+  ordem: ItemIniciativa[],
+  turno: number,
+  novos: Record<string, number>,
+): { ordem: ItemIniciativa[]; turn: number } {
+  const daVez = ordem[turno]?.slug;
+  const mexida = ordem.map((o) => (o.slug in novos ? { ...o, init: novos[o.slug] } : o));
+  const nova = ordenarPorIniciativa(mexida);
+  const i = daVez ? nova.findIndex((o) => o.slug === daVez) : -1;
+  return { ordem: nova, turn: i < 0 ? 0 : i };
+}
+
+/** Os dois trocam de número (talento Alerta, 2024). Devolve null se algum não está na ordem. */
+export function trocarIniciativas(
+  ordem: ItemIniciativa[],
+  turno: number,
+  slugA: string,
+  slugB: string,
+): { ordem: ItemIniciativa[]; turn: number } | null {
+  const a = ordem.find((o) => o.slug === slugA);
+  const b = ordem.find((o) => o.slug === slugB);
+  if (!a || !b || slugA === slugB) return null;
+  return mudarIniciativas(ordem, turno, { [slugA]: b.init, [slugB]: a.init });
+}
+
+/**
  * Índice do turno depois de remover a posição `removida` da ordem.
  * Mantém o turno apontando pra mesma pessoa quando possível.
  */
