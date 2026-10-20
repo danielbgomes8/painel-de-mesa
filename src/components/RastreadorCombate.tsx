@@ -24,6 +24,8 @@ import {
   metadeDoDano,
   nomeExibidoIniciativa,
   nomeNoLog,
+  mudarIniciativas,
+  trocarIniciativas,
   numerarNpcsNaOrdem,
   podeEditarPersonagem,
   proximoTurno,
@@ -125,6 +127,8 @@ export function RastreadorCombate({
   const mapa = sala.semInternet ? null : cenaNaMesa;
 
   const [quem, setQuem] = useState(NOVO_NPC);
+  // Linha cujo número da iniciativa está sendo editado (o jogador só abre a própria).
+  const [editandoIni, setEditandoIni] = useState<string | null>(null);
   const [nomeNpc, setNomeNpc] = useState("");
   const [pvNpc, setPvNpc] = useState("");
   const [caNpc, setCaNpc] = useState("");
@@ -378,6 +382,61 @@ export function RastreadorCombate({
     .filter((x): x is Personagem => Boolean(x) && temCovil(x!.resources ?? []))
     .map((x) => x.name);
 
+  /** Mestre: qualquer linha. Jogador: só a do próprio personagem (os companheiros seguem o dono). */
+  function podeEditarIni(slug: string): boolean {
+    if (souMestre) return true;
+    return Boolean(meuPersonagem) && slug === meuPersonagem!.slug;
+  }
+
+  /** Quem muda junto com `slug`: ele mesmo e os companheiros dele (agem na iniciativa do dono). */
+  function grupoDe(slug: string): string[] {
+    return [slug, ...companheirosQueSaemJunto(personagens, slug)];
+  }
+
+  async function salvarIniciativa(slug: string, novo: number) {
+    const antes = combate.order.find((o) => o.slug === slug);
+    if (!antes || antes.init === novo) {
+      setEditandoIni(null);
+      return;
+    }
+    const feito = await sala.definirCombate((atual) => {
+      if (!atual.order.some((o) => o.slug === slug)) return {};
+      const r = mudarIniciativas(atual.order, atual.turn, Object.fromEntries(grupoDe(slug).map((x) => [x, novo])));
+      return { order: r.ordem, turn: r.turn };
+    });
+    if (!feito) return;
+    setEditandoIni(null);
+    const ficha = pvDe(slug);
+    const linha = `${ficha ? nomeNoLog(ficha) : antes.name} mudou a iniciativa de ${antes.init} para ${novo}`;
+    sala.registrarLog(linha);
+    sala.lembrarDesfazer({ rotulo: linha, textoLog: textoDesfeito([linha], ""), personagens: [], combate: feito, criados: [] });
+  }
+
+  /** Talento Alerta (2024): troca o número com um aliado que topou. */
+  async function trocarIniciativa(slug: string, outro: string) {
+    let trocou = false;
+    const feito = await sala.definirCombate((atual) => {
+      const a = atual.order.find((o) => o.slug === slug);
+      const b = atual.order.find((o) => o.slug === outro);
+      const r = trocarIniciativas(atual.order, atual.turn, slug, outro);
+      if (!a || !b || !r) return {};
+      // Os companheiros de cada um acompanham o número do dono.
+      const novos: Record<string, number> = {};
+      for (const x of grupoDe(slug)) novos[x] = b.init;
+      for (const x of grupoDe(outro)) novos[x] = a.init;
+      const m = mudarIniciativas(atual.order, atual.turn, novos);
+      trocou = true;
+      return { order: m.ordem, turn: m.turn };
+    });
+    if (!feito || !trocou) return;
+    setEditandoIni(null);
+    const f1 = pvDe(slug);
+    const f2 = pvDe(outro);
+    const linha = `${f1 ? nomeNoLog(f1) : slug} trocou de iniciativa com ${f2 ? nomeNoLog(f2) : outro}`;
+    sala.registrarLog(linha);
+    sala.lembrarDesfazer({ rotulo: linha, textoLog: textoDesfeito([linha], ""), personagens: [], combate: feito, criados: [] });
+  }
+
   function trocar(i: number, j: number) {
     if (j < 0 || j >= combate.order.length) return;
     sala.definirCombate((atual) => {
@@ -454,7 +513,20 @@ export function RastreadorCombate({
           return (
             <Fragment key={`${c.slug}-${i}`}>
               <div className={`initrow${i === combate.turn ? " turn" : ""}`}>
-                <div className="n">{c.init}</div>
+                {podeEditarIni(c.slug) ? (
+                  <button
+                    type="button"
+                    className="n nbtn"
+                    aria-expanded={editandoIni === c.slug}
+                    aria-label={`Editar iniciativa (${c.init})`}
+                    title="Editar ou trocar a iniciativa"
+                    onClick={() => setEditandoIni(editandoIni === c.slug ? null : c.slug)}
+                  >
+                    {c.init}
+                  </button>
+                ) : (
+                  <div className="n">{c.init}</div>
+                )}
                 {podeAjustar ? (
                   // A linha toda (nome + PV) é o alvo do toque: é o gesto mais
                   // repetido do combate, feito no celular com a mesa esperando.
@@ -516,6 +588,19 @@ export function RastreadorCombate({
                   <span />
                 )}
               </div>
+              {editandoIni === c.slug && podeEditarIni(c.slug) && (
+                <EditarIniciativa
+                  atual={c.init}
+                  nome={nomeExibido}
+                  outros={combate.order
+                    .filter((o) => o.slug !== c.slug)
+                    .map((o) => ({ o, f: pvDe(o.slug) }))
+                    .filter(({ f }) => f && !f.is_npc)
+                    .map(({ o }) => ({ slug: o.slug, nome: o.name, init: o.init }))}
+                  onSalvar={(n) => salvarIniciativa(c.slug, n)}
+                  onTrocar={(outro) => trocarIniciativa(c.slug, outro)}
+                />
+              )}
               {pv && (caido || conds.length > 0 || exaustao > 0) && (
                 <div className="initconds">
                   {caido && pv && (
@@ -951,6 +1036,60 @@ function MinhaIniciativa({ sala, personagem }: { sala: Sala; personagem: Persona
         estou surpreso (desvantagem)
       </label>
       {dica && <p className="empty-note">{dica}</p>}
+    </div>
+  );
+}
+
+/** Painel que abre embaixo da linha: digitar outro número ou trocar com um aliado (talento Alerta). */
+function EditarIniciativa({
+  atual,
+  nome,
+  outros,
+  onSalvar,
+  onTrocar,
+}: {
+  atual: number;
+  nome: string;
+  outros: { slug: string; nome: string; init: number }[];
+  onSalvar: (n: number) => void;
+  onTrocar: (slug: string) => void;
+}) {
+  const [texto, setTexto] = useState(String(atual));
+  const [alvo, setAlvo] = useState("");
+  const n = Number.parseInt(texto, 10);
+  return (
+    <div className="editini" role="group" aria-label={`Iniciativa de ${nome}`}>
+      <div className="editini-linha">
+        <input
+          className="num"
+          type="number"
+          inputMode="numeric"
+          aria-label="Nova iniciativa"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !Number.isNaN(n)) onSalvar(n);
+          }}
+        />
+        <button type="button" className="btn" disabled={Number.isNaN(n)} onClick={() => onSalvar(n)}>
+          Salvar
+        </button>
+      </div>
+      {outros.length > 0 && (
+        <div className="editini-linha">
+          <select aria-label="Trocar iniciativa com" value={alvo} onChange={(e) => setAlvo(e.target.value)}>
+            <option value="">Trocar com…</option>
+            {outros.map((o) => (
+              <option key={o.slug} value={o.slug}>
+                {o.nome} ({o.init})
+              </option>
+            ))}
+          </select>
+          <button type="button" className="btn" disabled={!alvo} onClick={() => onTrocar(alvo)}>
+            Trocar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

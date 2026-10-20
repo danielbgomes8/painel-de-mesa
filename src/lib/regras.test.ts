@@ -49,6 +49,8 @@ import {
   situacaoMorte,
   turnoAposRemover,
   turnoAposTrocar,
+  mudarIniciativas,
+  trocarIniciativas,
   ataqueMagia,
   bonusPericia,
   bonusProficiencia,
@@ -940,5 +942,32 @@ describe("efeitosDeCa", () => {
     const mods = [arcano, { ...arcano, nome: "x", ativo: false }, { nome: "y", campo: "pp" as const, delta: 9, ativo: true }];
     expect(efeitosDeCa({ modificadores: mods, concentration: false, concentration_on: "" }).bonus).toBe(5);
     expect(efeitosDeCa({ modificadores: null, concentration: false, concentration_on: "" }).bonus).toBe(0);
+  });
+});
+
+describe("mudar e trocar iniciativa", () => {
+  const ordem = [
+    { slug: "a", name: "A", init: 20 },
+    { slug: "b", name: "B", init: 15 },
+    { slug: "c", name: "C", init: 10 },
+  ];
+  it("reordena e o turno continua na mesma pessoa", () => {
+    const r = mudarIniciativas(ordem, 1, { c: 25 });
+    expect(r.ordem.map((o) => o.slug)).toEqual(["c", "a", "b"]);
+    expect(r.turn).toBe(2); // B continua na vez
+  });
+  it("slug fora da ordem não muda nada", () => {
+    const r = mudarIniciativas(ordem, 0, { z: 99 });
+    expect(r.ordem).toEqual(ordem);
+    expect(r.turn).toBe(0);
+  });
+  it("troca os números dos dois e mantém o turno", () => {
+    const r = trocarIniciativas(ordem, 0, "a", "c")!;
+    expect(r.ordem.map((o) => [o.slug, o.init])).toEqual([["c", 20], ["b", 15], ["a", 10]]);
+    expect(r.turn).toBe(2); // A estava na vez e agora é a última
+  });
+  it("troca inválida devolve null", () => {
+    expect(trocarIniciativas(ordem, 0, "a", "a")).toBeNull();
+    expect(trocarIniciativas(ordem, 0, "a", "z")).toBeNull();
   });
 });
