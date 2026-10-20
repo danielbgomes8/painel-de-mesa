@@ -220,3 +220,16 @@ Lições que valem se um dia voltar (o resto está nos commits):
   pintado, caverna e foto nunca foram medidos — e foi aí que o Daniel viu o resultado ruim.
 - Detecção por contraste/cor de pixel, contorno de silhueta, gargalo por distância e lacuna entre pisos já foram tentados; não há
   ganho barato sem mapas reais de teste (o Daniel é jogador e não tem os mapas das campanhas).
+
+## Revisão de 20/10/2026 — o que falha ou demora não pode apagar o que outro aparelho fez
+
+- **Desfazer de gravação recusada devolve SÓ o que este toque mexeu** (`useParedes`): porta → só os campos pedidos
+  (`aberta`, `trancada`...); remoção → só as paredes que saíram (`devolver`). Antes era `mexer(() => antes)`, a lista
+  inteira de antes do pedido, que apagava o que outro aparelho mexeu enquanto ele ia e voltava. Não voltar a esse padrão.
+- **Releitura lenta não ressuscita parede apagada**: cada `carregar()` em andamento tem a sua lista de ids apagados
+  (`leiturasAtivas`, alimentada por `remover*` e pelo DELETE do tempo real) e descarta esses ao chegar. A foto do banco é
+  de ANTES do pedido; sem isso a parede voltava e nada a tirava de novo.
+- **Importar**: coordenada de parede escrita como texto (`"120"`) vale; a MEDIDA do mapa (`largura`/`altura`) como texto
+  continua sendo erro (teste "medida pela metade ou torta é erro").
+- Visão: peão com o centro em cima de uma parede (2×2 no cruzamento da grade) ignora essa parede (`poligonoDeVisao`,
+  folga de 0,5 px); antes não enxergava nada.

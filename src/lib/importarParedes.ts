@@ -52,6 +52,12 @@ function numero(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+/** Coordenada de uma parede: número, ou texto que é um número ("120", "12.5") — algumas IAs escrevem entre aspas.
+ *  A MEDIDA do mapa (largura/altura) continua exigindo número de verdade: medida torta é erro, não chute. */
+function coordenada(v: unknown): number | null {
+  return numero(typeof v === "string" && v.trim() !== "" ? Number(v) : v);
+}
+
 /** O JSON de dentro do texto: a IA costuma embrulhar em ```json … ``` ou pôr uma frase antes. */
 function extrairJson(texto: string): unknown {
   const inicio = texto.indexOf("{");
@@ -66,13 +72,13 @@ function extrairJson(texto: string): unknown {
 
 function lerItem(item: unknown): { seg: [number, number, number, number]; aberta: boolean } | null {
   if (Array.isArray(item)) {
-    const [x1, y1, x2, y2] = [numero(item[0]), numero(item[1]), numero(item[2]), numero(item[3])];
+    const [x1, y1, x2, y2] = [coordenada(item[0]), coordenada(item[1]), coordenada(item[2]), coordenada(item[3])];
     if (x1 === null || y1 === null || x2 === null || y2 === null) return null;
     return { seg: [x1, y1, x2, y2], aberta: false };
   }
   if (!item || typeof item !== "object") return null;
   const o = item as Record<string, unknown>;
-  const [x1, y1, x2, y2] = [numero(o.x1), numero(o.y1), numero(o.x2), numero(o.y2)];
+  const [x1, y1, x2, y2] = [coordenada(o.x1), coordenada(o.y1), coordenada(o.x2), coordenada(o.y2)];
   if (x1 === null || y1 === null || x2 === null || y2 === null) return null;
   return { seg: [x1, y1, x2, y2], aberta: o.aberta === true };
 }

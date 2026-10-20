@@ -52,6 +52,16 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
   // O aviso de tempo real de uma gravação ANTERIOR não pode devolver a porta ao estado velho no meio de toques seguidos
   // (lib/escudoDeEco.ts); passada a janela, as paredes da cena são relidas uma vez.
   const [escudo] = useState(() => criarEscudoDeEco());
+  // Uma releitura da lista leva um tempo na rede e o que ela devolve é a foto do banco de ANTES. Se uma parede for
+  // apagada nesse meio-tempo (aqui ou em outro aparelho), a foto velha a traria de volta e nada a tiraria de novo.
+  // Cada releitura em andamento tem a sua lista de ids apagados desde que começou; ela descarta esses ao chegar.
+  const leiturasAtivas = useRef(new Set<Set<string>>());
+  const marcarApagadas = useCallback((ids: readonly string[]) => {
+    for (const apagadas of leiturasAtivas.current) for (const id of ids) apagadas.add(id);
+  }, []);
+  const desmarcarApagadas = useCallback((ids: readonly string[]) => {
+    for (const apagadas of leiturasAtivas.current) for (const id of ids) apagadas.delete(id);
+  }, []);
 
   const mexer = useCallback(
     (fn: (atual: Parede[]) => Parede[], extra: { carregou?: boolean; indisponivel?: boolean } = {}) => {
@@ -68,17 +78,32 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
     [cenaId],
   );
 
+  /** Desfaz uma remoção que o banco recusou: devolve SÓ as paredes que saíram (a lista inteira de antes apagaria o
+   *  que outro aparelho mexeu enquanto o pedido ia e voltava). */
+  const devolver = useCallback(
+    (removidas: readonly Parede[]) => {
+      mexer((atual) => {
+        const tem = new Set(atual.map((p) => p.id));
+        return [...atual, ...removidas.filter((p) => !tem.has(p.id))];
+      });
+    },
+    [mexer],
+  );
+
   useEffect(() => {
     if (!cenaId || !supabaseConfigurado) return;
     let vivo = true;
     let canal: ReturnType<typeof supabase.channel> | null = null;
 
     async function carregar(): Promise<boolean> {
+      const apagadas = new Set<string>();
+      leiturasAtivas.current.add(apagadas);
       const { data, error } = await supabase
         .from("cena_paredes")
         .select("*")
         .eq("cena_id", cenaId)
         .order("created_at", { ascending: true });
+      leiturasAtivas.current.delete(apagadas);
       if (!vivo) return false;
       if (error) {
         if (ehTabelaAusente(error)) mexer((a) => a, { carregou: true, indisponivel: true });
@@ -88,7 +113,7 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
         }
         return false;
       }
-      const lidas = (data ?? []).map(normalizarParede).filter((p): p is Parede => p !== null);
+      const lidas = (data ?? []).map(normalizarParede).filter((p): p is Parede => p !== null && !apagadas.has(p.id));
       mexer(
         (atual) => {
           // Parede criada agora há pouco, ainda não devolvida pelo banco, fica.
@@ -117,6 +142,7 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
         .on("postgres_changes", { event: "*", schema: "public", table: "cena_paredes", filter: `cena_id=eq.${cenaId}` }, (msg) => {
           if (msg.eventType === "DELETE") {
             const id = (msg.old as { id?: string }).id;
+            if (id) for (const apagadas of leiturasAtivas.current) apagadas.add(id);
             mexer((atual) => atual.filter((p) => p.id !== id));
             return;
           }
@@ -187,7 +213,7 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
       const { error } = await supabase.from("cena_paredes").update({ aberta }).eq("id", id);
       if (error) {
         relatarErro("alternarPorta", error);
-        mexer(() => antes);
+        mexer((atual) => atual.map((p) => (p.id === id ? { ...p, aberta: porta.aberta } : p)));
         setAviso(AVISO_NAO_SALVOU);
         return false;
       }
@@ -199,14 +225,17 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
 
   const atualizarPorta = useCallback<Paredes["atualizarPorta"]>(
     async (id, mudanca) => {
-      const antes = ref.current;
-      if (!antes.some((p) => p.id === id && p.tipo === "porta")) return false;
+      const porta = ref.current.find((p) => p.id === id && p.tipo === "porta");
+      if (!porta) return false;
       escudo.proteger(id);
       mexer((atual) => atual.map((p) => (p.id === id ? { ...p, ...mudanca } : p)));
       const { error } = await supabase.from("cena_paredes").update(mudanca).eq("id", id);
       if (error) {
         relatarErro("atualizarPorta", error);
-        mexer(() => antes);
+        // Volta só o que este toque mexeu (o resto da porta pode ter mudado em outro aparelho).
+        const volta: Record<string, unknown> = {};
+        for (const campo of Object.keys(mudanca) as (keyof Parede)[]) volta[campo] = porta[campo];
+        mexer((atual) => atual.map((p) => (p.id === id ? { ...p, ...volta } : p)));
         setAviso(AVISO_NAO_SALVOU);
         return false;
       }
@@ -218,54 +247,61 @@ export function useParedes(cenaId: string | null, codigo: string, canalExtra = "
 
   const remover = useCallback<Paredes["remover"]>(
     async (id) => {
-      const antes = ref.current;
+      const removidas = ref.current.filter((p) => p.id === id);
+      marcarApagadas([id]);
       mexer((atual) => atual.filter((p) => p.id !== id));
       const { error } = await supabase.from("cena_paredes").delete().eq("id", id);
       if (error) {
         relatarErro("removerParede", error);
-        mexer(() => antes);
+        desmarcarApagadas([id]);
+        devolver(removidas);
         setAviso(AVISO_NAO_SALVOU);
         return false;
       }
       setAviso(null);
       return true;
     },
-    [mexer],
+    [mexer, marcarApagadas, desmarcarApagadas, devolver],
   );
 
   const removerVarias = useCallback<Paredes["removerVarias"]>(
     async (ids) => {
       if (ids.length === 0) return false;
-      const antes = ref.current;
       const fora = new Set(ids);
+      const removidas = ref.current.filter((p) => fora.has(p.id));
+      marcarApagadas(ids);
       mexer((atual) => atual.filter((p) => !fora.has(p.id)));
       const { error } = await supabase.from("cena_paredes").delete().in("id", ids);
       if (error) {
         relatarErro("removerParedes (várias)", error);
-        mexer(() => antes);
+        desmarcarApagadas(ids);
+        devolver(removidas);
         setAviso(AVISO_NAO_SALVOU);
         return false;
       }
       setAviso(null);
       return true;
     },
-    [mexer],
+    [mexer, marcarApagadas, desmarcarApagadas, devolver],
   );
 
   const removerTodas = useCallback<Paredes["removerTodas"]>(async () => {
     if (!cenaId) return false;
-    const antes = ref.current;
+    const removidas = ref.current;
+    const ids = removidas.map((p) => p.id);
+    marcarApagadas(ids);
     mexer(() => []);
     const { error } = await supabase.from("cena_paredes").delete().eq("cena_id", cenaId);
     if (error) {
       relatarErro("removerParedes", error);
-      mexer(() => antes);
+      desmarcarApagadas(ids);
+      devolver(removidas);
       setAviso(AVISO_NAO_SALVOU);
       return false;
     }
     setAviso(null);
     return true;
-  }, [cenaId, mexer]);
+  }, [cenaId, mexer, marcarApagadas, desmarcarApagadas, devolver]);
 
   return { paredes, carregando, indisponivel: daCena?.indisponivel ?? false, aviso, adicionar, alternarPorta, atualizarPorta, remover, removerVarias, removerTodas };
 }

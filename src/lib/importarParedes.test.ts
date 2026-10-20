@@ -225,3 +225,15 @@ describe("fechar a borda do mapa", () => {
     expect(contornoQueFalta(c, contornoQueFalta(c, []))).toEqual([]);
   });
 });
+
+describe("coordenadas escritas como texto", () => {
+  it("aceita números entre aspas (algumas IAs escrevem assim) e continua recusando texto que não é número", () => {
+    const r = lerParedesDoTexto(JSON.stringify({ largura: 760, altura: 760, paredes: [["10", "10", "200.5", "10"], ["a", 0, 5, 5], ["", 0, 90, 90]] }), { largura: 760, altura: 760 }, []);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.paredes).toBe(1);
+      expect(r.ignoradas).toBe(2);
+      expect(r.novas[0]).toMatchObject({ x1: 10, y1: 10, x2: 200.5, y2: 10 });
+    }
+  });
+});
