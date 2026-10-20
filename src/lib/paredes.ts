@@ -265,10 +265,12 @@ export function ultimoDesenho(paredes: readonly Parede[]): Parede[] {
   return ultima ? paredes.filter((p) => p.created_at === ultima.created_at) : [];
 }
 
-/** A mais recente (pra "desfazer parede"): pela data, e na falta dela a última da lista. */
+/** A mais recente (pra "desfazer parede"): pela data; a ainda não confirmada (hora vazia) é a mais nova de todas,
+ *  e entre iguais vale a última da lista. */
 export function ultimaParede(paredes: readonly Parede[]): Parede | null {
   if (paredes.length === 0) return null;
-  return [...paredes].sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))[paredes.length - 1];
+  const hora = (p: Parede) => p.created_at || "￿";
+  return [...paredes].sort((a, b) => (hora(a) < hora(b) ? -1 : hora(a) > hora(b) ? 1 : 0))[paredes.length - 1];
 }
 
 // ── Andar ──────────────────────────────────────────────────────────────────
