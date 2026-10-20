@@ -309,7 +309,7 @@ describe("sessões e cartões", () => {
   });
 });
 
-import { colunasEmUso, comColunasVazias } from "./quadro";
+import { colunasEmUso, comColunasVazias, vaziasDeVerdade } from "./quadro";
 
 describe("colunas vazias e em uso", () => {
   const vistos = cartoesVisiveis([cartao({ id: "a", coluna: "Suspeitos", revelacao: "revelado" }), cartao({ id: "b", revelacao: "revelado" })], ANA);
@@ -325,6 +325,19 @@ describe("colunas vazias e em uso", () => {
   });
   it("lista os nomes em uso", () => {
     expect(colunasEmUso(vistos)).toEqual(["Suspeitos"]);
+  });
+  it("filtro de tipo não ressuscita, como vazia, uma coluna que tem cartões de outro tipo", () => {
+    const todos = cartoesVisiveis(
+      [
+        cartao({ id: "m", tipo: "missao", coluna: "Incidente", revelacao: "revelado" }),
+        cartao({ id: "p", tipo: "pista", revelacao: "revelado" }),
+      ],
+      ANA,
+    );
+    const vazias = vaziasDeVerdade(todos, ["Incidente", "Aliados"]);
+    expect(vazias).toEqual(["Aliados"]); // "Incidente" tem cartão (de missão); "Aliados" é de fato vazia
+    const nasPistas = comColunasVazias(agruparPorColuna(filtrarPorTipo(todos, "pista")), vazias);
+    expect(nasPistas.map((c) => c.valor)).toEqual(["Aliados", ""]);
   });
 });
 

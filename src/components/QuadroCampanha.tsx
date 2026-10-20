@@ -30,6 +30,7 @@ import {
   agruparPorColuna,
   colunasEmUso,
   comColunasVazias,
+  vaziasDeVerdade,
   cartoesVisiveis,
   emojiDoTipo,
   filtrarPorTipo,
@@ -126,7 +127,7 @@ export function QuadroCampanha({
   // Se o tipo filtrado deixou de existir (cartão apagado ou escondido), volta pra "todos".
   const tipoAtivo = tipo && tiposPresentes.has(tipo) ? tipo : null;
   const lista = filtrarPorTipo(visiveis, tipoAtivo);
-  const colunasDaTela = comColunasVazias(agruparPorColuna(lista), vazias);
+  const colunasDaTela = comColunasVazias(agruparPorColuna(lista), vaziasDeVerdade(visiveis, vazias));
   const aVer = visiveis.find((v) => v.cartao.id === aberto) ?? null;
 
   if (quadro.indisponivel) {
