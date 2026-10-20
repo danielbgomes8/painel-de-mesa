@@ -6,6 +6,7 @@ import { relatarErro } from "@/lib/relatarErro";
 import { ehTabelaAusente } from "@/lib/cenas";
 import { normalizarPeca, type NovaPeca, type Peca } from "@/lib/pecas";
 import { colunasDaLuz, type Luz } from "@/lib/luzes";
+import { criarEscudoDeEco } from "@/lib/escudoDeEco";
 
 const AVISO_NAO_SALVOU = "Não salvou o peão. Confira a conexão e tente de novo.";
 const SEM_PECAS: Peca[] = [];
@@ -46,6 +47,9 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
   useEffect(() => {
     ref.current = pecas;
   }, [pecas]);
+  // O aviso de tempo real de um movimento ANTERIOR não pode devolver o peão ao lugar velho no meio de arrastos
+  // seguidos (lib/escudoDeEco.ts); passada a janela, os peões da cena são relidos uma vez.
+  const [escudo] = useState(() => criarEscudoDeEco());
 
   const mexer = useCallback(
     (fn: (atual: Peca[]) => Peca[], extra: { carregou?: boolean; indisponivel?: boolean } = {}) => {
@@ -94,6 +98,10 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
       return true;
     }
 
+    escudo.aoFechar(() => {
+      void carregar();
+    });
+
     const aoVoltar = () => {
       if (document.visibilityState === "visible") void carregar();
     };
@@ -111,7 +119,7 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
             return;
           }
           const nova = normalizarPeca(msg.new);
-          if (!nova) return;
+          if (!nova || escudo.protegido(nova.id)) return;
           mexer((atual) => (atual.some((p) => p.id === nova.id) ? atual.map((p) => (p.id === nova.id ? nova : p)) : [...atual, nova]));
         })
         .subscribe((status) => {
@@ -121,11 +129,13 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
 
     return () => {
       vivo = false;
+      escudo.encerrar();
+      escudo.aoFechar(() => {});
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("online", aoVoltar);
       if (canal) supabase.removeChannel(canal);
     };
-  }, [cenaId, mexer, canalExtra]);
+  }, [cenaId, mexer, canalExtra, escudo]);
 
   const adicionar = useCallback<Pecas["adicionar"]>(
     async (novas) => {
@@ -164,6 +174,7 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
   const atualizar = useCallback<Pecas["atualizar"]>(
     async (id, mudanca) => {
       const antes = ref.current;
+      escudo.proteger(id);
       mexer((atual) => atual.map((p) => (p.id === id ? { ...p, ...mudanca } : p)));
       const { error } = await supabase.from("cena_pecas").update(mudanca).eq("id", id);
       if (error) {
@@ -175,7 +186,7 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
       setAviso(null);
       return true;
     },
-    [mexer],
+    [mexer, escudo],
   );
 
   const definirLuzes = useCallback<Pecas["definirLuzes"]>(
@@ -183,6 +194,7 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
       if (mudancas.length === 0) return true;
       const antes = ref.current;
       const porId = new Map(mudancas.map((m) => [m.id, m.luz]));
+      for (const m of mudancas) escudo.proteger(m.id);
       mexer((atual) => atual.map((p) => (porId.has(p.id) ? { ...p, luz: porId.get(p.id) ?? null } : p)));
       const respostas = await Promise.all(mudancas.map((m) => supabase.from("cena_pecas").update(colunasDaLuz(m.luz)).eq("id", m.id)));
       const erro = respostas.find((r) => r.error)?.error;
@@ -195,7 +207,7 @@ export function usePecas(cenaId: string | null, codigo: string, canalExtra = "")
       setAviso(null);
       return true;
     },
-    [mexer],
+    [mexer, escudo],
   );
 
   const remover = useCallback<Pecas["remover"]>(
