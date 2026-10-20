@@ -6277,6 +6277,13 @@ input.fj-score:focus-visible {
 
 /* ---------- O que a mesa usa (Mestre → Sala) ---------- */
 .usolista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---------- Luzes e armadilhas no mapa ---------- */
 .luz-subtitulo {
   margin: 14px 0 6px;
@@ -6293,7 +6300,10 @@ input.fj-score:focus-visible {
   padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
+
+/* ---------- O que a mesa usa (Mestre → Sala) ---------- */
 .usolista li {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -6608,7 +6618,6 @@ input.fj-score:focus-visible {
   gap: 8px;
   font-size: 13px;
   color: var(--muted);
-  gap: 6px;
 }
 .luz-item {
   display: flex;
