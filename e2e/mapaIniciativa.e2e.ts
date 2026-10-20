@@ -56,6 +56,13 @@ async function tocarNoMapa(page: Page, ix: number, iy: number) {
 async function abrirCartao(page: Page, ix: number, iy: number) {
   const cartao = page.locator(".mapa-cartao");
   await expect(async () => {
+    // Na tela do Mestre em Jogar a câmera desliza sozinha até o peão da vez (e a Vista Mestre a leva pra mesa):
+    // espera o deslize acabar e volta pro mapa todo, que é a vista que `tocarNoMapa` supõe.
+    const verTudo = page.getByRole("button", { name: "Ver o mapa todo" });
+    if ((await verTudo.count()) > 0) {
+      await page.waitForTimeout(900);
+      await verTudo.click();
+    }
     await tocarNoMapa(page, ix, iy);
     await expect(cartao).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 30_000 });
