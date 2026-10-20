@@ -1,4 +1,4 @@
-# Confere o painel a cada push e a cada pull request: testes das regras,
+# Confere o painel a cada push na main e a cada pull request: testes das regras,
 # tipos, lint e o build de produção. Se algo quebrar, o commit ganha um ✗
 # vermelho no GitHub e quem fez o push recebe um e-mail.
 #
@@ -10,8 +10,12 @@
 
 name: Verificar
 
+# Push só na main: num branch com PR aberto, `push` + `pull_request` rodavam a
+# mesma conferência duas vezes por atualização (gasto à toa da cota de minutos).
+# Branch sem PR não é conferido aqui — o `npm run verificar` local cobre.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
