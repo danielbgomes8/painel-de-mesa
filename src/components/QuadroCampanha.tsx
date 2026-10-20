@@ -718,7 +718,7 @@ function FormNovoCartao({
 }) {
   const [tipo, setTipo] = useState<TipoCartao>("npc");
   const [titulo, setTitulo] = useState("");
-  const [foto, setFoto] = useState<File | null>(null);
+  const [fotos, setFotos] = useState<File[]>([]);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -728,7 +728,7 @@ function FormNovoCartao({
     setErro(null);
     const r = await quadro.criar(
       { tipo, titulo: titulo.trim(), dono: quem.tipo === "jogador" ? quem.slug : null },
-      foto,
+      fotos,
     );
     setEnviando(false);
     if (r.ok) aoCriar(r.cartao);
@@ -764,10 +764,19 @@ function FormNovoCartao({
       </div>
       <div className="qd-linha">
         <label className="btn ghost qd-arquivo">
-          📷 {foto ? "trocar foto" : "foto (opcional)"}
-          <input type="file" accept="image/*" hidden onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
+          📷 {fotos.length ? "trocar fotos" : `fotos (opcional, até ${FOTOS_MAXIMAS})`}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              setFotos(Array.from(e.target.files ?? []).slice(0, FOTOS_MAXIMAS));
+              e.target.value = "";
+            }}
+          />
         </label>
-        {foto && <span className="qd-nomearquivo">{foto.name}</span>}
+        {fotos.length > 0 && <span className="qd-nomearquivo">{fotos.length === 1 ? fotos[0].name : `${fotos.length} fotos`}</span>}
       </div>
       <div className="qd-linha">
         <button type="button" className="btn primary" disabled={enviando || !titulo.trim()} onClick={() => void criar()}>

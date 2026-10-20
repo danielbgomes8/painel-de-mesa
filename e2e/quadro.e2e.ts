@@ -390,14 +390,17 @@ test("várias fotos: adicionar de uma vez, galeria, tirar a capa, limite de 6 e 
   await page.getByRole("button", { name: "Campanha", exact: true }).click();
   await page.getByRole("button", { name: "+ cartão" }).click();
   await page.getByLabel("Nome do cartão").fill("Galeria do Barão");
-  await page.locator(".qd-form input[type=file]").setInputFiles(foto(0));
+  // Já na criação: duas fotos de uma vez (capa + 1 extra).
+  await page.locator(".qd-form input[type=file]").setInputFiles([foto(0), foto(8)]);
+  await expect(page.locator(".qd-form .qd-nomearquivo")).toHaveText("2 fotos");
   await page.getByRole("button", { name: "Criar cartão" }).click();
   const folha = page.locator(".qd-folha");
   await expect(folha).toBeVisible({ timeout: 30_000 });
 
-  // Duas de uma vez: viram 3 no total (capa + 2 extras).
+  // Criado com 2; mais 1 na folha: 3 no total (capa + 2 extras).
+  await expect(folha.locator(".qd-galeria .qd-foto")).toHaveCount(2, { timeout: 30_000 });
   const campo = folha.locator("input[type=file]");
-  await campo.setInputFiles([foto(1), foto(2)]);
+  await campo.setInputFiles([foto(1)]);
   await expect(folha.locator(".qd-galeria .qd-foto")).toHaveCount(3, { timeout: 30_000 });
   await expect(folha.locator(".qd-contagem")).toHaveText("1/3");
   await expect(folha.locator(".qd-miniaturas li")).toHaveCount(3);
