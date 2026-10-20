@@ -230,7 +230,7 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
       } catch (e) {
         return { erro: e instanceof ErroDeImagem ? e.message : "Não deu pra preparar essa imagem." };
       }
-      const caminho = caminhoDaFoto(codigo, idCartao, Date.now().toString(36));
+      const caminho = caminhoDaFoto(codigo, idCartao, `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`);
       const envio = await supabase.storage
         .from(BUCKET)
         .upload(caminho, pronta.blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
