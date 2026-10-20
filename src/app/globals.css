@@ -358,6 +358,72 @@ button:focus-visible {
   cursor: pointer;
   font-size: 14px;
 }
+/* PIN do Mestre (portão e aba Mestre > Sala) */
+.rolebtn.pinmestre {
+  flex-direction: column;
+  align-items: stretch;
+  cursor: default;
+}
+.rolebtn.pinmestre:hover {
+  transform: none;
+}
+.pinlinha {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pinlinha input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 14px;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  letter-spacing: 0.2em;
+}
+.pinlinha input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pinlinha button {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.pinlinha button.pinvoltar {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 400;
+}
+.pinlinha button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pinlinha button:disabled {
+  opacity: 0.6;
+}
+.pinaviso {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.pinaviso:empty {
+  margin-top: -10px; /* cancela o espaço da lista quando não há aviso */
+}
+.rolebtn.dm {
+  touch-action: manipulation;
+}
 .gate .fine {
   margin-top: 22px;
   font-size: 12px;
@@ -646,6 +712,35 @@ body:has(.desfazerbarra) .proximoturno {
   text-align: center;
   color: var(--accent);
 }
+.initrow .nbtn {
+  background: transparent;
+  border: 1px dashed var(--accent);
+  border-radius: 7px;
+  min-height: 32px;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.initrow .nbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.editini {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--surface2);
+}
+.editini-linha {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.editini-linha select {
+  flex: 1;
+  min-height: 32px;
+}
 .initrow .who {
   display: flex;
   align-items: center;
@@ -712,35 +807,6 @@ body:has(.desfazerbarra) .proximoturno {
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--accent);
-.initrow .nbtn {
-  background: transparent;
-  border: 1px dashed var(--accent);
-  border-radius: 7px;
-  min-height: 32px;
-  touch-action: manipulation;
-  cursor: pointer;
-}
-.initrow .nbtn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.editini {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 9px;
-  background: var(--surface2);
-}
-.editini-linha {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.editini-linha select {
-  flex: 1;
-  min-height: 32px;
-}
   border-radius: 9px;
   background: var(--surface);
 }

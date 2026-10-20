@@ -7,6 +7,7 @@ import { BibliotecaNpcs } from "@/components/BibliotecaNpcs";
 import { NotasDoMestre } from "@/components/NotasDoMestre";
 import { BackupSala } from "@/components/BackupSala";
 import { UsoDaMesa } from "@/components/UsoDaMesa";
+import { PinDoMestre } from "@/components/PinDoMestre";
 import { registrarUso } from "@/lib/registrarUso";
 
 type Secao = "encontros" | "npcs" | "notas" | "sala";
@@ -68,6 +69,7 @@ export function AbaMestre({
               📺 abrir o modo telão
             </button>
           </div>
+          <PinDoMestre codigo={codigo} />
           <UsoDaMesa codigo={codigo} />
           <BackupSala sala={sala} codigo={codigo} rotulo={rotulo} />
         </>
