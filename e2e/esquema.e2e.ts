@@ -102,7 +102,7 @@ const COMBATE = colunas<LinhaCombate>({ room_code: true, round: true, turn: true
 const BASTIAO = colunas<LinhaBastiao>({ room_code: true, turno: true, tesouro_po: true, defensores: true, notes: true, version: true });
 // Sem tipo próprio no código (o app só lê `text`): a lista é a da migration 0001.
 const NOTAS_DO_MESTRE = ["room_code", "text"];
-const SALAS = ["code", "created_at"];
+const SALAS = ["code", "created_at", "mestre_pin_hash"];
 
 const TABELAS: { tabela: string; colunas: string[] }[] = [
   { tabela: "characters", colunas: PERSONAGEM },
