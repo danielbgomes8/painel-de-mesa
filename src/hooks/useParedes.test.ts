@@ -105,3 +105,81 @@ describe("useParedes: toques seguidos na porta com o eco atrasado", () => {
     expect(abertaNaTela(result)).toBe(true);
   });
 });
+
+describe("useParedes: o que falha ou demora não pode apagar o que outro aparelho fez", () => {
+  const MAPA = { cena_id: CENA, room_code: SALA, x1: 0, y1: 0, x2: 60, y2: 0 };
+
+  async function abrirComDuas() {
+    const [a, b] = bd.semear("cena_paredes", [
+      { ...MAPA, tipo: "parede", aberta: false },
+      { ...MAPA, tipo: "porta", aberta: false, y1: 100, y2: 100 },
+    ]) as { id: string }[];
+    const r = renderHook(() => useParedes(CENA, SALA));
+    await waitFor(() => expect(r.result.current.carregando).toBe(false));
+    await act(async () => {
+      await new Promise((ok) => setTimeout(ok, 20));
+    });
+    return { ...r, a: a.id, b: b.id };
+  }
+
+  it("remover que o banco recusa devolve SÓ a parede removida (a mudança de outro aparelho na outra fica)", async () => {
+    const { result, a, b } = await abrirComDuas();
+    bd.semRede = true;
+    let promessa!: Promise<boolean>;
+    act(() => {
+      promessa = result.current.remover(a);
+    });
+    // Enquanto o pedido vai e volta, outro aparelho tranca a porta.
+    act(() => {
+      bd.comoOutroAparelho("cena_paredes", (l) => l.id === b, { trancada: true });
+    });
+    await act(async () => {
+      expect(await promessa).toBe(false);
+    });
+    expect(result.current.paredes.map((p) => p.id).sort()).toEqual([a, b].sort());
+    expect(result.current.paredes.find((p) => p.id === b)?.trancada).toBe(true);
+  });
+
+  it("tocar na porta sem rede volta só o 'aberta' (a tranca que outro aparelho pôs fica)", async () => {
+    const { result, b } = await abrirComDuas();
+    bd.semRede = true;
+    let promessa!: Promise<boolean>;
+    act(() => {
+      promessa = result.current.alternarPorta(b);
+    });
+    act(() => {
+      bd.comoOutroAparelho("cena_paredes", (l) => l.id === b, { trancada: true });
+    });
+    await act(async () => {
+      expect(await promessa).toBe(false);
+    });
+    // Voltou só o "aberta"; a tranca do outro aparelho chega na releitura do fim da janela do escudo de eco (com a rede de volta).
+    expect(result.current.paredes.find((p) => p.id === b)?.aberta).toBe(false);
+    bd.semRede = false;
+    await waitFor(() => expect(result.current.paredes.find((p) => p.id === b)?.trancada).toBe(true), { timeout: 5000 });
+    expect(result.current.paredes.find((p) => p.id === b)?.aberta).toBe(false);
+  });
+
+  it("releitura lenta não traz de volta a parede que outro aparelho apagou enquanto ela viajava", async () => {
+    const { result, a } = await abrirComDuas();
+    // A resposta da leitura demora (a foto é tirada no banco na hora do pedido, mas chega tarde).
+    const original = bd.executar.bind(bd);
+    bd.executar = async (q) => {
+      const r = await original(q);
+      if (q.op === "select") await new Promise((ok) => setTimeout(ok, 40));
+      return r;
+    };
+    act(() => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await act(async () => {
+      await new Promise((ok) => setTimeout(ok, 15));
+    });
+    await act(async () => {
+      await bd.cliente.from("cena_paredes").delete().eq("id", a); // outro aparelho apaga
+      await new Promise((ok) => setTimeout(ok, 100));
+    });
+    expect(result.current.paredes.map((p) => p.id)).not.toContain(a);
+    expect(result.current.paredes).toHaveLength(1);
+  });
+});
