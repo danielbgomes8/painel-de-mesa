@@ -43,6 +43,11 @@ da aba continua `"diario"` (`BarraAbas.tsx`); só o rótulo mudou.
   Mestre**. `revelacao`: `escondido` (só o Mestre), `silhueta` (a mesa vê a foto escura e "???",
   sem texto) ou `revelado`. **Quem vê o quê está TODO em `visaoDoCartao`** — não reimplementar em
   componente. Como a névoa do mapa, isso esconde NA TELA: o banco é aberto (README, "Segurança").
+- **Várias fotos por cartão** (migration `0040`, até 6 com a capa): `foto` segue sendo a capa (miniatura do quadro,
+  ligações) e `fotos` guarda as extras. Sempre pelas funções puras `todasAsFotos`/`comAsFotos`/`semAFoto` — tirar a capa
+  promove a próxima. A folha desliza (scroll-snap, `GaleriaDeFotos`); o destaque/telão troca sozinho a cada 4 s
+  (ninguém toca no telão). Silhueta borra todas. Backup e restauração bruta copiam as extras também. Sem a migration o
+  cartão abre normal, mas gravar foto extra dá "não salvou".
 - **Cartão da mesa × pessoal**: `dono` nulo = da mesa (o Mestre edita, `revelacao` vale). `dono` = slug
   de um jogador = pessoal: **só ele vê, nem o Mestre**, até compartilhar (`revelacao = revelado`; aí a
   mesa vê, mas só o dono edita). O "pessoal do Mestre" são os cartões da mesa que ficam escondidos.

@@ -111,7 +111,7 @@ export async function restaurar({ dados, url, chave, executar, buscar = fetch, a
 export async function restaurarImagens({ dados, pasta, url, chave, executar, buscar = fetch, ler = (arquivo) => readFile(arquivo) }) {
   const resultado = { enviadas: 0, jaExistiam: 0, semArquivo: [] };
   // Imagem de cada mapa e foto de cada cartão do Quadro: mesmo bucket, mesma pasta.
-  const citadas = [...(dados.cenas ?? []).map((cena) => cena.imagem), ...(dados.quadro_cartoes ?? []).map((cartao) => cartao.foto)];
+  const citadas = [...(dados.cenas ?? []).map((cena) => cena.imagem), ...(dados.quadro_cartoes ?? []).flatMap((cartao) => [cartao.foto, ...(Array.isArray(cartao.fotos) ? cartao.fotos : [])])];
   for (const citada of citadas) {
     const caminho = caminhoSeguroDaImagem(citada);
     if (!caminho) continue;

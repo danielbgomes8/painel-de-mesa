@@ -7,6 +7,8 @@ import type { Quadro } from "@/hooks/useQuadro";
 import type { Identidade } from "@/lib/identidade";
 import type { EntradaDiario } from "@/lib/tipos";
 import {
+  FOTOS_MAXIMAS,
+  todasAsFotos,
   COLUNAS_SUGERIDAS,
   LIMITE_COLUNA,
   LIMITE_NOTA,
@@ -809,7 +811,8 @@ function FolhaDoCartao({
   const { cartao: c, visao } = visto;
   const silhueta = visao === "silhueta";
   const editavel = podeEditarCartao(c, quem);
-  const url = quadro.urlDaFoto(c);
+  const urls = quadro.urlsDasFotos(c);
+  const caminhos = todasAsFotos(c);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
 
@@ -821,11 +824,12 @@ function FolhaDoCartao({
     return () => window.removeEventListener("keydown", tecla);
   }, [aoFechar]);
 
-  async function novaFoto(arquivo: File | undefined) {
-    if (!arquivo) return;
+  async function novasFotos(lista: FileList | null) {
+    const arquivos = Array.from(lista ?? []);
+    if (arquivos.length === 0) return;
     setEnviandoFoto(true);
     setMensagem(null);
-    const r = await quadro.trocarFoto(c.id, arquivo);
+    const r = await quadro.acrescentarFotos(c.id, arquivos);
     setEnviandoFoto(false);
     if (!r.ok) setMensagem(r.erro);
   }
@@ -850,11 +854,7 @@ function FolhaDoCartao({
           ✕
         </button>
 
-        {url && (
-          <div className="qd-foto qd-fotogrande" data-silhueta={silhueta || undefined}>
-            <img src={url} alt={silhueta ? "" : c.titulo} />
-          </div>
-        )}
+        {urls.length > 0 && <GaleriaDeFotos urls={urls} alt={silhueta ? "" : c.titulo} silhueta={silhueta} />}
 
         <p className="qd-tiporotulo">
           {emojiDoTipo(c.tipo)} {rotuloDoTipo(c.tipo)}
@@ -920,15 +920,44 @@ function FolhaDoCartao({
 
             <div className="qd-linha">
               <label className="btn ghost qd-arquivo">
-                📷 {enviandoFoto ? "enviando…" : c.foto ? "trocar foto" : "pôr foto"}
-                <input type="file" accept="image/*" hidden disabled={enviandoFoto} onChange={(e) => void novaFoto(e.target.files?.[0])} />
+                📷 {enviandoFoto ? "enviando…" : caminhos.length === 0 ? "pôr foto" : "adicionar foto"} ({caminhos.length}/{FOTOS_MAXIMAS})
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  disabled={enviandoFoto || caminhos.length >= FOTOS_MAXIMAS}
+                  onChange={(e) => {
+                    void novasFotos(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
               </label>
-              {c.foto && (
-                <button type="button" className="btn ghost" onClick={() => void quadro.tirarFoto(c.id)}>
+            </div>
+            {urls.length > 1 && (
+              <ul className="qd-miniaturas" aria-label="Fotos do cartão">
+                {urls.map((u, i) => (
+                  <li key={caminhos[i]}>
+                    <img src={u} alt="" loading="lazy" />
+                    <button
+                      type="button"
+                      className="qd-miniatura-tirar"
+                      aria-label={`Tirar a foto ${i + 1}`}
+                      onClick={() => void quadro.tirarFoto(c.id, caminhos[i])}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {urls.length === 1 && (
+              <div className="qd-linha">
+                <button type="button" className="btn ghost" onClick={() => void quadro.tirarFoto(c.id, caminhos[0])}>
                   tirar foto
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             <CampoDeColuna cartao={c} quadro={quadro} existentes={colunas} />
 
@@ -1229,19 +1258,55 @@ function ControlesDoMestre({
 
 // ── Destaque em tela cheia ──────────────────────────────────────────────
 
+/** Fotos do cartão lado a lado: desliza com o dedo, uma por vez. Uma só foto = sem enfeite. */
+function GaleriaDeFotos({ urls, alt, silhueta }: { urls: string[]; alt: string; silhueta: boolean }) {
+  const [atual, setAtual] = useState(0);
+  return (
+    <div className="qd-galeria-caixa">
+      <div
+        className="qd-galeria"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setAtual(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+        }}
+      >
+        {urls.map((u) => (
+          <div key={u} className="qd-foto qd-fotogrande" data-silhueta={silhueta || undefined}>
+            <img src={u} alt={alt} />
+          </div>
+        ))}
+      </div>
+      {urls.length > 1 && (
+        <span className="qd-contagem" role="status" aria-live="polite">
+          {Math.min(atual, urls.length - 1) + 1}/{urls.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** O cartão que o Mestre acabou de mostrar: foto grande, nome e o texto.
  *  Toque (ou Esc) fecha; no telão, que ninguém toca, some sozinho. */
 export function DestaqueDoCartao({
   cartao,
-  url,
+  urls,
   aoFechar,
   fecharSozinhoEmMs,
 }: {
   cartao: Cartao;
-  url: string | null;
+  urls: string[];
   aoFechar: () => void;
   fecharSozinhoEmMs?: number;
 }) {
+  // Várias fotos: troca sozinha (ninguém desliza no telão, e o toque aqui fecha).
+  // Quem usa recomeça da primeira com `key` (cartão + instante do destaque).
+  const [indice, setIndice] = useState(0);
+  useEffect(() => {
+    if (urls.length < 2) return;
+    const t = setInterval(() => setIndice((i) => (i + 1) % urls.length), 4000);
+    return () => clearInterval(t);
+  }, [urls.length, cartao.destaque_em]);
+
   useEffect(() => {
     try {
       navigator.vibrate?.([60, 40, 60]);
@@ -1276,9 +1341,16 @@ export function DestaqueDoCartao({
     >
       <p className="qd-destaque-aviso">{silhueta ? "🌫️ O Mestre mostrou uma silhueta" : "📣 O Mestre mostrou à mesa"}</p>
       <div className="qd-destaque-corpo">
-        {url && (
+        {urls.length > 0 && (
           <div className="qd-destaque-foto" data-silhueta={silhueta || undefined}>
-            <img src={url} alt={silhueta ? "" : cartao.titulo} />
+            <img src={urls[indice % urls.length]} alt={silhueta ? "" : cartao.titulo} />
+            {urls.length > 1 && (
+              <p className="qd-pontos" aria-hidden="true">
+                {urls.map((u, i) => (
+                  <span key={u} data-ativo={i === indice % urls.length || undefined} />
+                ))}
+              </p>
+            )}
           </div>
         )}
         <div className="qd-destaque-textos">

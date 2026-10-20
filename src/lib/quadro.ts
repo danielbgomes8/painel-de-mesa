@@ -36,6 +36,8 @@ export type Cartao = {
   subtitulo: string;
   /** Caminho da foto no bucket `mapas`, ou nulo. */
   foto: string | null;
+  /** Fotos extras (além da capa `foto`), na ordem em que foram postas. */
+  fotos: string[];
   /** O que a mesa lê. */
   texto: string;
   /** Só o Mestre vê (e só nos cartões da mesa). */
@@ -60,6 +62,8 @@ export const LIMITE_COLUNA = 30;
 export const CARTOES_MAXIMOS = 200;
 /** A foto de cartão é retrato, não mapa: 1200 px bastam e poupam o 4G da mesa. */
 export const LADO_MAXIMO_FOTO = 1200;
+/** Por cartão, capa incluída. */
+export const FOTOS_MAXIMAS = 6;
 
 const IDS_DE_TIPO = new Set<string>(TIPOS_DE_CARTAO.map((t) => t.id));
 const REVELACOES = new Set<string>(["escondido", "silhueta", "revelado"]);
@@ -79,6 +83,7 @@ export function normalizarCartao(linha: unknown): Cartao | null {
     titulo: texto(l.titulo, LIMITE_TITULO),
     subtitulo: texto(l.subtitulo, LIMITE_SUBTITULO),
     foto: typeof l.foto === "string" && l.foto ? l.foto : null,
+    fotos: Array.isArray(l.fotos) ? l.fotos.filter((f): f is string => typeof f === "string" && f !== "").slice(0, FOTOS_MAXIMAS - 1) : [],
     texto: texto(l.texto, LIMITE_TEXTO),
     segredo: texto(l.segredo, LIMITE_TEXTO),
     revelacao: typeof l.revelacao === "string" && REVELACOES.has(l.revelacao) ? (l.revelacao as Revelacao) : "escondido",
@@ -233,6 +238,23 @@ export function destaqueEmSilhueta(c: Cartao): boolean {
 }
 
 // ── Foto ────────────────────────────────────────────────────────────────
+
+/** Todas as fotos do cartão, a capa primeiro. */
+export function todasAsFotos(c: Pick<Cartao, "foto" | "fotos">): string[] {
+  return c.foto ? [c.foto, ...c.fotos] : [...c.fotos];
+}
+
+/** Tira uma foto da lista; se era a capa, a primeira extra assume. Devolve as colunas a gravar. */
+export function semAFoto(c: Pick<Cartao, "foto" | "fotos">, caminho: string): Pick<Cartao, "foto" | "fotos"> {
+  const resto = todasAsFotos(c).filter((f) => f !== caminho);
+  return { foto: resto[0] ?? null, fotos: resto.slice(1) };
+}
+
+/** Põe fotos no fim (a primeira vira capa se não havia). Passou de `FOTOS_MAXIMAS`, as que sobram ficam de fora. */
+export function comAsFotos(c: Pick<Cartao, "foto" | "fotos">, novas: string[]): Pick<Cartao, "foto" | "fotos"> {
+  const todas = [...todasAsFotos(c), ...novas].slice(0, FOTOS_MAXIMAS);
+  return { foto: todas[0] ?? null, fotos: todas.slice(1) };
+}
 
 /** Cada foto tem caminho próprio (com um sufixo): trocar a foto muda o endereço,
  *  então o cache de um ano do Storage nunca mostra a antiga. */

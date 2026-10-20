@@ -10,6 +10,10 @@ import {
   CARTOES_MAXIMOS,
   LADO_MAXIMO_FOTO,
   caminhoDaFoto,
+  comAsFotos,
+  semAFoto,
+  todasAsFotos,
+  FOTOS_MAXIMAS,
   LIMITE_NOTA,
   ligacaoJaExiste,
   normalizarCartao,
@@ -48,8 +52,12 @@ export type Quadro = {
   criar: (novo: NovoCartao, foto?: File | null) => Promise<ResultadoCartao>;
   /** Escreve só as colunas pedidas: nunca a linha inteira. */
   atualizar: (id: string, mudanca: Mudanca) => Promise<boolean>;
-  trocarFoto: (id: string, arquivo: File) => Promise<ResultadoFoto>;
-  tirarFoto: (id: string) => Promise<boolean>;
+  /** Todas as fotos do cartão (capa primeiro), já como endereço. */
+  urlsDasFotos: (c: Cartao) => string[];
+  /** Põe fotos no fim, até `FOTOS_MAXIMAS`. Se a primeira falhar, nada muda. */
+  acrescentarFotos: (id: string, arquivos: File[]) => Promise<ResultadoFoto>;
+  /** Tira uma foto (pelo caminho); se era a capa, a próxima assume. */
+  tirarFoto: (id: string, caminho: string) => Promise<boolean>;
   remover: (id: string) => Promise<boolean>;
   /** Manda o cartão em tela cheia pra mesa. Por padrão revela; com `comoSilhueta`
    *  deixa o cartão em silhueta e a mesa vê só a foto escura e "???". */
@@ -208,6 +216,11 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
     return supabase.storage.from(BUCKET).getPublicUrl(c.foto).data.publicUrl;
   }, []);
 
+  const urlsDasFotos = useCallback(
+    (c: Cartao): string[] => todasAsFotos(c).map((f) => supabase.storage.from(BUCKET).getPublicUrl(f).data.publicUrl),
+    [],
+  );
+
   /** Reduz e sobe a foto; devolve o caminho ou a mensagem pronta pra tela. */
   const subirFoto = useCallback(
     async (idCartao: string, arquivo: File): Promise<{ caminho: string } | { erro: string }> => {
@@ -284,41 +297,57 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
     [codigo, subirFoto],
   );
 
-  const trocarFoto = useCallback<Quadro["trocarFoto"]>(
-    async (id, arquivo) => {
-      const antiga = ref.current.find((c) => c.id === id)?.foto ?? null;
-      const r = await subirFoto(id, arquivo);
-      if ("erro" in r) return { ok: false, erro: r.erro };
-      const { error } = await supabase.from("quadro_cartoes").update({ foto: r.caminho }).eq("id", id);
+  const acrescentarFotos = useCallback<Quadro["acrescentarFotos"]>(
+    async (id, arquivos) => {
+      const cartao = ref.current.find((c) => c.id === id);
+      if (!cartao) return { ok: false, erro: "Cartão não encontrado." };
+      const vagas = FOTOS_MAXIMAS - todasAsFotos(cartao).length;
+      if (vagas <= 0) return { ok: false, erro: `O cartão já tem ${FOTOS_MAXIMAS} fotos. Tire uma para pôr outra.` };
+      const subidas: string[] = [];
+      let erro: string | null = null;
+      for (const arquivo of arquivos.slice(0, vagas)) {
+        const r = await subirFoto(id, arquivo);
+        if ("erro" in r) {
+          erro = r.erro;
+          break;
+        }
+        subidas.push(r.caminho);
+      }
+      if (subidas.length === 0) return { ok: false, erro: erro ?? "Escolha uma imagem." };
+      const mudanca = comAsFotos(cartao, subidas);
+      const { error } = await supabase.from("quadro_cartoes").update(mudanca).eq("id", id);
       if (error) {
-        relatarErro("trocarFotoDoCartao", error);
-        await supabase.storage.from(BUCKET).remove([r.caminho]);
+        relatarErro("acrescentarFotosDoCartao", error);
+        await supabase.storage.from(BUCKET).remove(subidas);
         return { ok: false, erro: AVISO_NAO_SALVOU };
       }
-      setCartoes((atual) => atual.map((c) => (c.id === id ? { ...c, foto: r.caminho } : c)));
-      if (antiga) await supabase.storage.from(BUCKET).remove([antiga]);
+      setCartoes((atual) => atual.map((c) => (c.id === id ? { ...c, ...mudanca } : c)));
+      if (erro) return { ok: false, erro: `${erro} (as fotos anteriores foram salvas)` };
+      if (arquivos.length > vagas) return { ok: false, erro: `Só cabem ${FOTOS_MAXIMAS} fotos: ${arquivos.length - vagas} ficaram de fora.` };
       return { ok: true };
     },
     [subirFoto],
   );
 
-  const tirarFoto = useCallback<Quadro["tirarFoto"]>(async (id) => {
-    const antiga = ref.current.find((c) => c.id === id)?.foto ?? null;
-    if (!antiga) return true;
-    const { error } = await supabase.from("quadro_cartoes").update({ foto: null }).eq("id", id);
+  const tirarFoto = useCallback<Quadro["tirarFoto"]>(async (id, caminho) => {
+    const cartao = ref.current.find((c) => c.id === id);
+    if (!cartao || !todasAsFotos(cartao).includes(caminho)) return true;
+    const mudanca = semAFoto(cartao, caminho);
+    const { error } = await supabase.from("quadro_cartoes").update(mudanca).eq("id", id);
     if (error) {
       relatarErro("tirarFotoDoCartao", error);
       setAviso(AVISO_NAO_SALVOU);
       return false;
     }
-    setCartoes((atual) => atual.map((c) => (c.id === id ? { ...c, foto: null } : c)));
-    await supabase.storage.from(BUCKET).remove([antiga]);
+    setCartoes((atual) => atual.map((c) => (c.id === id ? { ...c, ...mudanca } : c)));
+    await supabase.storage.from(BUCKET).remove([caminho]);
     return true;
   }, []);
 
   const remover = useCallback<Quadro["remover"]>(async (id) => {
     const antes = ref.current;
-    const foto = antes.find((c) => c.id === id)?.foto ?? null;
+    const alvo = antes.find((c) => c.id === id);
+    const fotos = alvo ? todasAsFotos(alvo) : [];
     setCartoes((atual) => atual.filter((c) => c.id !== id));
     const { error } = await supabase.from("quadro_cartoes").delete().eq("id", id);
     if (error) {
@@ -327,7 +356,7 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
       setAviso(AVISO_NAO_SALVOU);
       return false;
     }
-    if (foto) await supabase.storage.from(BUCKET).remove([foto]);
+    if (fotos.length) await supabase.storage.from(BUCKET).remove(fotos);
     setAviso(null);
     return true;
   }, []);
@@ -436,7 +465,8 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
     urlDaFoto,
     criar,
     atualizar,
-    trocarFoto,
+    urlsDasFotos,
+    acrescentarFotos,
     tirarFoto,
     remover,
     mostrarAMesa,

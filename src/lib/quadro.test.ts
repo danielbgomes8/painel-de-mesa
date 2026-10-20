@@ -11,6 +11,10 @@ import {
   virouDestaque,
   destaqueEmSilhueta,
   visaoDoCartao,
+  todasAsFotos,
+  comAsFotos,
+  semAFoto,
+  FOTOS_MAXIMAS,
   type Cartao,
 } from "./quadro";
 import type { Identidade } from "./identidade";
@@ -27,6 +31,7 @@ function cartao(extra: Partial<Cartao> = {}): Cartao {
     titulo: "Barão Vael",
     subtitulo: "",
     foto: null,
+    fotos: [],
     texto: "um nobre",
     segredo: "serve ao culto",
     revelacao: "escondido",
@@ -320,5 +325,30 @@ describe("colunas vazias e em uso", () => {
   });
   it("lista os nomes em uso", () => {
     expect(colunasEmUso(vistos)).toEqual(["Suspeitos"]);
+  });
+});
+
+describe("várias fotos por cartão", () => {
+  it("a capa vem primeiro e as extras seguem a ordem", () => {
+    expect(todasAsFotos({ foto: "a", fotos: ["b", "c"] })).toEqual(["a", "b", "c"]);
+    expect(todasAsFotos({ foto: null, fotos: [] })).toEqual([]);
+  });
+
+  it("a primeira foto posta vira capa e o limite é de 6 no total", () => {
+    expect(comAsFotos({ foto: null, fotos: [] }, ["a", "b"])).toEqual({ foto: "a", fotos: ["b"] });
+    const cheio = comAsFotos({ foto: "a", fotos: ["b", "c", "d"] }, ["e", "f", "g", "h"]);
+    expect(todasAsFotos(cheio)).toHaveLength(FOTOS_MAXIMAS);
+    expect(todasAsFotos(cheio)).toEqual(["a", "b", "c", "d", "e", "f"]);
+  });
+
+  it("tirar a capa promove a próxima; tirar a última deixa o cartão sem foto", () => {
+    expect(semAFoto({ foto: "a", fotos: ["b", "c"] }, "a")).toEqual({ foto: "b", fotos: ["c"] });
+    expect(semAFoto({ foto: "a", fotos: ["b"] }, "b")).toEqual({ foto: "a", fotos: [] });
+    expect(semAFoto({ foto: "a", fotos: [] }, "a")).toEqual({ foto: null, fotos: [] });
+  });
+
+  it("linha de antes da migration (sem a coluna) lê como lista vazia", () => {
+    expect(normalizarCartao({ id: "x", room_code: "s", foto: "a" })?.fotos).toEqual([]);
+    expect(normalizarCartao({ id: "x", room_code: "s", fotos: ["a", 3, ""] })?.fotos).toEqual(["a"]);
   });
 });
