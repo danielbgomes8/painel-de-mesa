@@ -1839,6 +1839,21 @@ body:has(.telao) {
 .telao-proximos li + li {
   color: var(--dim);
 }
+/* Link de sala que ninguém usa ainda (pareceSalaNova): quase sempre um
+   ?sala= digitado errado. Tem que ser lido do outro lado da mesa. */
+.telao-sala-nova {
+  margin: 24px 0 0;
+  max-width: 32ch;
+  font-size: clamp(18px, 3vw, 28px);
+  line-height: 1.35;
+  color: var(--accent);
+}
+.telao-sala-nova-codigo {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.6em;
+  color: var(--dim);
+}
 /* Só aparece quando o navegador não segura a tela acesa (useTelaAcesa). */
 .telao-aviso {
   margin: 12px 0 0;
