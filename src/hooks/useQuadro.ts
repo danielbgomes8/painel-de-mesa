@@ -49,7 +49,8 @@ export type Quadro = {
   destaque: Cartao | null;
   dispensarDestaque: () => void;
   urlDaFoto: (c: Cartao) => string | null;
-  criar: (novo: NovoCartao, foto?: File | null) => Promise<ResultadoCartao>;
+  /** `fotos`: até `FOTOS_MAXIMAS`; a primeira vira a capa. Se alguma falhar, nada é criado. */
+  criar: (novo: NovoCartao, fotos?: File[]) => Promise<ResultadoCartao>;
   /** Escreve só as colunas pedidas: nunca a linha inteira. */
   atualizar: (id: string, mudanca: Mudanca) => Promise<boolean>;
   /** Todas as fotos do cartão (capa primeiro), já como endereço. */
@@ -258,18 +259,22 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
   }, []);
 
   const criar = useCallback<Quadro["criar"]>(
-    async (novo, foto) => {
+    async (novo, fotos = []) => {
       if (ref.current.length >= CARTOES_MAXIMOS) {
         setAviso(AVISO_LIMITE);
         return { ok: false, erro: AVISO_LIMITE };
       }
       const id = crypto.randomUUID();
-      let caminho: string | null = null;
-      if (foto) {
-        const r = await subirFoto(id, foto);
-        if ("erro" in r) return { ok: false, erro: r.erro };
-        caminho = r.caminho;
+      const caminhos: string[] = [];
+      for (const arquivo of fotos.slice(0, FOTOS_MAXIMAS)) {
+        const r = await subirFoto(id, arquivo);
+        if ("erro" in r) {
+          if (caminhos.length) await supabase.storage.from(BUCKET).remove(caminhos);
+          return { ok: false, erro: r.erro };
+        }
+        caminhos.push(r.caminho);
       }
+      const extras = comAsFotos({ foto: null, fotos: [] }, caminhos);
       const linha = {
         id,
         room_code: codigo,
@@ -281,13 +286,13 @@ export function useQuadro(codigo: string, quem: Identidade | null): Quadro {
         revelacao: novo.revelacao ?? "escondido",
         dono: novo.dono,
         coluna: novo.coluna ?? "",
-        foto: caminho,
+        ...extras,
       };
       const { data, error } = await supabase.from("quadro_cartoes").insert(linha).select().single();
       const criado = error ? null : normalizarCartao(data);
       if (error || !criado) {
         if (error) relatarErro("criarCartao", error);
-        if (caminho) await supabase.storage.from(BUCKET).remove([caminho]);
+        if (caminhos.length) await supabase.storage.from(BUCKET).remove(caminhos);
         return { ok: false, erro: "Não deu pra criar o cartão. Confira a conexão e tente de novo." };
       }
       setCartoes((atual) => (atual.some((c) => c.id === criado.id) ? atual : [...atual, criado]));
