@@ -712,6 +712,9 @@ body:has(.desfazerbarra) .proximoturno {
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--surface);
+}
 .initrow .nbtn {
   background: transparent;
   border: 1px dashed var(--accent);
@@ -740,9 +743,6 @@ body:has(.desfazerbarra) .proximoturno {
 .editini-linha select {
   flex: 1;
   min-height: 32px;
-}
-  border-radius: 9px;
-  background: var(--surface);
 }
 .initajuste input.num {
   /* 84px cortava o "quanto?" por 1px na fonte mono (medido a 375px). */
