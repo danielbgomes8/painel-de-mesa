@@ -299,3 +299,18 @@ describe("parede em curva (traço livre)", () => {
     expect(ultimoDesenho([])).toEqual([]);
   });
 });
+
+describe("a última parede (desfazer)", () => {
+  it("a ainda não confirmada (hora vazia) é a mais nova", () => {
+    const velha = parede({ id: "velha", created_at: "2026-10-20T10:00:00Z" });
+    const nova = parede({ id: "nova", created_at: "" });
+    expect(ultimaParede([velha, nova])?.id).toBe("nova");
+    expect(ultimaParede([nova, velha])?.id).toBe("nova");
+  });
+  it("entre as confirmadas vale a data", () => {
+    const a = parede({ id: "a", created_at: "2026-10-20T10:00:00Z" });
+    const b = parede({ id: "b", created_at: "2026-10-20T11:00:00Z" });
+    expect(ultimaParede([b, a])?.id).toBe("b");
+    expect(ultimaParede([])).toBeNull();
+  });
+});

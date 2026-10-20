@@ -207,3 +207,34 @@ describe("o mapa escuro: o que está à vista E iluminado", () => {
     expect(contarCelulas(m)).toBe(um + dois);
   });
 });
+
+describe("peão em cima de uma parede (um 2×2 fica no cruzamento da grade)", () => {
+  const fundo: Segmento = [0, 100, 200, 100]; // a parede passa pelo centro do peão
+  it("enxerga dos dois lados, em vez de ficar às cegas", () => {
+    const poli = poligonoDeVisao([100, 100], [fundo], 150);
+    expect(veEm(poli, 100, 60)).toBe(true);
+    expect(veEm(poli, 100, 140)).toBe(true);
+  });
+  it("as OUTRAS paredes continuam segurando a vista", () => {
+    const poli = poligonoDeVisao([100, 100], [fundo, [100, 140, 140, 140]], 150);
+    expect(veEm(poli, 120, 120)).toBe(true);
+    expect(veEm(poli, 120, 160)).toBe(false); // atrás da parede de baixo
+  });
+  it("a folga é de meio pixel: parede um pouco mais longe ainda bloqueia", () => {
+    const poli = poligonoDeVisao([100, 100], [[0, 102, 200, 102]], 150);
+    expect(veEm(poli, 100, 140)).toBe(false);
+  });
+});
+
+describe("texto da memória torto", () => {
+  it("não aceita um 'lado' que não é número", () => {
+    const cena = { grade_ligada: false, grade_px: 50, largura: 320, altura: 320 };
+    const m = criarMascara(cena);
+    m.celulas[0] = 1;
+    const bom = codificarMascara(m);
+    expect(decodificarMascara(bom, cena)).not.toBeNull();
+    const [cabeca, corpo] = bom.split(":");
+    const [cols, rows] = cabeca.split("x");
+    expect(decodificarMascara(`${cols}x${rows}xabc:${corpo}`, cena)).toBeNull();
+  });
+});

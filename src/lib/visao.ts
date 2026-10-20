@@ -20,6 +20,8 @@ export type Segmento = readonly [x1: number, y1: number, x2: number, y2: number]
 /** Pontos do círculo do alcance entre uma ponta de parede e outra. */
 const PONTOS_DO_CIRCULO = 96;
 const FOLGA_DO_RAIO = 0.0003;
+/** Peão a menos que isso (px da imagem) de uma parede está "em cima" dela (mesma folga de `FRESTA_PX`, em paredes.ts). */
+const ORIGEM_NA_PAREDE_PX = 0.5;
 
 /** Onde o raio `origem + t·(dx, dy)` (t ≥ 0) encontra o segmento; Infinity se não encontra. */
 function distanciaAteSegmento(ox: number, oy: number, dx: number, dy: number, s: Segmento): number {
@@ -45,8 +47,13 @@ export function distanciaAoSegmento(px: number, py: number, s: Segmento): number
  *  Sem paredes por perto, sai o círculo do alcance. */
 export function poligonoDeVisao(origem: Ponto, segmentos: readonly Segmento[], alcance: number): Ponto[] {
   const [ox, oy] = origem;
-  // Só as paredes que o alcance toca: com alcance curto, poupa muita conta.
-  const perto = segmentos.filter((s) => distanciaAoSegmento(ox, oy, s) <= alcance);
+  // Só as paredes que o alcance toca: com alcance curto, poupa muita conta. A parede em cima da qual o peão
+  // está (um 2×2 fica no cruzamento da grade, onde as paredes passam) não conta: todo raio bateria nela a
+  // distância 0 e o peão não enxergaria nada. As outras paredes seguem segurando a vista.
+  const perto = segmentos.filter((s) => {
+    const d = distanciaAoSegmento(ox, oy, s);
+    return d > ORIGEM_NA_PAREDE_PX && d <= alcance;
+  });
   const angulos: number[] = [];
   for (const s of perto) {
     for (const [x, y] of [[s[0], s[1]], [s[2], s[3]]] as const) {
@@ -215,7 +222,8 @@ export function decodificarMascara(texto: string, cena: Pick<Cena, "grade_ligada
   const corte = texto.indexOf(":");
   if (corte < 0) return null;
   const [cols, rows, lado] = texto.slice(0, corte).split("x").map(Number);
-  if (cols !== esperada.cols || rows !== esperada.rows || Math.abs(lado - Math.round(esperada.lado * 100) / 100) > 0.01) return null;
+  // `!(x <= 0.01)` e não `x > 0.01`: um "lado" que não é número dá NaN, e NaN > 0.01 é falso (aceitava o texto torto).
+  if (cols !== esperada.cols || rows !== esperada.rows || !(Math.abs(lado - Math.round(esperada.lado * 100) / 100) <= 0.01)) return null;
   let binario: string;
   try {
     binario = atob(texto.slice(corte + 1));
