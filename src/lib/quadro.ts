@@ -207,6 +207,14 @@ export function comColunasVazias(colunas: ColunaDoQuadro[], vazias: string[]): C
   return ordem.map((v) => porValor.get(v)!).filter(Boolean);
 }
 
+/** Das colunas criadas neste aparelho, só as que NENHUM cartão usa. Uma coluna que já
+ *  recebeu cartões é uma coluna de verdade: com um filtro de tipo ligado ela some se os
+ *  cartões dela são de outro tipo, em vez de voltar como uma coluna vazia "0". */
+export function vaziasDeVerdade(vistos: CartaoVisto[], vazias: string[]): string[] {
+  const usadas = new Set(vistos.map((v) => v.cartao.coluna.trim().toLowerCase()));
+  return vazias.filter((v) => !usadas.has(v.trim().toLowerCase()));
+}
+
 /** Nomes de coluna já usados nos cartões (sem repetir, sem vazio). */
 export function colunasEmUso(vistos: CartaoVisto[]): string[] {
   return ordenarColunas([...new Set(vistos.map((v) => v.cartao.coluna.trim()).filter(Boolean))]);
