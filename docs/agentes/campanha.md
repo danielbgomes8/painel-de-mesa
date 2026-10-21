@@ -33,6 +33,16 @@
   difícil de chutar.
 ## Quadro da Campanha (02/10/2026, migrations `0024` e `0025`, rodadas)
 
+> **Onde mora cada peça (dividido em 21/10/2026, PR #31, só mover código).** `QuadroCampanha.tsx`
+> (445 linhas) tem a tela principal, as três vistas e o `DestaqueDoCartao`. O resto saiu em:
+> `MiniaturaDoCartao.tsx`, `FolhaDoCartao.tsx` (com sessões, ligações, anotações, controles do
+> Mestre e a galeria de fotos), `FolhaDeLigacao.tsx`, `FormNovoCartao.tsx`,
+> `hooks/useArrastosDoQuadro.ts` (arrastar ligação e coluna, rolagem pela borda) e
+> `apoioDoQuadro.ts` (`ROTULO_REVELACAO` e `tituloVisto`, usados por mais de uma peça).
+> Quem vê o quê continua TODO em `visaoDoCartao` (`lib/quadro.ts`). Conferido com
+> `e2e/quadro.e2e.ts` e `e2e/vazamento.e2e.ts`.
+
+
 O Daniel achava o diário sem utilidade e pediu algo "como o Trello": o Mestre põe NPCs e vilões
 com foto, e decide o que os jogadores veem. A aba **Diário virou Campanha**: `AbaCampanha.tsx` tem
 dois botões, **🗂 Quadro** (novo) e **📖 Sessões** (o `DiarioCampanha` de antes, intacto). O id interno

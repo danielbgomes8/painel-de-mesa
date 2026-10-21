@@ -394,6 +394,27 @@ concorrência — foi fechada em 18/09/2026 com a migration `0015`: mesma trava
 de versão do combate, os dois agora passam por `gravarSeVersaoBater` em
 `useSala.ts`.)
 
+### Onde mora cada pedaço do `useSala` (dividido em 21/10/2026, PRs #29 e #30)
+
+O hook tinha 2004 linhas. Foi **só mover código** (nenhum comportamento mudou); hoje
+tem ~1600, e o que não depende do estado do hook mora ao lado, em `src/hooks/`:
+
+- `salaTipos.ts` — os tipos `Sala`, `SalaInteira`, `LinhaCombate`, `LinhaBastiao`,
+  `ResultadoDesfazer`. O `useSala.ts` reexporta, então `import ... from "@/hooks/useSala"` segue valendo.
+- `salaBanco.ts` — constantes e funções soltas: `gravarSeVersaoBater` (a trava de versão),
+  `lerTudoDaTabela`, `linhaDePersonagem`, `ordenar`, `comoCombate`, os prefixos do storage.
+- `salaFila.ts` — `gravarOperacaoDaFila`: manda UMA operação da fila sem internet pro banco
+  (o `sincronizar`, que anda pela fila e mexe na tela, continua no hook).
+- `salaDesfazer.ts` — `desfazerAcao`: os 4 passos do desfazer. Recebe `atual: () => ref.current`
+  (função, **não uma cópia**: o passo 3 lê o estado depois de esperar o banco).
+
+Ficou no hook, de propósito: o `sincronizar`, o carregamento/tempo real e todas as mutações.
+Dividi-las pede passar muitas referências internas; não compensa. O `useSala.test.ts` cobre o
+conjunto, e o desfazer ganhou dois testes em 21/10/2026 (a linha de log que ele escreve e a
+guarda da ordem de iniciativa dentro do laço de versão, que só dispara quando o aviso de tempo
+real ainda não chegou). Conferido plantando defeito: sem a linha de log, ou sem a guarda,
+o teste quebra.
+
 **Fichas de Sigha, Mordecai, Massaranduba e Mistery Grey ficam como estão**
 (decisão do Daniel em 06/10/2026: não vai preencher). Atributos 10, então o botão
 "pôr todos na ordem" rola d20+0 pra eles. Não cobrar de novo.
