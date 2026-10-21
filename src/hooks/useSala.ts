@@ -39,7 +39,6 @@ import {
   type EntradaDiario,
   type EstadoCombate,
   type InstalacaoBastiao,
-  type ItemIniciativa,
   type LinhaLog,
   type LinhaLogBastiao,
   type ModeloNpc,
@@ -50,289 +49,26 @@ import {
   type Personagem,
 } from "@/lib/tipos";
 
-const TAMANHO_LOG = 40;
-
-/** Quantas linhas por página ao ler uma tabela INTEIRA (backup). O PostgREST
- *  corta a resposta num teto próprio, então log de mesa antiga sairia pela
- *  metade sem paginar — e backup pela metade é pior que backup nenhum. */
-const PAGINA_EXPORTACAO = 1000;
-
-// Tentativas de uma escrita com versão antes de desistir e avisar (ver
-// migrations 0010 e 0015) — mais que suficiente pra qualquer contenção real
-// numa mesa de RPG; existe só pra não tentar pra sempre num cenário
-// patológico.
-const MAX_TENTATIVAS_VERSAO = 5;
-
-const BASTIAO_VAZIO: Bastiao = { room_code: "", turno: 1, tesouro_po: 0, defensores: 0, notes: "" };
-
-/** A linha de `combat_state` como está no banco (o robô do esquema confere as colunas). */
-export type LinhaCombate = {
-  room_code: string;
-  round: number;
-  turn: number;
-  order_json: ItemIniciativa[] | null;
-  version: number;
-  /** Preenchida pelo banco (gatilho da migration 0001); o app não lê. */
-  updated_at: string;
-};
-
-/** A linha de `bastiao` no banco: o que a tela usa, mais o contador de versão
- *  (que é detalhe de escrita e por isso fica fora do tipo `Bastiao`). */
-export type LinhaBastiao = Bastiao & { version: number };
-
-type ResultadoVersao<L> =
-  | { tipo: "gravou"; linha: L }
-  | { tipo: "conflito"; linha: L }
-  // `causa`: o erro inteiro do banco (com o código), pro relato de erro.
-  | { tipo: "erro"; mensagem: string; rede: boolean; causa: unknown };
-
-/** A sala inteira lida do banco na hora (não o que está na tela): o log vai
- *  completo, não só as últimas linhas. É o que vira arquivo de backup. */
-export type SalaInteira = {
-  personagens: Personagem[];
-  combate: EstadoCombate;
-  notasMestre: string;
-  modelosNpc: ModeloNpc[];
-  log: LinhaLog[];
-  diario: EntradaDiario[];
-  bastiao: Bastiao;
-  instalacoesBastiao: InstalacaoBastiao[];
-  logBastiao: LinhaLogBastiao[];
-  encontros: Encontro[];
-};
-
-export type Sala = {
-  carregando: boolean;
-  conectado: boolean;
-  erro: string | null;
-  /** Aviso curto e não-bloqueante de que a ÚLTIMA escrita falhou (a tela já
-   *  reverteu pro valor anterior). Diferente de `erro`, que é fatal e troca a
-   *  tela inteira. Fica até a próxima falha ou até `limparAvisoFalha()`. */
-  avisoFalha: string | null;
-  limparAvisoFalha: () => void;
-  /** Sem internet: o combate continua e as mudanças esperam numa fila neste
-   *  aparelho (ver lib/offline.ts). */
-  semInternet: boolean;
-  /** Quantas mudanças esperam conexão pra ir pro banco. */
-  esperando: number;
-  /** Abriu sem internet: hora da foto guardada que está na tela. null = a
-   *  tela veio do banco. */
-  fotoDe: string | null;
-  personagens: Personagem[];
-  combate: EstadoCombate;
-  notasMestre: string;
-  log: LinhaLog[];
-  modelosNpc: ModeloNpc[];
-  diario: EntradaDiario[];
-  bastiao: Bastiao;
-  instalacoesBastiao: InstalacaoBastiao[];
-  logBastiao: LinhaLogBastiao[];
-  encontros: Encontro[];
-  criarPersonagem: (dados: NovoPersonagem) => Promise<Personagem | null>;
-  /** Cria várias fichas numa escrita só — ou todas, ou nenhuma. É o que o
-   *  "começar encontro" usa: metade dos goblins criada e a outra metade não
-   *  deixaria o Mestre caçando quem faltou no meio da luta. null quando falha
-   *  (já avisa na tela). */
-  criarVariosPersonagens: (dados: NovoPersonagem[]) => Promise<Personagem[] | null>;
-  atualizarPersonagem: (id: string, patch: Partial<Personagem>) => Promise<void>;
-  /** Escrita das listas da ficha (inventário, magias, moedas) com trava de versão (migration 0032):
-   *  `fazer` recebe a ficha como está AGORA e devolve o patch, ou null se o que a pessoa tocou já
-   *  não existe mais ("mudou"). Se outro aparelho mexeu nas listas no meio tempo, relê a ficha e
-   *  chama `fazer` de novo em cima dela, em vez de gravar por cima. */
-  alterarListasDoPersonagem: (
-    id: string,
-    fazer: (atual: Personagem) => Partial<Personagem> | null,
-  ) => Promise<"ok" | "mudou" | "erro">;
-  /** Igual a atualizarPersonagem, só que pra vários de uma vez em uma única
-   *  escrita (Ações em Massa) — usado quando o patch de cada um pode ter um
-   *  formato diferente (ex.: cura zera dss/dsf só de quem estava caído).
-   *  Devolve false quando a escrita falha (e já reverteu o estado local) —
-   *  quem chama não deve logar o que não aconteceu. */
-  atualizarVariosPersonagens: (alvos: { id: string; patch: Partial<Personagem> }[]) => Promise<boolean>;
-  removerPersonagem: (id: string) => Promise<void>;
-  /** Aceita um patch pronto ou uma função (atual) => patch, resolvida contra o
-   *  estado mais recente conhecido — evite montar o patch a partir do
-   *  `combate` de fora depois de um `await`, pode já estar velho. Devolve o
-   *  estado de antes (o que a escrita que pegou usou de base) e o de depois —
-   *  o par que o desfazer precisa. null quando a escrita falha (e já reverteu
-   *  o estado local). */
-  definirCombate: (
-    patch: Partial<EstadoCombate> | ((atual: EstadoCombate) => Partial<EstadoCombate>),
-  ) => Promise<MudancaCombate | null>;
-  definirNotasMestre: (texto: string) => Promise<void>;
-  registrarLog: (texto: string) => Promise<void>;
-  /** Igual a registrarLog, várias linhas numa só escrita. */
-  registrarVariosLogs: (textos: string[]) => Promise<void>;
-  /** Devolve false quando a escrita falha, pra tela não confirmar o que não aconteceu. */
-  criarModeloNpc: (dados: NovoModeloNpc) => Promise<boolean>;
-  atualizarModeloNpc: (id: string, patch: Partial<ModeloNpc>) => Promise<void>;
-  removerModeloNpc: (id: string) => Promise<void>;
-  criarEntradaDiario: (dados: NovaEntradaDiario) => Promise<void>;
-  atualizarEntradaDiario: (id: string, patch: Partial<EntradaDiario>) => Promise<void>;
-  removerEntradaDiario: (id: string) => Promise<void>;
-  /** Devolve null quando a escrita falha (e já reverteu o estado local),
-   *  pra quem chama não anunciar um avanço que não aconteceu de verdade. */
-  definirBastiao: (patch: Partial<Bastiao> | ((atual: Bastiao) => Partial<Bastiao>)) => Promise<Bastiao | null>;
-  criarInstalacaoBastiao: (dados: NovaInstalacaoBastiao) => Promise<void>;
-  atualizarInstalacaoBastiao: (id: string, patch: Partial<InstalacaoBastiao>) => Promise<void>;
-  removerInstalacaoBastiao: (id: string) => Promise<void>;
-  registrarLogBastiao: (texto: string) => Promise<void>;
-  /** Devolve o encontro criado, ou null quando a escrita falha. */
-  criarEncontro: (nome: string) => Promise<Encontro | null>;
-  atualizarEncontro: (id: string, patch: Partial<Pick<Encontro, "name" | "grupos" | "eventos">>) => Promise<void>;
-  removerEncontro: (id: string) => Promise<void>;
-  /** Relê a sala inteira do banco agora (o mesmo que acontece quando o app
-   *  volta pra tela). Serve pra quem precisa comparar com o banco de verdade
-   *  e não com o que sobrou na memória — o tempo real, por exemplo, não
-   *  entrega apagamentos feitos em outro aparelho. */
-  recarregarSala: () => void;
-  /** A ação mais nova DESTE aparelho que dá pra desfazer (null = nenhuma). */
-  desfazivel: AcaoDesfazivel | null;
-  /** Guarda uma ação feita agora pra poder desfazer (ver lib/desfazer.ts).
-   *  Chamar só depois que a escrita confirmou. Ação que não mudou nada é
-   *  ignorada. */
-  lembrarDesfazer: (acao: NovaAcaoDesfazivel) => void;
-  /** Desfaz a ação mais nova, se nada do que ela mexeu mudou depois. */
-  desfazer: () => Promise<ResultadoDesfazer>;
-  /** Esvazia a pilha — quem trocou de identidade no aparelho não desfaz o
-   *  que a pessoa anterior fez. */
-  esquecerDesfazer: () => void;
-  /** Lê a sala inteira do banco pro arquivo de backup. null quando falha. */
-  exportarSala: () => Promise<SalaInteira | null>;
-  /** Apaga o conteúdo da sala e põe o do arquivo no lugar. Devolve a frase do
-   *  erro quando não deu — a tela precisa dizer o que aconteceu, não só que
-   *  "falhou". */
-  restaurarBackup: (backup: Backup) => Promise<{ ok: boolean; erro?: string }>;
-};
-
-/** Lê uma tabela da sala INTEIRA, em páginas, da mais antiga pra mais nova. */
-async function lerTudoDaTabela(
-  tabela: string,
-  codigo: string,
-): Promise<{ dados: Record<string, unknown>[]; erro: string | null }> {
-  const tudo: Record<string, unknown>[] = [];
-  for (let inicio = 0; ; inicio += PAGINA_EXPORTACAO) {
-    const { data, error } = await supabase
-      .from(tabela)
-      .select("*")
-      .eq("room_code", codigo)
-      .order("created_at", { ascending: true })
-      .range(inicio, inicio + PAGINA_EXPORTACAO - 1);
-    if (error) return { dados: [], erro: `${tabela}: ${error.message}` };
-    const pagina = (data ?? []) as Record<string, unknown>[];
-    tudo.push(...pagina);
-    if (pagina.length < PAGINA_EXPORTACAO) return { dados: tudo, erro: null };
-  }
-}
-
-/** Quebra uma lista em pedaços — insert de log de campanha inteira numa
- *  requisição só passaria do tamanho que o PostgREST aceita. */
-function pedacos<T>(lista: T[], tamanho: number): T[][] {
-  const saida: T[][] = [];
-  for (let i = 0; i < lista.length; i += tamanho) saida.push(lista.slice(i, i + tamanho));
-  return saida;
-}
-
-/**
- * UPDATE que só pega se `version` ainda for a que este cliente leu — o
- * controle de concorrência otimista das migrations 0010 (combate) e 0015
- * (Bastião). Uma instrução atômica no Postgres decide quem ganha: quem chegou
- * primeiro grava e incrementa a versão, quem chegou depois afeta zero linhas.
- *
- * "conflito" não é falha: vem com a linha de verdade que está no banco agora,
- * pra quem chamou refazer o cálculo em cima dela e tentar de novo. Relê
- * direto do banco de propósito — não dá pra confiar que o tempo real já
- * entregou a notícia a tempo.
- */
-async function gravarSeVersaoBater<L extends { version: number }>(
-  tabela: string,
-  codigo: string,
-  versao: number,
-  colunas: Record<string, unknown>,
-): Promise<ResultadoVersao<L>> {
-  const { data, error } = await supabase
-    .from(tabela)
-    .update({ ...colunas, version: versao + 1 })
-    .eq("room_code", codigo)
-    .eq("version", versao)
-    .select()
-    .maybeSingle();
-  if (error) return { tipo: "erro", mensagem: error.message, rede: ehFalhaDeRede(error), causa: error };
-  if (data) return { tipo: "gravou", linha: data as L };
-
-  const releitura = await supabase.from(tabela).select("*").eq("room_code", codigo).maybeSingle();
-  if (releitura.error)
-    return { tipo: "erro", mensagem: releitura.error.message, rede: ehFalhaDeRede(releitura.error), causa: releitura.error };
-  if (!releitura.data) {
-    const mensagem = `${tabela}: linha da sala sumiu`;
-    return { tipo: "erro", mensagem, rede: false, causa: mensagem };
-  }
-  return { tipo: "conflito", linha: releitura.data as L };
-}
-
-/** A linha de `characters` pra um personagem novo — um lugar só pros padrões,
- *  usado por quem cria um e por quem cria vários de uma vez. */
-function linhaDePersonagem(codigo: string, slug: string, dados: NovoPersonagem) {
-  return {
-    room_code: codigo,
-    slug,
-    name: dados.name,
-    cls: dados.cls ?? "",
-    ac: dados.ac ?? 12,
-    init_mod: dados.init_mod ?? 0,
-    speed: dados.speed ?? 9,
-    hp: dados.hp ?? 10,
-    hp_max: dados.hp_max ?? 10,
-    ataque: dados.ataque ?? "",
-    is_npc: dados.is_npc ?? false,
-    notes: dados.notes ?? "",
-    // Só se vierem: coluna nova não pode quebrar a criação de ninguém antes da migration 0031 rodar.
-    ...(dados.dono ? { dono: dados.dono } : {}),
-    ...(dados.revealed !== undefined ? { revealed: dados.revealed } : {}),
-  };
-}
-
-/** players primeiro, depois NPCs; dentro de cada grupo, por ordem de criação. */
-function ordenar(lista: Personagem[]): Personagem[] {
-  return [...lista].sort((a, b) => {
-    if (a.is_npc !== b.is_npc) return a.is_npc ? 1 : -1;
-    return a.created_at.localeCompare(b.created_at);
-  });
-}
-
-function comoCombate(linha: LinhaCombate | null): EstadoCombate {
-  if (!linha) return COMBATE_VAZIO;
-  return {
-    round: linha.round ?? 1,
-    turn: linha.turn ?? 0,
-    order: Array.isArray(linha.order_json) ? linha.order_json : [],
-  };
-}
-
-const MSG_SEM_CONFIG =
-  "Supabase não configurado. Crie o arquivo .env.local com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY (veja o README).";
-
-const AVISO_FALHA_ESCRITA = "Não salvou — confira a conexão e tente de novo.";
-
-/** Chave da pilha de desfazer no sessionStorage (+ código da sala). */
-const PREFIXO_PILHA_DESFAZER = "mesa-desfazer:";
-
-/** Sem internet (ver lib/offline.ts): fila de mudanças e foto da sala, no
- *  localStorage (+ código da sala) — sobrevivem ao app fechar. */
-const PREFIXO_FILA_OFFLINE = "mesa-fila:";
-const PREFIXO_FOTO_SALA = "mesa-foto:";
-
-/** De quanto em quanto tempo, sem internet, tenta mandar a fila de novo
- *  (além de quando o aparelho avisa que a conexão voltou). */
-const INTERVALO_TENTATIVA_MS = 10_000;
-
-function novoId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-export type ResultadoDesfazer =
-  | { ok: true; rotulo: string }
-  | { ok: false; motivo: string };
+export type { LinhaCombate, LinhaBastiao, SalaInteira, Sala, ResultadoDesfazer } from "./salaTipos";
+import type { LinhaCombate, LinhaBastiao, SalaInteira, Sala, ResultadoDesfazer } from "./salaTipos";
+import {
+  AVISO_FALHA_ESCRITA,
+  BASTIAO_VAZIO,
+  INTERVALO_TENTATIVA_MS,
+  MAX_TENTATIVAS_VERSAO,
+  MSG_SEM_CONFIG,
+  PREFIXO_FILA_OFFLINE,
+  PREFIXO_FOTO_SALA,
+  PREFIXO_PILHA_DESFAZER,
+  TAMANHO_LOG,
+  comoCombate,
+  gravarSeVersaoBater,
+  lerTudoDaTabela,
+  linhaDePersonagem,
+  novoId,
+  ordenar,
+  pedacos,
+} from "./salaBanco";
 
 export function useSala(codigo: string): Sala {
   const [carregando, setCarregando] = useState(supabaseConfigurado);
