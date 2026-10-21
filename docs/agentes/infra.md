@@ -215,7 +215,7 @@ primeiros itens; os outros estão na lista do fim desta seção.
    — consultas em cadeia, chaves únicas/23505, tempo real filtrado por sala, e o
    mesmo erro de queda de rede do supabase-js), com `happy-dom` +
    `@testing-library/react` (só nesse arquivo: `// @vitest-environment happy-dom`;
-   o resto continua em `node`; o `vitest.config.ts` ganhou o `@/` do tsconfig).
+   o resto continua em `node`; o `vitest.config.mts` ganhou o `@/` do tsconfig).
    Cobre o que o robô não alcança: abrir a sala, tempo real, dano que manda só a
    coluna que mudou (a nota de outro celular fica), corrida na ordem (o aviso que
    ainda não chegou — `comoOutroAparelho(..., { avisar: false })`), desfazer que
@@ -227,7 +227,7 @@ primeiros itens; os outros estão na lista do fim desta seção.
    número tem a segunda trava do próprio UPDATE, `camposConferiveis`; texto não.)
    **O Vercel roda o `verificar` com NODE_ENV=production**: em produção o React
    não tem `act` e o teste do hook quebrava SÓ lá (o 1º deploy dele falhou e a
-   trava segurou o site na versão anterior). O `vitest.config.ts` força
+   trava segurou o site na versão anterior). O `vitest.config.mts` força
    `env: { NODE_ENV: "test" }`. Pra simular o Vercel aqui:
    `NODE_ENV=production CI=1 VERCEL=1 bash -c "npm run verificar && npm run build"`.
 5. ~~Trava no apagar sala~~ — feito em 01/10/2026 (`0020`, rodada e conferida).
