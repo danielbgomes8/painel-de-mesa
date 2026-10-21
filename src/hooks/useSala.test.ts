@@ -199,6 +199,39 @@ describe("useSala: desfazer", () => {
     expect(ordemNoBanco()).toEqual(["tiberio"]);
   });
 
+  it("escreve no log a frase do desfazer quando volta", async () => {
+    ficha("tiberio", "Tibério Vaz", { hp: 20, hp_max: 20 });
+    const { result } = await abrir();
+    const p = result.current.personagens[0];
+    await act(async () => {
+      await result.current.atualizarVariosPersonagens([{ id: p.id, patch: { hp: 12 } }]);
+      result.current.lembrarDesfazer({ rotulo: "Tibério sofreu 8", textoLog: "Desfeito: Tibério sofreu 8", personagens: [mudancaDe(p, { hp: 12 })], combate: null, criados: [] });
+    });
+    await act(async () => {
+      await result.current.desfazer();
+    });
+    await waitFor(() => expect(bd.linhas("combat_log").map((l) => l.text)).toContain("Desfeito: Tibério sofreu 8"));
+  });
+
+  it("não atropela a ordem que outro aparelho mudou ANTES de o aviso chegar (a trava de versão acusa o conflito)", async () => {
+    const { result } = await abrir();
+    await act(async () => {
+      const feito = await result.current.definirCombate({ order: [{ slug: "tiberio", name: "Tibério Vaz", init: 15 }] });
+      result.current.lembrarDesfazer({ rotulo: "Tibério entrou", textoLog: null, personagens: [], combate: feito, criados: [], });
+    });
+    // Outro aparelho vira a rodada, mas o aviso de tempo real NÃO chega aqui:
+    // a tela ainda acha que a ordem é a que a ação deixou.
+    const versao = bd.linhas("combat_state")[0].version as number;
+    bd.comoOutroAparelho("combat_state", daSala, { round: 2, version: versao + 1 }, { avisar: false });
+    let r: Awaited<ReturnType<typeof result.current.desfazer>> | undefined;
+    await act(async () => {
+      r = await result.current.desfazer();
+    });
+    expect(r).toEqual({ ok: false, motivo: "a ordem de iniciativa mudou depois disso" });
+    expect(bd.linhas("combat_state")[0]).toMatchObject({ round: 2 });
+    expect(ordemNoBanco()).toEqual(["tiberio"]);
+  });
+
   it("devolve o peão que saiu do mapa junto com o inimigo, no mesmo lugar", async () => {
     const goblin = { slug: "goblin", name: "Goblin", init: 12 };
     bd.semear("combat_state", [{ room_code: SALA, order_json: [goblin], version: 3 }]);
