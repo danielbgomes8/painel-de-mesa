@@ -498,6 +498,13 @@ button:focus-visible {
   cursor: pointer;
   color: var(--muted);
   padding: 6px 0;
+  /* Piso de toque (medido a 375px em 22/10/2026: estava com 31px e sem touch-action). */
+  min-height: 32px;
+  touch-action: manipulation;
+}
+.condguia summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .condguia .condexplica {
   margin-top: 6px;
