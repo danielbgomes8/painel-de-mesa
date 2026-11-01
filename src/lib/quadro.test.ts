@@ -277,7 +277,7 @@ describe("anotações", () => {
     const a = { ...nota("ana"), id: "a", created_at: "2" };
     const b = { ...nota("beto"), id: "b", created_at: "1" };
     expect(notasDoCartao("c1", [a, b, { ...b, cartao_id: "outro" }]).map((n) => n.id)).toEqual(["b", "a"]);
-    expect(normalizarNota({ id: "a", cartao_id: "c", autor: "ana", texto: "x".repeat(400) })?.texto).toHaveLength(300);
+    expect(normalizarNota({ id: "a", cartao_id: "c", autor: "ana", texto: "x".repeat(6000) })?.texto).toHaveLength(5000);
     expect(normalizarNota({ id: "a", cartao_id: "c" })).toBeNull();
   });
 });

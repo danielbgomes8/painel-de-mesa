@@ -54,7 +54,7 @@ export type NovoCartao = Pick<Cartao, "tipo" | "titulo" | "dono"> & Partial<Pick
 
 export const LIMITE_TITULO = 80;
 export const LIMITE_SUBTITULO = 80;
-export const LIMITE_TEXTO = 1500;
+export const LIMITE_TEXTO = 20000;
 export const LIMITE_COLUNA = 30;
 /** Por sala. Cada cartão com foto é uma imagem baixada em cada celular. */
 export const CARTOES_MAXIMOS = 200;
@@ -297,7 +297,7 @@ export function ligacaoJaExiste(ligacoes: Ligacao[], de: string, para: string, r
 
 export type NotaDoCartao = { id: string; room_code: string; cartao_id: string; autor: string; texto: string; created_at: string };
 
-export const LIMITE_NOTA = 300;
+export const LIMITE_NOTA = 5000;
 /** `autor` de quem é o Mestre (os jogadores usam o slug da ficha). */
 export const AUTOR_MESTRE = "mestre";
 
