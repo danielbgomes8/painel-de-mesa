@@ -49,6 +49,7 @@ import { DestaqueDoCartao } from "@/components/QuadroCampanha";
 import { PainelBastiao } from "@/components/PainelBastiao";
 import { GuardaDeArmadilhas, PainelMapa } from "@/components/MapaSobDemanda";
 import { Telao } from "@/components/Telao";
+import { QrDoTelao } from "@/components/QrDoTelao";
 import { BASTIAO_ATIVO, BarraAbas, type Aba } from "@/components/BarraAbas";
 import { EscolherCampanha } from "@/components/EscolherCampanha";
 import { BarraDesfazer } from "@/components/BarraDesfazer";
@@ -165,6 +166,7 @@ function PainelSala({ codigo }: { codigo: string }) {
   // aba arrastada pra TV. O link leva a sala, então abre a campanha certa em qualquer lugar.
   const [telaoAberto, setTelaoAberto] = useState(false);
   const [linkCopiado, setLinkCopiado] = useState<"" | "sim" | "nao">("");
+  const [qrAberto, setQrAberto] = useState(false);
   function linkDoTelao() {
     const params = new URLSearchParams(window.location.search);
     params.set("sala", codigo);
@@ -373,6 +375,14 @@ function PainelSala({ codigo }: { codigo: string }) {
             <button className="linkbtn" type="button" onClick={abrirTelao}>
               ↗ abrir em aba nova
             </button>
+            <button
+              className="linkbtn"
+              type="button"
+              aria-expanded={qrAberto}
+              onClick={() => setQrAberto((v) => !v)}
+            >
+              ▦ {qrAberto ? "esconder QR" : "mostrar QR"}
+            </button>
             <span aria-live="polite">
               {linkCopiado === "sim"
                 ? "Link copiado."
@@ -381,6 +391,7 @@ function PainelSala({ codigo }: { codigo: string }) {
                   : ""}
             </span>
           </div>
+          {qrAberto && <QrDoTelao link={linkDoTelao()} />}
           <p className="bkpexplica" style={{ wordBreak: "break-all" }}>
             {linkDoTelao()}
           </p>
