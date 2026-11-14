@@ -357,14 +357,14 @@ function PainelSala({ codigo }: { codigo: string }) {
         />
       </div>
 
-      {souMestre && telaoAberto && (
+      {telaoAberto && (
         <section className="combat" aria-label="Modo telão">
           <div className="combat-head">
             <h2>📺 Modo telão</h2>
           </div>
           <p className="bkpexplica">
             O telão é uma tela só pra mesa olhar: de quem é a vez, os próximos e o mapa. Ele
-            não ocupa este painel e não tem controle nenhum — tudo o que você faz aqui aparece lá
+            não ocupa este painel e não tem controle nenhum — tudo o que acontece aqui aparece lá
             na hora. O ideal é abrir num <b>outro aparelho</b> (TV, tablet, notebook): copie o link e
             abra lá. Com um aparelho só, abra em aba nova e arraste a aba pra TV ou projetor.
           </p>

@@ -67,15 +67,13 @@ export function MenuDoTopo({
           <p className="menutopo-quem">
             Entrou como <b>{quem}</b>
           </p>
+          <button type="button" role="menuitem" aria-expanded={telaoAberto} onClick={() => escolher(aoTelao)}>
+            📺 Modo telão
+          </button>
           {souMestre && (
-            <>
-              <button type="button" role="menuitem" aria-expanded={telaoAberto} onClick={() => escolher(aoTelao)}>
-                📺 Modo telão
-              </button>
-              <button type="button" role="menuitem" disabled={baixandoBackup} onClick={() => escolher(aoBackup)}>
-                {baixandoBackup ? "⬇ Juntando…" : "⬇ Backup"}
-              </button>
-            </>
+            <button type="button" role="menuitem" disabled={baixandoBackup} onClick={() => escolher(aoBackup)}>
+              {baixandoBackup ? "⬇ Juntando…" : "⬇ Backup"}
+            </button>
           )}
           <button type="button" role="menuitem" aria-expanded={trocandoCampanha} onClick={() => escolher(aoTrocarCampanha)}>
             ⇄ Trocar campanha
