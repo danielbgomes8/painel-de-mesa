@@ -444,6 +444,10 @@ Mestre: **o app nunca revela nada sozinho**.
   uma coluna à direita (`--telao-lado`, 230–340px) com o nome grande, PV, condições e "a seguir"; **em pé** vira uma faixa fina
   (~70px) embaixo. Nada fica por cima do mapa. Os relógios fixos se afastam da coluna. O botão de recolher o card some
   (a coluna já é fina). Só CSS, em globals.css logo depois do `@media (max-width: 640px)` do card.
+- **Mudou em 14/11/2026: faixa embaixo também deitado.** O Daniel olhou o telão com mapa num tablet deitado e achou a coluna
+  vazia demais (o conteúdo usava ~200 dos 768px de altura, e ela tirava ~24% da largura do mapa). Agora o card é uma faixa fina
+  embaixo nas duas orientações; deitado, a letra segue a ALTURA da tela (`vh`), pra faixa não engordar. `--telao-lado` deixou
+  de existir e os relógios voltaram ao canto. **Não voltar à coluna sem perguntar.**
 
 - **Cartão do peão (19/10/2026):** o bloco "Condições" é um `<details>` recolhível (`condicoesRecolhiveis` em `AcoesNaLinha`),
   **fechado por padrão**, com as condições ativas no título ("Condições  Cego · Surdo"), pra o cartão não comer o mapa no
