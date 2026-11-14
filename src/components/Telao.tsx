@@ -112,7 +112,7 @@ export function Telao({
         <div className="telao-mapa">
           <VisorDaMesa cena={cenas.naMesa} codigo={codigo} urlDaImagem={cenas.urlDaImagem} sala={sala} telao />
         </div>
-        {/* O mapa é o principal: a vez fica num card discreto por cima, nunca numa faixa que rouba altura. */}
+        {/* O mapa é o principal: a vez é uma faixa fina embaixo dele, em pé e deitado (globals.css, "Disposição do telão com mapa"). */}
         <section className={`telao-card${cardRecolhido ? " telao-card--recolhido" : ""}`} aria-label="Vez">
           <button
             type="button"
